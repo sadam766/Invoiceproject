@@ -337,3 +337,37 @@ export const salesListData: SalesListItem[] = [
     paidDate: '2024-05-25',
   },
 ];
+
+export type SpdData = {
+    tanggal: string;
+    sales: string;
+    customer: string;
+    spd: string;
+    noInvoice: string;
+    tanggalInvoice: string;
+    tglTerimaCustomer: string;
+    tglJatuhTempo: string;
+    totalPiutang: number;
+    keterangan: string;
+    noKuitansi: string;
+    noFakturPajak: string;
+    suratJalan: string;
+};
+  
+export const spdData: SpdData[] = [
+    {
+        tanggal: '2024-05-20',
+        sales: 'Budi',
+        customer: 'CV. Maju Jaya',
+        spd: 'PS/1-J/KEU/2024/DK',
+        noInvoice: 'INV/2024/002',
+        tanggalInvoice: '2024-05-13',
+        tglTerimaCustomer: '-',
+        tglJatuhTempo: '-',
+        totalPiutang: 1500000,
+        keterangan: '-',
+        noKuitansi: '-',
+        noFakturPajak: '-',
+        suratJalan: '-',
+    }
+];
