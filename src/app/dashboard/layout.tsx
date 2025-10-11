@@ -111,27 +111,27 @@ export default function DashboardLayout({
                 <SidebarMenuSub>
                   <Link href="/dashboard/invoices" passHref>
                     <SidebarMenuSubButton asChild isActive={pathname === '/dashboard/invoices'}>
-                      Invoice List
+                      <span>Invoice List</span>
                     </SidebarMenuSubButton>
                   </Link>
                   <Link href="/dashboard/invoices/add" passHref>
                     <SidebarMenuSubButton asChild isActive={pathname === '/dashboard/invoices/add'}>
-                     Add Invoice
+                     <span>Add Invoice</span>
                     </SidebarMenuSubButton>
                   </Link>
                   <Link href="/dashboard/invoices/number" passHref>
                     <SidebarMenuSubButton asChild isActive={pathname === '/dashboard/invoices/number'}>
-                      Invoice Number
+                      <span>Invoice Number</span>
                     </SidebarMenuSubButton>
                   </Link>
                    <Link href="/dashboard/invoices/spd" passHref>
                     <SidebarMenuSubButton asChild isActive={pathname === '/dashboard/invoices/spd'}>
-                        SPD
+                        <span>SPD</span>
                     </SidebarMenuSubButton>
                   </Link>
                   <Link href="/dashboard/invoices/tax" passHref>
                     <SidebarMenuSubButton asChild isActive={pathname === '/dashboard/invoices/tax'}>
-                      Tax Invoices
+                      <span>Tax Invoices</span>
                     </SidebarMenuSubButton>
                   </Link>
                 </SidebarMenuSub>
