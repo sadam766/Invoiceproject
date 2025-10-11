@@ -220,3 +220,35 @@ export const taxInvoiceData: TaxInvoice[] = [
         taxPeriod: 5,
     }
 ];
+
+export type ProductListItem = {
+    name: string;
+    category: string;
+    quantity: number;
+    unit: string;
+    price: number;
+};
+
+export const productListData: ProductListItem[] = [
+    {
+        name: 'Kabel Fiber Optik',
+        category: 'Kabel',
+        quantity: 100,
+        unit: 'meter',
+        price: 15000,
+    },
+    {
+        name: 'Konektor RJ45',
+        category: 'Aksesoris',
+        quantity: 500,
+        unit: 'pcs',
+        price: 2500,
+    },
+    {
+        name: 'Kabel Tembaga 2.5mm',
+        category: 'Kabel',
+        quantity: 15,
+        unit: 'meter',
+        price: 7500,
+    }
+];
