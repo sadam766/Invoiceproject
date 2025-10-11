@@ -1,0 +1,115 @@
+/**
+ * @fileoverview Firestore Security Rules for the Sales Dashboard application.
+ *
+ * Core Philosophy:
+ * This ruleset enforces a strict user-ownership model for customer-related data (customers and their sales).
+ * Global entities (products, sales overviews, and top products) are publicly readable but not writable without further rules.
+ *
+ * Data Structure:
+ * - /customers/{customerId}: Stores customer profiles; customerId is the Firebase auth UID.
+ * - /customers/{customerId}/sales/{saleId}: Stores sales records for a customer.
+ * - /products/{productId}: Stores product information (publicly readable).
+ * - /salesOverview/{salesOverviewId}: Stores sales overview data (publicly readable).
+ * - /topProducts/{topProductId}: Stores top product data (publicly readable).
+ *
+ * Key Security Decisions:
+ * - Customers can only access their own profiles and sales data.
+ * - Listing all customers is not allowed.
+ * - Public read access is granted to the products, salesOverview, and topProducts collections.
+ * - Schema validation is relaxed for rapid prototyping but authorization checks are strictly enforced.
+ */
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    /**
+     * @description Protects the /customers collection.  Allows a user to create their own customer document, but restricts reads and writes to only the owner.
+     * @path /customers/{customerId}
+     * @allow (create) - User with UID 'user_abc' can create a customer document with ID 'user_abc'.
+     * @deny (create) - User with UID 'user_abc' cannot create a customer document with ID 'user_xyz'.
+     * @allow (get, list, update, delete) - Only the owner can read, update, or delete their customer document.
+     * @deny (get, list, update, delete) - Other users cannot read, update, or delete this customer document.
+     * @principle Enforces document ownership for reads and writes.
+     */
+    match /customers/{customerId} {
+      // Helper function to check if the request is made by the owner of the document.
+      function isOwner(userId) {
+        return request.auth != null && request.auth.uid == userId;
+      }
+
+      // Helper function to check if the request is made by the existing owner of the document.
+      function isExistingOwner(userId) {
+        return isOwner(userId) && resource != null;
+      }
+
+      allow get: if isOwner(customerId);
+      allow list: if false; // Listing customers is disallowed.
+      allow create: if isOwner(customerId) && request.resource.data.id == customerId;
+      allow update: if isExistingOwner(customerId) && request.resource.data.id == resource.data.id;
+      allow delete: if isExistingOwner(customerId);
+    }
+
+    /**
+     * @description Protects the /customers/{customerId}/sales collection.  Allows a customer to manage their own sales records.
+     * @path /customers/{customerId}/sales/{saleId}
+     * @allow (create) - Customer 'user_abc' can create a sale record under their customer document.
+     * @deny (create) - Customer 'user_abc' cannot create a sale record under customer 'user_xyz'.
+     * @allow (get, list, update, delete) - Only the customer can read, update, or delete their own sales records.
+     * @deny (get, list, update, delete) - Other customers cannot access these sales records.
+     * @principle Enforces path-based ownership for sales data.
+     */
+    match /customers/{customerId}/sales/{saleId} {
+      // Helper function to check if the request is made by the owner of the customer document.
+      function isOwner(customerId) {
+        return request.auth != null && request.auth.uid == customerId;
+      }
+
+      // Helper function to check if the request is made by the existing owner of the customer document.
+      function isExistingOwner(customerId) {
+        return isOwner(customerId) && resource != null;
+      }
+
+      allow get: if isOwner(customerId);
+      allow list: if isOwner(customerId);
+      allow create: if isOwner(customerId) && request.resource.data.customerId == customerId;
+      allow update: if isExistingOwner(customerId) && request.resource.data.customerId == customerId;
+      allow delete: if isExistingOwner(customerId);
+    }
+
+    /**
+     * @description Allows public read access to the /products collection, but restricts write access.
+     * @path /products/{productId}
+     * @allow (get, list) - Any user can read product information.
+     * @deny (create, update, delete) - No one can create, update, or delete product information in this prototype.
+     * @principle Allows public read access with restricted writes.
+     */
+    match /products/{productId} {
+      allow get, list: if true;
+      allow create, update, delete: if false;
+    }
+
+    /**
+     * @description Allows public read access to the /salesOverview collection, but restricts write access.
+     * @path /salesOverview/{salesOverviewId}
+     * @allow (get, list) - Any user can read sales overview information.
+     * @deny (create, update, delete) - No one can create, update, or delete sales overview information in this prototype.
+     * @principle Allows public read access with restricted writes.
+     */
+    match /salesOverview/{salesOverviewId} {
+      allow get, list: if true;
+      allow create, update, delete: if false;
+    }
+
+    /**
+     * @description Allows public read access to the /topProducts collection, but restricts write access.
+     * @path /topProducts/{topProductId}
+     * @allow (get, list) - Any user can read top product information.
+     * @deny (create, update, delete) - No one can create, update, or delete top product information in this prototype.
+     * @principle Allows public read access with restricted writes.
+     */
+    match /topProducts/{topProductId} {
+      allow get, list: if true;
+      allow create, update, delete: if false;
+    }
+  }
+}

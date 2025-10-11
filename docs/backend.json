@@ -1,0 +1,257 @@
+{
+  "entities": {
+    "Sale": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Sale",
+      "type": "object",
+      "description": "Represents a sales transaction.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the sale."
+        },
+        "customerId": {
+          "type": "string",
+          "description": "Reference to Customer. (Relationship: Customer 1:N Sale)"
+        },
+        "date": {
+          "type": "string",
+          "description": "The date of the sale.",
+          "format": "date-time"
+        },
+        "amount": {
+          "type": "number",
+          "description": "The total amount of the sale."
+        },
+        "status": {
+          "type": "string",
+          "description": "The status of the sale (e.g., 'completed', 'pending', 'cancelled')."
+        },
+        "invoiceId": {
+          "type": "string",
+          "description": "The invoice ID associated with the sale."
+        }
+      },
+      "required": [
+        "id",
+        "customerId",
+        "date",
+        "amount",
+        "status",
+        "invoiceId"
+      ]
+    },
+    "Customer": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Customer",
+      "type": "object",
+      "description": "Represents a customer.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the customer."
+        },
+        "name": {
+          "type": "string",
+          "description": "The name of the customer."
+        },
+        "email": {
+          "type": "string",
+          "description": "The email address of the customer.",
+          "format": "email"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "email"
+      ]
+    },
+    "Product": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Product",
+      "type": "object",
+      "description": "Represents a product.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the product."
+        },
+        "name": {
+          "type": "string",
+          "description": "The name of the product."
+        },
+        "description": {
+          "type": "string",
+          "description": "A description of the product."
+        },
+        "price": {
+          "type": "number",
+          "description": "The price of the product."
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "description",
+        "price"
+      ]
+    },
+    "SalesOverview": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "SalesOverview",
+      "type": "object",
+      "description": "Represents an overview of sales data for a specific time period.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the sales overview entry."
+        },
+        "date": {
+          "type": "string",
+          "description": "The date for which the sales data is recorded.",
+          "format": "date-time"
+        },
+        "revenue": {
+          "type": "number",
+          "description": "The total revenue for the specified date."
+        },
+        "sales": {
+          "type": "number",
+          "description": "The number of sales for the specified date."
+        }
+      },
+      "required": [
+        "id",
+        "date",
+        "revenue",
+        "sales"
+      ]
+    },
+    "TopProduct": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "TopProduct",
+      "type": "object",
+      "description": "Represents a top-selling product with its sales figures.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the top product entry."
+        },
+        "productId": {
+          "type": "string",
+          "description": "Reference to Product. (Relationship: Product 1:N TopProduct)"
+        },
+        "salesFigure": {
+          "type": "number",
+          "description": "The total sales figure for the product."
+        },
+        "quantitySold": {
+          "type": "number",
+          "description": "The total quantity sold of the product."
+        }
+      },
+      "required": [
+        "id",
+        "productId",
+        "salesFigure",
+        "quantitySold"
+      ]
+    }
+  },
+  "auth": {
+    "providers": [
+      "password",
+      "anonymous"
+    ]
+  },
+  "firestore": {
+    "structure": [
+      {
+        "path": "/customers/{customerId}",
+        "definition": {
+          "entityName": "Customer",
+          "schema": {
+            "$ref": "#/backend/entities/Customer"
+          },
+          "description": "Stores customer information. Used as the root for customer-specific data.",
+          "params": [
+            {
+              "name": "customerId",
+              "description": "Unique identifier for the customer."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/customers/{customerId}/sales/{saleId}",
+        "definition": {
+          "entityName": "Sale",
+          "schema": {
+            "$ref": "#/backend/entities/Sale"
+          },
+          "description": "Stores sales transactions associated with a customer. Path-based ownership.",
+          "params": [
+            {
+              "name": "customerId",
+              "description": "Unique identifier for the customer."
+            },
+            {
+              "name": "saleId",
+              "description": "Unique identifier for the sale."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/products/{productId}",
+        "definition": {
+          "entityName": "Product",
+          "schema": {
+            "$ref": "#/backend/entities/Product"
+          },
+          "description": "Stores product information.",
+          "params": [
+            {
+              "name": "productId",
+              "description": "Unique identifier for the product."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/salesOverview/{salesOverviewId}",
+        "definition": {
+          "entityName": "SalesOverview",
+          "schema": {
+            "$ref": "#/backend/entities/SalesOverview"
+          },
+          "description": "Stores an overview of sales data for a specific time period.",
+          "params": [
+            {
+              "name": "salesOverviewId",
+              "description": "Unique identifier for the sales overview entry."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/topProducts/{topProductId}",
+        "definition": {
+          "entityName": "TopProduct",
+          "schema": {
+            "$ref": "#/backend/entities/TopProduct"
+          },
+          "description": "Stores top-selling product information.",
+          "params": [
+            {
+              "name": "topProductId",
+              "description": "Unique identifier for the top product entry."
+            }
+          ]
+        }
+      }
+    ],
+    "reasoning": "The Firestore structure is designed to support the Sales Dashboard application. The design emphasizes authorization independence and efficient querying. Customer and Product data are stored at the root level. Sales data is stored as a subcollection of the customer, enabling easy retrieval of sales for a specific customer. Sales overview and Top Product are also at the root level since they are global. This design enables efficient querying and reporting while maintaining data integrity.\n\nTo achieve **Authorization Independence**, the design uses path-based ownership for Sales. Each sale document is located under its respective customer document, granting the customer access to modify them. This avoids the need for complex `get()` calls in security rules.\n\nFor **QAPs (Rules are not Filters)**, the structure ensures that listing operations can be securely performed. The segregation of data into separate collections (customers, products, and sales) based on their security posture allows for efficient and secure listing."
+  }
+}
