@@ -15,6 +15,11 @@ import {
   SidebarMenuSubButton,
 } from '@/components/ui/sidebar';
 import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from '@/components/ui/collapsible';
+import {
   Avatar,
   AvatarFallback,
   AvatarImage,
@@ -45,10 +50,11 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import React, { useState } from 'react';
+import React from 'react';
 import { usePathname } from 'next/navigation';
 import Link from 'next/link';
 import { ThemeToggle } from '../components/theme-toggle';
+import { cn } from '@/lib/utils';
 
 export default function DashboardLayout({
   children,
@@ -56,17 +62,6 @@ export default function DashboardLayout({
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
-
-  const [openMenus, setOpenMenus] = useState({
-    invoices: pathname.startsWith('/dashboard/invoices'),
-    products: pathname.startsWith('/dashboard/products'),
-    customers: pathname.startsWith('/dashboard/customers'),
-    sales: pathname.startsWith('/dashboard/sales'),
-  });
-
-  const toggleMenu = (menu: keyof typeof openMenus) => {
-    setOpenMenus((prev) => ({ ...prev, [menu]: !prev[menu] }));
-  };
 
   return (
     <SidebarProvider>
@@ -97,46 +92,54 @@ export default function DashboardLayout({
                 </SidebarMenuButton>
               </Link>
             </SidebarMenuItem>
-            <SidebarMenuItem>
-              <SidebarMenuButton onClick={() => toggleMenu('invoices')}>
-                <FileText />
-                Invoices
-                <ChevronDown
-                  className={`ml-auto h-4 w-4 transition-transform ${
-                    openMenus.invoices ? 'rotate-180' : ''
-                  }`}
-                />
-              </SidebarMenuButton>
-              {openMenus.invoices && (
-                <SidebarMenuSub>
-                  <Link href="/dashboard/invoices" passHref>
-                    <SidebarMenuSubButton asChild isActive={pathname === '/dashboard/invoices'}>
-                      <span>Invoice List</span>
-                    </SidebarMenuSubButton>
-                  </Link>
-                  <Link href="/dashboard/invoices/add" passHref>
-                    <SidebarMenuSubButton asChild isActive={pathname === '/dashboard/invoices/add'}>
-                     <span>Add Invoice</span>
-                    </SidebarMenuSubButton>
-                  </Link>
-                  <Link href="/dashboard/invoices/number" passHref>
-                    <SidebarMenuSubButton asChild isActive={pathname === '/dashboard/invoices/number'}>
-                      <span>Invoice Number</span>
-                    </SidebarMenuSubButton>
-                  </Link>
-                   <Link href="/dashboard/invoices/spd" passHref>
-                    <SidebarMenuSubButton asChild isActive={pathname === '/dashboard/invoices/spd'}>
-                        <span>SPD</span>
-                    </SidebarMenuSubButton>
-                  </Link>
-                  <Link href="/dashboard/invoices/tax" passHref>
-                    <SidebarMenuSubButton asChild isActive={pathname === '/dashboard/invoices/tax'}>
-                      <span>Tax Invoices</span>
-                    </SidebarMenuSubButton>
-                  </Link>
-                </SidebarMenuSub>
-              )}
-            </SidebarMenuItem>
+            
+            <Collapsible asChild defaultOpen={pathname.startsWith('/dashboard/invoices')}>
+              <SidebarMenuItem>
+                <CollapsibleTrigger asChild>
+                    <SidebarMenuButton>
+                      <FileText />
+                      Invoices
+                      <div className="grow" />
+                      <ChevronDown
+                        className={cn(
+                          'h-4 w-4 transition-transform',
+                          'group-data-[state=open]:rotate-180'
+                        )}
+                      />
+                    </SidebarMenuButton>
+                </CollapsibleTrigger>
+                <CollapsibleContent asChild>
+                  <SidebarMenuSub>
+                    <Link href="/dashboard/invoices" passHref>
+                      <SidebarMenuSubButton isActive={pathname === '/dashboard/invoices'}>
+                        Invoice List
+                      </SidebarMenuSubButton>
+                    </Link>
+                    <Link href="/dashboard/invoices/add" passHref>
+                      <SidebarMenuSubButton isActive={pathname === '/dashboard/invoices/add'}>
+                       Add Invoice
+                      </SidebarMenuSubButton>
+                    </Link>
+                    <Link href="/dashboard/invoices/number" passHref>
+                      <SidebarMenuSubButton isActive={pathname === '/dashboard/invoices/number'}>
+                        Invoice Number
+                      </SidebarMenuSubButton>
+                    </Link>
+                     <Link href="/dashboard/invoices/spd" passHref>
+                      <SidebarMenuSubButton isActive={pathname === '/dashboard/invoices/spd'}>
+                          SPD
+                      </SidebarMenuSubButton>
+                    </Link>
+                    <Link href="/dashboard/invoices/tax" passHref>
+                      <SidebarMenuSubButton isActive={pathname === '/dashboard/invoices/tax'}>
+                        Tax Invoices
+                      </SidebarMenuSubButton>
+                    </Link>
+                  </SidebarMenuSub>
+                </CollapsibleContent>
+              </SidebarMenuItem>
+            </Collapsible>
+
             <SidebarMenuItem>
               <Link href="/dashboard/products" passHref>
                 <SidebarMenuButton isActive={pathname.startsWith('/dashboard/products')}>
