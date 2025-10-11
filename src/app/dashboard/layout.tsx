@@ -78,20 +78,26 @@ export default function DashboardLayout({
         <SidebarContent>
           <SidebarMenu>
             <SidebarMenuItem>
-              <Link href="/dashboard" passHref>
-                <SidebarMenuButton asChild isActive={pathname === '/dashboard'}>
+              <SidebarMenuButton
+                asChild
+                isActive={pathname === '/dashboard'}
+              >
+                <Link href="/dashboard">
                   <LayoutDashboard />
                   Dashboard
-                </SidebarMenuButton>
-              </Link>
+                </Link>
+              </SidebarMenuButton>
             </SidebarMenuItem>
             <SidebarMenuItem>
-              <Link href="/dashboard/monitoring" passHref>
-                <SidebarMenuButton asChild isActive={pathname === '/dashboard/monitoring'}>
+              <SidebarMenuButton
+                asChild
+                isActive={pathname === '/dashboard/monitoring'}
+              >
+                <Link href="/dashboard/monitoring">
                   <Eye />
                   Monitoring
-                </SidebarMenuButton>
-              </Link>
+                </Link>
+              </SidebarMenuButton>
             </SidebarMenuItem>
             
             <Collapsible asChild defaultOpen={pathname.startsWith('/dashboard/invoices')}>
@@ -112,39 +118,39 @@ export default function DashboardLayout({
                 <CollapsibleContent asChild>
                   <SidebarMenuSub>
                     <SidebarMenuSubItem>
-                      <Link href="/dashboard/invoices" passHref>
-                        <SidebarMenuSubButton asChild isActive={pathname === '/dashboard/invoices'}>
+                      <SidebarMenuSubButton asChild isActive={pathname === '/dashboard/invoices'}>
+                        <Link href="/dashboard/invoices">
                           Invoice List
-                        </SidebarMenuSubButton>
-                      </Link>
+                        </Link>
+                      </SidebarMenuSubButton>
                     </SidebarMenuSubItem>
                     <SidebarMenuSubItem>
-                      <Link href="/dashboard/invoices/add" passHref>
-                        <SidebarMenuSubButton asChild isActive={pathname === '/dashboard/invoices/add'}>
+                      <SidebarMenuSubButton asChild isActive={pathname === '/dashboard/invoices/add'}>
+                        <Link href="/dashboard/invoices/add">
                          Add Invoice
-                        </SidebarMenuSubButton>
-                      </Link>
+                        </Link>
+                      </SidebarMenuSubButton>
                     </SidebarMenuSubItem>
                     <SidebarMenuSubItem>
-                      <Link href="/dashboard/invoices/number" passHref>
-                        <SidebarMenuSubButton asChild isActive={pathname === '/dashboard/invoices/number'}>
+                      <SidebarMenuSubButton asChild isActive={pathname === '/dashboard/invoices/number'}>
+                        <Link href="/dashboard/invoices/number">
                           Invoice Number
-                        </SidebarMenuSubButton>
-                      </Link>
+                        </Link>
+                      </SidebarMenuSubButton>
                     </SidebarMenuSubItem>
                      <SidebarMenuSubItem>
-                      <Link href="/dashboard/invoices/spd" passHref>
-                        <SidebarMenuSubButton asChild isActive={pathname === '/dashboard/invoices/spd'}>
+                      <SidebarMenuSubButton asChild isActive={pathname === '/dashboard/invoices/spd'}>
+                        <Link href="/dashboard/invoices/spd">
                             SPD
-                        </SidebarMenuSubButton>
-                      </Link>
+                        </Link>
+                      </SidebarMenuSubButton>
                     </SidebarMenuSubItem>
                     <SidebarMenuSubItem>
-                      <Link href="/dashboard/invoices/tax" passHref>
-                        <SidebarMenuSubButton asChild isActive={pathname === '/dashboard/invoices/tax'}>
+                      <SidebarMenuSubButton asChild isActive={pathname === '/dashboard/invoices/tax'}>
+                        <Link href="/dashboard/invoices/tax">
                           Tax Invoices
-                        </SidebarMenuSubButton>
-                      </Link>
+                        </Link>
+                      </SidebarMenuSubButton>
                     </SidebarMenuSubItem>
                   </SidebarMenuSub>
                 </CollapsibleContent>
@@ -152,44 +158,44 @@ export default function DashboardLayout({
             </Collapsible>
 
             <SidebarMenuItem>
-              <Link href="/dashboard/products" passHref>
-                <SidebarMenuButton asChild isActive={pathname.startsWith('/dashboard/products')}>
+              <SidebarMenuButton asChild isActive={pathname.startsWith('/dashboard/products')}>
+                <Link href="/dashboard/products">
                   <Package />
                   Products
-                </SidebarMenuButton>
-              </Link>
+                </Link>
+              </SidebarMenuButton>
             </SidebarMenuItem>
             <SidebarMenuItem>
-              <Link href="/dashboard/sales-orders" passHref>
-                <SidebarMenuButton asChild isActive={pathname === '/dashboard/sales-orders'}>
+              <SidebarMenuButton asChild isActive={pathname === '/dashboard/sales-orders'}>
+                <Link href="/dashboard/sales-orders">
                   <ShoppingCart />
                   SalesOrders
-                </SidebarMenuButton>
-              </Link>
+                </Link>
+              </SidebarMenuButton>
             </SidebarMenuItem>
             <SidebarMenuItem>
-              <Link href="/dashboard/customers" passHref>
-                <SidebarMenuButton asChild isActive={pathname.startsWith('/dashboard/customers')}>
+              <SidebarMenuButton asChild isActive={pathname.startsWith('/dashboard/customers')}>
+                <Link href="/dashboard/customers">
                   <Users />
                   Customers
-                </SidebarMenuButton>
-              </Link>
+                </Link>
+              </SidebarMenuButton>
             </SidebarMenuItem>
              <SidebarMenuItem>
-                <Link href="/dashboard/sales" passHref>
-                    <SidebarMenuButton asChild isActive={pathname.startsWith('/dashboard/sales')}>
+                <SidebarMenuButton asChild isActive={pathname.startsWith('/dashboard/sales')}>
+                    <Link href="/dashboard/sales">
                         <ShoppingCart />
                         Sales
-                    </SidebarMenuButton>
-                </Link>
+                    </Link>
+                </SidebarMenuButton>
             </SidebarMenuItem>
              <SidebarMenuItem>
-                <Link href="/dashboard/sales-management" passHref>
-                    <SidebarMenuButton asChild isActive={pathname === '/dashboard/sales-management'}>
+                <SidebarMenuButton asChild isActive={pathname === '/dashboard/sales-management'}>
+                    <Link href="/dashboard/sales-management">
                         <BarChart />
                         Sales Management
-                    </SidebarMenuButton>
-                </Link>
+                    </Link>
+                </SidebarMenuButton>
             </SidebarMenuItem>
              <SidebarMenuItem>
               <SidebarMenuButton>
