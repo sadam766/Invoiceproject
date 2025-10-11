@@ -36,9 +36,6 @@ import {
   Bell,
   PanelLeft,
   Search,
-  File,
-  Sprout,
-  FileArchive,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
