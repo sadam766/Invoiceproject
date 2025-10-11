@@ -59,6 +59,9 @@ export default function DashboardLayout({
 
   const [openMenus, setOpenMenus] = useState({
     invoices: pathname.startsWith('/dashboard/invoices'),
+    products: pathname.startsWith('/dashboard/products'),
+    sales: pathname.startsWith('/dashboard/sales'),
+    customers: pathname.startsWith('/dashboard/customers'),
   });
 
   const toggleMenu = (menu: keyof typeof openMenus) => {
@@ -113,7 +116,7 @@ export default function DashboardLayout({
                   </Link>
                   <Link href="/dashboard/invoices/add" passHref>
                     <SidebarMenuSubButton asChild isActive={pathname === '/dashboard/invoices/add'}>
-                      Add Invoice
+                     Add Invoice
                     </SidebarMenuSubButton>
                   </Link>
                   <Link href="/dashboard/invoices/number" passHref>
