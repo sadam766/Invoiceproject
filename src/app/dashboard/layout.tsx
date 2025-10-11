@@ -112,7 +112,9 @@ export default function DashboardLayout({
                   <Link href="/dashboard/invoices" passHref>
                     <SidebarMenuSubButton isActive={pathname === '/dashboard/invoices'}>Invoice List</SidebarMenuSubButton>
                   </Link>
-                  <SidebarMenuSubButton>Add Invoice</SidebarMenuSubButton>
+                  <Link href="/dashboard/invoices/add" passHref>
+                    <SidebarMenuSubButton isActive={pathname === '/dashboard/invoices/add'}>Add Invoice</SidebarMenuSubButton>
+                  </Link>
                   <SidebarMenuSubButton>Invoice Number</SidebarMenuSubButton>
                   <SidebarMenuSubButton>SPD</SidebarMenuSubButton>
                   <SidebarMenuSubButton>Tax Invoices</SidebarMenuSubButton>
