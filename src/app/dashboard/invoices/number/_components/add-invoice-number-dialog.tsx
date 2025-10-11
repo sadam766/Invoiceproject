@@ -42,12 +42,16 @@ export function AddInvoiceNumberDialog() {
       setSuffix('');
       if (isAutoNumber) {
         setMainNumber('25000003');
+      } else {
+        setMainNumber('');
       }
     } else { // kw
       setPrefix('KW/');
       setSuffix(`/KEU/${currentYear}`);
       if (isAutoNumber) {
         setMainNumber('0001');
+      } else {
+        setMainNumber('');
       }
     }
   }, [invoiceType, isAutoNumber]);
@@ -88,11 +92,11 @@ export function AddInvoiceNumberDialog() {
               <Label htmlFor="auto-number" className="font-normal">Nomor Otomatis</Label>
             </div>
             <div className="grid grid-cols-[auto_1fr_auto] items-center gap-2">
-              <Input value={prefix} className="bg-muted" readOnly />
-              <Input value={mainNumber} onChange={handleMainNumberChange} />
+              <Input value={prefix} className="bg-muted text-right" readOnly />
+              <Input value={mainNumber} onChange={handleMainNumberChange} disabled={!isAutoNumber} />
               {suffix && <Input value={suffix} className="bg-muted" readOnly />}
             </div>
-            <Input id="full-invoice-number" value={fullInvoiceNumber} disabled className="bg-muted" />
+            <Input id="full-invoice-number" value={fullInvoiceNumber} disabled className="bg-muted font-semibold text-center" />
           </div>
            <div className="space-y-2">
             <Label htmlFor="sales-order">Sales Order / SO (Opsional)</Label>
