@@ -32,50 +32,68 @@ import {
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Payment Overview</h1>
         </div>
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
-            <Card className="lg:col-span-2 bg-blue-50/50 border-blue-200 shadow-sm">
+        <div className="grid gap-4 md:grid-cols-3 lg:grid-cols-5">
+            <Card className="lg:col-span-2 bg-blue-50/50 border-blue-200 shadow-sm relative overflow-hidden">
                 <CardHeader>
-                    <CardTitle className="text-sm font-medium">Total (Filtered)</CardTitle>
+                    <CardTitle className="text-sm font-medium text-blue-900/80">Total (Filtered)</CardTitle>
                 </CardHeader>
                 <CardContent>
-                    <div className="text-3xl font-bold">Rp {totalFiltered.toLocaleString('id-ID')},00</div>
-                    <div className="h-4 w-full bg-blue-200 rounded-full mt-2 relative overflow-hidden">
-                        <div className="absolute h-full bg-primary" style={{ width: '60%' }}></div>
-                    </div>
+                    <div className="text-3xl font-bold text-blue-950">Rp {totalFiltered.toLocaleString('id-ID')},00</div>
                 </CardContent>
+                <div className="absolute bottom-0 left-0 w-full h-12 bg-gradient-to-t from-blue-100 to-transparent">
+                   <div className="w-full h-full" style={{
+                       background: 'linear-gradient(180deg, rgba(255,255,255,0) 0%, rgba(167,207,255,0.2) 50%, rgba(132,189,255,0.4) 100%)',
+                       clipPath: 'polygon(0 80%, 30% 60%, 70% 85%, 100% 70%, 100% 100%, 0% 100%)'
+                   }}>
+                       <div className="w-full h-px bg-primary/50" style={{
+                           position: 'absolute',
+                           bottom: 'calc(20% + (85% - 70%) / 2)',
+                           clipPath: 'polygon(0 80%, 30% 60%, 70% 85%, 100% 70%)'
+                       }}></div>
+                   </div>
+                   <div className="absolute bottom-0 left-0 right-0 h-10 w-full" style={{
+                        backgroundImage: 'linear-gradient(to top, #DBEAFE, transparent)'
+                   }}></div>
+                   <svg width="100%" height="30" viewBox="0 0 200 20" preserveAspectRatio="none" className="absolute bottom-0 left-0">
+                       <path d="M 0 16 L 60 12 L 140 17 L 200 14" stroke="hsl(var(--primary))" strokeWidth="1.5" fill="none"></path>
+                   </svg>
+                </div>
             </Card>
-            <Card>
-                <CardHeader>
-                    <CardTitle className="text-sm font-medium">Paid</CardTitle>
-                </CardHeader>
-                <CardContent>
-                    <div className="text-2xl font-bold">Rp {totalPaid.toLocaleString('id-ID')},00</div>
-                </CardContent>
-            </Card>
-            <Card>
-                <CardHeader>
-                    <CardTitle className="text-sm font-medium">Unpaid</CardTitle>
-                </CardHeader>
-                <CardContent>
-                    <div className="text-2xl font-bold">Rp {totalUnpaid.toLocaleString('id-ID')},00</div>
-                </CardContent>
-            </Card>
-            <Card>
-                <CardHeader>
-                    <CardTitle className="text-sm font-medium">Pending / Draft</CardTitle>
-                </CardHeader>
-                <CardContent>
-                    <div className="text-2xl font-bold">Rp 0,00</div>
-                </CardContent>
-            </Card>
-            <Card>
-                 <CardHeader>
-                    <CardTitle className="text-sm font-medium">Overdue</CardTitle>
-                </CardHeader>
-                <CardContent>
-                    <div className="text-2xl font-bold">Rp 0,00</div>
-                </CardContent>
-            </Card>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:col-span-3 gap-4">
+                <Card>
+                    <CardHeader>
+                        <CardTitle className="text-sm font-medium">Paid</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                        <div className="text-2xl font-bold">Rp {totalPaid.toLocaleString('id-ID')},00</div>
+                    </CardContent>
+                </Card>
+                <Card>
+                    <CardHeader>
+                        <CardTitle className="text-sm font-medium">Unpaid</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                        <div className="text-2xl font-bold">Rp {totalUnpaid.toLocaleString('id-ID')},00</div>
+                    </CardContent>
+                </Card>
+                <Card>
+                    <CardHeader>
+                        <CardTitle className="text-sm font-medium">Pending / Draft</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                        <div className="text-2xl font-bold">Rp 0,00</div>
+                    </CardContent>
+                </Card>
+                <Card>
+                    <CardHeader>
+                        <CardTitle className="text-sm font-medium">Overdue</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                        <div className="text-2xl font-bold">Rp 0,00</div>
+                    </CardContent>
+                </Card>
+            </div>
         </div>
   
         <Card>
