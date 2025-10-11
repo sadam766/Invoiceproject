@@ -200,3 +200,23 @@ export const invoiceNumberData: InvoiceNumber[] = [
         amount: 1500000,
     }
 ]
+
+export type TaxInvoice = {
+    buyerNpwp: string;
+    buyerName: string;
+    transactionCode: string;
+    taxInvoiceNumber: string;
+    taxInvoiceDate: string;
+    taxPeriod: number;
+};
+
+export const taxInvoiceData: TaxInvoice[] = [
+    {
+        buyerNpwp: '01.234.567.8-901.234',
+        buyerName: 'PT. Sejahtera Abadi',
+        transactionCode: '01',
+        taxInvoiceNumber: '010.000-24.00000001',
+        taxInvoiceDate: '2024-05-11',
+        taxPeriod: 5,
+    }
+];

@@ -119,7 +119,9 @@ export default function DashboardLayout({
                     <SidebarMenuSubButton isActive={pathname === '/dashboard/invoices/number'}>Invoice Number</SidebarMenuSubButton>
                   </Link>
                   <SidebarMenuSubButton>SPD</SidebarMenuSubButton>
-                  <SidebarMenuSubButton>Tax Invoices</SidebarMenuSubButton>
+                  <Link href="/dashboard/invoices/tax" passHref>
+                    <SidebarMenuSubButton isActive={pathname === '/dashboard/invoices/tax'}>Tax Invoices</SidebarMenuSubButton>
+                  </Link>
                 </SidebarMenuSub>
               )}
             </SidebarMenuItem>
