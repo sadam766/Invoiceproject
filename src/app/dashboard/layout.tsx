@@ -62,12 +62,13 @@ export default function DashboardLayout({
   const [isInvoiceOpen, setInvoiceOpen] = React.useState(pathname.startsWith('/dashboard/invoices'));
   const [isProductsOpen, setProductsOpen] = React.useState(pathname.startsWith('/dashboard/products'));
   const [isSalesOpen, setSalesOpen] = React.useState(pathname.startsWith('/dashboard/sales'));
-  const [isCustomersOpen, setCustomersOpen] = React.useState(false);
+  const [isCustomersOpen, setCustomersOpen] = React.useState(pathname.startsWith('/dashboard/customers'));
 
   React.useEffect(() => {
     setInvoiceOpen(pathname.startsWith('/dashboard/invoices'));
     setProductsOpen(pathname.startsWith('/dashboard/products'));
     setSalesOpen(pathname.startsWith('/dashboard/sales'));
+    setCustomersOpen(pathname.startsWith('/dashboard/customers'));
   }, [pathname]);
 
   return (
@@ -170,7 +171,10 @@ export default function DashboardLayout({
               </SidebarMenuButton>
                {isCustomersOpen && (
                 <SidebarMenuSub>
-                  <SidebarMenuSubButton>Sales</SidebarMenuSubButton>
+                    <Link href="/dashboard/customers" passHref>
+                        <SidebarMenuSubButton isActive={pathname === '/dashboard/customers'}>Customer List</SidebarMenuSubButton>
+                    </Link>
+                  <SidebarMenuSubButton>Add Customer</SidebarMenuSubButton>
                 </SidebarMenuSub>
               )}
             </SidebarMenuItem>

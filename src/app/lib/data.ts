@@ -288,3 +288,22 @@ export const salesOrderListData: SalesOrder[] = [
         price: 7500,
     }
 ];
+
+export type Customer = {
+  name: string;
+  address: string;
+  spdAddress: string;
+};
+
+export const customerListData: Customer[] = [
+  {
+    name: 'PT. Sejahtera Abadi',
+    address: 'Jl. Jendral Sudirman No. 123, Jakarta',
+    spdAddress: 'Jl. Gatot Subroto No. 45, Jakarta',
+  },
+  {
+    name: 'CV. Maju Jaya',
+    address: 'Jl. Gajah Mada No. 10, Surabaya',
+    spdAddress: 'Jl. Gajah Mada No. 10, Surabaya',
+  },
+];
