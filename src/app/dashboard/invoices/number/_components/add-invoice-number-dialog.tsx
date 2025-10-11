@@ -26,34 +26,39 @@ import { format } from 'date-fns';
 
 export function AddInvoiceNumberDialog() {
   const [date, setDate] = useState<Date | undefined>(new Date(2025, 10, 10));
-  const [invoiceType, setInvoiceType] = useState<'sar' | 'kw'>('sar');
+  const [invoiceType, setInvoiceType] = useState<'sar' | 'kw'>('kw');
   const [isAutoNumber, setIsAutoNumber] = useState(true);
-  const [prefix, setPrefix] = useState('SAR/');
-  const [mainNumber, setMainNumber] = useState('25000003');
-  const [fullInvoiceNumber, setFullInvoiceNumber] = useState('SAR/25000003');
+  
+  const [prefix, setPrefix] = useState('');
+  const [mainNumber, setMainNumber] = useState('');
+  const [suffix, setSuffix] = useState('');
+  
+  const [fullInvoiceNumber, setFullInvoiceNumber] = useState('');
 
   useEffect(() => {
-    const newPrefix = invoiceType === 'sar' ? 'SAR/' : 'KW/';
-    setPrefix(newPrefix);
-    if (isAutoNumber) {
-      // Placeholder for auto-number generation logic
-      const newMainNumber = invoiceType === 'sar' ? '25000003' : '10000001';
-      setMainNumber(newMainNumber);
-      setFullInvoiceNumber(`${newPrefix}${newMainNumber}`);
-    } else {
-        setFullInvoiceNumber(`${newPrefix}${mainNumber}`);
+    const currentYear = new Date().getFullYear();
+    if (invoiceType === 'sar') {
+      setPrefix('SAR/');
+      setSuffix('');
+      if (isAutoNumber) {
+        setMainNumber('25000003');
+      }
+    } else { // kw
+      setPrefix('KW/');
+      setSuffix(`/KEU/${currentYear}`);
+      if (isAutoNumber) {
+        setMainNumber('0001');
+      }
     }
   }, [invoiceType, isAutoNumber]);
 
   useEffect(() => {
-    setFullInvoiceNumber(`${prefix}${mainNumber}`);
-  }, [prefix, mainNumber]);
+    setFullInvoiceNumber(`${prefix}${mainNumber}${suffix}`);
+  }, [prefix, mainNumber, suffix]);
 
 
   const handleMainNumberChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (!isAutoNumber) {
-        setMainNumber(e.target.value);
-    }
+    setMainNumber(e.target.value);
   }
 
 
@@ -81,10 +86,13 @@ export function AddInvoiceNumberDialog() {
             <div className="flex items-center space-x-2">
               <Checkbox id="auto-number" checked={isAutoNumber} onCheckedChange={(checked) => setIsAutoNumber(Boolean(checked))} />
               <Label htmlFor="auto-number" className="font-normal">Nomor Otomatis</Label>
-               <Input id="invoice-prefix" value={prefix} className="w-20" readOnly />
-              <Input id="invoice-main-number" value={mainNumber} readOnly={isAutoNumber} onChange={handleMainNumberChange} />
             </div>
-            <Input id="full-invoice-number" value={fullInvoiceNumber} disabled />
+            <div className="grid grid-cols-[auto_1fr_auto] items-center gap-2">
+              <Input value={prefix} className="bg-muted" readOnly />
+              <Input value={mainNumber} onChange={handleMainNumberChange} />
+              {suffix && <Input value={suffix} className="bg-muted" readOnly />}
+            </div>
+            <Input id="full-invoice-number" value={fullInvoiceNumber} disabled className="bg-muted" />
           </div>
            <div className="space-y-2">
             <Label htmlFor="sales-order">Sales Order / SO (Opsional)</Label>
