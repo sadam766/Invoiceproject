@@ -150,7 +150,9 @@ export default function DashboardLayout({
               {openMenus.products && (
                 <SidebarMenuSub>
                   <Link href="/dashboard/products" passHref>
-                    <SidebarMenuSubButton asChild isActive={pathname === '/dashboard/products'}><a>List Product</a></SidebarMenuSubButton>
+                    <SidebarMenuSubButton asChild isActive={pathname === '/dashboard/products'}>
+                      <a>List Product</a>
+                    </SidebarMenuSubButton>
                   </Link>
                 </SidebarMenuSub>
               )}
@@ -176,7 +178,9 @@ export default function DashboardLayout({
                {openMenus.customers && (
                 <SidebarMenuSub>
                     <Link href="/dashboard/customers" passHref>
-                        <SidebarMenuSubButton asChild isActive={pathname === '/dashboard/customers'}><a>Customer List</a></SidebarMenuSubButton>
+                        <SidebarMenuSubButton asChild isActive={pathname === '/dashboard/customers'}>
+                          <a>Customer List</a>
+                        </SidebarMenuSubButton>
                     </Link>
                 </SidebarMenuSub>
               )}
@@ -194,7 +198,9 @@ export default function DashboardLayout({
                {openMenus.sales && (
                 <SidebarMenuSub>
                   <Link href="/dashboard/sales" passHref>
-                    <SidebarMenuSubButton asChild isActive={pathname === '/dashboard/sales'}><a>Sales List</a></SidebarMenuSubButton>
+                    <SidebarMenuSubButton asChild isActive={pathname === '/dashboard/sales'}>
+                      <a>Sales List</a>
+                    </SidebarMenuSubButton>
                   </Link>
                 </SidebarMenuSub>
               )}
