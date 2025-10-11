@@ -113,17 +113,17 @@ export default function DashboardLayout({
               {openMenus.invoices && (
                 <SidebarMenuSub>
                   <Link href="/dashboard/invoices" passHref>
-                    <SidebarMenuSubButton asChild isActive={pathname === '/dashboard/invoices'}><a>Invoice List</a></SidebarMenuSubButton>
+                    <SidebarMenuSubButton asChild isActive={pathname === '/dashboard/invoices'}>Invoice List</SidebarMenuSubButton>
                   </Link>
                   <Link href="/dashboard/invoices/add" passHref>
-                    <SidebarMenuSubButton asChild isActive={pathname === '/dashboard/invoices/add'}><a>Add Invoice</a></SidebarMenuSubButton>
+                    <SidebarMenuSubButton asChild isActive={pathname === '/dashboard/invoices/add'}>Add Invoice</SidebarMenuSubButton>
                   </Link>
                   <Link href="/dashboard/invoices/number" passHref>
-                    <SidebarMenuSubButton asChild isActive={pathname === '/dashboard/invoices/number'}><a>Invoice Number</a></SidebarMenuSubButton>
+                    <SidebarMenuSubButton asChild isActive={pathname === '/dashboard/invoices/number'}>Invoice Number</SidebarMenuSubButton>
                   </Link>
                   <SidebarMenuSubButton>SPD</SidebarMenuSubButton>
                   <Link href="/dashboard/invoices/tax" passHref>
-                    <SidebarMenuSubButton asChild isActive={pathname === '/dashboard/invoices/tax'}><a>Tax Invoices</a></SidebarMenuSubButton>
+                    <SidebarMenuSubButton asChild isActive={pathname === '/dashboard/invoices/tax'}>Tax Invoices</SidebarMenuSubButton>
                   </Link>
                 </SidebarMenuSub>
               )}
@@ -141,7 +141,7 @@ export default function DashboardLayout({
               {openMenus.products && (
                 <SidebarMenuSub>
                   <Link href="/dashboard/products" passHref>
-                    <SidebarMenuSubButton asChild isActive={pathname === '/dashboard/products'}><a>List Product</a></SidebarMenuSubButton>
+                    <SidebarMenuSubButton asChild isActive={pathname === '/dashboard/products'}>List Product</SidebarMenuSubButton>
                   </Link>
                   <SidebarMenuSubButton>Add Product</SidebarMenuSubButton>
                 </SidebarMenuSub>
@@ -168,7 +168,7 @@ export default function DashboardLayout({
                {openMenus.customers && (
                 <SidebarMenuSub>
                     <Link href="/dashboard/customers" passHref>
-                        <SidebarMenuSubButton asChild isActive={pathname === '/dashboard/customers'}><a>Customer List</a></SidebarMenuSubButton>
+                        <SidebarMenuSubButton asChild isActive={pathname === '/dashboard/customers'}>Customer List</SidebarMenuSubButton>
                     </Link>
                   <SidebarMenuSubButton>Add Customer</SidebarMenuSubButton>
                 </SidebarMenuSub>
@@ -187,7 +187,7 @@ export default function DashboardLayout({
                {openMenus.sales && (
                 <SidebarMenuSub>
                   <Link href="/dashboard/sales" passHref>
-                    <SidebarMenuSubButton asChild isActive={pathname === '/dashboard/sales'}><a>Sales List</a></SidebarMenuSubButton>
+                    <SidebarMenuSubButton asChild isActive={pathname === '/dashboard/sales'}>Sales List</SidebarMenuSubButton>
                   </Link>
                   <SidebarMenuSubButton>Add Sale</SidebarMenuSubButton>
                 </SidebarMenuSub>
