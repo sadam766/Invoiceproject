@@ -1,6 +1,6 @@
 
 'use client';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -26,7 +26,36 @@ import { format } from 'date-fns';
 
 export function AddInvoiceNumberDialog() {
   const [date, setDate] = useState<Date | undefined>(new Date(2025, 10, 10));
-  const [isAuto, setIsAuto] = useState(true);
+  const [invoiceType, setInvoiceType] = useState<'sar' | 'kw'>('sar');
+  const [isAutoNumber, setIsAutoNumber] = useState(true);
+  const [prefix, setPrefix] = useState('SAR/');
+  const [mainNumber, setMainNumber] = useState('25000003');
+  const [fullInvoiceNumber, setFullInvoiceNumber] = useState('SAR/25000003');
+
+  useEffect(() => {
+    const newPrefix = invoiceType === 'sar' ? 'SAR/' : 'KW/';
+    setPrefix(newPrefix);
+    if (isAutoNumber) {
+      // Placeholder for auto-number generation logic
+      const newMainNumber = invoiceType === 'sar' ? '25000003' : '10000001';
+      setMainNumber(newMainNumber);
+      setFullInvoiceNumber(`${newPrefix}${newMainNumber}`);
+    } else {
+        setFullInvoiceNumber(`${newPrefix}${mainNumber}`);
+    }
+  }, [invoiceType, isAutoNumber]);
+
+  useEffect(() => {
+    setFullInvoiceNumber(`${prefix}${mainNumber}`);
+  }, [prefix, mainNumber]);
+
+
+  const handleMainNumberChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!isAutoNumber) {
+        setMainNumber(e.target.value);
+    }
+  }
+
 
   return (
     <Dialog>
@@ -43,19 +72,19 @@ export function AddInvoiceNumberDialog() {
           <div>
             <Label htmlFor="invoice-type">Tipe Faktur</Label>
             <div className="mt-2 grid grid-cols-2 gap-2 rounded-md bg-muted p-1">
-                <Button variant={isAuto ? 'default' : 'ghost'} onClick={() => setIsAuto(true)} className="h-8">SAR</Button>
-                <Button variant={!isAuto ? 'default' : 'ghost'} onClick={() => setIsAuto(false)} className="h-8">KW / Proforma</Button>
+                <Button variant={invoiceType === 'sar' ? 'default' : 'ghost'} onClick={() => setInvoiceType('sar')} className="h-8">SAR</Button>
+                <Button variant={invoiceType === 'kw' ? 'default' : 'ghost'} onClick={() => setInvoiceType('kw')} className="h-8">KW / Proforma</Button>
             </div>
           </div>
           <div className="space-y-2">
             <Label>Nomor Faktur</Label>
             <div className="flex items-center space-x-2">
-              <Checkbox id="auto-number" checked={isAuto} onCheckedChange={() => setIsAuto(!isAuto)} />
+              <Checkbox id="auto-number" checked={isAutoNumber} onCheckedChange={(checked) => setIsAutoNumber(Boolean(checked))} />
               <Label htmlFor="auto-number" className="font-normal">Nomor Otomatis</Label>
-               <Input id="invoice-prefix" value="SAR/" className="w-20" readOnly={!isAuto} />
-              <Input id="invoice-main-number" defaultValue="25000003" readOnly={!isAuto}/>
+               <Input id="invoice-prefix" value={prefix} className="w-20" readOnly />
+              <Input id="invoice-main-number" value={mainNumber} readOnly={isAutoNumber} onChange={handleMainNumberChange} />
             </div>
-            <Input id="full-invoice-number" value="SAR/25000003" disabled />
+            <Input id="full-invoice-number" value={fullInvoiceNumber} disabled />
           </div>
            <div className="space-y-2">
             <Label htmlFor="sales-order">Sales Order / SO (Opsional)</Label>
