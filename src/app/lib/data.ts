@@ -175,3 +175,28 @@ export const invoiceListData: Invoice[] = [
     spdNumber: 'PS/1-J/KEU/2024/DK',
   },
 ];
+
+export type InvoiceNumber = {
+  id: string;
+  customer: string;
+  salesOrder: string;
+  date: string;
+  amount: number;
+};
+
+export const invoiceNumberData: InvoiceNumber[] = [
+    {
+        id: 'SAR/25000001',
+        customer: 'PT. Sejahtera Abadi',
+        salesOrder: 'SO-2024-001',
+        date: '11/5/2024',
+        amount: 1000000,
+    },
+    {
+        id: 'SAR/25000002',
+        customer: 'CV. Maju Jaya',
+        salesOrder: 'SO-2024-002',
+        date: '13/5/2024',
+        amount: 1500000,
+    }
+]
