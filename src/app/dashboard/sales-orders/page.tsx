@@ -1,5 +1,6 @@
 
 'use client';
+import { useState } from 'react';
 import {
     Card,
     CardContent,
@@ -20,18 +21,20 @@ import {
     SelectValue,
   } from '@/components/ui/select';
   import { Input } from '@/components/ui/input';
-  import { Button } from '@/components/ui/button';
-  import { salesOrderListData } from '@/app/lib/data';
+  import { Button } from '@/componentsui/button';
+  import { salesOrderListData, type SalesOrder } from '@/app/lib/data';
   import { Search, Upload, Download } from 'lucide-react';
   import { DeleteConfirmationDialog } from '@/app/components/delete-confirmation-dialog';
   
   export default function SalesOrderListPage() {
+    const [orders, setOrders] = useState(salesOrderListData);
+
     const handleEdit = (soNumber: string, productName: string) => {
         alert(`Edit SO: ${soNumber}, Product: ${productName}`);
     };
 
     const handleDelete = (soNumber: string, productName: string) => {
-        alert(`Delete SO: ${soNumber}, Product: ${productName}`);
+        setOrders(orders.filter(o => !(o.soNumber === soNumber && o.productName === productName)));
     };
 
     return (
@@ -79,7 +82,7 @@ import {
                             </TableRow>
                         </TableHeader>
                         <TableBody>
-                            {salesOrderListData.map((order, index) => (
+                            {orders.map((order, index) => (
                                 <TableRow key={index}>
                                     <TableCell className="font-medium">{order.soNumber}</TableCell>
                                     <TableCell>{order.productName}</TableCell>
@@ -99,7 +102,7 @@ import {
                     </Table>
                 </div>
                 <div className="text-sm text-muted-foreground mt-4">
-                    Showing 1 to 3 of 3 entries
+                    Showing 1 to {orders.length} of {orders.length} entries
                 </div>
             </CardContent>
         </Card>

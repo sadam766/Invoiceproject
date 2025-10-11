@@ -1,5 +1,6 @@
 
 'use client';
+import { useState } from 'react';
 import {
     Card,
     CardContent,
@@ -14,19 +15,50 @@ import {
   } from '@/components/ui/table';
   import { Input } from '@/components/ui/input';
   import { Button } from '@/components/ui/button';
-  import { invoiceNumberData } from '@/app/lib/data';
+  import { invoiceNumberData, type InvoiceNumber } from '@/app/lib/data';
   import { Search, Upload, Download, Filter, Plus } from 'lucide-react';
   import { AddInvoiceNumberDialog } from './_components/add-invoice-number-dialog';
   import { DeleteConfirmationDialog } from '@/app/components/delete-confirmation-dialog';
   
   export default function InvoiceNumberPage() {
-    const handleEdit = (invoiceId: string) => {
-        alert(`Edit invoice number: ${invoiceId}`);
+    const [invoices, setInvoices] = useState(invoiceNumberData);
+    const [editingInvoice, setEditingInvoice] = useState<InvoiceNumber | undefined>(undefined);
+    const [isDialogOpen, setIsDialogOpen] = useState(false);
+
+    const handleAdd = () => {
+      setEditingInvoice(undefined);
+      setIsDialogOpen(true);
+    };
+
+    const handleEdit = (invoice: InvoiceNumber) => {
+        setEditingInvoice(invoice);
+        setIsDialogOpen(true);
     };
 
     const handleDelete = (invoiceId: string) => {
-        alert(`Delete invoice number: ${invoiceId}`);
+        setInvoices(invoices.filter((i) => i.id !== invoiceId));
     };
+
+    const handleSave = (invoice: InvoiceNumber) => {
+      if (editingInvoice && editingInvoice.id === invoice.id) {
+        // Editing existing invoice
+        setInvoices(invoices.map((i) => i.id === invoice.id ? invoice : i));
+      } else if(editingInvoice) {
+        const filteredInvoices = invoices.filter(i => i.id !== editingInvoice.id);
+        setInvoices([...filteredInvoices, invoice]);
+      }
+      else {
+        // Adding new invoice
+        setInvoices([...invoices, invoice]);
+      }
+      setIsDialogOpen(false);
+      setEditingInvoice(undefined);
+    };
+
+    const handleDialogClose = () => {
+      setIsDialogOpen(false);
+      setEditingInvoice(undefined);
+    }
 
     return (
       <main className="flex flex-1 flex-col gap-4 p-4 md:gap-8 md:p-8">
@@ -48,7 +80,13 @@ import {
                        <Button variant="outline"><Upload className="mr-2 h-4 w-4"/> Impor</Button>
                        <Button variant="outline"><Download className="mr-2 h-4 w-4"/> Ekspor</Button>
                        <Button variant="outline"><Filter className="mr-2 h-4 w-4"/> Filter Duplikat</Button>
-                       <AddInvoiceNumberDialog />
+                       <AddInvoiceNumberDialog
+                        isOpen={isDialogOpen}
+                        onOpenChange={handleDialogClose}
+                        onSave={handleSave}
+                        invoiceData={editingInvoice}
+                        onAddClick={handleAdd}
+                       />
                     </div>
                 </div>
 
@@ -65,7 +103,7 @@ import {
                             </TableRow>
                         </TableHeader>
                         <TableBody>
-                            {invoiceNumberData.map((invoice) => (
+                            {invoices.map((invoice) => (
                                 <TableRow key={invoice.id}>
                                     <TableCell className="font-medium">{invoice.id}</TableCell>
                                     <TableCell>{invoice.customer}</TableCell>
@@ -74,7 +112,7 @@ import {
                                     <TableCell>Rp {invoice.amount.toLocaleString('id-ID')},00</TableCell>
                                     <TableCell>
                                         <div className="flex gap-2">
-                                            <Button variant="link" className="p-0 h-auto" onClick={() => handleEdit(invoice.id)}>Edit</Button>
+                                            <Button variant="link" className="p-0 h-auto" onClick={() => handleEdit(invoice)}>Edit</Button>
                                             <DeleteConfirmationDialog onConfirm={() => handleDelete(invoice.id)} />
                                         </div>
                                     </TableCell>
@@ -84,7 +122,7 @@ import {
                     </Table>
                 </div>
                 <div className="text-sm text-muted-foreground mt-4">
-                    Showing 1 to 2 of 2 entries
+                    Showing 1 to {invoices.length} of {invoices.length} entries
                 </div>
             </CardContent>
         </Card>

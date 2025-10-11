@@ -22,10 +22,20 @@ import {
 } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
 import { cn } from '@/lib/utils';
-import { format } from 'date-fns';
+import { format, formatISO } from 'date-fns';
+import type { InvoiceNumber } from '@/app/lib/data';
 
-export function AddInvoiceNumberDialog() {
-  const [date, setDate] = useState<Date | undefined>(new Date(2025, 10, 10));
+type AddInvoiceNumberDialogProps = {
+  isOpen: boolean;
+  onOpenChange: (isOpen: boolean) => void;
+  onSave: (invoice: InvoiceNumber) => void;
+  invoiceData?: InvoiceNumber;
+  onAddClick: () => void;
+};
+
+
+export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceData, onAddClick }: AddInvoiceNumberDialogProps) {
+  const [date, setDate] = useState<Date | undefined>(new Date());
   const [invoiceType, setInvoiceType] = useState<'sar' | 'kw'>('kw');
   const [isAutoNumber, setIsAutoNumber] = useState(true);
   
@@ -34,27 +44,49 @@ export function AddInvoiceNumberDialog() {
   const [suffix, setSuffix] = useState('');
   
   const [fullInvoiceNumber, setFullInvoiceNumber] = useState('');
+  
+  const [salesOrder, setSalesOrder] = useState('');
+  const [customer, setCustomer] = useState('');
+  const [amount, setAmount] = useState(0);
 
   useEffect(() => {
-    const currentYear = new Date().getFullYear();
-    if (invoiceType === 'sar') {
-      setPrefix('SAR/');
-      setSuffix('');
-      if (isAutoNumber) {
-        setMainNumber('25000003');
+    if (invoiceData) {
+      if (invoiceData.id.startsWith('SAR/')) {
+        setInvoiceType('sar');
+        setPrefix('SAR/');
+        setSuffix('');
+        setMainNumber(invoiceData.id.replace('SAR/', ''));
       } else {
-        setMainNumber('');
+        setInvoiceType('kw');
+        const parts = invoiceData.id.split('/');
+        setPrefix('KW/');
+        setSuffix(`/${parts[2]}/${parts[3]}`);
+        setMainNumber(parts[1]);
       }
-    } else { // kw
-      setPrefix('KW/');
-      setSuffix(`/KEU/${currentYear}`);
-      if (isAutoNumber) {
-        setMainNumber('0001');
-      } else {
-        setMainNumber('');
+      setCustomer(invoiceData.customer);
+      setSalesOrder(invoiceData.salesOrder);
+      setDate(new Date(invoiceData.date.split('/').reverse().join('-')));
+      setAmount(invoiceData.amount);
+    } else {
+      // Reset for new entry
+      const currentYear = new Date().getFullYear();
+      if (invoiceType === 'sar') {
+        setPrefix('SAR/');
+        setSuffix('');
+        if (isAutoNumber) setMainNumber('25000003');
+        else setMainNumber('');
+      } else { // kw
+        setPrefix('KW/');
+        setSuffix(`/KEU/${currentYear}`);
+        if (isAutoNumber) setMainNumber('0001');
+        else setMainNumber('');
       }
+      setCustomer('');
+      setSalesOrder('');
+      setDate(new Date());
+      setAmount(0);
     }
-  }, [invoiceType, isAutoNumber]);
+  }, [invoiceData, isOpen, invoiceType, isAutoNumber]);
 
   useEffect(() => {
     setFullInvoiceNumber(`${prefix}${mainNumber}${suffix}`);
@@ -65,17 +97,30 @@ export function AddInvoiceNumberDialog() {
     setMainNumber(e.target.value);
   }
 
+  const handleSave = () => {
+    const formattedDate = date ? format(date, 'dd/MM/yyyy') : '';
+    onSave({
+      id: fullInvoiceNumber,
+      customer,
+      salesOrder,
+      date: formattedDate,
+      amount
+    });
+  }
+
+  const dialogTitle = invoiceData ? "Edit Invoice Number" : "Add New Invoice Number";
+
 
   return (
-    <Dialog>
+    <Dialog open={isOpen} onOpenChange={onOpenChange}>
       <DialogTrigger asChild>
-        <Button>
+        <Button onClick={onAddClick}>
           <Plus className="mr-2 h-4 w-4" /> Add Number
         </Button>
       </DialogTrigger>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>Add New Invoice Number</DialogTitle>
+          <DialogTitle>{dialogTitle}</DialogTitle>
         </DialogHeader>
         <div className="grid gap-6 py-4">
           <div>
@@ -100,11 +145,11 @@ export function AddInvoiceNumberDialog() {
           </div>
            <div className="space-y-2">
             <Label htmlFor="sales-order">Sales Order / SO (Opsional)</Label>
-            <Input id="sales-order" placeholder="Search and select a Sales Order"/>
+            <Input id="sales-order" placeholder="Search and select a Sales Order" value={salesOrder} onChange={e => setSalesOrder(e.target.value)} />
           </div>
           <div className="space-y-2">
             <Label htmlFor="customer">Pelanggan</Label>
-            <Input id="customer" placeholder="e.g., PT. XYZ Corp"/>
+            <Input id="customer" placeholder="e.g., PT. XYZ Corp" value={customer} onChange={e => setCustomer(e.target.value)}/>
           </div>
           <div className="grid grid-cols-2 gap-4">
              <div className="space-y-2">
@@ -138,13 +183,13 @@ export function AddInvoiceNumberDialog() {
               </div>
             <div className="space-y-2">
               <Label htmlFor="amount">Jumlah</Label>
-              <Input id="amount" type="number" defaultValue="0"/>
+              <Input id="amount" type="number" value={amount} onChange={e => setAmount(Number(e.target.value))}/>
             </div>
           </div>
         </div>
         <DialogFooter>
-          <Button variant="ghost">Cancel</Button>
-          <Button type="submit">Save</Button>
+          <Button variant="ghost" onClick={() => onOpenChange(false)}>Cancel</Button>
+          <Button type="button" onClick={handleSave}>Save</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
