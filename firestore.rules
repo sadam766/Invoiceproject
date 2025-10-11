@@ -1,146 +1,127 @@
 /**
- * @fileoverview Firestore Security Rules for the Sales Dashboard application.
+ * @fileoverview Firestore Security Rules for Sales Dashboard App
  *
  * Core Philosophy:
- * This ruleset prioritizes authorization independence and aims to provide secure,
- * yet permissive, access to data for prototyping. It enforces ownership for
- * customer-specific data and allows public read access to global sales data.
+ * This ruleset enforces a user-ownership model for sales data, allowing users to manage their own sales records. Other data, such as customers, products, sales overviews, and top products, is publicly readable.
  *
  * Data Structure:
  * - /customers/{customerId}: Stores customer profiles.
- * - /customers/{customerId}/sales/{saleId}: Stores sales records for each customer.
- * - /products/{productId}: Stores product details.
+ * - /customers/{customerId}/sales/{saleId}: Stores sales transactions for each customer.
+ * - /products/{productId}: Stores product information.
  * - /salesOverview/{salesOverviewId}: Stores global sales overview data.
- * - /topProducts/{topProductId}: Stores information about top-selling products.
+ * - /topProducts/{topProductId}: Stores global top product data.
  *
  * Key Security Decisions:
- * - Customers can only access their own data (customer profiles and sales records).
- * - Global sales data (sales overview, top products) is publicly readable.
- * - Schema validation is relaxed to enable rapid prototyping. Only the consistency
- *   of owner IDs is enforced.
- * - Listing all customers, products, sales overviews or top products is disallowed to prevent data leakage, since these are global data stores.
+ * - Customers can only create, update, or delete their own sales records (path-based ownership).
+ * - Customer profiles, product data, sales overview data, and top product data are publicly readable.
+ * - Listing sales subcollection is only allowed by the owner.
  *
  * Denormalization for Authorization:
- * - Path-based ownership is used for sales records, ensuring that each sale is
- *   associated with a customer. This simplifies the security rules and avoids
- *   the need for complex `get()` calls.
+ *  - Sales are stored as subcollections under the customer to simplify ownership checks using path-based rules. The `customerId` is implicit in the path `/customers/{customerId}/sales/{saleId}`, so we don't need to duplicate it in the Sale document itself. This avoids costly `get()` calls to check ownership.
  *
  * Structural Segregation:
- * - Public data (sales overview, top products) is stored in separate, top-level
- *   collections to allow for public read access without compromising the security
- *   of private customer data.
+ * - Private sales data is stored under the `/customers/{customerId}/sales/{saleId}` path, while public product and overview data reside in top-level collections. This separation ensures that public data can be listed without exposing private sales information.
  */
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
     /**
-     * @description Checks if the requesting user is signed in.
-     * @path N/A (Helper function)
-     * @allow N/A (Helper function)
-     * @deny N/A (Helper function)
-     * @principle Verifies user authentication.
+     * @description Checks if the request is authenticated.
+     * @return {boolean} True if the request is authenticated, false otherwise.
      */
     function isSignedIn() {
       return request.auth != null;
     }
 
     /**
-     * @description Checks if the requesting user is the owner of the resource.
-     * @path N/A (Helper function)
-     * @allow N/A (Helper function)
-     * @deny N/A (Helper function)
-     * @principle Enforces resource ownership.
+     * @description Checks if the authenticated user ID matches the provided user ID.
+     * @param {string} userId The user ID to compare against the authenticated user's ID.
+     * @return {boolean} True if the user IDs match, false otherwise.
      */
     function isOwner(userId) {
-      return request.auth.uid == userId;
+      return isSignedIn() && request.auth.uid == userId;
     }
 
     /**
-     * @description Checks if the requesting user is the existing owner of the resource.
-     * @path N/A (Helper function)
-     * @allow N/A (Helper function)
-     * @deny N/A (Helper function)
-     * @principle Enforces resource ownership and existence.
+     * @description Checks if the authenticated user is the owner of the existing document.
+     * @param {string} userId The user ID to compare against the authenticated user's ID.
+     * @return {boolean} True if the user IDs match and the resource exists, false otherwise.
      */
     function isExistingOwner(userId) {
-      return isOwner(userId) && exists(resource.data);
+      return isSignedIn() && request.auth.uid == userId && resource.data != null;
     }
 
     /**
-     * @description Rules for customer profiles.
+     * @description Defines rules for the /customers/{customerId} collection.
      * @path /customers/{customerId}
-     * @allow (create) If the user's UID matches the customerId.
-     * @allow (get, update, delete) If the user is the owner of the customer profile.
-     * @deny (create) If the user's UID does not match the customerId.
-     * @deny (get, update, delete) If the user is not the owner of the customer profile.
-     * @principle Enforces document ownership for customer profiles.
+     * @allow (create) User with ID 'user123' can create a customer document with ID 'user123'.
+     * @deny (create) User with ID 'user456' cannot create a customer document with ID 'user123'.
+     * @allow (get, list) Any user can read customer profiles.
+     * @deny (update, delete) Only the user with a matching customer ID can update or delete their profile.
+     * @principle Enforces document ownership for writes, allows public reads.
      */
     match /customers/{customerId} {
-      allow get: if isOwner(customerId);
-      allow list: if false;
-      allow create: if isSignedIn() && isOwner(customerId);
+      allow get, list: if true;
+      allow create: if isOwner(customerId);
       allow update: if isExistingOwner(customerId);
       allow delete: if isExistingOwner(customerId);
     }
 
     /**
-     * @description Rules for sales records associated with a customer.
+     * @description Defines rules for the /customers/{customerId}/sales/{saleId} collection.
      * @path /customers/{customerId}/sales/{saleId}
-     * @allow (create) If the user is the owner of the customer profile and the sale's customerId matches the path.
-     * @allow (get, update, delete) If the user is the owner of the customer profile and the sale exists.
-     * @deny (create) If the user is not the owner of the customer profile or the sale's customerId does not match the path.
-     * @deny (get, update, delete) If the user is not the owner of the customer profile.
-     * @principle Enforces document ownership for sales records, ensuring sales are only accessible by their associated customer.
+     * @allow (create) User with ID 'user123' can create a sale document under customer 'user123'.
+     * @deny (create) User with ID 'user456' cannot create a sale document under customer 'user123'.
+     * @allow (get, list) User with ID 'user123' can read or list sales documents under customer 'user123'.
+     * @deny (update, delete) Only the user with a matching customer ID can update or delete sales records.
+     * @principle Enforces document ownership for writes, restricts listing to the owner.
      */
     match /customers/{customerId}/sales/{saleId} {
       allow get: if isOwner(customerId);
-      allow list: if false;
-      allow create: if isSignedIn() && isOwner(customerId);
+      allow list: if isOwner(customerId);
+      allow create: if isOwner(customerId);
       allow update: if isExistingOwner(customerId);
       allow delete: if isExistingOwner(customerId);
     }
 
     /**
-     * @description Rules for product information.
+     * @description Defines rules for the /products/{productId} collection.
      * @path /products/{productId}
-     * @allow (get, list) Public read access to product information.
-     * @deny (create, update, delete) No write access to product information.
-     * @principle Provides public read access to product data while restricting write access.
+     * @allow (get, list) Any user can read product information.
+     * @deny (create, update, delete) No user can create, update, or delete product information.
+     * @principle Allows public reads, restricts writes.
      */
     match /products/{productId} {
-      allow get: if true;
-      allow list: if false;
+      allow get, list: if true;
       allow create: if false;
       allow update: if false;
       allow delete: if false;
     }
 
     /**
-     * @description Rules for sales overview data.
+     * @description Defines rules for the /salesOverview/{salesOverviewId} collection.
      * @path /salesOverview/{salesOverviewId}
-     * @allow (get, list) Public read access to sales overview data.
-     * @deny (create, update, delete) No write access to sales overview data.
-     * @principle Provides public read access to sales overview data while restricting write access.
+     * @allow (get, list) Any user can read sales overview data.
+     * @deny (create, update, delete) No user can create, update, or delete sales overview data.
+     * @principle Allows public reads, restricts writes.
      */
     match /salesOverview/{salesOverviewId} {
-      allow get: if true;
-      allow list: if false;
+      allow get, list: if true;
       allow create: if false;
       allow update: if false;
       allow delete: if false;
     }
 
     /**
-     * @description Rules for top-selling product information.
+     * @description Defines rules for the /topProducts/{topProductId} collection.
      * @path /topProducts/{topProductId}
-     * @allow (get, list) Public read access to top products data.
-     * @deny (create, update, delete) No write access to top products data.
-     * @principle Provides public read access to top products data while restricting write access.
+     * @allow (get, list) Any user can read top product data.
+     * @deny (create, update, delete) No user can create, update, or delete top product data.
+     * @principle Allows public reads, restricts writes.
      */
     match /topProducts/{topProductId} {
-      allow get: if true;
-      allow list: if false;
+      allow get, list: if true;
       allow create: if false;
       allow update: if false;
       allow delete: if false;
