@@ -79,7 +79,7 @@ export default function DashboardLayout({
           <SidebarMenu>
             <SidebarMenuItem>
               <Link href="/dashboard" passHref>
-                <SidebarMenuButton isActive={pathname === '/dashboard'}>
+                <SidebarMenuButton asChild isActive={pathname === '/dashboard'}>
                   <LayoutDashboard />
                   Dashboard
                 </SidebarMenuButton>
@@ -87,7 +87,7 @@ export default function DashboardLayout({
             </SidebarMenuItem>
             <SidebarMenuItem>
               <Link href="/dashboard/monitoring" passHref>
-                <SidebarMenuButton isActive={pathname === '/dashboard/monitoring'}>
+                <SidebarMenuButton asChild isActive={pathname === '/dashboard/monitoring'}>
                   <Eye />
                   Monitoring
                 </SidebarMenuButton>
@@ -113,35 +113,35 @@ export default function DashboardLayout({
                   <SidebarMenuSub>
                     <SidebarMenuSubItem>
                       <Link href="/dashboard/invoices" passHref>
-                        <SidebarMenuSubButton isActive={pathname === '/dashboard/invoices'}>
+                        <SidebarMenuSubButton asChild isActive={pathname === '/dashboard/invoices'}>
                           Invoice List
                         </SidebarMenuSubButton>
                       </Link>
                     </SidebarMenuSubItem>
                     <SidebarMenuSubItem>
                       <Link href="/dashboard/invoices/add" passHref>
-                        <SidebarMenuSubButton isActive={pathname === '/dashboard/invoices/add'}>
+                        <SidebarMenuSubButton asChild isActive={pathname === '/dashboard/invoices/add'}>
                          Add Invoice
                         </SidebarMenuSubButton>
                       </Link>
                     </SidebarMenuSubItem>
                     <SidebarMenuSubItem>
                       <Link href="/dashboard/invoices/number" passHref>
-                        <SidebarMenuSubButton isActive={pathname === '/dashboard/invoices/number'}>
+                        <SidebarMenuSubButton asChild isActive={pathname === '/dashboard/invoices/number'}>
                           Invoice Number
                         </SidebarMenuSubButton>
                       </Link>
                     </SidebarMenuSubItem>
                      <SidebarMenuSubItem>
                       <Link href="/dashboard/invoices/spd" passHref>
-                        <SidebarMenuSubButton isActive={pathname === '/dashboard/invoices/spd'}>
+                        <SidebarMenuSubButton asChild isActive={pathname === '/dashboard/invoices/spd'}>
                             SPD
                         </SidebarMenuSubButton>
                       </Link>
                     </SidebarMenuSubItem>
                     <SidebarMenuSubItem>
                       <Link href="/dashboard/invoices/tax" passHref>
-                        <SidebarMenuSubButton isActive={pathname === '/dashboard/invoices/tax'}>
+                        <SidebarMenuSubButton asChild isActive={pathname === '/dashboard/invoices/tax'}>
                           Tax Invoices
                         </SidebarMenuSubButton>
                       </Link>
@@ -153,7 +153,7 @@ export default function DashboardLayout({
 
             <SidebarMenuItem>
               <Link href="/dashboard/products" passHref>
-                <SidebarMenuButton isActive={pathname.startsWith('/dashboard/products')}>
+                <SidebarMenuButton asChild isActive={pathname.startsWith('/dashboard/products')}>
                   <Package />
                   Products
                 </SidebarMenuButton>
@@ -161,7 +161,7 @@ export default function DashboardLayout({
             </SidebarMenuItem>
             <SidebarMenuItem>
               <Link href="/dashboard/sales-orders" passHref>
-                <SidebarMenuButton isActive={pathname === '/dashboard/sales-orders'}>
+                <SidebarMenuButton asChild isActive={pathname === '/dashboard/sales-orders'}>
                   <ShoppingCart />
                   SalesOrders
                 </SidebarMenuButton>
@@ -169,7 +169,7 @@ export default function DashboardLayout({
             </SidebarMenuItem>
             <SidebarMenuItem>
               <Link href="/dashboard/customers" passHref>
-                <SidebarMenuButton isActive={pathname.startsWith('/dashboard/customers')}>
+                <SidebarMenuButton asChild isActive={pathname.startsWith('/dashboard/customers')}>
                   <Users />
                   Customers
                 </SidebarMenuButton>
@@ -177,7 +177,7 @@ export default function DashboardLayout({
             </SidebarMenuItem>
              <SidebarMenuItem>
                 <Link href="/dashboard/sales" passHref>
-                    <SidebarMenuButton isActive={pathname.startsWith('/dashboard/sales')}>
+                    <SidebarMenuButton asChild isActive={pathname.startsWith('/dashboard/sales')}>
                         <ShoppingCart />
                         Sales
                     </SidebarMenuButton>
@@ -185,7 +185,7 @@ export default function DashboardLayout({
             </SidebarMenuItem>
              <SidebarMenuItem>
                 <Link href="/dashboard/sales-management" passHref>
-                    <SidebarMenuButton isActive={pathname === '/dashboard/sales-management'}>
+                    <SidebarMenuButton asChild isActive={pathname === '/dashboard/sales-management'}>
                         <BarChart />
                         Sales Management
                     </SidebarMenuButton>
