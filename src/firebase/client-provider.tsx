@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { type ReactNode } from 'react';
@@ -9,9 +10,8 @@ interface FirebaseClientProviderProps {
 }
 
 export function FirebaseClientProvider({ children }: FirebaseClientProviderProps) {
-  // The services are already initialized in client.ts, so we just pass them to the provider.
-  // This component's main job is to ensure that the Firebase services are only
-  // included in the client-side bundle.
+  // Pass the initialized services to the provider.
+  // This component ensures Firebase services are included only in the client-side bundle.
   return (
     <FirebaseProvider
       firebaseApp={firebaseApp}
