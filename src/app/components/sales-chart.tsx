@@ -1,3 +1,4 @@
+
 'use client';
 
 import {
@@ -8,6 +9,7 @@ import {
   XAxis,
   YAxis,
   CartesianGrid,
+  Legend,
 } from 'recharts';
 import {
   ChartConfig,
@@ -52,12 +54,13 @@ export default function SalesChart({ data }: { data: any[] }) {
           tickLine={false}
           axisLine={false}
           tickMargin={8}
-          tickFormatter={(value) => `$${value / 1000}k`}
+          tickFormatter={(value) => `Rp${value / 1000000}`}
         />
         <ChartTooltip
           cursor={false}
           content={<ChartTooltipContent indicator="dot" />}
         />
+        <Legend />
         <Line
           dataKey="revenue"
           type="monotone"

@@ -1,3 +1,4 @@
+
 import {
   Table,
   TableBody,
@@ -11,8 +12,7 @@ import type { Sale } from '@/app/lib/data';
 
 const statusVariant = {
   Paid: 'default',
-  Pending: 'secondary',
-  Failed: 'destructive',
+  Unpaid: 'destructive',
 } as const;
 
 export default function RecentSales({ sales }: { sales: Sale[] }) {
@@ -21,7 +21,7 @@ export default function RecentSales({ sales }: { sales: Sale[] }) {
       <Table>
         <TableHeader>
           <TableRow>
-            <TableHead>Invoice</TableHead>
+            <TableHead>Invoice ID</TableHead>
             <TableHead>Customer</TableHead>
             <TableHead>Date</TableHead>
             <TableHead className="text-right">Amount</TableHead>
@@ -35,7 +35,7 @@ export default function RecentSales({ sales }: { sales: Sale[] }) {
               <TableCell>{sale.customer}</TableCell>
               <TableCell>{sale.date}</TableCell>
               <TableCell className="text-right">
-                ${sale.amount.toLocaleString()}
+                Rp {sale.amount.toLocaleString('id-ID')}
               </TableCell>
               <TableCell className="text-center">
                 <Badge variant={statusVariant[sale.status]} className="capitalize">

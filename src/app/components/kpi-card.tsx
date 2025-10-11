@@ -1,6 +1,8 @@
+
 import type { LucideIcon } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
+import { Badge } from '@/components/ui/badge';
 
 type KpiCardProps = {
   title: string;
@@ -27,10 +29,12 @@ export default function KpiCard({
         <p
           className={cn(
             'text-xs text-muted-foreground',
-            isNegative ? 'text-red-600' : 'text-emerald-600'
           )}
         >
-          {change} from last month
+          <span className={cn(isNegative ? 'text-red-500' : 'text-green-500')}>
+            {change.split(' ')[0]}
+          </span>{' '}
+          vs last month
         </p>
       </CardContent>
     </Card>
