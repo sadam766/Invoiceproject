@@ -17,8 +17,17 @@ import {
   import { invoiceNumberData } from '@/app/lib/data';
   import { Search, Upload, Download, Filter, Plus } from 'lucide-react';
   import { AddInvoiceNumberDialog } from './_components/add-invoice-number-dialog';
+  import { DeleteConfirmationDialog } from '@/app/components/delete-confirmation-dialog';
   
   export default function InvoiceNumberPage() {
+    const handleEdit = (invoiceId: string) => {
+        alert(`Edit invoice number: ${invoiceId}`);
+    };
+
+    const handleDelete = (invoiceId: string) => {
+        alert(`Delete invoice number: ${invoiceId}`);
+    };
+
     return (
       <main className="flex flex-1 flex-col gap-4 p-4 md:gap-8 md:p-8">
         <div>
@@ -65,8 +74,8 @@ import {
                                     <TableCell>Rp {invoice.amount.toLocaleString('id-ID')},00</TableCell>
                                     <TableCell>
                                         <div className="flex gap-2">
-                                            <Button variant="link" className="p-0 h-auto text-primary">Edit</Button>
-                                            <Button variant="link" className="p-0 h-auto text-red-500">Hapus</Button>
+                                            <Button variant="link" className="p-0 h-auto" onClick={() => handleEdit(invoice.id)}>Edit</Button>
+                                            <DeleteConfirmationDialog onConfirm={() => handleDelete(invoice.id)} />
                                         </div>
                                     </TableCell>
                                 </TableRow>

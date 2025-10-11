@@ -17,8 +17,17 @@ import {
   import { customerListData } from '@/app/lib/data';
   import { Search, Upload, Download, Plus } from 'lucide-react';
   import { AddCustomerDialog } from './_components/add-customer-dialog';
+  import { DeleteConfirmationDialog } from '@/app/components/delete-confirmation-dialog';
   
   export default function CustomerListPage() {
+    const handleEdit = (customerName: string) => {
+        alert(`Edit customer: ${customerName}`);
+    };
+
+    const handleDelete = (customerName: string) => {
+        alert(`Delete customer: ${customerName}`);
+    };
+    
     return (
       <main className="flex flex-1 flex-col gap-4 p-4 md:gap-8 md:p-8">
         <div>
@@ -60,8 +69,8 @@ import {
                                     <TableCell>{customer.spdAddress}</TableCell>
                                     <TableCell>
                                         <div className="flex gap-2">
-                                            <Button variant="link" className="p-0 h-auto text-primary">Edit</Button>
-                                            <Button variant="link" className="p-0 h-auto text-red-500">Hapus</Button>
+                                            <Button variant="link" className="p-0 h-auto" onClick={() => handleEdit(customer.name)}>Edit</Button>
+                                            <DeleteConfirmationDialog onConfirm={() => handleDelete(customer.name)} />
                                         </div>
                                     </TableCell>
                                 </TableRow>

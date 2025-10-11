@@ -25,8 +25,17 @@ import {
   import { productListData } from '@/app/lib/data';
   import { Search, Upload, Download, Plus } from 'lucide-react';
   import { AddProductDialog } from './_components/add-product-dialog';
+  import { DeleteConfirmationDialog } from '@/app/components/delete-confirmation-dialog';
   
   export default function ProductListPage() {
+    const handleEdit = (productName: string) => {
+        alert(`Edit product: ${productName}`);
+    };
+
+    const handleDelete = (productName: string) => {
+        alert(`Delete product: ${productName}`);
+    };
+
     return (
       <main className="flex flex-1 flex-col gap-4 p-4 md:gap-8 md:p-8">
         <div>
@@ -81,8 +90,8 @@ import {
                                     <TableCell>Rp {product.price.toLocaleString('id-ID')},00</TableCell>
                                     <TableCell>
                                         <div className="flex gap-2">
-                                            <Button variant="link" className="p-0 h-auto text-primary">Edit</Button>
-                                            <Button variant="link" className="p-0 h-auto text-red-500">Hapus</Button>
+                                            <Button variant="link" className="p-0 h-auto" onClick={() => handleEdit(product.name)}>Edit</Button>
+                                            <DeleteConfirmationDialog onConfirm={() => handleDelete(product.name)} />
                                         </div>
                                     </TableCell>
                                 </TableRow>

@@ -1,4 +1,5 @@
 
+'use client';
 import {
     Card,
     CardContent,
@@ -22,8 +23,17 @@ import {
   import { Button } from '@/components/ui/button';
   import { salesOrderListData } from '@/app/lib/data';
   import { Search, Upload, Download } from 'lucide-react';
+  import { DeleteConfirmationDialog } from '@/app/components/delete-confirmation-dialog';
   
   export default function SalesOrderListPage() {
+    const handleEdit = (soNumber: string, productName: string) => {
+        alert(`Edit SO: ${soNumber}, Product: ${productName}`);
+    };
+
+    const handleDelete = (soNumber: string, productName: string) => {
+        alert(`Delete SO: ${soNumber}, Product: ${productName}`);
+    };
+
     return (
       <main className="flex flex-1 flex-col gap-4 p-4 md:gap-8 md:p-8">
         <div>
@@ -79,8 +89,8 @@ import {
                                     <TableCell>Rp {order.price.toLocaleString('id-ID')},00</TableCell>
                                     <TableCell>
                                         <div className="flex gap-2">
-                                            <Button variant="link" className="p-0 h-auto text-primary">Edit</Button>
-                                            <Button variant="link" className="p-0 h-auto text-red-500">Hapus</Button>
+                                            <Button variant="link" className="p-0 h-auto" onClick={() => handleEdit(order.soNumber, order.productName)}>Edit</Button>
+                                            <DeleteConfirmationDialog onConfirm={() => handleDelete(order.soNumber, order.productName)} />
                                         </div>
                                     </TableCell>
                                 </TableRow>
