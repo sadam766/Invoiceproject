@@ -61,12 +61,13 @@ export default function DashboardLayout({
   const pathname = usePathname();
   const [isInvoiceOpen, setInvoiceOpen] = React.useState(pathname.startsWith('/dashboard/invoices'));
   const [isProductsOpen, setProductsOpen] = React.useState(pathname.startsWith('/dashboard/products'));
+  const [isSalesOpen, setSalesOpen] = React.useState(pathname.startsWith('/dashboard/sales'));
   const [isCustomersOpen, setCustomersOpen] = React.useState(false);
-  const [isSalesOpen, setSalesOpen] = React.useState(false);
 
   React.useEffect(() => {
     setInvoiceOpen(pathname.startsWith('/dashboard/invoices'));
     setProductsOpen(pathname.startsWith('/dashboard/products'));
+    setSalesOpen(pathname.startsWith('/dashboard/sales'));
   }, [pathname]);
 
   return (
@@ -148,6 +149,14 @@ export default function DashboardLayout({
               )}
             </SidebarMenuItem>
             <SidebarMenuItem>
+              <Link href="/dashboard/sales-orders" passHref>
+                <SidebarMenuButton isActive={pathname === '/dashboard/sales-orders'}>
+                  <ShoppingCart />
+                  SalesOrders
+                </SidebarMenuButton>
+              </Link>
+            </SidebarMenuItem>
+            <SidebarMenuItem>
               <SidebarMenuButton
                 onClick={() => setCustomersOpen(!isCustomersOpen)}
               >
@@ -160,6 +169,22 @@ export default function DashboardLayout({
                 />
               </SidebarMenuButton>
                {isCustomersOpen && (
+                <SidebarMenuSub>
+                  <SidebarMenuSubButton>Sales</SidebarMenuSubButton>
+                </SidebarMenuSub>
+              )}
+            </SidebarMenuItem>
+             <SidebarMenuItem>
+              <SidebarMenuButton onClick={() => setSalesOpen(!isSalesOpen)}>
+                <BarChart />
+                Sales
+                <ChevronDown
+                  className={`ml-auto h-4 w-4 transition-transform ${
+                    isSalesOpen ? 'rotate-180' : ''
+                  }`}
+                />
+              </SidebarMenuButton>
+               {isSalesOpen && (
                 <SidebarMenuSub>
                   <SidebarMenuSubButton>Sales</SidebarMenuSubButton>
                 </SidebarMenuSub>

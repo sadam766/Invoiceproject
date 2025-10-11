@@ -252,3 +252,39 @@ export const productListData: ProductListItem[] = [
         price: 7500,
     }
 ];
+
+export type SalesOrder = {
+    soNumber: string;
+    productName: string;
+    category: string;
+    quantity: number;
+    unit: string;
+    price: number;
+};
+
+export const salesOrderListData: SalesOrder[] = [
+    {
+        soNumber: 'SO-2024-001',
+        productName: 'Kabel Fiber Optik',
+        category: 'Kabel',
+        quantity: 50,
+        unit: 'meter',
+        price: 15000,
+    },
+    {
+        soNumber: 'SO-2024-001',
+        productName: 'Konektor RJ45',
+        category: 'Aksesoris',
+        quantity: 100,
+        unit: 'pcs',
+        price: 2500,
+    },
+    {
+        soNumber: 'SO-2024-002',
+        productName: 'Kabel Tembaga 2.5mm',
+        category: 'Kabel',
+        quantity: 200,
+        unit: 'meter',
+        price: 7500,
+    }
+];
