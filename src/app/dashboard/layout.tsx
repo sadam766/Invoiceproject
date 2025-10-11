@@ -59,17 +59,10 @@ export default function DashboardLayout({
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
-  const [isInvoiceOpen, setInvoiceOpen] = React.useState(pathname.startsWith('/dashboard/invoices'));
-  const [isProductsOpen, setProductsOpen] = React.useState(pathname.startsWith('/dashboard/products'));
-  const [isSalesOpen, setSalesOpen] = React.useState(pathname.startsWith('/dashboard/sales'));
-  const [isCustomersOpen, setCustomersOpen] = React.useState(pathname.startsWith('/dashboard/customers'));
-
-  React.useEffect(() => {
-    setInvoiceOpen(pathname.startsWith('/dashboard/invoices'));
-    setProductsOpen(pathname.startsWith('/dashboard/products'));
-    setSalesOpen(pathname.startsWith('/dashboard/sales'));
-    setCustomersOpen(pathname.startsWith('/dashboard/customers'));
-  }, [pathname]);
+  const isInvoiceOpen = pathname.startsWith('/dashboard/invoices');
+  const isProductsOpen = pathname.startsWith('/dashboard/products');
+  const isSalesOpen = pathname.startsWith('/dashboard/sales');
+  const isCustomersOpen = pathname.startsWith('/dashboard/customers');
 
   return (
     <SidebarProvider>
@@ -101,7 +94,7 @@ export default function DashboardLayout({
               </Link>
             </SidebarMenuItem>
             <SidebarMenuItem>
-              <SidebarMenuButton onClick={() => setInvoiceOpen(!isInvoiceOpen)}>
+              <SidebarMenuButton>
                 <FileText />
                 Invoices
                 <ChevronDown
@@ -129,9 +122,7 @@ export default function DashboardLayout({
               )}
             </SidebarMenuItem>
             <SidebarMenuItem>
-              <SidebarMenuButton
-                onClick={() => setProductsOpen(!isProductsOpen)}
-              >
+              <SidebarMenuButton>
                 <Package />
                 Products
                 <ChevronDown
@@ -158,9 +149,7 @@ export default function DashboardLayout({
               </Link>
             </SidebarMenuItem>
             <SidebarMenuItem>
-              <SidebarMenuButton
-                onClick={() => setCustomersOpen(!isCustomersOpen)}
-              >
+              <SidebarMenuButton>
                 <Users />
                 Customers
                 <ChevronDown
@@ -179,7 +168,7 @@ export default function DashboardLayout({
               )}
             </SidebarMenuItem>
              <SidebarMenuItem>
-              <SidebarMenuButton onClick={() => setSalesOpen(!isSalesOpen)} isActive={isSalesOpen}>
+              <SidebarMenuButton isActive={isSalesOpen}>
                 <ShoppingCart />
                 Sales
                 <ChevronDown
