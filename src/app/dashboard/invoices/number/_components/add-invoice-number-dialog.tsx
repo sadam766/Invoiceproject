@@ -93,7 +93,7 @@ export function AddInvoiceNumberDialog() {
             </div>
             <div className="grid grid-cols-[auto_1fr_auto] items-center gap-2">
               <Input value={prefix} className="bg-muted text-right" readOnly />
-              <Input value={mainNumber} onChange={handleMainNumberChange} disabled={!isAutoNumber} />
+              <Input value={mainNumber} onChange={handleMainNumberChange} />
               {suffix && <Input value={suffix} className="bg-muted" readOnly />}
             </div>
             <Input id="full-invoice-number" value={fullInvoiceNumber} disabled className="bg-muted font-semibold text-center" />
