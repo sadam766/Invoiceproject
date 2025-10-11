@@ -6,7 +6,6 @@ import { Toaster } from "@/components/ui/toaster";
 import { cn } from '@/lib/utils';
 import { ThemeProvider } from '@/app/components/theme-provider';
 import { FirebaseClientProvider } from '@/firebase';
-import { FirebaseErrorListener } from '@/components/FirebaseErrorListener';
 
 export default function RootLayout({
   children,
@@ -34,7 +33,6 @@ export default function RootLayout({
             enableSystem
             disableTransitionOnChange
           >
-            <FirebaseErrorListener />
             {children}
             <Toaster />
           </ThemeProvider>
