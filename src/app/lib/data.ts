@@ -222,6 +222,7 @@ export const taxInvoiceData: TaxInvoice[] = [
 ];
 
 export type ProductListItem = {
+    id?: string;
     name: string;
     category: string;
     quantity: number;
@@ -290,6 +291,7 @@ export const salesOrderListData: SalesOrder[] = [
 ];
 
 export type Customer = {
+  id?: string;
   name: string;
   address: string;
   spdAddress: string;
@@ -297,11 +299,13 @@ export type Customer = {
 
 export const customerListData: Customer[] = [
   {
+    id: '1',
     name: 'PT. Sejahtera Abadi',
     address: 'Jl. Jendral Sudirman No. 123, Jakarta',
     spdAddress: 'Jl. Gatot Subroto No. 45, Jakarta',
   },
-  {
+  { 
+    id: '2',
     name: 'CV. Maju Jaya',
     address: 'Jl. Gajah Mada No. 10, Surabaya',
     spdAddress: 'Jl. Gajah Mada No. 10, Surabaya',

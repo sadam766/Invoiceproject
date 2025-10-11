@@ -19,7 +19,7 @@ import { useEffect, useState } from 'react';
 type AddCustomerDialogProps = {
   isOpen: boolean;
   onOpenChange: (isOpen: boolean) => void;
-  onSave: (customer: Customer) => void;
+  onSave: (customer: Omit<Customer, 'id'>) => void;
   customerData?: Customer;
   onAddClick: () => void;
 };
@@ -28,24 +28,22 @@ export function AddCustomerDialog({ isOpen, onOpenChange, onSave, customerData, 
   const [name, setName] = useState('');
   const [address, setAddress] = useState('');
   const [spdAddress, setSpdAddress] = useState('');
-  const [originalName, setOriginalName] = useState('');
 
   useEffect(() => {
     if (customerData) {
       setName(customerData.name);
       setAddress(customerData.address);
       setSpdAddress(customerData.spdAddress);
-      setOriginalName(customerData.name);
     } else {
       setName('');
       setAddress('');
       setSpdAddress('');
-      setOriginalName('');
     }
   }, [customerData, isOpen]);
 
   const handleSave = () => {
     onSave({ name, address, spdAddress });
+    onOpenChange(false);
   };
   
   const dialogTitle = customerData ? "Edit Customer" : "Add New Customer";

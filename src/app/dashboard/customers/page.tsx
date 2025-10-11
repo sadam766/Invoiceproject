@@ -15,13 +15,20 @@ import {
   } from '@/components/ui/table';
   import { Input } from '@/components/ui/input';
   import { Button } from '@/components/ui/button';
-  import { customerListData, type Customer } from '@/app/lib/data';
+  import { type Customer } from '@/app/lib/data';
   import { Search, Upload, Download, Plus } from 'lucide-react';
   import { AddCustomerDialog } from './_components/add-customer-dialog';
   import { DeleteConfirmationDialog } from '@/app/components/delete-confirmation-dialog';
+  import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
+  import { collection, doc } from 'firebase/firestore';
+  import { addDocumentNonBlocking, updateDocumentNonBlocking, deleteDocumentNonBlocking } from '@/firebase/non-blocking-updates';
+  import { Skeleton } from '@/components/ui/skeleton';
   
   export default function CustomerListPage() {
-    const [customers, setCustomers] = useState(customerListData);
+    const firestore = useFirestore();
+    const customersCollection = useMemoFirebase(() => collection(firestore, 'customers'), [firestore]);
+    const { data: customers, isLoading } = useCollection<Customer>(customersCollection);
+
     const [editingCustomer, setEditingCustomer] = useState<Customer | undefined>(undefined);
     const [isDialogOpen, setIsDialogOpen] = useState(false);
 
@@ -35,25 +42,26 @@ import {
         setIsDialogOpen(true);
     };
 
-    const handleDelete = (customerName: string) => {
-        setCustomers(customers.filter((c) => c.name !== customerName));
+    const handleDelete = (customerId: string) => {
+        if (!firestore) return;
+        const customerDocRef = doc(firestore, 'customers', customerId);
+        deleteDocumentNonBlocking(customerDocRef);
     };
 
-    const handleSave = (customer: Customer) => {
-      if (editingCustomer && editingCustomer.name === customer.name) {
-        // Editing existing customer
-        setCustomers(customers.map((c) => c.name === customer.name ? customer : c));
-      } else if (editingCustomer) {
-        // Editing existing customer but with new name (treat as delete old and add new)
-        const filteredCustomers = customers.filter(c => c.name !== editingCustomer.name);
-        setCustomers([...filteredCustomers, customer]);
-      } else {
-        // Adding new customer
-        setCustomers([...customers, customer]);
-      }
-      setIsDialogOpen(false);
-      setEditingCustomer(undefined);
-    };
+    const handleSave = (customer: Omit<Customer, 'id'>) => {
+        if (!firestore) return;
+    
+        if (editingCustomer) {
+          // Editing existing customer
+          const customerDocRef = doc(firestore, 'customers', editingCustomer.id!);
+          updateDocumentNonBlocking(customerDocRef, customer);
+        } else {
+          // Adding new customer
+          addDocumentNonBlocking(collection(firestore, 'customers'), customer);
+        }
+        setIsDialogOpen(false);
+        setEditingCustomer(undefined);
+      };
 
     const handleDialogClose = () => {
       setIsDialogOpen(false);
@@ -100,28 +108,38 @@ import {
                             </TableRow>
                         </TableHeader>
                         <TableBody>
-                            {customers.map((customer) => (
-                                <TableRow key={customer.name}>
-                                    <TableCell className="font-medium">{customer.name}</TableCell>
-                                    <TableCell>{customer.address}</TableCell>
-                                    <TableCell>{customer.spdAddress}</TableCell>
-                                    <TableCell>
-                                        <div className="flex gap-2">
-                                            <Button variant="link" className="p-0 h-auto" onClick={() => handleEdit(customer)}>Edit</Button>
-                                            <DeleteConfirmationDialog onConfirm={() => handleDelete(customer.name)} />
-                                        </div>
-                                    </TableCell>
-                                </TableRow>
-                            ))}
+                            {isLoading ? (
+                                Array.from({ length: 3 }).map((_, i) => (
+                                    <TableRow key={i}>
+                                        <TableCell><Skeleton className="h-4 w-48" /></TableCell>
+                                        <TableCell><Skeleton className="h-4 w-64" /></TableCell>
+                                        <TableCell><Skeleton className="h-4 w-64" /></TableCell>
+                                        <TableCell><Skeleton className="h-4 w-20" /></TableCell>
+                                    </TableRow>
+                                ))
+                            ) : (
+                                customers?.map((customer) => (
+                                    <TableRow key={customer.id}>
+                                        <TableCell className="font-medium">{customer.name}</TableCell>
+                                        <TableCell>{customer.address}</TableCell>
+                                        <TableCell>{customer.spdAddress}</TableCell>
+                                        <TableCell>
+                                            <div className="flex gap-2">
+                                                <Button variant="link" className="p-0 h-auto" onClick={() => handleEdit(customer)}>Edit</Button>
+                                                <DeleteConfirmationDialog onConfirm={() => handleDelete(customer.id!)} />
+                                            </div>
+                                        </TableCell>
+                                    </TableRow>
+                                ))
+                            )}
                         </TableBody>
                     </Table>
                 </div>
                 <div className="text-sm text-muted-foreground mt-4">
-                    Showing 1 to {customers.length} of {customers.length} entries
+                    Showing 1 to {customers?.length || 0} of {customers?.length || 0} entries
                 </div>
             </CardContent>
         </Card>
       </main>
     );
   }
-  
