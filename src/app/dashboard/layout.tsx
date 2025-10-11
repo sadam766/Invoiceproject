@@ -110,31 +110,41 @@ export default function DashboardLayout({
                 </CollapsibleTrigger>
                 <CollapsibleContent asChild>
                   <SidebarMenuSub>
-                    <Link href="/dashboard/invoices" passHref>
-                      <SidebarMenuSubButton isActive={pathname === '/dashboard/invoices'}>
-                        Invoice List
-                      </SidebarMenuSubButton>
-                    </Link>
-                    <Link href="/dashboard/invoices/add" passHref>
-                      <SidebarMenuSubButton isActive={pathname === '/dashboard/invoices/add'}>
-                       Add Invoice
-                      </SidebarMenuSubButton>
-                    </Link>
-                    <Link href="/dashboard/invoices/number" passHref>
-                      <SidebarMenuSubButton isActive={pathname === '/dashboard/invoices/number'}>
-                        Invoice Number
-                      </SidebarMenuSubButton>
-                    </Link>
-                     <Link href="/dashboard/invoices/spd" passHref>
-                      <SidebarMenuSubButton isActive={pathname === '/dashboard/invoices/spd'}>
-                          SPD
-                      </SidebarMenuSubButton>
-                    </Link>
-                    <Link href="/dashboard/invoices/tax" passHref>
-                      <SidebarMenuSubButton isActive={pathname === '/dashboard/invoices/tax'}>
-                        Tax Invoices
-                      </SidebarMenuSubButton>
-                    </Link>
+                    <SidebarMenuSubItem>
+                      <Link href="/dashboard/invoices" passHref legacyBehavior>
+                        <SidebarMenuSubButton isActive={pathname === '/dashboard/invoices'}>
+                          Invoice List
+                        </SidebarMenuSubButton>
+                      </Link>
+                    </SidebarMenuSubItem>
+                    <SidebarMenuSubItem>
+                      <Link href="/dashboard/invoices/add" passHref legacyBehavior>
+                        <SidebarMenuSubButton isActive={pathname === '/dashboard/invoices/add'}>
+                         Add Invoice
+                        </SidebarMenuSubButton>
+                      </Link>
+                    </SidebarMenuSubItem>
+                    <SidebarMenuSubItem>
+                      <Link href="/dashboard/invoices/number" passHref legacyBehavior>
+                        <SidebarMenuSubButton isActive={pathname === '/dashboard/invoices/number'}>
+                          Invoice Number
+                        </SidebarMenuSubButton>
+                      </Link>
+                    </SidebarMenuSubItem>
+                     <SidebarMenuSubItem>
+                      <Link href="/dashboard/invoices/spd" passHref legacyBehavior>
+                        <SidebarMenuSubButton isActive={pathname === '/dashboard/invoices/spd'}>
+                            SPD
+                        </SidebarMenuSubButton>
+                      </Link>
+                    </SidebarMenuSubItem>
+                    <SidebarMenuSubItem>
+                      <Link href="/dashboard/invoices/tax" passHref legacyBehavior>
+                        <SidebarMenuSubButton isActive={pathname === '/dashboard/invoices/tax'}>
+                          Tax Invoices
+                        </SidebarMenuSubButton>
+                      </Link>
+                    </SidebarMenuSubItem>
                   </SidebarMenuSub>
                 </CollapsibleContent>
               </SidebarMenuItem>
