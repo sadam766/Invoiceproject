@@ -21,14 +21,14 @@ import {
   import { AddInvoiceNumberDialog } from './_components/add-invoice-number-dialog';
   import { DeleteConfirmationDialog } from '@/app/components/delete-confirmation-dialog';
   import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
-  import { collection, doc, addDoc } from 'firebase/firestore';
+  import { collection, doc, addDoc, setDoc } from 'firebase/firestore';
   import { deleteDocumentNonBlocking, updateDocumentNonBlocking } from '@/firebase/non-blocking-updates';
   import { Skeleton } from '@/components/ui/skeleton';
 
   export default function InvoiceNumberPage() {
     const router = useRouter();
     const firestore = useFirestore();
-    const invoiceNumbersCollection = useMemoFirebase(() => collection(firestore, 'invoiceNumbers'), [firestore]);
+    const invoiceNumbersCollection = useMemoFirebase(() => firestore ? collection(firestore, 'invoiceNumbers'): null, [firestore]);
     const { data: invoices, isLoading } = useCollection<InvoiceNumber>(invoiceNumbersCollection);
 
     const [editingInvoice, setEditingInvoice] = useState<InvoiceNumber | undefined>(undefined);
@@ -50,15 +50,16 @@ import {
         deleteDocumentNonBlocking(invoiceDocRef);
     };
 
-    const handleSave = async (invoice: Omit<InvoiceNumber, 'id'>) => {
+    const handleSave = async (invoice: Omit<InvoiceNumber, 'id'> & {id: string}) => {
       if (!firestore) return;
 
       if (editingInvoice) {
         const invoiceDocRef = doc(firestore, 'invoiceNumbers', editingInvoice.id!);
         updateDocumentNonBlocking(invoiceDocRef, invoice);
       } else {
-        const docRef = await addDoc(collection(firestore, 'invoiceNumbers'), invoice);
-        router.push(`/dashboard/invoices/add?invoiceNumberId=${docRef.id}`);
+        const newDocRef = doc(firestore, 'invoiceNumbers', invoice.id);
+        await setDoc(newDocRef, invoice);
+        router.push(`/dashboard/invoices/add?invoiceNumberId=${newDocRef.id}`);
       }
       
       setIsDialogOpen(false);

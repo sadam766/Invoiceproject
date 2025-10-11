@@ -28,7 +28,7 @@ import type { InvoiceNumber } from '@/app/lib/data';
 type AddInvoiceNumberDialogProps = {
   isOpen: boolean;
   onOpenChange: (isOpen: boolean) => void;
-  onSave: (invoice: Omit<InvoiceNumber, 'id'>) => void;
+  onSave: (invoice: Omit<InvoiceNumber, 'id'> & {id: string}) => void;
   invoiceData?: InvoiceNumber;
   onAddClick: () => void;
 };
@@ -189,7 +189,7 @@ export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceDa
         </div>
         <DialogFooter>
           <Button variant="ghost" onClick={() => onOpenChange(false)}>Cancel</Button>
-          <Button type="button" onClick={handleSave}>Save & Create Invoice</Button>
+          <Button type="button" onClick={handleSave}>Save &amp; Create Invoice</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
