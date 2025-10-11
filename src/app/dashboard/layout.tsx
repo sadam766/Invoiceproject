@@ -59,7 +59,6 @@ export default function DashboardLayout({
 
   const [openMenus, setOpenMenus] = useState({
     invoices: pathname.startsWith('/dashboard/invoices'),
-    sales: pathname.startsWith('/dashboard/sales'),
   });
 
   const toggleMenu = (menu: keyof typeof openMenus) => {
