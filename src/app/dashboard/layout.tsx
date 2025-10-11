@@ -32,7 +32,6 @@ import {
   Calendar,
   ChevronDown,
   Globe,
-  Sun,
   Bell,
   PanelLeft,
   Search,
@@ -49,6 +48,7 @@ import {
 import React, { useState } from 'react';
 import { usePathname } from 'next/navigation';
 import Link from 'next/link';
+import { ThemeToggle } from '../components/theme-toggle';
 
 export default function DashboardLayout({
   children,
@@ -178,7 +178,6 @@ export default function DashboardLayout({
                     <Link href="/dashboard/customers" passHref>
                         <SidebarMenuSubButton asChild isActive={pathname === '/dashboard/customers'}><a>Customer List</a></SidebarMenuSubButton>
                     </Link>
-                  <SidebarMenuSubButton><a>Add Customer</a></SidebarMenuSubButton>
                 </SidebarMenuSub>
               )}
             </SidebarMenuItem>
@@ -247,9 +246,7 @@ export default function DashboardLayout({
                 <Button variant="ghost" size="icon">
                     <Globe className="h-5 w-5" />
                 </Button>
-                <Button variant="ghost" size="icon">
-                    <Sun className="h-5 w-5" />
-                </Button>
+                <ThemeToggle />
                 <Button variant="ghost" size="icon">
                     <LayoutDashboard className="h-5 w-5" />
                 </Button>
