@@ -110,17 +110,25 @@ export default function DashboardLayout({
               {openMenus.invoices && (
                 <SidebarMenuSub>
                   <Link href="/dashboard/invoices" passHref>
-                    <SidebarMenuSubButton asChild isActive={pathname === '/dashboard/invoices'}>Invoice List</SidebarMenuSubButton>
+                    <SidebarMenuSubButton asChild isActive={pathname === '/dashboard/invoices'}>
+                      <a>Invoice List</a>
+                    </SidebarMenuSubButton>
                   </Link>
                   <Link href="/dashboard/invoices/add" passHref>
-                    <SidebarMenuSubButton asChild isActive={pathname === '/dashboard/invoices/add'}>Add Invoice</SidebarMenuSubButton>
+                    <SidebarMenuSubButton asChild isActive={pathname === '/dashboard/invoices/add'}>
+                      <a>Add Invoice</a>
+                    </SidebarMenuSubButton>
                   </Link>
                   <Link href="/dashboard/invoices/number" passHref>
-                    <SidebarMenuSubButton asChild isActive={pathname === '/dashboard/invoices/number'}>Invoice Number</SidebarMenuSubButton>
+                    <SidebarMenuSubButton asChild isActive={pathname === '/dashboard/invoices/number'}>
+                      <a>Invoice Number</a>
+                    </SidebarMenuSubButton>
                   </Link>
-                  <SidebarMenuSubButton>SPD</SidebarMenuSubButton>
+                  <SidebarMenuSubButton><a>SPD</a></SidebarMenuSubButton>
                   <Link href="/dashboard/invoices/tax" passHref>
-                    <SidebarMenuSubButton asChild isActive={pathname === '/dashboard/invoices/tax'}>Tax Invoices</SidebarMenuSubButton>
+                    <SidebarMenuSubButton asChild isActive={pathname === '/dashboard/invoices/tax'}>
+                      <a>Tax Invoices</a>
+                    </SidebarMenuSubButton>
                   </Link>
                 </SidebarMenuSub>
               )}
@@ -138,9 +146,9 @@ export default function DashboardLayout({
               {openMenus.products && (
                 <SidebarMenuSub>
                   <Link href="/dashboard/products" passHref>
-                    <SidebarMenuSubButton asChild isActive={pathname === '/dashboard/products'}>List Product</SidebarMenuSubButton>
+                    <SidebarMenuSubButton asChild isActive={pathname === '/dashboard/products'}><a>List Product</a></SidebarMenuSubButton>
                   </Link>
-                  <SidebarMenuSubButton>Add Product</SidebarMenuSubButton>
+                  <SidebarMenuSubButton><a>Add Product</a></SidebarMenuSubButton>
                 </SidebarMenuSub>
               )}
             </SidebarMenuItem>
@@ -165,9 +173,9 @@ export default function DashboardLayout({
                {openMenus.customers && (
                 <SidebarMenuSub>
                     <Link href="/dashboard/customers" passHref>
-                        <SidebarMenuSubButton asChild isActive={pathname === '/dashboard/customers'}>Customer List</SidebarMenuSubButton>
+                        <SidebarMenuSubButton asChild isActive={pathname === '/dashboard/customers'}><a>Customer List</a></SidebarMenuSubButton>
                     </Link>
-                  <SidebarMenuSubButton>Add Customer</SidebarMenuSubButton>
+                  <SidebarMenuSubButton><a>Add Customer</a></SidebarMenuSubButton>
                 </SidebarMenuSub>
               )}
             </SidebarMenuItem>
@@ -184,9 +192,9 @@ export default function DashboardLayout({
                {openMenus.sales && (
                 <SidebarMenuSub>
                   <Link href="/dashboard/sales" passHref>
-                    <SidebarMenuSubButton asChild isActive={pathname === '/dashboard/sales'}>Sales List</SidebarMenuSubButton>
+                    <SidebarMenuSubButton asChild isActive={pathname === '/dashboard/sales'}><a>Sales List</a></SidebarMenuSubButton>
                   </Link>
-                  <SidebarMenuSubButton>Add Sale</SidebarMenuSubButton>
+                  <SidebarMenuSubButton><a>Add Sale</a></SidebarMenuSubButton>
                 </SidebarMenuSub>
               )}
             </SidebarMenuItem>
