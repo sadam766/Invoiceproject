@@ -59,7 +59,6 @@ export default function DashboardLayout({
 
   const [openMenus, setOpenMenus] = useState({
     invoices: pathname.startsWith('/dashboard/invoices'),
-    products: pathname.startsWith('/dashboard/products'),
   });
 
   const toggleMenu = (menu: keyof typeof openMenus) => {
@@ -136,24 +135,12 @@ export default function DashboardLayout({
               )}
             </SidebarMenuItem>
             <SidebarMenuItem>
-              <SidebarMenuButton onClick={() => toggleMenu('products')}>
-                <Package />
-                Products
-                <ChevronDown
-                  className={`ml-auto h-4 w-4 transition-transform ${
-                    openMenus.products ? 'rotate-180' : ''
-                  }`}
-                />
-              </SidebarMenuButton>
-              {openMenus.products && (
-                <SidebarMenuSub>
-                  <Link href="/dashboard/products" passHref>
-                    <SidebarMenuSubButton asChild isActive={pathname === '/dashboard/products'}>
-                      <a>List Product</a>
-                    </SidebarMenuSubButton>
-                  </Link>
-                </SidebarMenuSub>
-              )}
+              <Link href="/dashboard/products" passHref>
+                <SidebarMenuButton isActive={pathname.startsWith('/dashboard/products')}>
+                  <Package />
+                  Products
+                </SidebarMenuButton>
+              </Link>
             </SidebarMenuItem>
             <SidebarMenuItem>
               <Link href="/dashboard/sales-orders" passHref>
@@ -165,7 +152,7 @@ export default function DashboardLayout({
             </SidebarMenuItem>
             <SidebarMenuItem>
               <Link href="/dashboard/customers" passHref>
-                <SidebarMenuButton isActive={pathname === '/dashboard/customers'}>
+                <SidebarMenuButton isActive={pathname.startsWith('/dashboard/customers')}>
                   <Users />
                   Customers
                 </SidebarMenuButton>
@@ -173,7 +160,7 @@ export default function DashboardLayout({
             </SidebarMenuItem>
              <SidebarMenuItem>
                 <Link href="/dashboard/sales" passHref>
-                    <SidebarMenuButton isActive={pathname === '/dashboard/sales'}>
+                    <SidebarMenuButton isActive={pathname.startsWith('/dashboard/sales')}>
                         <ShoppingCart />
                         Sales
                     </SidebarMenuButton>
