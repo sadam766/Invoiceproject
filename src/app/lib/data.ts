@@ -307,3 +307,33 @@ export const customerListData: Customer[] = [
     spdAddress: 'Jl. Gajah Mada No. 10, Surabaya',
   },
 ];
+
+export type SalesListItem = {
+  soNumber: string;
+  customer: string;
+  sales: string;
+  poNumber: string;
+  amount: number;
+  status: 'Paid' | 'Unpaid';
+  paidDate?: string;
+};
+
+export const salesListData: SalesListItem[] = [
+  {
+    soNumber: 'SO-2024-001',
+    customer: 'PT. Sejahtera Abadi',
+    sales: 'Budi',
+    poNumber: 'PO-ABC-001',
+    amount: 1000000,
+    status: 'Unpaid',
+  },
+  {
+    soNumber: 'SO-2024-002',
+    customer: 'CV. Maju Jaya',
+    sales: 'Citra',
+    poNumber: 'PO-DEF-002',
+    amount: 1500000,
+    status: 'Paid',
+    paidDate: '2024-05-25',
+  },
+];

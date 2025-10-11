@@ -179,8 +179,8 @@ export default function DashboardLayout({
               )}
             </SidebarMenuItem>
              <SidebarMenuItem>
-              <SidebarMenuButton onClick={() => setSalesOpen(!isSalesOpen)}>
-                <BarChart />
+              <SidebarMenuButton onClick={() => setSalesOpen(!isSalesOpen)} isActive={isSalesOpen}>
+                <ShoppingCart />
                 Sales
                 <ChevronDown
                   className={`ml-auto h-4 w-4 transition-transform ${
@@ -190,7 +190,10 @@ export default function DashboardLayout({
               </SidebarMenuButton>
                {isSalesOpen && (
                 <SidebarMenuSub>
-                  <SidebarMenuSubButton>Sales</SidebarMenuSubButton>
+                  <Link href="/dashboard/sales" passHref>
+                    <SidebarMenuSubButton isActive={pathname === '/dashboard/sales'}>Sales List</SidebarMenuSubButton>
+                  </Link>
+                  <SidebarMenuSubButton>Add Sale</SidebarMenuSubButton>
                 </SidebarMenuSub>
               )}
             </SidebarMenuItem>
