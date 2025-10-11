@@ -1,8 +1,10 @@
 export const firebaseConfig = {
-  "projectId": "studio-7965178539-236f3",
-  "appId": "1:432612300615:web:f406b4ee6ea643b80e5e62",
-  "apiKey": "AIzaSyA641pV1OC68S3SBYzJ-mpT_xcBlVTcV4c",
-  "authDomain": "studio-7965178539-236f3.firebaseapp.com",
-  "measurementId": "",
-  "messagingSenderId": "432612300615"
+  apiKey: "AIzaSyDhMFk2zI8mBEhQGVhJU9galY83gg1cpMM",
+  authDomain: "projectdakota-9e0cc.firebaseapp.com",
+  databaseURL: "https://projectdakota-9e0cc-default-rtdb.firebaseio.com",
+  projectId: "projectdakota-9e0cc",
+  storageBucket: "projectdakota-9e0cc.appspot.com",
+  messagingSenderId: "623275029335",
+  appId: "1:623275029335:web:9caed78ba96f30d1bc8412",
+  measurementId: "G-L83D2RTJW9"
 };
