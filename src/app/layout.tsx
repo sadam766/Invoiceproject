@@ -4,24 +4,8 @@ import './globals.css';
 import { Toaster } from "@/components/ui/toaster";
 import { cn } from '@/lib/utils';
 import { ThemeProvider } from '@/app/components/theme-provider';
-import { FirebaseClientProvider, useAuth } from '@/firebase';
-import { useEffect } from 'react';
-import { signInAnonymously } from 'firebase/auth';
-
-const AppContent = ({ children }: { children: React.ReactNode }) => {
-  const auth = useAuth();
-
-  useEffect(() => {
-    if (auth && !auth.currentUser) {
-      signInAnonymously(auth).catch((error) => {
-        console.error("Anonymous sign-in failed:", error);
-      });
-    }
-  }, [auth]);
-
-  return <>{children}</>;
-};
-
+import { FirebaseClientProvider } from '@/firebase';
+import { FirebaseErrorListener } from '@/components/FirebaseErrorListener';
 
 export default function RootLayout({
   children,
@@ -49,7 +33,8 @@ export default function RootLayout({
             enableSystem
             disableTransitionOnChange
           >
-            <AppContent>{children}</AppContent>
+            <FirebaseErrorListener />
+            {children}
             <Toaster />
           </ThemeProvider>
         </FirebaseClientProvider>
