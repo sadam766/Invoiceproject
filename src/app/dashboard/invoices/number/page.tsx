@@ -1,6 +1,7 @@
 
 'use client';
 import { useState } from 'react';
+import { useRouter } from 'next/navigation';
 import {
     Card,
     CardContent,
@@ -15,13 +16,21 @@ import {
   } from '@/components/ui/table';
   import { Input } from '@/components/ui/input';
   import { Button } from '@/components/ui/button';
-  import { invoiceNumberData, type InvoiceNumber } from '@/app/lib/data';
-  import { Search, Upload, Download, Filter, Plus } from 'lucide-react';
+  import { type InvoiceNumber } from '@/app/lib/data';
+  import { Search, Upload, Download, Filter } from 'lucide-react';
   import { AddInvoiceNumberDialog } from './_components/add-invoice-number-dialog';
   import { DeleteConfirmationDialog } from '@/app/components/delete-confirmation-dialog';
-  
+  import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
+  import { collection, doc, addDoc } from 'firebase/firestore';
+  import { deleteDocumentNonBlocking, updateDocumentNonBlocking } from '@/firebase/non-blocking-updates';
+  import { Skeleton } from '@/components/ui/skeleton';
+
   export default function InvoiceNumberPage() {
-    const [invoices, setInvoices] = useState(invoiceNumberData);
+    const router = useRouter();
+    const firestore = useFirestore();
+    const invoiceNumbersCollection = useMemoFirebase(() => collection(firestore, 'invoiceNumbers'), [firestore]);
+    const { data: invoices, isLoading } = useCollection<InvoiceNumber>(invoiceNumbersCollection);
+
     const [editingInvoice, setEditingInvoice] = useState<InvoiceNumber | undefined>(undefined);
     const [isDialogOpen, setIsDialogOpen] = useState(false);
 
@@ -36,21 +45,22 @@ import {
     };
 
     const handleDelete = (invoiceId: string) => {
-        setInvoices(invoices.filter((i) => i.id !== invoiceId));
+        if (!firestore) return;
+        const invoiceDocRef = doc(firestore, 'invoiceNumbers', invoiceId);
+        deleteDocumentNonBlocking(invoiceDocRef);
     };
 
-    const handleSave = (invoice: InvoiceNumber) => {
-      if (editingInvoice && editingInvoice.id === invoice.id) {
-        // Editing existing invoice
-        setInvoices(invoices.map((i) => i.id === invoice.id ? invoice : i));
-      } else if(editingInvoice) {
-        const filteredInvoices = invoices.filter(i => i.id !== editingInvoice.id);
-        setInvoices([...filteredInvoices, invoice]);
+    const handleSave = async (invoice: Omit<InvoiceNumber, 'id'>) => {
+      if (!firestore) return;
+
+      if (editingInvoice) {
+        const invoiceDocRef = doc(firestore, 'invoiceNumbers', editingInvoice.id!);
+        updateDocumentNonBlocking(invoiceDocRef, invoice);
+      } else {
+        const docRef = await addDoc(collection(firestore, 'invoiceNumbers'), invoice);
+        router.push(`/dashboard/invoices/add?invoiceNumberId=${docRef.id}`);
       }
-      else {
-        // Adding new invoice
-        setInvoices([...invoices, invoice]);
-      }
+      
       setIsDialogOpen(false);
       setEditingInvoice(undefined);
     };
@@ -103,26 +113,39 @@ import {
                             </TableRow>
                         </TableHeader>
                         <TableBody>
-                            {invoices.map((invoice) => (
-                                <TableRow key={invoice.id}>
-                                    <TableCell className="font-medium">{invoice.id}</TableCell>
-                                    <TableCell>{invoice.customer}</TableCell>
-                                    <TableCell>{invoice.salesOrder}</TableCell>
-                                    <TableCell>{invoice.date}</TableCell>
-                                    <TableCell>Rp {invoice.amount.toLocaleString('id-ID')},00</TableCell>
-                                    <TableCell>
-                                        <div className="flex gap-2">
-                                            <Button variant="link" className="p-0 h-auto" onClick={() => handleEdit(invoice)}>Edit</Button>
-                                            <DeleteConfirmationDialog onConfirm={() => handleDelete(invoice.id)} />
-                                        </div>
-                                    </TableCell>
-                                </TableRow>
-                            ))}
+                            {isLoading ? (
+                                Array.from({ length: 3 }).map((_, i) => (
+                                    <TableRow key={i}>
+                                        <TableCell><Skeleton className="h-4 w-32" /></TableCell>
+                                        <TableCell><Skeleton className="h-4 w-48" /></TableCell>
+                                        <TableCell><Skeleton className="h-4 w-32" /></TableCell>
+                                        <TableCell><Skeleton className="h-4 w-24" /></TableCell>
+                                        <TableCell><Skeleton className="h-4 w-28" /></TableCell>
+                                        <TableCell><Skeleton className="h-4 w-20" /></TableCell>
+                                    </TableRow>
+                                ))
+                            ) : (
+                                invoices?.map((invoice) => (
+                                    <TableRow key={invoice.id}>
+                                        <TableCell className="font-medium">{invoice.id}</TableCell>
+                                        <TableCell>{invoice.customer}</TableCell>
+                                        <TableCell>{invoice.salesOrder}</TableCell>
+                                        <TableCell>{invoice.date}</TableCell>
+                                        <TableCell>Rp {invoice.amount.toLocaleString('id-ID')},00</TableCell>
+                                        <TableCell>
+                                            <div className="flex gap-2">
+                                                <Button variant="link" className="p-0 h-auto" onClick={() => handleEdit(invoice)}>Edit</Button>
+                                                <DeleteConfirmationDialog onConfirm={() => handleDelete(invoice.id!)} />
+                                            </div>
+                                        </TableCell>
+                                    </TableRow>
+                                ))
+                            )}
                         </TableBody>
                     </Table>
                 </div>
                 <div className="text-sm text-muted-foreground mt-4">
-                    Showing 1 to {invoices.length} of {invoices.length} entries
+                    Showing 1 to {invoices?.length || 0} of {invoices?.length || 0} entries
                 </div>
             </CardContent>
         </Card>

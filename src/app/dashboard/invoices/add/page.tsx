@@ -1,7 +1,8 @@
 
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { useSearchParams, useRouter } from 'next/navigation';
 import {
   Card,
   CardContent,
@@ -40,12 +41,92 @@ import {
   Settings,
 } from 'lucide-react';
 import Link from 'next/link';
+import { useDoc, useFirestore, useMemoFirebase } from '@/firebase';
+import { doc, collection, addDoc, serverTimestamp } from 'firebase/firestore';
+import { type InvoiceNumber } from '@/app/lib/data';
+import { useToast } from '@/hooks/use-toast';
 
 export default function AddInvoicePage() {
-  const [issueDate, setIssueDate] = useState<Date | undefined>(
-    new Date(2025, 10, 11)
-  );
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const firestore = useFirestore();
+  const { toast } = useToast();
+
+  const invoiceNumberId = searchParams.get('invoiceNumberId');
+  const invoiceNumberDocRef = useMemoFirebase(() => {
+    if (!firestore || !invoiceNumberId) return null;
+    return doc(firestore, 'invoiceNumbers', invoiceNumberId);
+  }, [firestore, invoiceNumberId]);
+
+  const { data: invoiceNumberData, isLoading } = useDoc<InvoiceNumber>(invoiceNumberDocRef);
+  
+  const [invoiceId, setInvoiceId] = useState('');
+  const [customerName, setCustomerName] = useState('');
+  const [soNumber, setSoNumber] = useState('');
+  const [issueDate, setIssueDate] = useState<Date | undefined>(new Date());
   const [dueDate, setDueDate] = useState<Date | undefined>();
+  const [totalAmount, setTotalAmount] = useState(0);
+  const [status, setStatus] = useState('draft');
+
+
+  useEffect(() => {
+    if (invoiceNumberData) {
+      setInvoiceId(invoiceNumberData.id);
+      setCustomerName(invoiceNumberData.customer);
+      setSoNumber(invoiceNumberData.salesOrder);
+      setTotalAmount(invoiceNumberData.amount);
+      if (invoiceNumberData.date) {
+        setIssueDate(new Date(invoiceNumberData.date.split('/').reverse().join('-')));
+      }
+    }
+  }, [invoiceNumberData]);
+  
+  const handleSaveInvoice = async (invoiceStatus: 'draft' | 'sent' = 'draft') => {
+    if (!firestore) {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Firestore is not initialized.",
+      });
+      return;
+    }
+
+    const invoiceData = {
+      id: invoiceId,
+      customer: customerName,
+      soNumber: soNumber,
+      date: issueDate ? format(issueDate, 'yyyy-MM-dd') : '',
+      amount: totalAmount,
+      status: invoiceStatus,
+      spdNumber: '-',
+      createdAt: serverTimestamp(),
+    };
+    
+    try {
+      await addDoc(collection(firestore, 'invoices'), invoiceData);
+      toast({
+        title: "Invoice Saved",
+        description: `Invoice ${invoiceId} has been successfully saved.`,
+      });
+      router.push('/dashboard/invoices');
+    } catch (error) {
+      console.error("Error saving invoice:", error);
+      toast({
+        variant: "destructive",
+        title: "Uh oh! Something went wrong.",
+        description: "There was a problem with your request.",
+      });
+    }
+  };
+
+
+  if (isLoading && invoiceNumberId) {
+    return (
+        <main className="flex flex-1 flex-col gap-4 p-4 md:gap-8 md:p-8">
+            <div>Loading invoice data...</div>
+        </main>
+    )
+  }
 
   return (
     <main className="flex flex-1 flex-col gap-4 p-4 md:gap-8 md:p-8">
@@ -66,11 +147,11 @@ export default function AddInvoicePage() {
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
               <div>
                 <label className="text-sm font-medium">Invoice No.</label>
-                <Input />
+                <Input value={invoiceId} onChange={e => setInvoiceId(e.target.value)} />
               </div>
               <div>
                 <label className="text-sm font-medium">SO/Sales Order</label>
-                <Input placeholder="Search an SO..." />
+                <Input placeholder="Search an SO..." value={soNumber} onChange={e => setSoNumber(e.target.value)} />
               </div>
               <div>
                 <label className="text-sm font-medium">No. PO</label>
@@ -82,7 +163,7 @@ export default function AddInvoicePage() {
               </div>
               <div className="lg:col-span-2">
                 <label className="text-sm font-medium">Bill To</label>
-                <Input placeholder="Search for a customer..." />
+                <Input placeholder="Search for a customer..." value={customerName} onChange={e => setCustomerName(e.target.value)} />
               </div>
               <div>
                 <label className="text-sm font-medium">Issue Date</label>
@@ -168,7 +249,7 @@ export default function AddInvoicePage() {
                     <TableCell>
                       <Input placeholder="Rp 0,00" />
                     </TableCell>
-                    <TableCell className="text-right">Rp 0,00</TableCell>
+                    <TableCell className="text-right">Rp {totalAmount.toLocaleString('id-ID')},00</TableCell>
                     <TableCell>
                       <Button variant="ghost" size="icon">
                         <Trash2 className="h-4 w-4" />
@@ -186,7 +267,7 @@ export default function AddInvoicePage() {
                 <div className="lg:col-start-3 lg:col-span-2">
                     <div className="flex justify-between items-center py-1">
                         <span className="text-sm text-muted-foreground">Subtotal:</span>
-                        <span className="text-sm font-medium">Rp 0,00</span>
+                        <span className="text-sm font-medium">Rp {totalAmount.toLocaleString('id-ID')},00</span>
                     </div>
                     <div className="flex justify-between items-center py-1">
                         <span className="text-sm text-muted-foreground">A/Negotiation:</span>
@@ -222,7 +303,7 @@ export default function AddInvoicePage() {
                     </div>
                      <div className="flex justify-between items-center py-2 mt-2 border-t">
                         <span className="text-base font-bold">Total:</span>
-                        <span className="text-base font-bold">Rp 0,00</span>
+                        <span className="text-base font-bold">Rp {totalAmount.toLocaleString('id-ID')},00</span>
                     </div>
                 </div>
             </div>
@@ -232,7 +313,7 @@ export default function AddInvoicePage() {
           <Card>
             <CardContent className="p-4 space-y-4">
               <div className="flex gap-2">
-                <Button className="flex-1">
+                <Button className="flex-1" onClick={() => handleSaveInvoice('sent')}>
                   <Send className="mr-2 h-4 w-4" /> Send Invoice
                 </Button>
                 <Button variant="outline" size="icon">
@@ -242,13 +323,13 @@ export default function AddInvoicePage() {
               <Button variant="outline" className="w-full">
                 Preview
               </Button>
-              <Button variant="outline" className="w-full">
+              <Button variant="outline" className="w-full" onClick={() => handleSaveInvoice('draft')}>
                 Save
               </Button>
 
               <div className="space-y-2">
                 <label className="text-sm font-medium">Status</label>
-                <Select defaultValue="draft">
+                <Select value={status} onValueChange={setStatus}>
                   <SelectTrigger>
                     <SelectValue />
                   </SelectTrigger>

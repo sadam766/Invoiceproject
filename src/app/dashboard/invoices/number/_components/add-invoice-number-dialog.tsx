@@ -22,13 +22,13 @@ import {
 } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
 import { cn } from '@/lib/utils';
-import { format, formatISO } from 'date-fns';
+import { format } from 'date-fns';
 import type { InvoiceNumber } from '@/app/lib/data';
 
 type AddInvoiceNumberDialogProps = {
   isOpen: boolean;
   onOpenChange: (isOpen: boolean) => void;
-  onSave: (invoice: InvoiceNumber) => void;
+  onSave: (invoice: Omit<InvoiceNumber, 'id'>) => void;
   invoiceData?: InvoiceNumber;
   onAddClick: () => void;
 };
@@ -189,7 +189,7 @@ export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceDa
         </div>
         <DialogFooter>
           <Button variant="ghost" onClick={() => onOpenChange(false)}>Cancel</Button>
-          <Button type="button" onClick={handleSave}>Save</Button>
+          <Button type="button" onClick={handleSave}>Save & Create Invoice</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

@@ -1,4 +1,5 @@
 
+'use client';
 import Link from 'next/link';
 import {
     Card,
@@ -20,13 +21,20 @@ import {
   import { Button } from '@/components/ui/button';
   import { Badge } from '@/components/ui/badge';
   import { Checkbox } from '@/components/ui/checkbox';
-  import { invoiceListData } from '@/app/lib/data';
+  import { type Invoice } from '@/app/lib/data';
   import { Search, Filter, MoreHorizontal, ArrowUpDown, Plus } from 'lucide-react';
-  
+  import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
+  import { collection } from 'firebase/firestore';
+  import { Skeleton } from '@/components/ui/skeleton';
+
   export default function InvoiceListPage() {
-    const totalFiltered = invoiceListData.reduce((sum, item) => sum + item.amount, 0);
-    const totalPaid = invoiceListData.filter(item => item.status === 'Paid').reduce((sum, item) => sum + item.amount, 0);
-    const totalUnpaid = invoiceListData.filter(item => item.status === 'Unpaid').reduce((sum, item) => sum + item.amount, 0);
+    const firestore = useFirestore();
+    const invoicesCollection = useMemoFirebase(() => collection(firestore, 'invoices'), [firestore]);
+    const { data: invoices, isLoading } = useCollection<Invoice>(invoicesCollection);
+    
+    const totalFiltered = invoices?.reduce((sum, item) => sum + item.amount, 0) || 0;
+    const totalPaid = invoices?.filter(item => item.status === 'Paid' || item.status === 'paid').reduce((sum, item) => sum + item.amount, 0) || 0;
+    const totalUnpaid = invoices?.filter(item => item.status === 'Unpaid' || item.status === 'unpaid' || item.status === 'sent').reduce((sum, item) => sum + item.amount, 0) || 0;
   
     return (
       <main className="flex flex-1 flex-col gap-4 p-4 md:gap-8 md:p-8">
@@ -113,9 +121,9 @@ import {
                     </div>
                     <div className="flex justify-between items-center">
                     <TabsList>
-                        <TabsTrigger value="all">All Invoices <Badge variant="secondary" className="ml-2">2</Badge></TabsTrigger>
-                        <TabsTrigger value="paid">Paid <Badge variant="secondary" className="ml-2">1</Badge></TabsTrigger>
-                        <TabsTrigger value="unpaid">Unpaid <Badge variant="secondary" className="ml-2">1</Badge></TabsTrigger>
+                        <TabsTrigger value="all">All Invoices <Badge variant="secondary" className="ml-2">{invoices?.length || 0}</Badge></TabsTrigger>
+                        <TabsTrigger value="paid">Paid <Badge variant="secondary" className="ml-2">{invoices?.filter(i => i.status === 'paid').length || 0}</Badge></TabsTrigger>
+                        <TabsTrigger value="unpaid">Unpaid <Badge variant="secondary" className="ml-2">{invoices?.filter(i => i.status !== 'paid').length || 0}</Badge></TabsTrigger>
                     </TabsList>
                     <div className="flex items-center gap-2">
                         <div className="relative w-64">
@@ -144,35 +152,51 @@ import {
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
-                                {invoiceListData.map((invoice) => (
-                                <TableRow key={invoice.id}>
-                                    <TableCell>
-                                        <Checkbox />
-                                    </TableCell>
-                                    <TableCell className="font-medium">{invoice.id}</TableCell>
-                                    <TableCell>{invoice.soNumber}</TableCell>
-                                    <TableCell>{invoice.customer}</TableCell>
-                                    <TableCell>{invoice.date}</TableCell>
-                                    <TableCell>Rp {invoice.amount.toLocaleString('id-ID')},00</TableCell>
-                                    <TableCell>
-                                        <Badge variant={invoice.status === 'Paid' ? 'outline' : 'destructive'} 
-                                        className={invoice.status === 'Paid' ? 'bg-green-100 text-green-800 border-green-200' : 'bg-red-100 text-red-800 border-red-200'}>
-                                            {invoice.status}
-                                        </Badge>
-                                    </TableCell>
-                                    <TableCell>{invoice.spdNumber}</TableCell>
-                                    <TableCell>
-                                        <Button variant="ghost" size="icon">
-                                            <MoreHorizontal className="h-4 w-4" />
-                                        </Button>
-                                    </TableCell>
-                                </TableRow>
-                                ))}
+                                {isLoading ? (
+                                    Array.from({ length: 3 }).map((_, i) => (
+                                        <TableRow key={i}>
+                                            <TableCell><Skeleton className="h-4 w-4" /></TableCell>
+                                            <TableCell><Skeleton className="h-4 w-32" /></TableCell>
+                                            <TableCell><Skeleton className="h-4 w-32" /></TableCell>
+                                            <TableCell><Skeleton className="h-4 w-48" /></TableCell>
+                                            <TableCell><Skeleton className="h-4 w-24" /></TableCell>
+                                            <TableCell><Skeleton className="h-4 w-28" /></TableCell>
+                                            <TableCell><Skeleton className="h-6 w-16 rounded-full" /></TableCell>
+                                            <TableCell><Skeleton className="h-4 w-32" /></TableCell>
+                                            <TableCell><Skeleton className="h-8 w-8" /></TableCell>
+                                        </TableRow>
+                                    ))
+                                ) : (
+                                    invoices?.map((invoice) => (
+                                    <TableRow key={invoice.id}>
+                                        <TableCell>
+                                            <Checkbox />
+                                        </TableCell>
+                                        <TableCell className="font-medium">{invoice.id}</TableCell>
+                                        <TableCell>{invoice.soNumber}</TableCell>
+                                        <TableCell>{invoice.customer}</TableCell>
+                                        <TableCell>{invoice.date}</TableCell>
+                                        <TableCell>Rp {invoice.amount.toLocaleString('id-ID')},00</TableCell>
+                                        <TableCell>
+                                            <Badge variant={invoice.status === 'Paid' || invoice.status === 'paid' ? 'outline' : 'destructive'} 
+                                            className={invoice.status === 'Paid' || invoice.status === 'paid' ? 'bg-green-100 text-green-800 border-green-200' : 'bg-red-100 text-red-800 border-red-200 capitalize'}>
+                                                {invoice.status}
+                                            </Badge>
+                                        </TableCell>
+                                        <TableCell>{invoice.spdNumber}</TableCell>
+                                        <TableCell>
+                                            <Button variant="ghost" size="icon">
+                                                <MoreHorizontal className="h-4 w-4" />
+                                            </Button>
+                                        </TableCell>
+                                    </TableRow>
+                                    ))
+                                )}
                             </TableBody>
                             </Table>
                         </div>
                         <div className="text-sm text-muted-foreground mt-4">
-                            Showing 1 to 2 of 2 entries
+                            Showing 1 to {invoices?.length || 0} of {invoices?.length || 0} entries
                         </div>
                     </TabsContent>
                 </Tabs>
@@ -181,4 +205,3 @@ import {
       </main>
     );
   }
-  

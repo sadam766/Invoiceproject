@@ -151,7 +151,7 @@ export type Invoice = {
   customer: string;
   date: string;
   amount: number;
-  status: 'Paid' | 'Unpaid';
+  status: 'paid' | 'unpaid' | 'sent' | 'draft';
   spdNumber: string;
 };
 
@@ -162,7 +162,7 @@ export const invoiceListData: Invoice[] = [
     customer: 'PT. Sejahtera Abadi',
     date: '2024-05-11',
     amount: 1000000,
-    status: 'Unpaid',
+    status: 'unpaid',
     spdNumber: '-',
   },
   {
@@ -171,7 +171,7 @@ export const invoiceListData: Invoice[] = [
     customer: 'CV. Maju Jaya',
     date: '2024-05-13',
     amount: 1500000,
-    status: 'Paid',
+    status: 'paid',
     spdNumber: 'PS/1-J/KEU/2024/DK',
   },
 ];
