@@ -198,10 +198,12 @@ export default function DashboardLayout({
               )}
             </SidebarMenuItem>
              <SidebarMenuItem>
-              <SidebarMenuButton>
-                <BarChart />
-                Sales Management
-              </SidebarMenuButton>
+                <Link href="/dashboard/sales-management" passHref>
+                    <SidebarMenuButton isActive={pathname === '/dashboard/sales-management'}>
+                        <BarChart />
+                        Sales Management
+                    </SidebarMenuButton>
+                </Link>
             </SidebarMenuItem>
              <SidebarMenuItem>
               <SidebarMenuButton>
