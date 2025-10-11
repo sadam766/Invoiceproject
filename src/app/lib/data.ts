@@ -144,3 +144,34 @@ export const salesMonitoringData: SalesMonitoringData[] = [
     needsSpd: true,
   },
 ];
+
+export type Invoice = {
+  id: string;
+  soNumber: string;
+  customer: string;
+  date: string;
+  amount: number;
+  status: 'Paid' | 'Unpaid';
+  spdNumber: string;
+};
+
+export const invoiceListData: Invoice[] = [
+  {
+    id: 'INV/2024/001',
+    soNumber: 'SO-2024-001',
+    customer: 'PT. Sejahtera Abadi',
+    date: '2024-05-11',
+    amount: 1000000,
+    status: 'Unpaid',
+    spdNumber: '-',
+  },
+  {
+    id: 'INV/2024/002',
+    soNumber: 'SO-2024-002',
+    customer: 'CV. Maju Jaya',
+    date: '2024-05-13',
+    amount: 1500000,
+    status: 'Paid',
+    spdNumber: 'PS/1-J/KEU/2024/DK',
+  },
+];

@@ -36,6 +36,9 @@ import {
   Bell,
   PanelLeft,
   Search,
+  File,
+  Sprout,
+  FileArchive,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -56,10 +59,14 @@ export default function DashboardLayout({
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
-  const [isInvoiceOpen, setInvoiceOpen] = React.useState(false);
+  const [isInvoiceOpen, setInvoiceOpen] = React.useState(pathname.startsWith('/dashboard/invoices'));
   const [isProductsOpen, setProductsOpen] = React.useState(false);
   const [isCustomersOpen, setCustomersOpen] = React.useState(false);
   const [isSalesOpen, setSalesOpen] = React.useState(false);
+
+  React.useEffect(() => {
+    setInvoiceOpen(pathname.startsWith('/dashboard/invoices'));
+  }, [pathname]);
 
   return (
     <SidebarProvider>
@@ -102,6 +109,10 @@ export default function DashboardLayout({
               </SidebarMenuButton>
               {isInvoiceOpen && (
                 <SidebarMenuSub>
+                  <Link href="/dashboard/invoices" passHref>
+                    <SidebarMenuSubButton isActive={pathname === '/dashboard/invoices'}>Invoice List</SidebarMenuSubButton>
+                  </Link>
+                  <SidebarMenuSubButton>Add Invoice</SidebarMenuSubButton>
                   <SidebarMenuSubButton>Invoice Number</SidebarMenuSubButton>
                   <SidebarMenuSubButton>SPD</SidebarMenuSubButton>
                   <SidebarMenuSubButton>Tax Invoices</SidebarMenuSubButton>
