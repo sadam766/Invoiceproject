@@ -60,8 +60,6 @@ export default function DashboardLayout({
   const [openMenus, setOpenMenus] = useState({
     invoices: pathname.startsWith('/dashboard/invoices'),
     products: pathname.startsWith('/dashboard/products'),
-    sales: pathname.startsWith('/dashboard/sales'),
-    customers: pathname.startsWith('/dashboard/customers'),
   });
 
   const toggleMenu = (menu: keyof typeof openMenus) => {
@@ -124,7 +122,7 @@ export default function DashboardLayout({
                       <a>Invoice Number</a>
                     </SidebarMenuSubButton>
                   </Link>
-                  <Link href="/dashboard/invoices/spd" passHref>
+                   <Link href="/dashboard/invoices/spd" passHref>
                     <SidebarMenuSubButton asChild isActive={pathname === '/dashboard/invoices/spd'}>
                         <a>SPD</a>
                     </SidebarMenuSubButton>
@@ -166,44 +164,20 @@ export default function DashboardLayout({
               </Link>
             </SidebarMenuItem>
             <SidebarMenuItem>
-              <SidebarMenuButton onClick={() => toggleMenu('customers')}>
-                <Users />
-                Customers
-                <ChevronDown
-                  className={`ml-auto h-4 w-4 transition-transform ${
-                    openMenus.customers ? 'rotate-180' : ''
-                  }`}
-                />
-              </SidebarMenuButton>
-               {openMenus.customers && (
-                <SidebarMenuSub>
-                    <Link href="/dashboard/customers" passHref>
-                        <SidebarMenuSubButton asChild isActive={pathname === '/dashboard/customers'}>
-                          <a>Customer List</a>
-                        </SidebarMenuSubButton>
-                    </Link>
-                </SidebarMenuSub>
-              )}
+              <Link href="/dashboard/customers" passHref>
+                <SidebarMenuButton isActive={pathname === '/dashboard/customers'}>
+                  <Users />
+                  Customers
+                </SidebarMenuButton>
+              </Link>
             </SidebarMenuItem>
              <SidebarMenuItem>
-              <SidebarMenuButton onClick={() => toggleMenu('sales')}>
-                <ShoppingCart />
-                Sales
-                <ChevronDown
-                  className={`ml-auto h-4 w-4 transition-transform ${
-                    openMenus.sales ? 'rotate-180' : ''
-                  }`}
-                />
-              </SidebarMenuButton>
-               {openMenus.sales && (
-                <SidebarMenuSub>
-                  <Link href="/dashboard/sales" passHref>
-                    <SidebarMenuSubButton asChild isActive={pathname === '/dashboard/sales'}>
-                      <a>Sales List</a>
-                    </SidebarMenuSubButton>
-                  </Link>
-                </SidebarMenuSub>
-              )}
+                <Link href="/dashboard/sales" passHref>
+                    <SidebarMenuButton isActive={pathname === '/dashboard/sales'}>
+                        <ShoppingCart />
+                        Sales
+                    </SidebarMenuButton>
+                </Link>
             </SidebarMenuItem>
              <SidebarMenuItem>
                 <Link href="/dashboard/sales-management" passHref>
