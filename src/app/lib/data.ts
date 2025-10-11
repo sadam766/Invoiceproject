@@ -104,3 +104,43 @@ export const recentSales: Sale[] = [
     status: 'Unpaid',
   },
 ];
+
+export type SalesMonitoringData = {
+  soNumber: string;
+  customer: string;
+  date: string;
+  amount: number;
+  invoice: string;
+  invoiceStatus: 'Paid' | 'Unpaid';
+  taxInvoice: string;
+  spd: string;
+  paymentStatus: 'Paid' | 'Unpaid';
+  needsSpd: boolean;
+};
+
+export const salesMonitoringData: SalesMonitoringData[] = [
+  {
+    soNumber: 'SO-2024-002',
+    customer: 'CV. Maju Jaya',
+    date: '2024-05-12',
+    amount: 1500000,
+    invoice: 'INV/2024/002',
+    invoiceStatus: 'Paid',
+    taxInvoice: 'N/A',
+    spd: 'PS/1-J/KEU/2024/DK',
+    paymentStatus: 'Paid',
+    needsSpd: false,
+  },
+  {
+    soNumber: 'SO-2024-001',
+    customer: 'PT. Sejahtera Abadi',
+    date: '2024-05-10',
+    amount: 1000000,
+    invoice: 'INV/2024/001',
+    invoiceStatus: 'Unpaid',
+    taxInvoice: '010.000-24.00000001',
+    spd: '',
+    paymentStatus: 'Unpaid',
+    needsSpd: true,
+  },
+];

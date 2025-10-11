@@ -47,12 +47,15 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import React from 'react';
+import { usePathname } from 'next/navigation';
+import Link from 'next/link';
 
 export default function DashboardLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
+  const pathname = usePathname();
   const [isInvoiceOpen, setInvoiceOpen] = React.useState(false);
   const [isProductsOpen, setProductsOpen] = React.useState(false);
   const [isCustomersOpen, setCustomersOpen] = React.useState(false);
@@ -72,16 +75,20 @@ export default function DashboardLayout({
         <SidebarContent>
           <SidebarMenu>
             <SidebarMenuItem>
-              <SidebarMenuButton isActive>
-                <LayoutDashboard />
-                Dashboard
-              </SidebarMenuButton>
+              <Link href="/dashboard" passHref>
+                <SidebarMenuButton isActive={pathname === '/dashboard'}>
+                  <LayoutDashboard />
+                  Dashboard
+                </SidebarMenuButton>
+              </Link>
             </SidebarMenuItem>
             <SidebarMenuItem>
-              <SidebarMenuButton>
-                <Eye />
-                Monitoring
-              </SidebarMenuButton>
+              <Link href="/dashboard/monitoring" passHref>
+                <SidebarMenuButton isActive={pathname === '/dashboard/monitoring'}>
+                  <Eye />
+                  Monitoring
+                </SidebarMenuButton>
+              </Link>
             </SidebarMenuItem>
             <SidebarMenuItem>
               <SidebarMenuButton onClick={() => setInvoiceOpen(!isInvoiceOpen)}>
