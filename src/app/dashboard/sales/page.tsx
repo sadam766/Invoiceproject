@@ -1,7 +1,10 @@
 
+'use client';
 import {
     Card,
     CardContent,
+    CardHeader,
+    CardTitle,
   } from '@/components/ui/card';
   import {
     Table,
@@ -18,6 +21,7 @@ import {
   import { Checkbox } from '@/components/ui/checkbox';
   import { salesListData } from '@/app/lib/data';
   import { Search, Filter, MoreHorizontal, ArrowUpDown, Plus, Upload, Download } from 'lucide-react';
+  import { AddSaleDialog } from './_components/add-sale-dialog';
   
   export default function SalesListPage() {
     const totalFiltered = salesListData.reduce((sum, item) => sum + item.amount, 0);
@@ -103,7 +107,7 @@ import {
                         <div className="flex items-center gap-2">
                            <Button variant="outline"><Upload className="mr-2 h-4 w-4"/> Import</Button>
                            <Button variant="outline"><Download className="mr-2 h-4 w-4"/> Export</Button>
-                           <Button className="bg-teal-500 hover:bg-teal-600"><Plus className="mr-2 h-4 w-4"/> New Sale</Button>
+                           <AddSaleDialog />
                         </div>
                     </div>
                     <div className="flex justify-between items-center">

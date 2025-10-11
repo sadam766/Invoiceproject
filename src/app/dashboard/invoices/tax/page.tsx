@@ -5,7 +5,7 @@ import {
   Card,
   CardContent,
   CardHeader,
-  CardTitle
+  CardTitle,
 } from '@/components/ui/card';
 import {
   Table,
@@ -22,6 +22,7 @@ import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
 import { taxInvoiceData } from '@/app/lib/data';
 import { Search, Upload, Download, Filter, Plus, ArrowUpDown } from 'lucide-react';
+import { AddTaxInvoiceDialog } from './_components/add-tax-invoice-dialog';
 
 export default function TaxInvoicePage() {
   return (
@@ -85,7 +86,7 @@ export default function TaxInvoicePage() {
                  <Button variant="outline"><Upload className="mr-2 h-4 w-4"/> Import</Button>
                  <Button variant="outline"><Download className="mr-2 h-4 w-4"/> Export</Button>
                  <Button variant="outline"><Filter className="mr-2 h-4 w-4"/> Filter Duplikat</Button>
-                 <Button className="bg-teal-500 hover:bg-teal-600"><Plus className="mr-2 h-4 w-4"/> New Tax Invoice</Button>
+                 <AddTaxInvoiceDialog />
               </div>
             </div>
             <div className="flex justify-between items-center">

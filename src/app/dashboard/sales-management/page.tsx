@@ -1,4 +1,5 @@
 
+'use client';
 import {
     Card,
     CardContent,
@@ -22,6 +23,7 @@ import {
   import { Button } from '@/components/ui/button';
   import { Badge } from '@/components/ui/badge';
   import { Calendar, ChevronRight, Edit, Search, ArrowUpDown, List, LayoutGrid, Plus, MoreVertical } from 'lucide-react';
+  import { AddDocumentDialog } from './_components/add-document-dialog';
   
   export default function SalesManagementPage() {
     return (
@@ -122,9 +124,7 @@ import {
                                 <LayoutGrid className="h-4 w-4"/>
                             </Button>
                         </div>
-                        <Button className="bg-teal-500 hover:bg-teal-600">
-                           <Plus className="mr-2 h-4 w-4"/> CREATE DOCUMENT
-                        </Button>
+                        <AddDocumentDialog />
                     </div>
                 </div>
 

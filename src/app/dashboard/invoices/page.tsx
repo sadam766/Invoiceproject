@@ -1,4 +1,5 @@
 
+import Link from 'next/link';
 import {
     Card,
     CardContent,
@@ -105,7 +106,9 @@ import {
                         </div>
                         <div className="flex items-center gap-2">
                            <Button variant="outline">Buat SPD dari Pilihan</Button>
-                           <Button><Plus className="mr-2 h-4 w-4"/> New Invoice</Button>
+                           <Link href="/dashboard/invoices/add" passHref>
+                            <Button><Plus className="mr-2 h-4 w-4"/> New Invoice</Button>
+                           </Link>
                         </div>
                     </div>
                     <div className="flex justify-between items-center">

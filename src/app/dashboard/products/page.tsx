@@ -1,4 +1,6 @@
 
+'use client';
+
 import {
     Card,
     CardContent,
@@ -22,6 +24,7 @@ import {
   import { Button } from '@/components/ui/button';
   import { productListData } from '@/app/lib/data';
   import { Search, Upload, Download, Plus } from 'lucide-react';
+  import { AddProductDialog } from './_components/add-product-dialog';
   
   export default function ProductListPage() {
     return (
@@ -52,7 +55,7 @@ import {
                         </Select>
                        <Button variant="outline"><Upload className="mr-2 h-4 w-4"/> Import</Button>
                        <Button variant="outline"><Download className="mr-2 h-4 w-4"/> Export</Button>
-                       <Button><Plus className="mr-2 h-4 w-4"/> Add Product</Button>
+                       <AddProductDialog />
                     </div>
                 </div>
 

@@ -1,4 +1,5 @@
 
+'use client';
 import {
     Card,
     CardContent,
@@ -15,6 +16,7 @@ import {
   import { Button } from '@/components/ui/button';
   import { customerListData } from '@/app/lib/data';
   import { Search, Upload, Download, Plus } from 'lucide-react';
+  import { AddCustomerDialog } from './_components/add-customer-dialog';
   
   export default function CustomerListPage() {
     return (
@@ -36,7 +38,7 @@ import {
                     <div className="flex items-center gap-2">
                        <Button variant="outline"><Upload className="mr-2 h-4 w-4"/> Import</Button>
                        <Button variant="outline"><Download className="mr-2 h-4 w-4"/> Export</Button>
-                       <Button><Plus className="mr-2 h-4 w-4"/> Add Customer</Button>
+                       <AddCustomerDialog />
                     </div>
                 </div>
 

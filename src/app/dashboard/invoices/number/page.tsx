@@ -1,4 +1,5 @@
 
+'use client';
 import {
     Card,
     CardContent,
@@ -15,6 +16,7 @@ import {
   import { Button } from '@/components/ui/button';
   import { invoiceNumberData } from '@/app/lib/data';
   import { Search, Upload, Download, Filter, Plus } from 'lucide-react';
+  import { AddInvoiceNumberDialog } from './_components/add-invoice-number-dialog';
   
   export default function InvoiceNumberPage() {
     return (
@@ -37,7 +39,7 @@ import {
                        <Button variant="outline"><Upload className="mr-2 h-4 w-4"/> Impor</Button>
                        <Button variant="outline"><Download className="mr-2 h-4 w-4"/> Ekspor</Button>
                        <Button variant="outline"><Filter className="mr-2 h-4 w-4"/> Filter Duplikat</Button>
-                       <Button><Plus className="mr-2 h-4 w-4"/> Add Number</Button>
+                       <AddInvoiceNumberDialog />
                     </div>
                 </div>
 
