@@ -1,136 +1,77 @@
-/**
- * @file Firestore Security Rules
- * @description This ruleset enforces a role-based access control model, primarily focused on securing sales data and product information.
- *
- * Data Structure:
- * - /customers/{customerId}: Stores customer data. Access is managed through admin roles or potential user-specific access.
- * - /products/{productId}: Stores product information. Globally accessible (read-only) or restricted to admin users.
- * - /customers/{customerId}/sales/{saleId}: Stores sales data under the corresponding customer.
- * - /sales_overviews/{salesOverviewId}: Stores aggregated sales overview data, restricted to admins.
- * - /top_products/{topProductId}: Stores top product data, restricted to admins.
- *
- * Key Security Decisions:
- * - No user listing is allowed for any collection.
- * - Default security posture for ambiguous relationships is strict owner-only access or admin-only access.
- * - Sales data includes denormalized customerId for efficient querying and authorization.
- */
 rules_version = '2';
-service cloud.firestore {
+ service cloud.firestore {
   match /databases/{database}/documents {
+ 
 
-    /**
-     * @description Secures customer data. Access is likely managed through admin roles.
-     * @path /customers/{customerId}
-     * @allow get: if false;
-     * @allow list: if false;
-     * @allow create: if false;
-     * @allow update: if false;
-     * @allow delete: if false;
-     * @deny get: Always denied, as there are no read permissions defined.
-     * @deny list: Always denied, as there are no read permissions defined.
-     * @deny create: Always denied, as there are no write permissions defined.
-     * @deny update: Always denied, as there are no write permissions defined.
-     * @deny delete: Always denied, as there are no write permissions defined.
-     * @principle Restricts access to customer data, defaulting to admin-only.
-     */
-    match /customers/{customerId} {
-      allow get: if false;
-      allow list: if false;
-      allow create: if false;
-      allow update: if false;
-      allow delete: if false;
-    }
-
-    /**
-     * @description Secures product information. Globally accessible (read-only) or restricted to admin users.
-     * @path /products/{productId}
-     * @allow get: if true;
-     * @allow list: if true;
-     * @allow create: if false;
-     * @allow update: if false;
-     * @allow delete: if false;
-     * @deny get: Allowed for all.
-     * @deny list: Allowed for all.
-     * @deny create: Always denied, as there are no write permissions defined.
-     * @deny update: Always denied, as there are no write permissions defined.
-     * @deny delete: Always denied, as there are no write permissions defined.
-     * @principle Restricts access to product data, defaulting to public read-only.
-     */
-    match /products/{productId} {
-      allow get: if true;
-      allow list: if true;
-      allow create: if false;
-      allow update: if false;
-      allow delete: if false;
-    }
-
-    /**
-     * @description Stores sales data under the corresponding customer.
-     * @path /customers/{customerId}/sales/{saleId}
-     * @allow get: if false;
-     * @allow list: if false;
-     * @allow create: if false;
-     * @allow update: if false;
-     * @allow delete: if false;
-     * @deny get: Always denied, as there are no read permissions defined.
-     * @deny list: Always denied, as there are no read permissions defined.
-     * @deny create: Always denied, as there are no write permissions defined.
-     * @deny update: Always denied, as there are no write permissions defined.
-     * @deny delete: Always denied, as there are no write permissions defined.
-     * @principle Restricts access to sales data, defaulting to admin-only.
-     */
-    match /customers/{customerId}/sales/{saleId} {
-      allow get: if false;
-      allow list: if false;
-      allow create: if false;
-      allow update: if false;
-      allow delete: if false;
-    }
-
-    /**
-     * @description Stores sales overview data, potentially aggregated. Access will likely be admin controlled.
-     * @path /sales_overviews/{salesOverviewId}
-     * @allow get: if false;
-     * @allow list: if false;
-     * @allow create: if false;
-     * @allow update: if false;
-     * @allow delete: if false;
-     * @deny get: Always denied, as there are no read permissions defined.
-     * @deny list: Always denied, as there are no read permissions defined.
-     * @deny create: Always denied, as there are no write permissions defined.
-     * @deny update: Always denied, as there are no write permissions defined.
-     * @deny delete: Always denied, as there are no write permissions defined.
-     * @principle Restricts access to sales overview data, defaulting to admin-only.
-     */
-    match /sales_overviews/{salesOverviewId} {
-      allow get: if false;
-      allow list: if false;
-      allow create: if false;
-      allow update: if false;
-      allow delete: if false;
-    }
-
-    /**
-     * @description Stores top product data. Top products are stored globally, also likely admin controlled.
-     * @path /top_products/{topProductId}
-     * @allow get: if false;
-     * @allow list: if false;
-     * @allow create: if false;
-     * @allow update: if false;
-     * @allow delete: if false;
-     * @deny get: Always denied, as there are no read permissions defined.
-     * @deny list: Always denied, as there are no read permissions defined.
-     * @deny create: Always denied, as there are no write permissions defined.
-     * @deny update: Always denied, as there are no write permissions defined.
-     * @deny delete: Always denied, as there are no write permissions defined.
-     * @principle Restricts access to top product data, defaulting to admin-only.
-     */
-    match /top_products/{topProductId} {
-      allow get: if false;
-      allow list: if false;
-      allow create: if false;
-      allow update: if false;
-      allow delete: if false;
-    }
+  /**
+   * @description Allows access to customer data. Access is likely managed through admin roles.
+   * @path /customers/{customerId}
+   * @allow (get, list) if false; // Example: Admin role check required, replace with actual admin check
+   * @deny (create, update, delete) Always deny write access for non-admin users
+   * @principle Restricts direct user access to customer data, requiring admin privileges for management
+   */
+  match /customers/{customerId} {
+  allow get, list: if isSignedIn() && false;
+  allow create, update, delete: if false;
   }
-}
+ 
+
+  /**
+   * @description Allows read access to product information. Admin users can create, update, and delete product data.
+   * @path /products/{productId}
+   * @allow (get, list) if true; // Example: Products are publicly readable
+   * @allow (create, update, delete) if false; // Example: Admin role check required, replace with actual admin check
+   * @deny (create, update, delete) Always deny write access for non-admin users
+   * @principle Restricts write access to product data to admin users, while allowing public read access
+   */
+  match /products/{productId} {
+  allow get, list: if true;
+  allow create, update, delete: if false;
+  }
+ 
+
+  /**
+   * @description Restricts access to sales data under the corresponding customer.
+   * The `customerId` is denormalized to enable filtering and efficient security rules.
+   * @path /customers/{customerId}/sales/{saleId}
+   * @allow (get, list) if false; // Example: Customer role check required, replace with actual customer check
+   * @deny (create, update, delete) Always deny write access for non-admin users
+   * @principle Restricts direct user access to sales data, requiring customer or admin privileges for management
+   */
+  match /customers/{customerId}/sales/{saleId} {
+  allow get, list: if isSignedIn() && false;
+  allow create, update, delete: if false;
+  }
+ 
+
+  /**
+   * @description Allows access to sales overview data. Access will likely be admin controlled.
+   * @path /sales_overviews/{salesOverviewId}
+   * @allow (get, list) if false; // Example: Admin role check required, replace with actual admin check
+   * @deny (create, update, delete) Always deny write access for non-admin users
+   * @principle Restricts direct user access to sales overview data, requiring admin privileges for management
+   */
+  match /sales_overviews/{salesOverviewId} {
+  allow get, list: if isSignedIn() && false;
+  allow create, update, delete: if false;
+  }
+ 
+
+  /**
+   * @description Allows access to top product data. Top products are stored globally, also likely admin controlled.
+   * @path /top_products/{topProductId}
+   * @allow (get, list) if false; // Example: Admin role check required, replace with actual admin check
+   * @deny (create, update, delete) Always deny write access for non-admin users
+   * @principle Restricts direct user access to top product data, requiring admin privileges for management
+   */
+  match /top_products/{topProductId} {
+  allow get, list: if isSignedIn() && false;
+  allow create, update, delete: if false;
+  }
+ 
+
+  function isSignedIn() {
+  return request.auth != null;
+  }
+  }
+ }
