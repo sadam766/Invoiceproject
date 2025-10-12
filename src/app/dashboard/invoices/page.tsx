@@ -23,8 +23,16 @@ import {
   import { Badge } from '@/components/ui/badge';
   import { Checkbox } from '@/components/ui/checkbox';
   import { invoiceListData, type Invoice } from '@/app/lib/data';
-  import { Search, Filter, MoreHorizontal, ArrowUpDown, Plus } from 'lucide-react';
+  import { Search, Filter, MoreHorizontal, ArrowUpDown, Plus, Eye, Pencil, Trash2 } from 'lucide-react';
   import { Skeleton } from '@/components/ui/skeleton';
+  import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuTrigger,
+  } from '@/components/ui/dropdown-menu';
+  import { DeleteConfirmationDialog } from '@/app/components/delete-confirmation-dialog';
+
 
   export default function InvoiceListPage() {
     const [invoices, setInvoices] = useState(invoiceListData);
@@ -56,6 +64,15 @@ import {
     const totalFiltered = filteredInvoices?.reduce((sum, item) => sum + item.amount, 0) || 0;
     const totalPaid = invoices?.filter(item => item.status === 'Paid' || item.status === 'paid').reduce((sum, item) => sum + item.amount, 0) || 0;
     const totalUnpaid = invoices?.filter(item => item.status === 'Unpaid' || item.status === 'unpaid' || item.status === 'sent').reduce((sum, item) => sum + item.amount, 0) || 0;
+
+    const handleDelete = (invoiceId: string) => {
+        setInvoices(invoices.filter((inv) => inv.id !== invoiceId));
+    };
+
+    const handleEdit = (invoice: Invoice) => {
+      // Logic to handle editing, for now we can just log it
+      console.log('Editing invoice:', invoice.id);
+    }
   
     return (
       <main className="flex flex-1 flex-col gap-4 p-4 md:gap-8 md:p-8">
@@ -212,9 +229,28 @@ import {
                                         </TableCell>
                                         <TableCell>{invoice.spdNumber}</TableCell>
                                         <TableCell>
-                                            <Button variant="ghost" size="icon">
-                                                <MoreHorizontal className="h-4 w-4" />
-                                            </Button>
+                                            <DropdownMenu>
+                                                <DropdownMenuTrigger asChild>
+                                                    <Button variant="ghost" size="icon">
+                                                        <MoreHorizontal className="h-4 w-4" />
+                                                    </Button>
+                                                </DropdownMenuTrigger>
+                                                <DropdownMenuContent align="end">
+                                                    <DropdownMenuItem>
+                                                        <Eye className="mr-2 h-4 w-4" />
+                                                        Preview
+                                                    </DropdownMenuItem>
+                                                    <DropdownMenuItem onClick={() => handleEdit(invoice)}>
+                                                        <Pencil className="mr-2 h-4 w-4" />
+                                                        Edit
+                                                    </DropdownMenuItem>
+                                                    <DropdownMenuItem className="text-destructive">
+                                                        <div className="w-full">
+                                                        <DeleteConfirmationDialog onConfirm={() => handleDelete(invoice.id)} />
+                                                        </div>
+                                                    </DropdownMenuItem>
+                                                </DropdownMenuContent>
+                                            </DropdownMenu>
                                         </TableCell>
                                     </TableRow>
                                     ))
@@ -232,3 +268,5 @@ import {
       </main>
     );
   }
+
+    

@@ -14,6 +14,7 @@ import {
 } from '@/components/ui/alert-dialog';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
+import { Trash2 } from 'lucide-react';
 
 type DeleteConfirmationDialogProps = {
   onConfirm: () => void;
@@ -23,9 +24,10 @@ export function DeleteConfirmationDialog({ onConfirm }: DeleteConfirmationDialog
   return (
     <AlertDialog>
       <AlertDialogTrigger asChild>
-        <Button variant="link" className="p-0 h-auto text-destructive">
-          Hapus
-        </Button>
+        <div className='flex items-center w-full'>
+          <Trash2 className="mr-2 h-4 w-4" />
+          <span>Hapus</span>
+        </div>
       </AlertDialogTrigger>
       <AlertDialogContent>
         <AlertDialogHeader>
@@ -47,3 +49,5 @@ export function DeleteConfirmationDialog({ onConfirm }: DeleteConfirmationDialog
     </AlertDialog>
   );
 }
+
+    
