@@ -8,9 +8,9 @@ import { FirebaseErrorListener } from '@/components/FirebaseErrorListener'
 
 interface FirebaseProviderProps {
   children: ReactNode;
-  firebaseApp?: FirebaseApp;
-  firestore?: Firestore;
-  auth?: Auth;
+  firebaseApp: FirebaseApp;
+  firestore: Firestore;
+  auth: Auth;
 }
 
 // Internal state for user authentication
@@ -22,13 +22,13 @@ interface UserAuthState {
 
 // Combined state for the Firebase context
 export interface FirebaseContextState {
-  firebaseApp: FirebaseApp | null;
-  firestore: Firestore | null;
-  auth: Auth | null; // The Auth service instance
+  firebaseApp: FirebaseApp;
+  firestore: Firestore;
+  auth: Auth;
   // User authentication state
   user: User | null;
-  isUserLoading: boolean; // True during initial auth check
-  userError: Error | null; // Error from auth listener
+  isUserLoading: boolean;
+  userError: Error | null;
 }
 
 // Return type for useFirebase()
@@ -68,12 +68,6 @@ export const FirebaseProvider: React.FC<FirebaseProviderProps> = ({
 
   // Effect to subscribe to Firebase auth state changes
   useEffect(() => {
-    if (!auth) { 
-      // If auth service isn't ready yet, do nothing. It will re-run when it is.
-      setUserAuthState(prevState => ({ ...prevState, isUserLoading: !auth }));
-      return;
-    }
-
     const unsubscribe = onAuthStateChanged(
       auth,
       (firebaseUser) => { 
@@ -98,16 +92,12 @@ export const FirebaseProvider: React.FC<FirebaseProviderProps> = ({
 
   // Memoize the context value
   const contextValue = useMemo((): FirebaseContextState => ({
-    firebaseApp: firebaseApp || null,
-    firestore: firestore || null,
-    auth: auth || null,
+    firebaseApp,
+    firestore,
+    auth,
     ...userAuthState,
   }), [firebaseApp, firestore, auth, userAuthState]);
   
-  if (!auth) {
-    return <>{children}</>; // Render children consistently on server and client initial render
-  }
-
   return (
     <FirebaseContext.Provider value={contextValue}>
       <FirebaseErrorListener />

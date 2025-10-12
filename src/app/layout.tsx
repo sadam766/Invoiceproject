@@ -1,4 +1,3 @@
-'use client';
 import type { Metadata } from 'next';
 import './globals.css';
 import { Toaster } from "@/components/ui/toaster";
@@ -6,17 +5,16 @@ import { cn } from '@/lib/utils';
 import { ThemeProvider } from '@/app/components/theme-provider';
 import { FirebaseClientProvider } from '@/firebase/client-provider';
 
+export const metadata: Metadata = {
+  title: 'Sales Dashboard',
+  description: 'A dashboard to visualize and track sales data.',
+};
+
 export default function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-
-  const metadata: Metadata = {
-    title: 'Sales Dashboard',
-    description: 'A dashboard to visualize and track sales data.',
-  };
-
   return (
     <html lang="en" suppressHydrationWarning>
       <head>

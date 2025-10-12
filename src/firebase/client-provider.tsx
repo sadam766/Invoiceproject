@@ -32,13 +32,17 @@ export function FirebaseClientProvider({ children }: FirebaseClientProviderProps
     setServices({ app, auth, firestore });
   }, []); 
 
-  // Pass services (which can be null initially) to the provider.
-  // This ensures the same component tree is rendered on server and client initially.
+  if (!services) {
+    // Render nothing or a loading spinner on the initial client render until services are ready.
+    // This ensures the server and initial client render match (both rendering nothing for this part).
+    return null; 
+  }
+
   return (
     <FirebaseProvider
-      firebaseApp={services?.app}
-      auth={services?.auth}
-      firestore={services?.firestore}
+      firebaseApp={services.app}
+      auth={services.auth}
+      firestore={services.firestore}
     >
       {children}
     </FirebaseProvider>
