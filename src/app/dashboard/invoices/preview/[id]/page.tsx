@@ -54,7 +54,7 @@ export default function InvoicePreviewPage() {
     if (!invoice) {
         return (
             <div className="p-8">
-                <Button onClick={() => router.back()} variant="outline" className="mb-4">
+                <Button onClick={() => router.back()} variant="outline" className="mb-4 print:hidden">
                     <ArrowLeft className="mr-2 h-4 w-4" /> Back
                 </Button>
                 <div>Loading or Invoice not found...</div>
@@ -74,7 +74,7 @@ export default function InvoicePreviewPage() {
                     <Printer className="mr-2 h-4 w-4" /> Print Invoice
                 </Button>
             </div>
-            <div className="bg-white p-8 max-w-4xl mx-auto border font-sans text-xs">
+            <div className="print-container bg-white p-8 max-w-4xl mx-auto border font-sans text-xs">
                 <div className="flex justify-between items-start mb-4">
                     <div>
                         <h1 className="text-sm font-bold">INVOICE/OFFICIAL RECEIPT</h1>
@@ -98,7 +98,9 @@ export default function InvoicePreviewPage() {
                             <p className="text-left">Reference A:</p>
                             <p className="text-left"></p>
                         </div>
-                        <p className="mt-2">Date: {format(new Date(invoice.date), 'dd-MM-yyyy')}</p>
+                        {invoice.date && (
+                            <p className="mt-2">Date: {format(new Date(invoice.date), 'dd-MM-yyyy')}</p>
+                        )}
                     </div>
                 </div>
 
