@@ -1,11 +1,10 @@
 'use client';
 
-import React, { DependencyList, createContext, useContext, ReactNode, useMemo, useState, useEffect } from 'react';
+import React, { createContext, useContext, ReactNode, useMemo, useState, useEffect } from 'react';
 import { FirebaseApp } from 'firebase/app';
 import { Firestore } from 'firebase/firestore';
 import { Auth, User, onAuthStateChanged, signInAnonymously } from 'firebase/auth';
 import { FirebaseErrorListener } from '@/components/FirebaseErrorListener';
-import { Skeleton } from '@/components/ui/skeleton';
 
 interface FirebaseProviderProps {
   children: ReactNode;
@@ -56,6 +55,14 @@ export const FirebaseProvider: React.FC<FirebaseProviderProps> = ({
       setUserAuthState({ user: null, isUserLoading: false, userError: null });
       return;
     }
+    
+    // Proactively sign in anonymously if no user is logged in
+    if (!auth.currentUser) {
+      signInAnonymously(auth).catch((error) => {
+        console.error("FirebaseProvider: Anonymous sign-in failed", error);
+        setUserAuthState({ user: null, isUserLoading: false, userError: error });
+      });
+    }
 
     const unsubscribe = onAuthStateChanged(
       auth,
@@ -78,9 +85,8 @@ export const FirebaseProvider: React.FC<FirebaseProviderProps> = ({
     ...userAuthState,
   }), [firebaseApp, firestore, auth, userAuthState]);
 
-  // If services are not ready yet from the client provider, don't render children
   if (!auth || !firestore || !firebaseApp) {
-     return null; // Or a loading spinner, but null is safer for hydration
+     return null;
   }
   
   return (
@@ -137,7 +143,7 @@ export const useFirebaseApp = (): FirebaseApp => {
 
 type MemoFirebase <T> = T & {__memo?: boolean};
 
-export function useMemoFirebase<T>(factory: () => T, deps: DependencyList): T {
+export function useMemoFirebase<T>(factory: () => T, deps: React.DependencyList): T {
   const memoized = useMemo(factory, deps);
   
   if(typeof memoized === 'object' && memoized !== null) {
