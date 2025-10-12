@@ -1,6 +1,6 @@
 
 'use client';
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import {
     Card,
     CardContent,
@@ -31,6 +31,23 @@ import {
     const [products, setProducts] = useState(productListData);
     const [editingProduct, setEditingProduct] = useState<ProductListItem | undefined>(undefined);
     const [isDialogOpen, setIsDialogOpen] = useState(false);
+    const [searchQuery, setSearchQuery] = useState('');
+    const [categoryFilter, setCategoryFilter] = useState('all');
+
+    const filteredProducts = useMemo(() => {
+        let filtered = products;
+        if (categoryFilter !== 'all') {
+            filtered = filtered.filter(p => p.category === categoryFilter);
+        }
+        if (searchQuery) {
+            filtered = filtered.filter(p => 
+                p.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                p.category.toLowerCase().includes(searchQuery.toLowerCase())
+            );
+        }
+        return filtered;
+    }, [products, searchQuery, categoryFilter]);
+
 
     const handleAddClick = () => {
       setEditingProduct(undefined);
@@ -83,14 +100,21 @@ import {
                 <div className="flex justify-between items-center mb-4">
                     <div className="relative w-1/3">
                         <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-                        <Input type="search" placeholder="Search products..." className="pl-8" />
+                        <Input 
+                            type="search" 
+                            placeholder="Search products..." 
+                            className="pl-8" 
+                            value={searchQuery}
+                            onChange={(e) => setSearchQuery(e.target.value)}
+                        />
                     </div>
                     <div className="flex items-center gap-2">
-                       <Select>
+                       <Select value={categoryFilter} onValueChange={setCategoryFilter}>
                           <SelectTrigger className="w-[180px]">
                             <SelectValue placeholder="All Categories" />
                           </SelectTrigger>
                           <SelectContent>
+                            <SelectItem value="all">All Categories</SelectItem>
                             <SelectItem value="kabel">Kabel</SelectItem>
                             <SelectItem value="aksesoris">Aksesoris</SelectItem>
                           </SelectContent>
@@ -120,7 +144,7 @@ import {
                             </TableRow>
                         </TableHeader>
                         <TableBody>
-                            {products.map((product) => (
+                            {filteredProducts.map((product) => (
                                 <TableRow key={product.name}>
                                     <TableCell className="font-medium">{product.name}</TableCell>
                                     <TableCell>{product.category}</TableCell>
@@ -139,7 +163,7 @@ import {
                     </Table>
                 </div>
                 <div className="text-sm text-muted-foreground mt-4">
-                    Showing 1 to {products.length} of {products.length} entries
+                    Showing 1 to {filteredProducts.length} of {products.length} entries
                 </div>
             </CardContent>
         </Card>

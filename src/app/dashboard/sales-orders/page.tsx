@@ -1,6 +1,6 @@
 
 'use client';
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import {
     Card,
     CardContent,
@@ -31,6 +31,23 @@ import {
     const [orders, setOrders] = useState(salesOrderListData);
     const [editingOrder, setEditingOrder] = useState<SalesOrder | undefined>(undefined);
     const [isDialogOpen, setIsDialogOpen] = useState(false);
+    const [searchQuery, setSearchQuery] = useState('');
+    const [categoryFilter, setCategoryFilter] = useState('all');
+
+    const filteredOrders = useMemo(() => {
+        let filtered = orders;
+        if (categoryFilter !== 'all') {
+            filtered = filtered.filter(o => o.category === categoryFilter);
+        }
+        if (searchQuery) {
+            filtered = filtered.filter(o => 
+                o.soNumber.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                o.productName.toLowerCase().includes(searchQuery.toLowerCase())
+            );
+        }
+        return filtered;
+    }, [orders, searchQuery, categoryFilter]);
+
 
     const handleAddClick = () => {
       setEditingOrder(undefined);
@@ -87,14 +104,21 @@ import {
                 <div className="flex justify-between items-center mb-4">
                     <div className="relative w-1/3">
                         <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-                        <Input type="search" placeholder="Search orders..." className="pl-8" />
+                        <Input 
+                            type="search" 
+                            placeholder="Search orders..." 
+                            className="pl-8" 
+                            value={searchQuery}
+                            onChange={(e) => setSearchQuery(e.target.value)}
+                        />
                     </div>
                     <div className="flex items-center gap-2">
-                       <Select>
+                       <Select value={categoryFilter} onValueChange={setCategoryFilter}>
                           <SelectTrigger className="w-[180px]">
                             <SelectValue placeholder="All Categories" />
                           </SelectTrigger>
                           <SelectContent>
+                            <SelectItem value="all">All Categories</SelectItem>
                             <SelectItem value="kabel">Kabel</SelectItem>
                             <SelectItem value="aksesoris">Aksesoris</SelectItem>
                           </SelectContent>
@@ -125,7 +149,7 @@ import {
                             </TableRow>
                         </TableHeader>
                         <TableBody>
-                            {orders.map((order, index) => (
+                            {filteredOrders.map((order, index) => (
                                 <TableRow key={`${order.soNumber}-${order.productName}-${index}`}>
                                     <TableCell className="font-medium">{order.soNumber}</TableCell>
                                     <TableCell>{order.productName}</TableCell>
@@ -145,7 +169,7 @@ import {
                     </Table>
                 </div>
                 <div className="text-sm text-muted-foreground mt-4">
-                    Showing 1 to {orders.length} of {orders.length} entries
+                    Showing 1 to {filteredOrders.length} of {orders.length} entries
                 </div>
             </CardContent>
         </Card>

@@ -1,6 +1,6 @@
 
 'use client';
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import {
     Card,
     CardContent,
@@ -24,6 +24,18 @@ import {
     const [customers, setCustomers] = useState(customerListData);
     const [editingCustomer, setEditingCustomer] = useState<Customer | undefined>(undefined);
     const [isDialogOpen, setIsDialogOpen] = useState(false);
+    const [searchQuery, setSearchQuery] = useState('');
+
+    const filteredCustomers = useMemo(() => {
+        if (!searchQuery) {
+          return customers;
+        }
+        return customers.filter((customer) =>
+          Object.values(customer).some((value) =>
+            String(value).toLowerCase().includes(searchQuery.toLowerCase())
+          )
+        );
+      }, [customers, searchQuery]);
 
     const handleAddClick = () => {
       setEditingCustomer(undefined);
@@ -73,7 +85,13 @@ import {
                 <div className="flex justify-between items-center mb-4">
                     <div className="relative w-1/3">
                         <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-                        <Input type="search" placeholder="Search Customer" className="pl-8" />
+                        <Input 
+                            type="search" 
+                            placeholder="Search Customer" 
+                            className="pl-8" 
+                            value={searchQuery}
+                            onChange={(e) => setSearchQuery(e.target.value)}
+                        />
                     </div>
                     <div className="flex items-center gap-2">
                        <Button variant="outline"><Upload className="mr-2 h-4 w-4"/> Import</Button>
@@ -99,7 +117,7 @@ import {
                             </TableRow>
                         </TableHeader>
                         <TableBody>
-                            {customers?.map((customer) => (
+                            {filteredCustomers?.map((customer) => (
                                 <TableRow key={customer.id}>
                                     <TableCell className="font-medium">{customer.name}</TableCell>
                                     <TableCell>{customer.address}</TableCell>
@@ -116,7 +134,7 @@ import {
                     </Table>
                 </div>
                 <div className="text-sm text-muted-foreground mt-4">
-                    Showing 1 to {customers?.length || 0} of {customers?.length || 0} entries
+                    Showing 1 to {filteredCustomers?.length || 0} of {customers?.length || 0} entries
                 </div>
             </CardContent>
         </Card>

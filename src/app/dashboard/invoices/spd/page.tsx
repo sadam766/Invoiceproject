@@ -1,6 +1,6 @@
 
 'use client';
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import {
     Card,
     CardContent,
@@ -23,6 +23,19 @@ import {
     const [data, setData] = useState(spdData);
     const [editingSpd, setEditingSpd] = useState<SpdData | undefined>(undefined);
     const [isDialogOpen, setIsDialogOpen] = useState(false);
+    const [searchQuery, setSearchQuery] = useState('');
+
+    const filteredData = useMemo(() => {
+        if (!searchQuery) {
+          return data;
+        }
+        return data.filter((item) =>
+          Object.values(item).some((value) =>
+            String(value).toLowerCase().includes(searchQuery.toLowerCase())
+          )
+        );
+      }, [data, searchQuery]);
+
 
     const handleAdd = () => {
       setEditingSpd(undefined);
@@ -63,7 +76,13 @@ import {
                 <div className="flex justify-between items-center mb-4">
                     <div className="relative w-1/3">
                         <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-                        <Input type="search" placeholder="Cari SPD..." className="pl-8" />
+                        <Input 
+                            type="search" 
+                            placeholder="Cari SPD..." 
+                            className="pl-8" 
+                            value={searchQuery}
+                            onChange={(e) => setSearchQuery(e.target.value)}
+                        />
                     </div>
                      <AddSpdDialog
                         isOpen={isDialogOpen}
@@ -94,7 +113,7 @@ import {
                             </TableRow>
                         </TableHeader>
                         <TableBody>
-                            {data.map((item, index) => (
+                            {filteredData.map((item, index) => (
                                 <TableRow key={index}>
                                     <TableCell>{item.tanggal}</TableCell>
                                     <TableCell>{item.sales}</TableCell>
@@ -115,7 +134,7 @@ import {
                     </Table>
                 </div>
                 <div className="text-sm text-muted-foreground mt-4">
-                    Showing 1 to {data.length} of {data.length} entries
+                    Showing 1 to {filteredData.length} of {data.length} entries
                 </div>
             </CardContent>
         </Card>

@@ -1,7 +1,7 @@
 
 'use client';
 import Link from 'next/link';
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import {
     Card,
     CardContent,
@@ -29,8 +29,31 @@ import {
   export default function InvoiceListPage() {
     const [invoices, setInvoices] = useState(invoiceListData);
     const [isLoading, setIsLoading] = useState(false);
+    const [activeTab, setActiveTab] = useState('all');
+    const [searchQuery, setSearchQuery] = useState('');
     
-    const totalFiltered = invoices?.reduce((sum, item) => sum + item.amount, 0) || 0;
+    const filteredInvoices = useMemo(() => {
+        let filtered = invoices;
+        if (activeTab !== 'all') {
+            if (activeTab === 'paid') {
+                filtered = invoices.filter(i => i.status === 'paid');
+            } else if (activeTab === 'unpaid') {
+                filtered = invoices.filter(i => i.status !== 'paid');
+            }
+        }
+
+        if (searchQuery) {
+            filtered = filtered.filter(invoice => 
+                invoice.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                invoice.soNumber.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                invoice.customer.toLowerCase().includes(searchQuery.toLowerCase())
+            );
+        }
+
+        return filtered;
+    }, [invoices, activeTab, searchQuery]);
+
+    const totalFiltered = filteredInvoices?.reduce((sum, item) => sum + item.amount, 0) || 0;
     const totalPaid = invoices?.filter(item => item.status === 'Paid' || item.status === 'paid').reduce((sum, item) => sum + item.amount, 0) || 0;
     const totalUnpaid = invoices?.filter(item => item.status === 'Unpaid' || item.status === 'unpaid' || item.status === 'sent').reduce((sum, item) => sum + item.amount, 0) || 0;
   
@@ -105,7 +128,7 @@ import {
   
         <Card>
             <CardContent className="pt-6">
-                <Tabs defaultValue="all">
+                <Tabs defaultValue="all" value={activeTab} onValueChange={setActiveTab}>
                     <div className="flex justify-between items-center mb-4">
                         <div>
                             <h2 className="text-xl font-bold">Invoices</h2>
@@ -126,12 +149,18 @@ import {
                     <div className="flex items-center gap-2">
                         <div className="relative w-64">
                             <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-                            <Input type="search" placeholder="Search" className="pl-8" />
+                            <Input 
+                                type="search" 
+                                placeholder="Search" 
+                                className="pl-8" 
+                                value={searchQuery}
+                                onChange={e => setSearchQuery(e.target.value)}
+                            />
                         </div>
                         <Button variant="outline"><Filter className="mr-2 h-4 w-4" /> Filters</Button>
                     </div>
                     </div>
-                    <TabsContent value="all">
+                    <TabsContent value={activeTab}>
                         <div className="mt-4 w-full overflow-auto">
                             <Table>
                             <TableHeader>
@@ -165,7 +194,7 @@ import {
                                         </TableRow>
                                     ))
                                 ) : (
-                                    invoices?.map((invoice) => (
+                                    filteredInvoices?.map((invoice) => (
                                     <TableRow key={invoice.id}>
                                         <TableCell>
                                             <Checkbox />
@@ -194,7 +223,7 @@ import {
                             </Table>
                         </div>
                         <div className="text-sm text-muted-foreground mt-4">
-                            Showing 1 to {invoices?.length || 0} of {invoices?.length || 0} entries
+                            Showing 1 to {filteredInvoices?.length || 0} of {invoices?.length || 0} entries
                         </div>
                     </TabsContent>
                 </Tabs>

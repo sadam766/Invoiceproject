@@ -1,6 +1,6 @@
 
 'use client';
-import { useState, useRef } from 'react';
+import { useState, useRef, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import {
     Card,
@@ -30,9 +30,21 @@ import {
     const [invoices, setInvoices] = useState(invoiceNumberData);
     const [isLoading, setIsLoading] = useState(false);
     const fileInputRef = useRef<HTMLInputElement>(null);
+    const [searchQuery, setSearchQuery] = useState('');
 
     const [editingInvoice, setEditingInvoice] = useState<InvoiceNumber | undefined>(undefined);
     const [isDialogOpen, setIsDialogOpen] = useState(false);
+
+    const filteredInvoices = useMemo(() => {
+        if (!searchQuery) {
+            return invoices;
+        }
+        return invoices.filter((invoice) => 
+            invoice.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
+            invoice.customer.toLowerCase().includes(searchQuery.toLowerCase()) ||
+            invoice.salesOrder.toLowerCase().includes(searchQuery.toLowerCase())
+        );
+    }, [invoices, searchQuery]);
 
     const handleAddClick = () => {
       setEditingInvoice(undefined);
@@ -113,7 +125,13 @@ import {
                 <div className="flex justify-between items-center mb-4">
                     <div className="relative w-1/3">
                         <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-                        <Input type="search" placeholder="Cari Faktur" className="pl-8" />
+                        <Input 
+                            type="search" 
+                            placeholder="Cari Faktur" 
+                            className="pl-8" 
+                            value={searchQuery}
+                            onChange={(e) => setSearchQuery(e.target.value)}
+                        />
                     </div>
                     <div className="flex items-center gap-2">
                        <input type="file" ref={fileInputRef} onChange={handleFileChange} className="hidden" accept=".xlsx, .xls" />
@@ -155,7 +173,7 @@ import {
                                     </TableRow>
                                 ))
                             ) : (
-                                invoices?.map((invoice) => (
+                                filteredInvoices?.map((invoice) => (
                                     <TableRow key={invoice.id}>
                                         <TableCell className="font-medium">{invoice.id.replace(/_/g, '/')}</TableCell>
                                         <TableCell>{invoice.customer}</TableCell>
@@ -175,7 +193,7 @@ import {
                     </Table>
                 </div>
                 <div className="text-sm text-muted-foreground mt-4">
-                    Showing 1 to {invoices?.length || 0} of {invoices?.length || 0} entries
+                    Showing 1 to {filteredInvoices?.length || 0} of {invoices?.length || 0} entries
                 </div>
             </CardContent>
         </Card>

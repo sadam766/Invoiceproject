@@ -1,5 +1,6 @@
 
 'use client';
+import { useState, useMemo } from 'react';
 import {
   Card,
   CardContent,
@@ -16,7 +17,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { getSalesMonitoringData } from '@/app/lib/data';
+import { getSalesMonitoringData, SalesMonitoringData } from '@/app/lib/data';
 import { Search, Eye } from 'lucide-react';
 import Link from 'next/link';
 
@@ -27,19 +28,54 @@ const statusVariant: { [key: string]: 'outline' | 'destructive' | 'secondary' } 
     'Draft': 'secondary',
 };
 
-const statusStyle = {
+const statusStyle: { [key: string]: string } = {
     'Paid': 'border-green-500 text-green-500 bg-green-50',
     'Unpaid': 'border-red-500 text-red-500 bg-red-50',
     'Sent': 'border-blue-500 text-blue-500 bg-blue-50',
     'Draft': 'border-gray-500 text-gray-500 bg-gray-50',
 };
 
+function cn(...inputs: (string | undefined | null | false)[]): string {
+    return inputs.filter(Boolean).join(' ');
+}
+
 export default function SalesMonitoringPage() {
-  const salesMonitoringData = getSalesMonitoringData();
+  const [salesMonitoringData, setSalesMonitoringData] = useState(getSalesMonitoringData());
+  const [activeTab, setActiveTab] = useState('all');
+  const [searchQuery, setSearchQuery] = useState('');
   
   const needsInvoiceData = salesMonitoringData.filter(d => d.needsInvoice);
   const needsSpdData = salesMonitoringData.filter(d => d.needsSpd);
   const unpaidData = salesMonitoringData.filter(d => d.paymentStatus === 'Unpaid');
+
+  const filteredData = useMemo(() => {
+    let data: SalesMonitoringData[];
+    switch (activeTab) {
+        case 'needs-invoice':
+            data = needsInvoiceData;
+            break;
+        case 'needs-spd':
+            data = needsSpdData;
+            break;
+        case 'unpaid':
+            data = unpaidData;
+            break;
+        case 'all':
+        default:
+            data = salesMonitoringData;
+            break;
+    }
+
+    if (!searchQuery) {
+        return data;
+    }
+
+    return data.filter(item => 
+        item.soNumber.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        item.customer.toLowerCase().includes(searchQuery.toLowerCase())
+    );
+
+  }, [activeTab, searchQuery, salesMonitoringData, needsInvoiceData, needsSpdData, unpaidData]);
 
 
   const renderTable = (data: typeof salesMonitoringData) => (
@@ -90,7 +126,9 @@ export default function SalesMonitoringPage() {
               </TableCell>
               <TableCell>
                 {sale.spd ? sale.spd : (sale.invoice && sale.needsSpd ? (
-                  <Button size="sm">Create SPD</Button>
+                  <Button size="sm" asChild>
+                    <Link href={`/dashboard/invoices/spd`}>Create SPD</Link>
+                  </Button>
                 ) : (
                   '-'
                 ))}
@@ -131,7 +169,7 @@ export default function SalesMonitoringPage() {
 
       <Card>
         <CardContent className="pt-6">
-          <Tabs defaultValue="all">
+          <Tabs defaultValue="all" value={activeTab} onValueChange={setActiveTab}>
             <div className="flex justify-between items-center">
               <div className="relative w-1/3">
                 <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
@@ -139,6 +177,8 @@ export default function SalesMonitoringPage() {
                   type="search"
                   placeholder="Search by SO, customer..."
                   className="w-full appearance-none bg-background pl-8 shadow-none"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
                 />
               </div>
               <TabsList>
@@ -148,17 +188,8 @@ export default function SalesMonitoringPage() {
                 <TabsTrigger value="unpaid">Unpaid ({unpaidData.length})</TabsTrigger>
               </TabsList>
             </div>
-            <TabsContent value="all">
-              {renderTable(salesMonitoringData)}
-            </TabsContent>
-            <TabsContent value="needs-invoice">
-              {renderTable(needsInvoiceData)}
-            </TabsContent>
-            <TabsContent value="needs-spd">
-              {renderTable(needsSpdData)}
-            </TabsContent>
-            <TabsContent value="unpaid">
-              {renderTable(unpaidData)}
+            <TabsContent value={activeTab}>
+              {renderTable(filteredData)}
             </TabsContent>
           </Tabs>
         </CardContent>
@@ -167,6 +198,3 @@ export default function SalesMonitoringPage() {
   );
 }
 
-function cn(...inputs: (string | undefined | null | false)[]): string {
-    return inputs.filter(Boolean).join(' ');
-}
