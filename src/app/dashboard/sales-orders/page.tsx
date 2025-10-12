@@ -23,19 +23,53 @@ import {
   import { Input } from '@/components/ui/input';
   import { Button } from '@/components/ui/button';
   import { salesOrderListData, type SalesOrder } from '@/app/lib/data';
-  import { Search, Upload, Download } from 'lucide-react';
+  import { Search, Upload, Download, Plus } from 'lucide-react';
   import { DeleteConfirmationDialog } from '@/app/components/delete-confirmation-dialog';
+  import { AddSalesOrderDialog } from './_components/add-sales-order-dialog';
   
   export default function SalesOrderListPage() {
     const [orders, setOrders] = useState(salesOrderListData);
+    const [editingOrder, setEditingOrder] = useState<SalesOrder | undefined>(undefined);
+    const [isDialogOpen, setIsDialogOpen] = useState(false);
 
-    const handleEdit = (soNumber: string, productName: string) => {
-        alert(`Edit SO: ${soNumber}, Product: ${productName}`);
+    const handleAdd = () => {
+      setEditingOrder(undefined);
+      setIsDialogOpen(true);
+    };
+
+    const handleEdit = (order: SalesOrder) => {
+        setEditingOrder(order);
+        setIsDialogOpen(true);
     };
 
     const handleDelete = (soNumber: string, productName: string) => {
         setOrders(orders.filter(o => !(o.soNumber === soNumber && o.productName === productName)));
     };
+
+    const handleSave = (order: SalesOrder) => {
+        const orderKey = `${order.soNumber}-${order.productName}`;
+        if (editingOrder) {
+            const editingKey = `${editingOrder.soNumber}-${editingOrder.productName}`;
+            if (editingKey === orderKey) {
+                // Editing existing order, key hasn't changed
+                setOrders(orders.map(o => (`${o.soNumber}-${o.productName}` === orderKey ? order : o)));
+            } else {
+                // Editing existing order, but key (soNumber or productName) has changed
+                const filteredOrders = orders.filter(o => `${o.soNumber}-${o.productName}` !== editingKey);
+                setOrders([...filteredOrders, order]);
+            }
+        } else {
+            // Adding new order
+            setOrders([...orders, order]);
+        }
+        setIsDialogOpen(false);
+        setEditingOrder(undefined);
+    };
+
+    const handleDialogClose = () => {
+      setIsDialogOpen(false);
+      setEditingOrder(undefined);
+    }
 
     return (
       <main className="flex flex-1 flex-col gap-4 p-4 md:gap-8 md:p-8">
@@ -65,6 +99,13 @@ import {
                         </Select>
                        <Button variant="outline"><Upload className="mr-2 h-4 w-4"/> Import</Button>
                        <Button variant="outline"><Download className="mr-2 h-4 w-4"/> Export</Button>
+                       <AddSalesOrderDialog
+                            isOpen={isDialogOpen}
+                            onOpenChange={handleDialogClose}
+                            onSave={handleSave}
+                            orderData={editingOrder}
+                            onAddClick={handleAdd}
+                        />
                     </div>
                 </div>
 
@@ -83,7 +124,7 @@ import {
                         </TableHeader>
                         <TableBody>
                             {orders.map((order, index) => (
-                                <TableRow key={index}>
+                                <TableRow key={`${order.soNumber}-${order.productName}-${index}`}>
                                     <TableCell className="font-medium">{order.soNumber}</TableCell>
                                     <TableCell>{order.productName}</TableCell>
                                     <TableCell>{order.category}</TableCell>
@@ -92,7 +133,7 @@ import {
                                     <TableCell>Rp {order.price.toLocaleString('id-ID')},00</TableCell>
                                     <TableCell>
                                         <div className="flex gap-2">
-                                            <Button variant="link" className="p-0 h-auto" onClick={() => handleEdit(order.soNumber, order.productName)}>Edit</Button>
+                                            <Button variant="link" className="p-0 h-auto" onClick={() => handleEdit(order)}>Edit</Button>
                                             <DeleteConfirmationDialog onConfirm={() => handleDelete(order.soNumber, order.productName)} />
                                         </div>
                                     </TableCell>

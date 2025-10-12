@@ -1,4 +1,6 @@
 
+'use client';
+import { useState } from 'react';
 import {
     Card,
     CardContent,
@@ -12,10 +14,41 @@ import {
     TableRow,
   } from '@/components/ui/table';
   import { Input } from '@/components/ui/input';
-  import { spdData } from '@/app/lib/data';
-  import { Search } from 'lucide-react';
+  import { Button } from '@/components/ui/button';
+  import { spdData, type SpdData } from '@/app/lib/data';
+  import { Search, Plus } from 'lucide-react';
+  import { AddSpdDialog } from './_components/add-spd-dialog';
   
   export default function SpdPage() {
+    const [data, setData] = useState(spdData);
+    const [editingSpd, setEditingSpd] = useState<SpdData | undefined>(undefined);
+    const [isDialogOpen, setIsDialogOpen] = useState(false);
+
+    const handleAdd = () => {
+      setEditingSpd(undefined);
+      setIsDialogOpen(true);
+    };
+
+    const handleSave = (newItem: Omit<SpdData, 'totalPiutang'> & { totalPiutang: number | string }) => {
+        const newItemWithNumber = {
+            ...newItem,
+            totalPiutang: Number(newItem.totalPiutang)
+        };
+
+        if (editingSpd) {
+            setData(data.map((item) => (item.spd === editingSpd.spd ? newItemWithNumber : item)));
+        } else {
+            setData([...data, newItemWithNumber]);
+        }
+        setIsDialogOpen(false);
+        setEditingSpd(undefined);
+    };
+
+    const handleDialogClose = () => {
+      setIsDialogOpen(false);
+      setEditingSpd(undefined);
+    }
+  
     return (
       <main className="flex flex-1 flex-col gap-4 p-4 md:gap-8 md:p-8">
         <div>
@@ -32,6 +65,13 @@ import {
                         <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
                         <Input type="search" placeholder="Cari SPD..." className="pl-8" />
                     </div>
+                     <AddSpdDialog
+                        isOpen={isDialogOpen}
+                        onOpenChange={handleDialogClose}
+                        onSave={handleSave}
+                        spdData={editingSpd}
+                        onAddClick={handleAdd}
+                    />
                 </div>
 
                 <div className="w-full overflow-auto">
@@ -54,7 +94,7 @@ import {
                             </TableRow>
                         </TableHeader>
                         <TableBody>
-                            {spdData.map((item, index) => (
+                            {data.map((item, index) => (
                                 <TableRow key={index}>
                                     <TableCell>{item.tanggal}</TableCell>
                                     <TableCell>{item.sales}</TableCell>
@@ -75,7 +115,7 @@ import {
                     </Table>
                 </div>
                 <div className="text-sm text-muted-foreground mt-4">
-                    Showing 1 to 1 of 1 entries
+                    Showing 1 to {data.length} of {data.length} entries
                 </div>
             </CardContent>
         </Card>
