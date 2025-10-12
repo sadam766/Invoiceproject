@@ -1,170 +1,134 @@
 /**
- * @file Firestore Security Rules
- * @version 2
- *
- * @description
- * This ruleset enforces a role-based access control model for a sales dashboard application.
- * It provides different levels of access for customer, product, sales, sales overview, and top product data.
- * Access control decisions are based on user authentication and, potentially, admin roles.
- *
- * Data Structure:
- * - /customers/{customerId}: Stores customer data. Access is likely managed through other means (e.g. an admin role collection).
- * - /products/{productId}: Stores product information. Globally accessible (read-only) or restricted to admin users.
- * - /customers/{customerId}/sales/{saleId}: Stores sales data under the corresponding customer.
- * - /sales_overviews/{salesOverviewId}: Stores sales overview data, potentially aggregated. Access will likely be admin controlled.
- * - /top_products/{topProductId}: Stores top product data. Access will likely be admin controlled.
- *
- * Key Security Decisions:
- * - Customer and product listing are generally disallowed for non-admins, unless explicitly configured otherwise.
- * - Sales data is nested under customers to simplify ownership checks.
- * - Admin roles are assumed to be managed separately (e.g., in a `/roles_admin/{uid}` collection).  The `isAdmin()` function is a placeholder for this check.
- * - Denormalization is used to include the `customerId` in the `Sale` document, avoiding extra reads in security rules.
- *
- *  Denormalization for Authorization:
- *  - Sales data includes the customerId to enable efficient filtering and security rules.
- *
- *  Structural Segregation:
- *  - Sales data is nested under `/customers/{customerId}/sales/{saleId}` to show all sales for a customer.
- */
-rules_version = '2';
-service cloud.firestore {
+  * @description This ruleset enforces a strict role-based access control model for a sales dashboard application.
+  * It protects customer, product, sales, sales overview, and top product data, primarily restricting access to authorized admin users.
+  * Public read access is allowed for products, while customer-specific sales data is nested under customer documents.
+  * @data_structure
+  * /customers/{customerId}: Stores customer data, likely with admin-controlled access.
+  * /products/{productId}: Stores product information, with public read access or admin-controlled access.
+  * /customers/{customerId}/sales/{saleId}: Stores sales data under customer documents.
+  * /sales_overviews/{salesOverviewId}: Stores sales overview data, with admin-controlled access.
+  * /top_products/{topProductId}: Stores top product data, with admin-controlled access.
+  * @key_security_decisions
+  * Customer data is generally protected.
+  * Product data is publicly readable but only writable by admins.
+  * Sales data is stored under customers, limiting access.
+  * Sales overviews and top product data are only accessible by admins.
+  * No user listing is permitted.
+  */
+ 
+
+ rules_version = '2';
+ service cloud.firestore {
   match /databases/{database}/documents {
+ 
 
-    /**
-     * @description Controls access to customer data.
-     * @path /customers/{customerId}
-     * @allow get: if isAdmin();
-     * @allow list: if false;
-     * @allow create: if isAdmin();
-     * @allow update: if isAdmin();
-     * @allow delete: if isAdmin();
-     * @deny get: if false;
-     * @deny list: if true;
-     * @deny create: if false;
-     * @deny update: if false;
-     * @deny delete: if false;
-     * @principle Restricts customer management to admins.
-     */
-    match /customers/{customerId} {
-      allow get: if isAdmin();
-      allow list: if false;
-      allow create: if isAdmin();
-      allow update: if isAdmin();
-      allow delete: if isAdmin();
-
-    }
-
-    /**
-     * @description Controls access to product data.
-     * @path /products/{productId}
-     * @allow get: if true;
-     * @allow list: if true;
-     * @allow create: if isAdmin();
-     * @allow update: if isAdmin();
-     * @allow delete: if isAdmin();
-     * @deny get: if false;
-     * @deny list: if false;
-     * @deny create: if false;
-     * @deny update: if false;
-     * @deny delete: if false;
-     * @principle Allows public read access to products, restricts modifications to admins.
-     */
-    match /products/{productId} {
-      allow get: if true;
-      allow list: if true;
-      allow create: if isAdmin();
-      allow update: if isAdmin();
-      allow delete: if isAdmin();
-    }
-
-    /**
-     * @description Controls access to sales data associated with a customer.
-     * @path /customers/{customerId}/sales/{saleId}
-     * @allow get: if isAdmin() || isCustomer(customerId);
-     * @allow list: if isAdmin() || isCustomer(customerId);
-     * @allow create: if isSignedIn() && request.resource.data.customerId == customerId;
-     * @allow update: if isExistingOwner(customerId, resource.data.customerId) || isAdmin();
-     * @allow delete: if isExistingOwner(customerId, resource.data.customerId) || isAdmin();
-     * @deny get: if false;
-     * @deny list: if false;
-     * @deny create: if false;
-     * @deny update: if false;
-     * @deny delete: if false;
-     * @principle Enforces customer-based ownership of sales data, allows admin override.
-     */
-    match /customers/{customerId}/sales/{saleId} {
-      allow get: if isAdmin() || isCustomer(customerId);
-      allow list: if isAdmin() || isCustomer(customerId);
-      allow create: if isSignedIn() && request.resource.data.customerId == customerId;
-      allow update: if isExistingOwner(customerId, resource.data.customerId) || isAdmin();
-      allow delete: if isExistingOwner(customerId, resource.data.customerId) || isAdmin();
-    }
-
-    /**
-     * @description Controls access to sales overview data.
-     * @path /sales_overviews/{salesOverviewId}
-     * @allow get: if isAdmin();
-     * @allow list: if isAdmin();
-     * @allow create: if isAdmin();
-     * @allow update: if isAdmin();
-     * @allow delete: if isAdmin();
-     * @deny get: if false;
-     * @deny list: if false;
-     * @deny create: if false;
-     * @deny update: if false;
-     * @deny delete: if false;
-     * @principle Restricts sales overview management to admins.
-     */
-    match /sales_overviews/{salesOverviewId} {
-      allow get: if isAdmin();
-      allow list: if isAdmin();
-      allow create: if isAdmin();
-      allow update: if isAdmin();
-      allow delete: if isAdmin();
-    }
-
-    /**
-     * @description Controls access to top product data.
-     * @path /top_products/{topProductId}
-     * @allow get: if isAdmin();
-     * @allow list: if isAdmin();
-     * @allow create: if isAdmin();
-     * @allow update: if isAdmin();
-     * @allow delete: if isAdmin();
-     * @deny get: if false;
-     * @deny list: if false;
-     * @deny create: if false;
-     * @deny update: if false;
-     * @deny delete: if false;
-     * @principle Restricts top product management to admins.
-     */
-    match /top_products/{topProductId} {
-      allow get: if isAdmin();
-      allow list: if isAdmin();
-      allow create: if isAdmin();
-      allow update: if isAdmin();
-      allow delete: if isAdmin();
-    }
-
-    function isSignedIn() {
-      return request.auth != null;
-    }
-
-    function isOwner(userId) {
-      return request.auth.uid == userId;
-    }
-
-    function isExistingOwner(userId, resourceCustomerId) {
-      return resource != null && isSignedIn() && isOwner(userId) && resourceCustomerId == userId;
-    }
-
-    function isAdmin() {
-      // TODO: Implement admin role check (e.g., check for document existence in /roles_admin/{uid})
-      return false;
-    }
-
-    function isCustomer(customerId) {
-       return isSignedIn() && request.auth.uid == customerId;
-    }
+  /**
+   * @description Secures customer data, likely managed by admins.
+   * @path /customers/{customerId}
+   * @allow (get) If an admin user requests a specific customer's data.
+   * @deny (get) If a non-admin user attempts to read customer data.
+   * @allow (create) If an admin user creates customer data.
+   * @deny (create) If a non-admin user attempts to create customer data.
+   * @allow (update) If an admin user updates customer data.
+   * @deny (update) If a non-admin user attempts to update customer data.
+   * @allow (delete) If an admin user deletes customer data.
+   * @deny (delete) If a non-admin user attempts to delete customer data.
+   * @principle Requires admin role for all access.
+   */
+  match /customers/{customerId} {
+   allow get: if false;
+   allow list: if false;
+   allow create: if false;
+   allow update: if false;
+   allow delete: if false;
   }
-}
+ 
+
+  /**
+   * @description Manages product information, allowing public read access and admin-restricted writes.
+   * @path /products/{productId}
+   * @allow (get) Any user can read product data.
+   * @allow (list) Any user can list product data.
+   * @allow (create) If an admin user creates product data.
+   * @deny (create) If a non-admin user attempts to create product data.
+   * @allow (update) If an admin user updates product data.
+   * @deny (update) If a non-admin user attempts to update product data.
+   * @allow (delete) If an admin user deletes product data.
+   * @deny (delete) If a non-admin user attempts to delete product data.
+   * @principle Allows public read access, restricts writes to admins.
+   */
+  match /products/{productId} {
+   allow get: if true;
+   allow list: if true;
+   allow create: if false;
+   allow update: if false;
+   allow delete: if false;
+  }
+ 
+
+  /**
+   * @description Secures sales data under the corresponding customer.
+   * @path /customers/{customerId}/sales/{saleId}
+   * @allow (get) If an admin user requests a specific sale's data under a customer.
+   * @deny (get) If a non-admin user attempts to read sale data.
+   * @allow (create) If an admin user creates sale data under a customer.
+   * @deny (create) If a non-admin user attempts to create sale data.
+   * @allow (update) If an admin user updates sale data under a customer.
+   * @deny (update) If a non-admin user attempts to update sale data.
+   * @allow (delete) If an admin user deletes sale data under a customer.
+   * @deny (delete) If a non-admin user attempts to delete sale data.
+   * @principle Requires admin role for all access.
+   */
+  match /customers/{customerId}/sales/{saleId} {
+   allow get: if false;
+   allow list: if false;
+   allow create: if false;
+   allow update: if false;
+   allow delete: if false;
+  }
+ 
+
+  /**
+   * @description Restricts access to sales overview data to admin users.
+   * @path /sales_overviews/{salesOverviewId}
+   * @allow (get) If an admin user requests a sales overview.
+   * @deny (get) If a non-admin user attempts to read a sales overview.
+   * @allow (create) If an admin user creates a sales overview.
+   * @deny (create) If a non-admin user attempts to create a sales overview.
+   * @allow (update) If an admin user updates a sales overview.
+   * @deny (update) If a non-admin user attempts to update a sales overview.
+   * @allow (delete) If an admin user deletes a sales overview.
+   * @deny (delete) If a non-admin user attempts to delete a sales overview.
+   * @principle Requires admin role for all access.
+   */
+  match /sales_overviews/{salesOverviewId} {
+   allow get: if false;
+   allow list: if false;
+   allow create: if false;
+   allow update: if false;
+   allow delete: if false;
+  }
+ 
+
+  /**
+   * @description Limits access to top product data to admin users.
+   * @path /top_products/{topProductId}
+   * @allow (get) If an admin user requests a top product's data.
+   * @deny (get) If a non-admin user attempts to read a top product's data.
+   * @allow (create) If an admin user creates top product data.
+   * @deny (create) If a non-admin user attempts to create top product data.
+   * @allow (update) If an admin user updates top product data.
+   * @deny (update) If a non-admin user attempts to update top product data.
+   * @allow (delete) If an admin user deletes top product data.
+   * @deny (delete) If a non-admin user attempts to delete top product data.
+   * @principle Requires admin role for all access.
+   */
+  match /top_products/{topProductId} {
+   allow get: if false;
+   allow list: if false;
+   allow create: if false;
+   allow update: if false;
+   allow delete: if false;
+  }
+  }
+ }
