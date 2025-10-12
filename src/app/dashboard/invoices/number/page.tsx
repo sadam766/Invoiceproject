@@ -1,6 +1,6 @@
 
 'use client';
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import {
     Card,
@@ -21,11 +21,15 @@ import {
   import { AddInvoiceNumberDialog } from './_components/add-invoice-number-dialog';
   import { DeleteConfirmationDialog } from '@/app/components/delete-confirmation-dialog';
   import { Skeleton } from '@/components/ui/skeleton';
+  import { exportToExcel, importFromExcel } from '@/lib/utils';
+  import { useToast } from '@/hooks/use-toast';
 
   export default function InvoiceNumberPage() {
     const router = useRouter();
+    const { toast } = useToast();
     const [invoices, setInvoices] = useState(invoiceNumberData);
     const [isLoading, setIsLoading] = useState(false);
+    const fileInputRef = useRef<HTMLInputElement>(null);
 
     const [editingInvoice, setEditingInvoice] = useState<InvoiceNumber | undefined>(undefined);
     const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -63,6 +67,37 @@ import {
         setEditingInvoice(undefined);
       }
     }
+    
+    const handleExport = () => {
+      exportToExcel(invoices, 'invoice-numbers');
+    };
+
+    const handleImportClick = () => {
+        fileInputRef.current?.click();
+    };
+    
+    const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
+      const file = event.target.files?.[0];
+      if (file) {
+        try {
+          const data = await importFromExcel(file);
+          // Assuming the Excel columns match the InvoiceNumber type
+          // You might need to add validation or mapping here
+          setInvoices(prevInvoices => [...prevInvoices, ...data as InvoiceNumber[]]);
+          toast({
+            title: "Success",
+            description: `${data.length} records imported successfully.`,
+          });
+        } catch (error) {
+          console.error("Error importing file:", error);
+          toast({
+            variant: "destructive",
+            title: "Error",
+            description: "Failed to import the Excel file.",
+          });
+        }
+      }
+    };
 
     return (
       <main className="flex flex-1 flex-col gap-4 p-4 md:gap-8 md:p-8">
@@ -81,8 +116,9 @@ import {
                         <Input type="search" placeholder="Cari Faktur" className="pl-8" />
                     </div>
                     <div className="flex items-center gap-2">
-                       <Button variant="outline"><Upload className="mr-2 h-4 w-4"/> Impor</Button>
-                       <Button variant="outline"><Download className="mr-2 h-4 w-4"/> Ekspor</Button>
+                       <input type="file" ref={fileInputRef} onChange={handleFileChange} className="hidden" accept=".xlsx, .xls" />
+                       <Button variant="outline" onClick={handleImportClick}><Upload className="mr-2 h-4 w-4"/> Impor</Button>
+                       <Button variant="outline" onClick={handleExport}><Download className="mr-2 h-4 w-4"/> Ekspor</Button>
                        <Button variant="outline"><Filter className="mr-2 h-4 w-4"/> Filter Duplikat</Button>
                        <AddInvoiceNumberDialog
                         isOpen={isDialogOpen}
