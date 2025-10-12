@@ -1,116 +1,133 @@
 /**
  * @file Firestore Security Rules
- * @description This ruleset enforces a role-based access control model with separation of concerns.
+ * @description This ruleset enforces a role-based access control model, primarily focused on securing sales data and product information.
  *
  * Data Structure:
- * - /customers/{customerId}: Stores customer data, likely admin-controlled.
- * - /products/{productId}: Stores product data, potentially public read, admin write.
- * - /customers/{customerId}/sales/{saleId}: Stores sales data related to a customer.
- * - /sales_overviews/{salesOverviewId}: Stores aggregated sales overview data, admin-controlled.
- * - /top_products/{topProductId}: Stores top product data, admin-controlled.
+ * - /customers/{customerId}: Stores customer data. Access is managed through admin roles or potential user-specific access.
+ * - /products/{productId}: Stores product information. Globally accessible (read-only) or restricted to admin users.
+ * - /customers/{customerId}/sales/{saleId}: Stores sales data under the corresponding customer.
+ * - /sales_overviews/{salesOverviewId}: Stores aggregated sales overview data, restricted to admins.
+ * - /top_products/{topProductId}: Stores top product data, restricted to admins.
  *
  * Key Security Decisions:
- * - Admin access is assumed for sensitive data like sales overviews and top products.  Admin status is not directly validated in this rules set, but the comments show a way to validate based on document existence.
- * - Public read access is considered for product data, but write access is restricted.
- * - Data consistency between path segments and document data is enforced where appropriate.
- *
- * Authorization Independence: Data required for authorization (e.g., customerId on sales documents)
- * is denormalized to avoid costly `get()` calls in security rules.
+ * - No user listing is allowed for any collection.
+ * - Default security posture for ambiguous relationships is strict owner-only access or admin-only access.
+ * - Sales data includes denormalized customerId for efficient querying and authorization.
  */
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
     /**
-     * @description Controls access to customer documents.  Likely admin controlled.
+     * @description Secures customer data. Access is likely managed through admin roles.
      * @path /customers/{customerId}
-     * @allow get, list: if false; // Listing and getting customers is not permitted to all users.
-     * @allow create: if false; // Only admins can create new customers
-     * @allow update: if false; // Only admins can update customers
-     * @allow delete: if false; // Only admins can delete customers
-     * @principle Restricts customer management to admins.
+     * @allow get: if false;
+     * @allow list: if false;
+     * @allow create: if false;
+     * @allow update: if false;
+     * @allow delete: if false;
+     * @deny get: Always denied, as there are no read permissions defined.
+     * @deny list: Always denied, as there are no read permissions defined.
+     * @deny create: Always denied, as there are no write permissions defined.
+     * @deny update: Always denied, as there are no write permissions defined.
+     * @deny delete: Always denied, as there are no write permissions defined.
+     * @principle Restricts access to customer data, defaulting to admin-only.
      */
     match /customers/{customerId} {
-      allow get, list: if false;
+      allow get: if false;
+      allow list: if false;
       allow create: if false;
       allow update: if false;
       allow delete: if false;
     }
 
     /**
-     * @description Controls access to product documents.  Potentially public read, admin write.
+     * @description Secures product information. Globally accessible (read-only) or restricted to admin users.
      * @path /products/{productId}
-     * @allow get, list: if true; // Products are publicly readable.
-     * @allow create: if false; // Only admins can create new products
-     * @allow update: if false; // Only admins can update products
-     * @allow delete: if false; // Only admins can delete products
-     * @principle Allows public read access to products, restricts writes to admins.
+     * @allow get: if true;
+     * @allow list: if true;
+     * @allow create: if false;
+     * @allow update: if false;
+     * @allow delete: if false;
+     * @deny get: Allowed for all.
+     * @deny list: Allowed for all.
+     * @deny create: Always denied, as there are no write permissions defined.
+     * @deny update: Always denied, as there are no write permissions defined.
+     * @deny delete: Always denied, as there are no write permissions defined.
+     * @principle Restricts access to product data, defaulting to public read-only.
      */
     match /products/{productId} {
-      allow get, list: if true;
+      allow get: if true;
+      allow list: if true;
       allow create: if false;
       allow update: if false;
       allow delete: if false;
     }
 
     /**
-     * @description Controls access to sales documents under a customer.
+     * @description Stores sales data under the corresponding customer.
      * @path /customers/{customerId}/sales/{saleId}
-     * @allow get, list: if false; // Listing and getting sales is not permitted to all users.
-     * @allow create: if false; // Only admins can create new sales
-     * @allow update: if false; // Only admins can update sales
-     * @allow delete: if false; // Only admins can delete sales
-     * @principle Restricts sales data management to admins.
+     * @allow get: if false;
+     * @allow list: if false;
+     * @allow create: if false;
+     * @allow update: if false;
+     * @allow delete: if false;
+     * @deny get: Always denied, as there are no read permissions defined.
+     * @deny list: Always denied, as there are no read permissions defined.
+     * @deny create: Always denied, as there are no write permissions defined.
+     * @deny update: Always denied, as there are no write permissions defined.
+     * @deny delete: Always denied, as there are no write permissions defined.
+     * @principle Restricts access to sales data, defaulting to admin-only.
      */
     match /customers/{customerId}/sales/{saleId} {
-      allow get, list: if false;
+      allow get: if false;
+      allow list: if false;
       allow create: if false;
       allow update: if false;
       allow delete: if false;
     }
 
     /**
-     * @description Controls access to sales overview documents.
+     * @description Stores sales overview data, potentially aggregated. Access will likely be admin controlled.
      * @path /sales_overviews/{salesOverviewId}
-     * @allow get, list: if false; // Listing and getting sales overviews is not permitted to all users.
-     * @allow create: if false; // Only admins can create new sales overviews
-     * @allow update: if false; // Only admins can update sales overviews
-     * @allow delete: if false; // Only admins can delete sales overviews
-     * @principle Restricts sales overview data management to admins.
+     * @allow get: if false;
+     * @allow list: if false;
+     * @allow create: if false;
+     * @allow update: if false;
+     * @allow delete: if false;
+     * @deny get: Always denied, as there are no read permissions defined.
+     * @deny list: Always denied, as there are no read permissions defined.
+     * @deny create: Always denied, as there are no write permissions defined.
+     * @deny update: Always denied, as there are no write permissions defined.
+     * @deny delete: Always denied, as there are no write permissions defined.
+     * @principle Restricts access to sales overview data, defaulting to admin-only.
      */
     match /sales_overviews/{salesOverviewId} {
-      allow get, list: if false;
+      allow get: if false;
+      allow list: if false;
       allow create: if false;
       allow update: if false;
       allow delete: if false;
     }
 
     /**
-     * @description Controls access to top product documents.
+     * @description Stores top product data. Top products are stored globally, also likely admin controlled.
      * @path /top_products/{topProductId}
-     * @allow get, list: if false; // Listing and getting top products is not permitted to all users.
-     * @allow create: if false; // Only admins can create new top products
-     * @allow update: if false; // Only admins can update top products
-     * @allow delete: if false; // Only admins can delete top products
-     * @principle Restricts top product data management to admins.
+     * @allow get: if false;
+     * @allow list: if false;
+     * @allow create: if false;
+     * @allow update: if false;
+     * @allow delete: if false;
+     * @deny get: Always denied, as there are no read permissions defined.
+     * @deny list: Always denied, as there are no read permissions defined.
+     * @deny create: Always denied, as there are no write permissions defined.
+     * @deny update: Always denied, as there are no write permissions defined.
+     * @deny delete: Always denied, as there are no write permissions defined.
+     * @principle Restricts access to top product data, defaulting to admin-only.
      */
     match /top_products/{topProductId} {
-      allow get, list: if false;
-      allow create: if false;
-      allow update: if false;
-      allow delete: if false;
-    }
-       /**
-     * @description Denies access to the `invoiceNumbers` collection.
-     * @path /invoiceNumbers/{invoiceNumberId}
-     * @allow get, list: if false; // No one can list invoice numbers.
-     * @allow create: if false; // No one can create invoice numbers.
-     * @allow update: if false; // No one can update invoice numbers.
-     * @allow delete: if false; // No one can delete invoice numbers.
-     * @principle Restricts all access to invoice number documents.
-     */
-    match /invoiceNumbers/{invoiceNumberId} {
-      allow get, list: if false;
+      allow get: if false;
+      allow list: if false;
       allow create: if false;
       allow update: if false;
       allow delete: if false;
