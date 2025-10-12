@@ -105,7 +105,7 @@ export const FirebaseProvider: React.FC<FirebaseProviderProps> = ({
   }), [firebaseApp, firestore, auth, userAuthState]);
   
   if (!auth) {
-    return <div>Loading Firebase...</div>
+    return <>{children}</>; // Render children consistently on server and client initial render
   }
 
   return (
