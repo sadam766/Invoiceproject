@@ -1,10 +1,8 @@
 
+'use client';
 import {
   Card,
   CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
 } from '@/components/ui/card';
 import {
   Table,
@@ -18,10 +16,108 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { salesMonitoringData } from '@/app/lib/data';
+import { getSalesMonitoringData } from '@/app/lib/data';
 import { Search, Eye } from 'lucide-react';
+import Link from 'next/link';
+
+const statusVariant: { [key: string]: 'outline' | 'destructive' | 'secondary' } = {
+    'Paid': 'outline',
+    'Unpaid': 'destructive',
+    'Sent': 'secondary',
+    'Draft': 'secondary',
+};
+
+const statusStyle = {
+    'Paid': 'border-green-500 text-green-500 bg-green-50',
+    'Unpaid': 'border-red-500 text-red-500 bg-red-50',
+    'Sent': 'border-blue-500 text-blue-500 bg-blue-50',
+    'Draft': 'border-gray-500 text-gray-500 bg-gray-50',
+};
 
 export default function SalesMonitoringPage() {
+  const salesMonitoringData = getSalesMonitoringData();
+  
+  const needsInvoiceData = salesMonitoringData.filter(d => d.needsInvoice);
+  const needsSpdData = salesMonitoringData.filter(d => d.needsSpd);
+  const unpaidData = salesMonitoringData.filter(d => d.paymentStatus === 'Unpaid');
+
+
+  const renderTable = (data: typeof salesMonitoringData) => (
+    <div className="mt-4 w-full overflow-auto">
+      <Table>
+        <TableHeader>
+          <TableRow>
+            <TableHead>SO Number</TableHead>
+            <TableHead>Customer</TableHead>
+            <TableHead>Date</TableHead>
+            <TableHead>Amount</TableHead>
+            <TableHead>Invoice</TableHead>
+            <TableHead>Tax Invoice</TableHead>
+            <TableHead>SPD</TableHead>
+            <TableHead>Payment</TableHead>
+            <TableHead>Actions</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {data.map((sale) => (
+            <TableRow key={sale.soNumber}>
+              <TableCell className="font-medium">
+                {sale.soNumber}
+              </TableCell>
+              <TableCell>{sale.customer}</TableCell>
+              <TableCell>{sale.date}</TableCell>
+              <TableCell>
+                Rp {sale.amount.toLocaleString('id-ID')}
+              </TableCell>
+              <TableCell>
+                {sale.invoice ? (
+                   <div className="flex items-center gap-2">
+                    <span>{sale.invoice}</span>
+                    <Badge
+                        variant={statusVariant[sale.invoiceStatus] || 'secondary'}
+                        className={cn(statusStyle[sale.invoiceStatus] || '')}
+                    >
+                        {sale.invoiceStatus}
+                    </Badge>
+                   </div>
+                ) : (
+                    <Button size="sm" asChild>
+                       <Link href={`/dashboard/invoices/number`}>Create Invoice</Link>
+                    </Button>
+                )}
+              </TableCell>
+              <TableCell>{sale.taxInvoice || '-'}
+              </TableCell>
+              <TableCell>
+                {sale.spd ? sale.spd : (sale.invoice && sale.needsSpd ? (
+                  <Button size="sm">Create SPD</Button>
+                ) : (
+                  '-'
+                ))}
+              </TableCell>
+              <TableCell>
+                <Badge
+                    variant={statusVariant[sale.paymentStatus] || 'secondary'}
+                    className={cn(statusStyle[sale.paymentStatus] || '')}
+                >
+                  {sale.paymentStatus}
+                </Badge>
+              </TableCell>
+              <TableCell>
+                <Button variant="ghost" size="icon">
+                  <Eye className="h-4 w-4" />
+                </Button>
+              </TableCell>
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
+       <div className="text-sm text-muted-foreground mt-4">
+        Showing 1 to {data.length} of {data.length} entries
+      </div>
+    </div>
+  );
+
   return (
     <main className="flex flex-1 flex-col gap-4 p-4 md:gap-8 md:p-8">
       <div className="flex items-center justify-between">
@@ -46,97 +142,31 @@ export default function SalesMonitoringPage() {
                 />
               </div>
               <TabsList>
-                <TabsTrigger value="all">All Sales</TabsTrigger>
-                <TabsTrigger value="needs-invoice">Needs Invoice</TabsTrigger>
-                <TabsTrigger value="needs-spd">Needs SPD</TabsTrigger>
-                <TabsTrigger value="unpaid">Unpaid</TabsTrigger>
+                <TabsTrigger value="all">All Sales ({salesMonitoringData.length})</TabsTrigger>
+                <TabsTrigger value="needs-invoice">Needs Invoice ({needsInvoiceData.length})</TabsTrigger>
+                <TabsTrigger value="needs-spd">Needs SPD ({needsSpdData.length})</TabsTrigger>
+                <TabsTrigger value="unpaid">Unpaid ({unpaidData.length})</TabsTrigger>
               </TabsList>
             </div>
             <TabsContent value="all">
-              <div className="mt-4 w-full overflow-auto">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>SO Number</TableHead>
-                      <TableHead>Customer</TableHead>
-                      <TableHead>Date</TableHead>
-                      <TableHead>Amount</TableHead>
-                      <TableHead>Invoice</TableHead>
-                      <TableHead>Tax Invoice</TableHead>
-                      <TableHead>SPD</TableHead>
-                      <TableHead>Payment</TableHead>
-                      <TableHead>Actions</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {salesMonitoringData.map((sale) => (
-                      <TableRow key={sale.soNumber}>
-                        <TableCell className="font-medium">
-                          {sale.soNumber}
-                        </TableCell>
-                        <TableCell>{sale.customer}</TableCell>
-                        <TableCell>{sale.date}</TableCell>
-                        <TableCell>
-                          Rp {sale.amount.toLocaleString('id-ID')}
-                        </TableCell>
-                        <TableCell>
-                          {sale.invoice}
-                          <Badge
-                            variant={
-                              sale.invoiceStatus === 'Paid'
-                                ? 'outline'
-                                : 'destructive'
-                            }
-                            className={`ml-2 ${
-                              sale.invoiceStatus === 'Paid'
-                                ? 'border-green-500 text-green-500'
-                                : ''
-                            }`}
-                          >
-                            {sale.invoiceStatus}
-                          </Badge>
-                        </TableCell>
-                        <TableCell>{sale.taxInvoice}</TableCell>
-                        <TableCell>
-                          {sale.needsSpd ? (
-                            <Button size="sm">Create SPD</Button>
-                          ) : (
-                            sale.spd
-                          )}
-                        </TableCell>
-                        <TableCell>
-                          <Badge
-                            variant={
-                              sale.paymentStatus === 'Paid'
-                                ? 'outline'
-                                : 'destructive'
-                            }
-                            className={`${
-                              sale.paymentStatus === 'Paid'
-                                ? 'border-green-500 text-green-500'
-                                : ''
-                            }`}
-                          >
-                            {sale.paymentStatus}
-                          </Badge>
-                        </TableCell>
-                        <TableCell>
-                          <Button variant="ghost" size="icon">
-                            <Eye className="h-4 w-4" />
-                          </Button>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
-              <div className="text-sm text-muted-foreground mt-4">
-                Showing 1 to 2 of 2 entries
-              </div>
+              {renderTable(salesMonitoringData)}
+            </TabsContent>
+            <TabsContent value="needs-invoice">
+              {renderTable(needsInvoiceData)}
+            </TabsContent>
+            <TabsContent value="needs-spd">
+              {renderTable(needsSpdData)}
+            </TabsContent>
+            <TabsContent value="unpaid">
+              {renderTable(unpaidData)}
             </TabsContent>
           </Tabs>
         </CardContent>
       </Card>
     </main>
   );
+}
+
+function cn(...inputs: (string | undefined | null | false)[]): string {
+    return inputs.filter(Boolean).join(' ');
 }

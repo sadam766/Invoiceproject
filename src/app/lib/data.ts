@@ -111,39 +111,52 @@ export type SalesMonitoringData = {
   date: string;
   amount: number;
   invoice: string;
-  invoiceStatus: 'Paid' | 'Unpaid';
+  invoiceStatus: 'Paid' | 'Unpaid' | 'Sent' | 'Draft';
   taxInvoice: string;
   spd: string;
   paymentStatus: 'Paid' | 'Unpaid';
+  needsInvoice: boolean;
   needsSpd: boolean;
 };
 
-export const salesMonitoringData: SalesMonitoringData[] = [
-  {
-    soNumber: 'SO-2024-002',
-    customer: 'CV. Maju Jaya',
-    date: '2024-05-12',
-    amount: 1500000,
-    invoice: 'INV/2024/002',
-    invoiceStatus: 'Paid',
-    taxInvoice: 'N/A',
-    spd: 'PS/1-J/KEU/2024/DK',
-    paymentStatus: 'Paid',
-    needsSpd: false,
-  },
-  {
-    soNumber: 'SO-2024-001',
-    customer: 'PT. Sejahtera Abadi',
-    date: '2024-05-10',
-    amount: 1000000,
-    invoice: 'INV/2024/001',
-    invoiceStatus: 'Unpaid',
-    taxInvoice: '010.000-24.00000001',
-    spd: '',
-    paymentStatus: 'Unpaid',
-    needsSpd: true,
-  },
-];
+export function getSalesMonitoringData(): SalesMonitoringData[] {
+    const soData = salesOrderListData.reduce((acc, order) => {
+        if (!acc[order.soNumber]) {
+            acc[order.soNumber] = {
+                soNumber: order.soNumber,
+                customer: order.customer,
+                date: new Date().toLocaleDateString('en-CA'), // Placeholder date
+                amount: 0,
+            };
+        }
+        acc[order.soNumber].amount += order.quantity * order.price;
+        return acc;
+    }, {} as {[key: string]: any});
+
+
+    return Object.values(soData).map(so => {
+        const invoice = invoiceListData.find(inv => inv.soNumber === so.soNumber);
+        const taxInvoice = taxInvoiceData.find(ti => ti.taxInvoiceNumber.includes(so.soNumber.slice(-4))); // Simplified logic
+        const spd = spdData.find(s => s.noInvoice === (invoice?.id || ''));
+
+        const paymentStatus = (invoice?.status === 'paid') ? 'Paid' : 'Unpaid';
+
+        return {
+            soNumber: so.soNumber,
+            customer: so.customer,
+            date: so.date,
+            amount: so.amount,
+            invoice: invoice?.id || '',
+            invoiceStatus: invoice?.status || 'Draft',
+            taxInvoice: taxInvoice?.taxInvoiceNumber || '',
+            spd: spd?.spd || '',
+            paymentStatus: paymentStatus,
+            needsInvoice: !invoice,
+            needsSpd: !!invoice && !spd,
+        };
+    });
+}
+
 
 export type Invoice = {
   id: string;
@@ -291,6 +304,15 @@ export const salesOrderListData: SalesOrder[] = [
         quantity: 200,
         unit: 'meter',
         price: 7500,
+    },
+     {
+        soNumber: 'SO-2024-003',
+        customer: 'Toko Listrik Sinar Jaya',
+        productName: 'Kabel Tembaga 1.5mm',
+        category: 'Kabel',
+        quantity: 500,
+        unit: 'meter',
+        price: 5500,
     }
 ];
 
@@ -379,4 +401,3 @@ export const spdData: SpdData[] = [
         suratJalan: '-',
     }
 ];
-
