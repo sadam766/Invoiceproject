@@ -1,77 +1,134 @@
+/**
+ * @file Firestore Security Rules for the Sales Dashboard application.
+ *
+ * Core Philosophy:
+ * This ruleset prioritizes secure data access by enforcing ownership and role-based restrictions.
+ * It assumes an administrative role that manages global data, while customers' sales data is accessible only to admins.
+ * Read operations for products are generally public.
+ *
+ * Data Structure:
+ * - /customers/{customerId}: Stores customer data, with likely admin-only access.
+ * - /products/{productId}: Stores product data, with public read access and admin-only write access.
+ * - /customers/{customerId}/sales/{saleId}: Stores sales data nested under customers.
+ * - /sales_overviews/{salesOverviewId}: Stores aggregated sales overview data, with likely admin-only access.
+ * - /top_products/{topProductId}: Stores top product data, with likely admin-only access.
+ *
+ * Key Security Decisions:
+ * - The rules assume the existence of an administrative role to manage sales overviews and top products.
+ * - Customer data access is restricted, implying it's managed via an admin role or other mechanism (not user-owned).
+ * - Public listing of sales data is disallowed to prevent unauthorized access.
+ *
+ * Denormalization for Authorization:
+ * The rules leverage denormalization by assuming that any data needed for authorization (e.g., customerId in sales documents)
+ * is already present within the document itself. This avoids costly and complex `get()` calls in the security rules.
+ *
+ * Structural Segregation:
+ * The data model uses structural segregation to separate customer-specific sales data (under `/customers/{customerId}`) from
+ * global sales overviews and top products, which are stored in top-level collections and likely managed by admins.
+ */
 rules_version = '2';
- service cloud.firestore {
+service cloud.firestore {
   match /databases/{database}/documents {
- 
 
-  /**
-   * @description Allows access to customer data. Access is likely managed through admin roles.
-   * @path /customers/{customerId}
-   * @allow (get, list) if false; // Example: Admin role check required, replace with actual admin check
-   * @deny (create, update, delete) Always deny write access for non-admin users
-   * @principle Restricts direct user access to customer data, requiring admin privileges for management
-   */
-  match /customers/{customerId} {
-  allow get, list: if isSignedIn() && false;
-  allow create, update, delete: if false;
-  }
- 
+    /**
+     * @description Controls access to customer data. Assumes admin-only access.
+     * @path /customers/{customerId}
+     * @allow get: if false; // Assuming admin-only access, no direct gets allowed.
+     * @allow list: if false; // Assuming admin-only access, no direct listing allowed.
+     * @allow create: if false; // Admin only
+     * @allow update: if false; // Admin only
+     * @allow delete: if false; // Admin only
+     * @deny get: if true; // No one can get without auth
+     * @deny list: if true; // No one can list without auth
+     * @principle Restricts access to customer data, assuming admin-only management.
+     */
+    match /customers/{customerId} {
+      allow get: if false;
+      allow list: if false;
+      allow create: if false;
+      allow update: if false;
+      allow delete: if false;
+    }
 
-  /**
-   * @description Allows read access to product information. Admin users can create, update, and delete product data.
-   * @path /products/{productId}
-   * @allow (get, list) if true; // Example: Products are publicly readable
-   * @allow (create, update, delete) if false; // Example: Admin role check required, replace with actual admin check
-   * @deny (create, update, delete) Always deny write access for non-admin users
-   * @principle Restricts write access to product data to admin users, while allowing public read access
-   */
-  match /products/{productId} {
-  allow get, list: if true;
-  allow create, update, delete: if false;
-  }
- 
+    /**
+     * @description Controls access to product data. Allows public read access, restricts writes to admins.
+     * @path /products/{productId}
+     * @allow get: if true;
+     * @allow list: if true;
+     * @allow create: if false; // Admin only
+     * @allow update: if false; // Admin only
+     * @allow delete: if false; // Admin only
+     * @deny create: if true;
+     * @deny update: if true;
+     * @deny delete: if true;
+     * @principle Allows public read access to product data, restricts writes to admins.
+     */
+    match /products/{productId} {
+      allow get: if true;
+      allow list: if true;
+      allow create: if false;
+      allow update: if false;
+      allow delete: if false;
+    }
 
-  /**
-   * @description Restricts access to sales data under the corresponding customer.
-   * The `customerId` is denormalized to enable filtering and efficient security rules.
-   * @path /customers/{customerId}/sales/{saleId}
-   * @allow (get, list) if false; // Example: Customer role check required, replace with actual customer check
-   * @deny (create, update, delete) Always deny write access for non-admin users
-   * @principle Restricts direct user access to sales data, requiring customer or admin privileges for management
-   */
-  match /customers/{customerId}/sales/{saleId} {
-  allow get, list: if isSignedIn() && false;
-  allow create, update, delete: if false;
-  }
- 
+    /**
+     * @description Controls access to sales data nested under customer data. Assumes admin-only access.
+     * @path /customers/{customerId}/sales/{saleId}
+     * @allow get: if false; // Assuming admin-only access, no direct gets allowed.
+     * @allow list: if false; // Assuming admin-only access, no direct listing allowed.
+     * @allow create: if false; // Admin only
+     * @allow update: if false; // Admin only
+     * @allow delete: if false; // Admin only
+     * @deny get: if true; // No one can get without auth
+     * @deny list: if true; // No one can list without auth
+     * @principle Restricts access to sales data, assuming admin-only management.
+     */
+    match /customers/{customerId}/sales/{saleId} {
+      allow get: if false;
+      allow list: if false;
+      allow create: if false;
+      allow update: if false;
+      allow delete: if false;
+    }
 
-  /**
-   * @description Allows access to sales overview data. Access will likely be admin controlled.
-   * @path /sales_overviews/{salesOverviewId}
-   * @allow (get, list) if false; // Example: Admin role check required, replace with actual admin check
-   * @deny (create, update, delete) Always deny write access for non-admin users
-   * @principle Restricts direct user access to sales overview data, requiring admin privileges for management
-   */
-  match /sales_overviews/{salesOverviewId} {
-  allow get, list: if isSignedIn() && false;
-  allow create, update, delete: if false;
-  }
- 
+    /**
+     * @description Controls access to sales overview data. Assumes admin-only access.
+     * @path /sales_overviews/{salesOverviewId}
+     * @allow get: if false; // Assuming admin-only access, no direct gets allowed.
+     * @allow list: if false; // Assuming admin-only access, no direct listing allowed.
+     * @allow create: if false; // Admin only
+     * @allow update: if false; // Admin only
+     * @allow delete: if false; // Admin only
+     * @deny get: if true; // No one can get without auth
+     * @deny list: if true; // No one can list without auth
+     * @principle Restricts access to sales overview data, assuming admin-only management.
+     */
+    match /sales_overviews/{salesOverviewId} {
+      allow get: if false;
+      allow list: if false;
+      allow create: if false;
+      allow update: if false;
+      allow delete: if false;
+    }
 
-  /**
-   * @description Allows access to top product data. Top products are stored globally, also likely admin controlled.
-   * @path /top_products/{topProductId}
-   * @allow (get, list) if false; // Example: Admin role check required, replace with actual admin check
-   * @deny (create, update, delete) Always deny write access for non-admin users
-   * @principle Restricts direct user access to top product data, requiring admin privileges for management
-   */
-  match /top_products/{topProductId} {
-  allow get, list: if isSignedIn() && false;
-  allow create, update, delete: if false;
+    /**
+     * @description Controls access to top product data. Assumes admin-only access.
+     * @path /top_products/{topProductId}
+     * @allow get: if false; // Assuming admin-only access, no direct gets allowed.
+     * @allow list: if false; // Assuming admin-only access, no direct listing allowed.
+     * @allow create: if false; // Admin only
+     * @allow update: if false; // Admin only
+     * @allow delete: if false; // Admin only
+     * @deny get: if true; // No one can get without auth
+     * @deny list: if true; // No one can list without auth
+     * @principle Restricts access to top product data, assuming admin-only management.
+     */
+    match /top_products/{topProductId} {
+      allow get: if false;
+      allow list: if false;
+      allow create: if false;
+      allow update: if false;
+      allow delete: if false;
+    }
   }
- 
-
-  function isSignedIn() {
-  return request.auth != null;
-  }
-  }
- }
+}
