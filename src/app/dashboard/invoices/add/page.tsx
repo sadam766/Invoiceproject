@@ -39,6 +39,7 @@ import {
   Trash2,
   Send,
   Settings,
+  Eye,
 } from 'lucide-react';
 import Link from 'next/link';
 import { type InvoiceNumber, invoiceNumberData } from '@/app/lib/data';
@@ -316,9 +317,11 @@ export default function AddInvoicePage() {
                   <Settings className="h-4 w-4" />
                 </Button>
               </div>
-              <Button variant="outline" className="w-full">
-                Preview
-              </Button>
+              <Link href={`/dashboard/invoices/preview/${encodeURIComponent(invoiceId)}`} passHref>
+                <Button variant="outline" className="w-full">
+                    <Eye className="mr-2 h-4 w-4" /> Preview
+                </Button>
+              </Link>
               <Button variant="outline" className="w-full" onClick={() => handleSaveInvoice('draft')}>
                 Save
               </Button>

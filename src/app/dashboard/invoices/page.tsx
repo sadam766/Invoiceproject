@@ -236,9 +236,11 @@ import {
                                                     </Button>
                                                 </DropdownMenuTrigger>
                                                 <DropdownMenuContent align="end">
-                                                    <DropdownMenuItem>
-                                                        <Eye className="mr-2 h-4 w-4" />
-                                                        Preview
+                                                    <DropdownMenuItem asChild>
+                                                        <Link href={`/dashboard/invoices/preview/${encodeURIComponent(invoice.id)}`}>
+                                                            <Eye className="mr-2 h-4 w-4" />
+                                                            Preview
+                                                        </Link>
                                                     </DropdownMenuItem>
                                                     <DropdownMenuItem onClick={() => handleEdit(invoice)}>
                                                         <Pencil className="mr-2 h-4 w-4" />
