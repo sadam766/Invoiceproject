@@ -1,6 +1,7 @@
+
 'use client';
 
-import { useEffect, useState }s from 'react';
+import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { invoiceListData, salesOrderListData, type Invoice, type SalesOrder } from '@/app/lib/data';
@@ -198,3 +199,4 @@ export default function InvoicePreviewPage() {
         </main>
     );
 }
+    
