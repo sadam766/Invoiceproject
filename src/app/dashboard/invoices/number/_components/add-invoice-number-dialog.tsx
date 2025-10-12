@@ -5,25 +5,33 @@ import { Button } from '@/components/ui/button';
 import {
   Dialog,
   DialogContent,
-  DialogDescription,
-  DialogFooter,
   DialogHeader,
   DialogTitle,
   DialogTrigger,
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Plus, Calendar as CalendarIcon } from 'lucide-react';
+import { Plus, Calendar as CalendarIcon, Check, ChevronsUpDown } from 'lucide-react';
 import { Checkbox } from '@/components/ui/checkbox';
 import {
   Popover,
   PopoverContent,
   PopoverTrigger,
 } from '@/components/ui/popover';
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from '@/components/ui/command';
 import { Calendar } from '@/components/ui/calendar';
 import { cn, formatNumberWithCommas, parseFormattedNumber } from '@/lib/utils';
 import { format } from 'date-fns';
 import type { InvoiceNumber } from '@/app/lib/data';
+import { customerListData, salesOrderListData } from '@/app/lib/data';
+
 
 type AddInvoiceNumberDialogProps = {
   isOpen: boolean;
@@ -48,6 +56,42 @@ export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceDa
   const [salesOrder, setSalesOrder] = useState('');
   const [customer, setCustomer] = useState('');
   const [amount, setAmount] = useState<string | number>(0);
+
+  const [customerPopoverOpen, setCustomerPopoverOpen] = useState(false);
+  const [soPopoverOpen, setSoPopoverOpen] = useState(false);
+
+  const uniqueSalesOrders = Array.from(new Set(salesOrderListData.map(item => item.soNumber)));
+
+  const handleSalesOrderSelect = (currentValue: string) => {
+    const newSalesOrder = currentValue === salesOrder ? '' : currentValue;
+    setSalesOrder(newSalesOrder);
+
+    if (newSalesOrder) {
+      // Find customer and total amount for the selected SO
+      const soDetails = salesOrderListData.filter(item => item.soNumber === newSalesOrder);
+      const associatedCustomer = customerListData.find(c => c.name.includes(soDetails[0].productName.split(' ')[0])); // Simplified logic
+      
+      const soCustomer = salesOrderListData.find(item => item.soNumber === newSalesOrder)?.customer;
+      
+      if (soCustomer) {
+        const customerDetails = customerListData.find(c => c.name === soCustomer);
+        if (customerDetails) {
+            setCustomer(customerDetails.name);
+        }
+      }
+
+      const totalAmount = soDetails.reduce((sum, item) => sum + (item.quantity * item.price), 0);
+      setAmount(formatNumberWithCommas(totalAmount));
+
+    } else {
+        // Reset if SO is deselected
+        setCustomer('');
+        setAmount(0);
+    }
+
+    setSoPopoverOpen(false);
+  };
+
 
   useEffect(() => {
     const resetForm = () => {
@@ -137,7 +181,7 @@ export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceDa
         <DialogHeader>
           <DialogTitle>{dialogTitle}</DialogTitle>
         </DialogHeader>
-        <div className="grid gap-6 py-4">
+        <div className="grid gap-6 py-4 max-h-[70vh] overflow-y-auto pr-4">
           <div>
             <Label htmlFor="invoice-type">Tipe Faktur</Label>
             <div className="mt-2 grid grid-cols-2 gap-2 rounded-md bg-muted p-1">
@@ -160,11 +204,92 @@ export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceDa
           </div>
            <div className="space-y-2">
             <Label htmlFor="sales-order">Sales Order / SO (Opsional)</Label>
-            <Input id="sales-order" placeholder="Search and select a Sales Order" value={salesOrder} onChange={e => setSalesOrder(e.target.value)} />
+            <Popover open={soPopoverOpen} onOpenChange={setSoPopoverOpen}>
+                <PopoverTrigger asChild>
+                    <Button
+                    variant="outline"
+                    role="combobox"
+                    aria-expanded={soPopoverOpen}
+                    className="w-full justify-between"
+                    >
+                    {salesOrder
+                        ? uniqueSalesOrders.find((so) => so === salesOrder)
+                        : "Search and select a Sales Order"}
+                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                    </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-[375px] p-0">
+                    <Command>
+                    <CommandInput placeholder="Search sales order..." />
+                    <CommandList>
+                      <CommandEmpty>No sales order found.</CommandEmpty>
+                      <CommandGroup>
+                          {uniqueSalesOrders.map((so) => (
+                          <CommandItem
+                              key={so}
+                              value={so}
+                              onSelect={handleSalesOrderSelect}
+                          >
+                              <Check
+                              className={cn(
+                                  "mr-2 h-4 w-4",
+                                  salesOrder === so ? "opacity-100" : "opacity-0"
+                              )}
+                              />
+                              {so}
+                          </CommandItem>
+                          ))}
+                      </CommandGroup>
+                      </CommandList>
+                    </Command>
+                </PopoverContent>
+            </Popover>
           </div>
           <div className="space-y-2">
             <Label htmlFor="customer">Pelanggan</Label>
-            <Input id="customer" placeholder="e.g., PT. XYZ Corp" value={customer} onChange={e => setCustomer(e.target.value)}/>
+            <Popover open={customerPopoverOpen} onOpenChange={setCustomerPopoverOpen}>
+                <PopoverTrigger asChild>
+                    <Button
+                    variant="outline"
+                    role="combobox"
+                    aria-expanded={customerPopoverOpen}
+                    className="w-full justify-between"
+                    >
+                    {customer
+                        ? customerListData.find((c) => c.name === customer)?.name
+                        : "e.g., PT. XYZ Corp"}
+                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                    </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-[375px] p-0">
+                    <Command>
+                    <CommandInput placeholder="Search customer..." />
+                     <CommandList>
+                        <CommandEmpty>No customer found.</CommandEmpty>
+                        <CommandGroup>
+                            {customerListData.map((c) => (
+                            <CommandItem
+                                key={c.id}
+                                value={c.name}
+                                onSelect={(currentValue) => {
+                                    setCustomer(currentValue === customer ? "" : currentValue);
+                                    setCustomerPopoverOpen(false);
+                                }}
+                            >
+                                <Check
+                                className={cn(
+                                    "mr-2 h-4 w-4",
+                                    customer === c.name ? "opacity-100" : "opacity-0"
+                                )}
+                                />
+                                {c.name}
+                            </CommandItem>
+                            ))}
+                        </CommandGroup>
+                     </CommandList>
+                    </Command>
+                </PopoverContent>
+            </Popover>
           </div>
           <div className="grid grid-cols-2 gap-4">
              <div className="space-y-2">
@@ -202,10 +327,10 @@ export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceDa
             </div>
           </div>
         </div>
-        <DialogFooter>
+        <div className="pt-6 border-t flex justify-end gap-2">
           <Button variant="ghost" onClick={() => onOpenChange(false)}>Cancel</Button>
           <Button type="button" onClick={handleSave}>Save &amp; Create Invoice</Button>
-        </DialogFooter>
+        </div>
       </DialogContent>
     </Dialog>
   );

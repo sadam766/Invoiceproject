@@ -256,6 +256,7 @@ export const productListData: ProductListItem[] = [
 
 export type SalesOrder = {
     soNumber: string;
+    customer: string;
     productName: string;
     category: string;
     quantity: number;
@@ -266,6 +267,7 @@ export type SalesOrder = {
 export const salesOrderListData: SalesOrder[] = [
     {
         soNumber: 'SO-2024-001',
+        customer: 'PT. Sejahtera Abadi',
         productName: 'Kabel Fiber Optik',
         category: 'Kabel',
         quantity: 50,
@@ -274,6 +276,7 @@ export const salesOrderListData: SalesOrder[] = [
     },
     {
         soNumber: 'SO-2024-001',
+        customer: 'PT. Sejahtera Abadi',
         productName: 'Konektor RJ45',
         category: 'Aksesoris',
         quantity: 100,
@@ -282,6 +285,7 @@ export const salesOrderListData: SalesOrder[] = [
     },
     {
         soNumber: 'SO-2024-002',
+        customer: 'CV. Maju Jaya',
         productName: 'Kabel Tembaga 2.5mm',
         category: 'Kabel',
         quantity: 200,
@@ -375,3 +379,4 @@ export const spdData: SpdData[] = [
         suratJalan: '-',
     }
 ];
+
