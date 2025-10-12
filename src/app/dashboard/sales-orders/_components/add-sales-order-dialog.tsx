@@ -22,6 +22,7 @@ import {
 import { Plus } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import type { SalesOrder } from '@/app/lib/data';
+import { formatNumberWithCommas, parseFormattedNumber } from '@/lib/utils';
 
 type AddSalesOrderDialogProps = {
   isOpen: boolean;
@@ -35,18 +36,18 @@ export function AddSalesOrderDialog({ isOpen, onOpenChange, onSave, orderData, o
   const [soNumber, setSoNumber] = useState('');
   const [productName, setProductName] = useState('');
   const [category, setCategory] = useState('');
-  const [quantity, setQuantity] = useState(0);
+  const [quantity, setQuantity] = useState<number|string>(0);
   const [unit, setUnit] = useState('');
-  const [price, setPrice] = useState(0);
+  const [price, setPrice] = useState<number|string>(0);
 
   useEffect(() => {
     if (orderData && isOpen) {
       setSoNumber(orderData.soNumber);
       setProductName(orderData.productName);
       setCategory(orderData.category);
-      setQuantity(orderData.quantity);
+      setQuantity(formatNumberWithCommas(orderData.quantity));
       setUnit(orderData.unit);
-      setPrice(orderData.price);
+      setPrice(formatNumberWithCommas(orderData.price));
     } else if (!isOpen) {
       setSoNumber('');
       setProductName('');
@@ -57,8 +58,23 @@ export function AddSalesOrderDialog({ isOpen, onOpenChange, onSave, orderData, o
     }
   }, [orderData, isOpen]);
 
+  const handleNumericChange = (setter: React.Dispatch<React.SetStateAction<string | number>>) => (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    const parsedValue = parseFormattedNumber(value);
+    if (!isNaN(parsedValue) || value === '') {
+        setter(value === '' ? '' : formatNumberWithCommas(parsedValue));
+    }
+  };
+
   const handleSave = () => {
-    onSave({ soNumber, productName, category, quantity, unit, price });
+    onSave({ 
+        soNumber, 
+        productName, 
+        category, 
+        quantity: typeof quantity === 'string' ? parseFormattedNumber(quantity) : quantity, 
+        unit, 
+        price: typeof price === 'string' ? parseFormattedNumber(price) : price 
+    });
     onOpenChange(false);
   };
 
@@ -110,7 +126,7 @@ export function AddSalesOrderDialog({ isOpen, onOpenChange, onSave, orderData, o
             <Label htmlFor="quantity" className="text-right">
               Quantity
             </Label>
-            <Input id="quantity" type="number" value={quantity} onChange={(e) => setQuantity(Number(e.target.value))} className="col-span-3" />
+            <Input id="quantity" value={quantity} onChange={handleNumericChange(setQuantity)} className="col-span-3" placeholder="0"/>
           </div>
           <div className="grid grid-cols-4 items-center gap-4">
             <Label htmlFor="unit" className="text-right">
@@ -122,7 +138,7 @@ export function AddSalesOrderDialog({ isOpen, onOpenChange, onSave, orderData, o
             <Label htmlFor="price" className="text-right">
               Price
             </Label>
-            <Input id="price" type="number" value={price} onChange={(e) => setPrice(Number(e.target.value))} className="col-span-3" />
+            <Input id="price" value={price} onChange={handleNumericChange(setPrice)} className="col-span-3" placeholder="0" />
           </div>
         </div>
         <DialogFooter>

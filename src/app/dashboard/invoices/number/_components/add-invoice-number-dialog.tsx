@@ -21,7 +21,7 @@ import {
   PopoverTrigger,
 } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
-import { cn } from '@/lib/utils';
+import { cn, formatNumberWithCommas, parseFormattedNumber } from '@/lib/utils';
 import { format } from 'date-fns';
 import type { InvoiceNumber } from '@/app/lib/data';
 
@@ -47,7 +47,7 @@ export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceDa
   
   const [salesOrder, setSalesOrder] = useState('');
   const [customer, setCustomer] = useState('');
-  const [amount, setAmount] = useState(0);
+  const [amount, setAmount] = useState<string | number>(0);
 
   useEffect(() => {
     const resetForm = () => {
@@ -86,7 +86,7 @@ export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceDa
         setCustomer(invoiceData.customer);
         setSalesOrder(invoiceData.salesOrder);
         setDate(new Date(invoiceData.date.split('/').reverse().join('-')));
-        setAmount(invoiceData.amount);
+        setAmount(formatNumberWithCommas(invoiceData.amount));
       } else {
         resetForm();
       }
@@ -101,15 +101,24 @@ export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceDa
   const handleMainNumberChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setMainNumber(e.target.value);
   }
+  
+  const handleAmountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    const parsedValue = parseFormattedNumber(value);
+    if (!isNaN(parsedValue) || value === '') {
+        setAmount(value === '' ? '' : formatNumberWithCommas(parsedValue));
+    }
+  };
 
   const handleSave = () => {
     const formattedDate = date ? format(date, 'dd/MM/yyyy') : '';
+    const numericAmount = typeof amount === 'string' ? parseFormattedNumber(amount) : amount;
     onSave({
       id: fullInvoiceNumber,
       customer,
       salesOrder,
       date: formattedDate,
-      amount
+      amount: numericAmount
     });
     onOpenChange(false);
   }
@@ -189,7 +198,7 @@ export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceDa
               </div>
             <div className="space-y-2">
               <Label htmlFor="amount">Jumlah</Label>
-              <Input id="amount" type="number" value={amount} onChange={e => setAmount(Number(e.target.value))}/>
+              <Input id="amount" value={amount} onChange={handleAmountChange} placeholder="0" />
             </div>
           </div>
         </div>

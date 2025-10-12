@@ -15,6 +15,7 @@ import { Label } from '@/components/ui/label';
 import { Plus } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import type { SpdData } from '@/app/lib/data';
+import { formatNumberWithCommas, parseFormattedNumber } from '@/lib/utils';
 
 type AddSpdDialogProps = {
   isOpen: boolean;
@@ -49,7 +50,7 @@ export function AddSpdDialog({ isOpen, onOpenChange, onSave, spdData, onAddClick
       setTanggalInvoice(spdData.tanggalInvoice);
       setTglTerimaCustomer(spdData.tglTerimaCustomer);
       setTglJatuhTempo(spdData.tglJatuhTempo);
-      setTotalPiutang(spdData.totalPiutang);
+      setTotalPiutang(formatNumberWithCommas(spdData.totalPiutang));
       setKeterangan(spdData.keterangan);
       setNoKuitansi(spdData.noKuitansi);
       setNoFakturPajak(spdData.noFakturPajak);
@@ -72,7 +73,16 @@ export function AddSpdDialog({ isOpen, onOpenChange, onSave, spdData, onAddClick
     }
   }, [spdData, isOpen]);
 
+  const handleTotalPiutangChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    const parsedValue = parseFormattedNumber(value);
+    if (!isNaN(parsedValue) || value === '') {
+        setTotalPiutang(value === '' ? '' : formatNumberWithCommas(parsedValue));
+    }
+  };
+
   const handleSave = () => {
+    const numericTotalPiutang = typeof totalPiutang === 'string' ? parseFormattedNumber(totalPiutang) : totalPiutang;
     onSave({
       tanggal,
       sales,
@@ -82,7 +92,7 @@ export function AddSpdDialog({ isOpen, onOpenChange, onSave, spdData, onAddClick
       tanggalInvoice,
       tglTerimaCustomer,
       tglJatuhTempo,
-      totalPiutang,
+      totalPiutang: numericTotalPiutang,
       keterangan,
       noKuitansi,
       noFakturPajak,
@@ -142,7 +152,7 @@ export function AddSpdDialog({ isOpen, onOpenChange, onSave, spdData, onAddClick
           </div>
           <div className="space-y-2">
             <Label htmlFor="totalPiutang">Total Piutang</Label>
-            <Input id="totalPiutang" type="number" value={totalPiutang} onChange={(e) => setTotalPiutang(e.target.value)} />
+            <Input id="totalPiutang" value={totalPiutang} onChange={handleTotalPiutangChange} placeholder="0" />
           </div>
           <div className="space-y-2">
             <Label htmlFor="keterangan">Keterangan</Label>
