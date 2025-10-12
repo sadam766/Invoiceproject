@@ -19,15 +19,22 @@ import {
   import { Search, Upload, Download, Plus } from 'lucide-react';
   import { AddCustomerDialog } from './_components/add-customer-dialog';
   import { DeleteConfirmationDialog } from '@/app/components/delete-confirmation-dialog';
-  import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
+  import { useCollection, useFirestore, useMemoFirebase, useUser } from '@/firebase';
   import { collection, doc } from 'firebase/firestore';
   import { addDocumentNonBlocking, updateDocumentNonBlocking, deleteDocumentNonBlocking } from '@/firebase/non-blocking-updates';
   import { Skeleton } from '@/components/ui/skeleton';
   
   export default function CustomerListPage() {
     const firestore = useFirestore();
-    const customersCollection = useMemoFirebase(() => collection(firestore, 'customers'), [firestore]);
-    const { data: customers, isLoading } = useCollection<Customer>(customersCollection);
+    const { user, isUserLoading } = useUser();
+
+    const customersCollection = useMemoFirebase(() => {
+        if (!firestore || !user) return null;
+        return collection(firestore, 'customers');
+    }, [firestore, user]);
+
+    const { data: customers, isLoading: isCustomersLoading } = useCollection<Customer>(customersCollection);
+    const isLoading = isUserLoading || isCustomersLoading;
 
     const [editingCustomer, setEditingCustomer] = useState<Customer | undefined>(undefined);
     const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -143,3 +150,5 @@ import {
       </main>
     );
   }
+
+    

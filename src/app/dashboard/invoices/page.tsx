@@ -23,15 +23,23 @@ import {
   import { Checkbox } from '@/components/ui/checkbox';
   import { type Invoice } from '@/app/lib/data';
   import { Search, Filter, MoreHorizontal, ArrowUpDown, Plus } from 'lucide-react';
-  import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
+  import { useCollection, useFirestore, useMemoFirebase, useUser } from '@/firebase';
   import { collection } from 'firebase/firestore';
   import { Skeleton } from '@/components/ui/skeleton';
 
   export default function InvoiceListPage() {
     const firestore = useFirestore();
-    const invoicesCollection = useMemoFirebase(() => collection(firestore, 'invoices'), [firestore]);
-    const { data: invoices, isLoading } = useCollection<Invoice>(invoicesCollection);
+    const { user, isUserLoading } = useUser();
     
+    const invoicesCollection = useMemoFirebase(() => {
+        if (!firestore || !user) return null;
+        return collection(firestore, 'invoices');
+    }, [firestore, user]);
+    
+    const { data: invoices, isLoading: isInvoicesLoading } = useCollection<Invoice>(invoicesCollection);
+    
+    const isLoading = isUserLoading || isInvoicesLoading;
+
     const totalFiltered = invoices?.reduce((sum, item) => sum + item.amount, 0) || 0;
     const totalPaid = invoices?.filter(item => item.status === 'Paid' || item.status === 'paid').reduce((sum, item) => sum + item.amount, 0) || 0;
     const totalUnpaid = invoices?.filter(item => item.status === 'Unpaid' || item.status === 'unpaid' || item.status === 'sent').reduce((sum, item) => sum + item.amount, 0) || 0;
@@ -205,3 +213,5 @@ import {
       </main>
     );
   }
+
+    

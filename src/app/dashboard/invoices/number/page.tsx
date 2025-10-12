@@ -20,7 +20,7 @@ import {
   import { Search, Upload, Download, Filter } from 'lucide-react';
   import { AddInvoiceNumberDialog } from './_components/add-invoice-number-dialog';
   import { DeleteConfirmationDialog } from '@/app/components/delete-confirmation-dialog';
-  import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
+  import { useCollection, useFirestore, useMemoFirebase, useUser } from '@/firebase';
   import { collection, doc, addDoc, setDoc } from 'firebase/firestore';
   import { deleteDocumentNonBlocking, updateDocumentNonBlocking } from '@/firebase/non-blocking-updates';
   import { Skeleton } from '@/components/ui/skeleton';
@@ -28,8 +28,15 @@ import {
   export default function InvoiceNumberPage() {
     const router = useRouter();
     const firestore = useFirestore();
-    const invoiceNumbersCollection = useMemoFirebase(() => firestore ? collection(firestore, 'invoiceNumbers'): null, [firestore]);
-    const { data: invoices, isLoading } = useCollection<InvoiceNumber>(invoiceNumbersCollection);
+    const { user, isUserLoading } = useUser();
+
+    const invoiceNumbersCollection = useMemoFirebase(() => {
+        if (!firestore || !user) return null;
+        return collection(firestore, 'invoiceNumbers');
+    }, [firestore, user]);
+
+    const { data: invoices, isLoading: isInvoicesLoading } = useCollection<InvoiceNumber>(invoiceNumbersCollection);
+    const isLoading = isUserLoading || isInvoicesLoading;
 
     const [editingInvoice, setEditingInvoice] = useState<InvoiceNumber | undefined>(undefined);
     const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -153,4 +160,5 @@ import {
       </main>
     );
   }
-  
+
+    

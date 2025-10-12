@@ -41,25 +41,30 @@ import {
   Settings,
 } from 'lucide-react';
 import Link from 'next/link';
-import { useDoc, useFirestore, useMemoFirebase } from '@/firebase';
+import { useDoc, useFirestore, useMemoFirebase, useUser } from '@/firebase';
 import { doc, collection, addDoc, serverTimestamp } from 'firebase/firestore';
 import { type InvoiceNumber } from '@/app/lib/data';
 import { useToast } from '@/hooks/use-toast';
+import { Skeleton } from '@/components/ui/skeleton';
 
 export default function AddInvoicePage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const firestore = useFirestore();
+  const { user, isUserLoading } = useUser();
   const { toast } = useToast();
 
   const invoiceNumberId = searchParams.get('invoiceNumberId');
-  const invoiceNumberDocRef = useMemoFirebase(() => {
-    if (!firestore || !invoiceNumberId) return null;
-    return doc(firestore, 'invoiceNumbers', invoiceNumberId);
-  }, [firestore, invoiceNumberId]);
 
-  const { data: invoiceNumberData, isLoading } = useDoc<InvoiceNumber>(invoiceNumberDocRef);
+  const invoiceNumberDocRef = useMemoFirebase(() => {
+    if (!firestore || !invoiceNumberId || !user) return null;
+    return doc(firestore, 'invoiceNumbers', invoiceNumberId);
+  }, [firestore, invoiceNumberId, user]);
+
+  const { data: invoiceNumberData, isLoading: isInvoiceNumberLoading } = useDoc<InvoiceNumber>(invoiceNumberDocRef);
   
+  const isLoading = isUserLoading || (!!invoiceNumberId && isInvoiceNumberLoading);
+
   const [invoiceId, setInvoiceId] = useState('');
   const [customerName, setCustomerName] = useState('');
   const [soNumber, setSoNumber] = useState('');
@@ -76,7 +81,12 @@ export default function AddInvoicePage() {
       setSoNumber(invoiceNumberData.salesOrder);
       setTotalAmount(invoiceNumberData.amount);
       if (invoiceNumberData.date) {
-        setIssueDate(new Date(invoiceNumberData.date.split('/').reverse().join('-')));
+        // Assuming date is dd/MM/yyyy
+        const parts = invoiceNumberData.date.split('/');
+        if (parts.length === 3) {
+            const [day, month, year] = parts;
+            setIssueDate(new Date(`${year}-${month}-${day}`));
+        }
       }
     }
   }, [invoiceNumberData]);
@@ -120,10 +130,21 @@ export default function AddInvoicePage() {
   };
 
 
-  if (isLoading && invoiceNumberId) {
+  if (isLoading) {
     return (
         <main className="flex flex-1 flex-col gap-4 p-4 md:gap-8 md:p-8">
-            <div>Loading invoice data...</div>
+            <div className="flex items-center gap-4">
+                <Skeleton className="h-7 w-7 rounded-full" />
+                <Skeleton className="h-6 w-32" />
+            </div>
+             <Card className="p-6">
+                 <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+                     <Skeleton className="h-10 w-full" />
+                     <Skeleton className="h-10 w-full" />
+                     <Skeleton className="h-10 w-full" />
+                     <Skeleton className="h-10 w-full" />
+                 </div>
+             </Card>
         </main>
     )
   }
@@ -365,3 +386,5 @@ export default function AddInvoicePage() {
     </main>
   );
 }
+
+    
