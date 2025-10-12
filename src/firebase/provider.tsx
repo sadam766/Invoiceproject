@@ -8,9 +8,9 @@ import { FirebaseErrorListener } from '@/components/FirebaseErrorListener'
 
 interface FirebaseProviderProps {
   children: ReactNode;
-  firebaseApp: FirebaseApp;
-  firestore: Firestore;
-  auth: Auth;
+  firebaseApp?: FirebaseApp;
+  firestore?: Firestore;
+  auth?: Auth;
 }
 
 // Internal state for user authentication
@@ -69,7 +69,8 @@ export const FirebaseProvider: React.FC<FirebaseProviderProps> = ({
   // Effect to subscribe to Firebase auth state changes
   useEffect(() => {
     if (!auth) { 
-      setUserAuthState({ user: null, isUserLoading: false, userError: new Error("Auth service not provided.") });
+      // If auth service isn't ready yet, do nothing. It will re-run when it is.
+      setUserAuthState(prevState => ({ ...prevState, isUserLoading: !auth }));
       return;
     }
 
@@ -97,11 +98,15 @@ export const FirebaseProvider: React.FC<FirebaseProviderProps> = ({
 
   // Memoize the context value
   const contextValue = useMemo((): FirebaseContextState => ({
-    firebaseApp,
-    firestore,
-    auth,
+    firebaseApp: firebaseApp || null,
+    firestore: firestore || null,
+    auth: auth || null,
     ...userAuthState,
   }), [firebaseApp, firestore, auth, userAuthState]);
+  
+  if (!auth) {
+    return <div>Loading Firebase...</div>
+  }
 
   return (
     <FirebaseContext.Provider value={contextValue}>
@@ -158,11 +163,16 @@ export const useFirebaseApp = (): FirebaseApp => {
 
 type MemoFirebase <T> = T & {__memo?: boolean};
 
-export function useMemoFirebase<T>(factory: () => T, deps: DependencyList): T | (MemoFirebase<T>) {
+export function useMemoFirebase<T>(factory: () => T, deps: DependencyList): T {
   const memoized = useMemo(factory, deps);
   
-  if(typeof memoized !== 'object' || memoized === null) return memoized;
-  (memoized as MemoFirebase<T>).__memo = true;
+  if(typeof memoized === 'object' && memoized !== null) {
+    Object.defineProperty(memoized, '__memo', {
+      value: true,
+      writable: false,
+      enumerable: false,
+    });
+  }
   
   return memoized;
 }
