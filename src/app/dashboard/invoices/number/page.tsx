@@ -21,7 +21,7 @@ import {
   import { AddInvoiceNumberDialog } from './_components/add-invoice-number-dialog';
   import { DeleteConfirmationDialog } from '@/app/components/delete-confirmation-dialog';
   import { useCollection, useFirestore, useMemoFirebase, useUser } from '@/firebase';
-  import { collection, doc, addDoc, setDoc } from 'firebase/firestore';
+  import { collection, doc, setDoc } from 'firebase/firestore';
   import { deleteDocumentNonBlocking, updateDocumentNonBlocking } from '@/firebase/non-blocking-updates';
   import { Skeleton } from '@/components/ui/skeleton';
 
@@ -53,18 +53,22 @@ import {
 
     const handleDelete = (invoiceId: string) => {
         if (!firestore) return;
-        const invoiceDocRef = doc(firestore, 'invoiceNumbers', invoiceId);
+        const safeId = invoiceId.replace(/\//g, '_');
+        const invoiceDocRef = doc(firestore, 'invoiceNumbers', safeId);
         deleteDocumentNonBlocking(invoiceDocRef);
     };
 
     const handleSave = async (invoice: Omit<InvoiceNumber, 'id'> & {id: string}) => {
       if (!firestore) return;
 
+      const safeId = invoice.id.replace(/\//g, '_');
+
       if (editingInvoice) {
-        const invoiceDocRef = doc(firestore, 'invoiceNumbers', editingInvoice.id!);
+        const editingSafeId = editingInvoice.id!.replace(/\//g, '_');
+        const invoiceDocRef = doc(firestore, 'invoiceNumbers', editingSafeId);
         updateDocumentNonBlocking(invoiceDocRef, invoice);
       } else {
-        const newDocRef = doc(firestore, 'invoiceNumbers', invoice.id);
+        const newDocRef = doc(firestore, 'invoiceNumbers', safeId);
         await setDoc(newDocRef, invoice);
         router.push(`/dashboard/invoices/add?invoiceNumberId=${newDocRef.id}`);
       }
