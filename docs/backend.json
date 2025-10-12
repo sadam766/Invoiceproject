@@ -1,3 +1,4 @@
+
 {
   "entities": {
     "Sale": {
@@ -161,7 +162,6 @@
   },
   "auth": {
     "providers": [
-      "password",
       "anonymous"
     ]
   },
@@ -255,3 +255,5 @@
     "reasoning": "The Firestore structure is designed to efficiently support the Sales Dashboard application, focusing on secure data access and scalability. We will leverage path-based ownership for user-specific data and denormalization to maintain authorization independence.  The core entities are `Customer`, `Product`, `Sale`, `SalesOverview`, and `TopProduct`.  To address the `auth/admin-restricted-operation` error, it is important to note that this often arises when client-side code attempts to perform operations that are restricted to Firebase Admin SDK, this error does not stem directly from the data structure itself but from the interaction with Firebase Authentication and Firestore security rules. To fix this error, ensure the correct usage of security roles, which can be enforced by the recommended data structure.\n\n**Data Segregation and Authorization Independence:**\n\n*   `/customers/{customerId}`: Customer data is stored at this path. Access is likely managed through other means (e.g. an admin role collection that is checked in security rules).  If users were to have access to their own customer profile data, the path would be `/users/{userId}/customers/{customerId}`.\n*   `/products/{productId}`: Product data is globally accessible (read-only) or restricted to admin users. This depends on the application's requirements. If admins are stored as documents in `/roles_admin/{uid}`, the rules can check for document existence. \n*   `/sales/{saleId}`: Sales data is stored here. A common approach is to also nest this under `/customers/{customerId}/sales/{saleId}` to show all sales for a customer. This design is used given the entity relationship `Customer 1:N Sale`.\n\n*   `/sales_overviews/{salesOverviewId}`: Sales overview data is stored globally, potentially aggregated. Access will likely be admin controlled.\n*   `/top_products/{topProductId}`: Top products are stored globally, also likely admin controlled.\n\n**QAPs (Rules are not Filters):**\n*List Operations*: The structure allows for efficient and secure list operations by segregating data based on its access requirements. For instance, listing all sales for a specific customer under `/customers/{customerId}/sales/{saleId}` is efficient and the rules can be easily scoped. If global listing of all sales needs to be supported (e.g., for admin purposes), a dedicated collection such as `/sales` can be used. Security rules on `/sales` would ensure that non-admin users cannot access all sales data. Sales data is denormalized to include customerId to optimize querying and reporting.\n\n**Authorization Independence:**\nThis design supports authorization independence by avoiding hierarchical `get()` calls in security rules.  For example, if sales data requires customer information for authorization, the relevant customer attributes (e.g., customerId) are denormalized directly into the sales document. This enables security rules to make access control decisions based on the data present in the sale document itself, without needing to fetch the customer document."
   }
 }
+
+    
