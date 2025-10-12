@@ -1,49 +1,27 @@
-/**
- * @file Firestore Security Rules
- * @description This ruleset enforces a role-based access control model with admin privileges.
- *
- * Data Structure:
- * - /customers/{customerId}: Stores customer data; access is managed via admin roles.
- * - /products/{productId}: Stores product data; read access may be public, while writes are admin-restricted.
- * - /customers/{customerId}/sales/{saleId}: Stores sales data nested under customer documents; access is admin-controlled.
- * - /sales_overviews/{salesOverviewId}: Stores sales overview data; access is admin-controlled.
- * - /top_products/{topProductId}: Stores top product data; access is admin-controlled.
- *
- * Key Security Decisions:
- * - Admin-only write access for critical collections (sales overviews, top products).
- * - Read access is generally open unless there are write rules, so specific read constraints are not required.
- * - Assumes the existence of an `isAdmin()` function to check for admin privileges.
- *
- * Denormalization for Authorization:
- * - Sales documents under /customers/{customerId}/sales/{saleId} do not have denormalized authorization data, the rules assume that admin access is granted.
- *
- * Structural Segregation:
- * - Public product information is stored separately from private sales data to allow open read access where appropriate.
- */
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
     /**
-     * @description Grants admin access to manage customer data.
+     * @description Allows administrators to manage customer data.
      * @path /customers/{customerId}
-     * @allow (create, update, delete) if isAdmin()
-     * @deny (create, update, delete) if !isAdmin()
-     * @allow get, list: if true;
-     * @principle Enforces admin-only write access for customer data.
+     * @allow (create, update, delete) if isAdmin() with valid data
+     * @allow (get, list) if isAdmin()
+     * @deny (create, update, delete) if not isAdmin()
+     * @principle Restricts customer data management to administrators.
      */
     match /customers/{customerId} {
-      allow get, list: if true;
+      allow get, list: if isAdmin();
       allow create, update, delete: if isAdmin();
     }
 
     /**
-     * @description Manages product data with potential public read access and admin-only writes.
+     * @description Allows administrators to manage product data.  Potentially allows public read access.
      * @path /products/{productId}
-     * @allow (create, update, delete) if isAdmin()
-     * @deny (create, update, delete) if !isAdmin()
-     * @allow get, list: if true;
-     * @principle Allows public read access but restricts writes to admins.
+     * @allow (get, list) if true (for public read access, otherwise restricted to admins)
+     * @allow (create, update, delete) if isAdmin() with valid data
+     * @deny (create, update, delete) if not isAdmin()
+     * @principle Restricts product data management to administrators.  Potentially allows public read access.
      */
     match /products/{productId} {
       allow get, list: if true;
@@ -51,12 +29,12 @@ service cloud.firestore {
     }
 
     /**
-     * @description Restricts access to sales data under a customer to admins.
+     * @description Allows administrators to manage sales data for a specific customer.
      * @path /customers/{customerId}/sales/{saleId}
-     * @allow (create, update, delete) if isAdmin()
-     * @deny (create, update, delete) if !isAdmin()
-     * @allow get, list: if isAdmin();
-     * @principle Enforces admin-only access to sales data.
+     * @allow (create, update, delete) if isAdmin() with valid data
+     * @allow (get, list) if isAdmin()
+     * @deny (create, update, delete) if not isAdmin()
+     * @principle Restricts sales data management to administrators.
      */
     match /customers/{customerId}/sales/{saleId} {
       allow get, list: if isAdmin();
@@ -64,12 +42,12 @@ service cloud.firestore {
     }
 
     /**
-     * @description Grants admin access to manage sales overview data.
+     * @description Allows administrators to manage sales overview data.
      * @path /sales_overviews/{salesOverviewId}
-     * @allow (create, update, delete) if isAdmin()
-     * @deny (create, update, delete) if !isAdmin()
-     * @allow get, list: if isAdmin();
-     * @principle Enforces admin-only access to sales overview data.
+     * @allow (create, update, delete) if isAdmin() with valid data
+     * @allow (get, list) if isAdmin()
+     * @deny (create, update, delete) if not isAdmin()
+     * @principle Restricts sales overview data management to administrators.
      */
     match /sales_overviews/{salesOverviewId} {
       allow get, list: if isAdmin();
@@ -77,21 +55,56 @@ service cloud.firestore {
     }
 
     /**
-     * @description Restricts access to top product data to admins.
+     * @description Allows administrators to manage top product data.
      * @path /top_products/{topProductId}
-     * @allow (create, update, delete) if isAdmin()
-     * @deny (create, update, delete) if !isAdmin()
-     * @allow get, list: if isAdmin();
-     * @principle Enforces admin-only access to top product data.
+     * @allow (create, update, delete) if isAdmin() with valid data
+     * @allow (get, list) if isAdmin()
+     * @deny (create, update, delete) if not isAdmin()
+     * @principle Restricts top product data management to administrators.
      */
     match /top_products/{topProductId} {
       allow get, list: if isAdmin();
       allow create, update, delete: if isAdmin();
     }
 
-    // Helper function to determine if the user is an admin.
-    function isAdmin() {
-        return false; // TODO: Implement admin check, e.g., check for admin role in custom claims
+
+    /**
+     * @description Allows access to invoice numbers.
+     * @path /invoiceNumbers/{invoiceNumberId}
+     * @allow get if isAdmin()
+     * @allow list if isAdmin()
+     * @allow create if false
+     * @allow update if false
+     * @allow delete if false
+     * @principle Restricts access to invoice numbers to administrators only.
+     */
+    match /invoiceNumbers/{invoiceNumberId} {
+      allow get: if isAdmin();
+      allow list: if isAdmin();
+      allow create: if false;
+      allow update: if false;
+      allow delete: if false;
     }
+
+    match /{path=**} {
+      allow read, write: if false;
+    }
+  }
+
+  // Helper function to check if the user is an admin.
+  function isAdmin() {
+    // Replace this with your actual admin check logic.
+    // For example, check if the user's UID exists as a document in a `/roles_admin/{uid}` collection.
+    return exists(/databases/$(database)/documents/roles_admin/$(request.auth.uid));
+  }
+
+  // Helper function to check if the user is signed in
+  function isSignedIn() {
+    return request.auth != null;
+  }
+
+  // Helper function to check if the user is the owner of the resource.
+  function isOwner(userId) {
+    return request.auth.uid == userId;
   }
 }
