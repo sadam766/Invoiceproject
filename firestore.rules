@@ -1,122 +1,170 @@
 /**
  * @file Firestore Security Rules
- * @description This ruleset enforces a role-based access control model with public read access to certain collections.
+ * @version 2
+ *
+ * @description
+ * This ruleset enforces a role-based access control model for a sales dashboard application.
+ * It provides different levels of access for customer, product, sales, sales overview, and top product data.
+ * Access control decisions are based on user authentication and, potentially, admin roles.
  *
  * Data Structure:
- * - /customers/{customerId}: Customer data; likely admin-controlled.
- * - /products/{productId}: Product data; publicly readable or admin-controlled.
- * - /customers/{customerId}/sales/{saleId}: Sales data nested under customers, enables listing sales per customer.
- * - /sales_overviews/{salesOverviewId}: Sales overview data; admin-controlled.
- * - /top_products/{topProductId}: Top product data; admin-controlled.
+ * - /customers/{customerId}: Stores customer data. Access is likely managed through other means (e.g. an admin role collection).
+ * - /products/{productId}: Stores product information. Globally accessible (read-only) or restricted to admin users.
+ * - /customers/{customerId}/sales/{saleId}: Stores sales data under the corresponding customer.
+ * - /sales_overviews/{salesOverviewId}: Stores sales overview data, potentially aggregated. Access will likely be admin controlled.
+ * - /top_products/{topProductId}: Stores top product data. Access will likely be admin controlled.
  *
  * Key Security Decisions:
- * - Public read access is granted to the /products collection, assuming it contains non-sensitive data.
- * - All write operations are restricted and must be explicitly allowed based on admin roles or other criteria.
- * - The rules prioritize authorization independence by avoiding hierarchical `get()` calls.
+ * - Customer and product listing are generally disallowed for non-admins, unless explicitly configured otherwise.
+ * - Sales data is nested under customers to simplify ownership checks.
+ * - Admin roles are assumed to be managed separately (e.g., in a `/roles_admin/{uid}` collection).  The `isAdmin()` function is a placeholder for this check.
+ * - Denormalization is used to include the `customerId` in the `Sale` document, avoiding extra reads in security rules.
  *
- * Denormalization for Authorization:
- * - Sales documents under `/customers/{customerId}/sales/{saleId}` should contain the customerId.
+ *  Denormalization for Authorization:
+ *  - Sales data includes the customerId to enable efficient filtering and security rules.
+ *
+ *  Structural Segregation:
+ *  - Sales data is nested under `/customers/{customerId}/sales/{saleId}` to show all sales for a customer.
  */
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
     /**
-     * @description Controls access to customer data. Access is likely managed through an admin role.
+     * @description Controls access to customer data.
      * @path /customers/{customerId}
-     * @allow get, list: if false;
-     * @allow create: if false;
-     * @allow update: if false;
-     * @allow delete: if false;
-     * @principle Restricts all access to customer data, assuming admin-level control.
+     * @allow get: if isAdmin();
+     * @allow list: if false;
+     * @allow create: if isAdmin();
+     * @allow update: if isAdmin();
+     * @allow delete: if isAdmin();
+     * @deny get: if false;
+     * @deny list: if true;
+     * @deny create: if false;
+     * @deny update: if false;
+     * @deny delete: if false;
+     * @principle Restricts customer management to admins.
      */
     match /customers/{customerId} {
-      allow get, list: if false;
-      allow create: if false;
-      allow update: if false;
-      allow delete: if false;
+      allow get: if isAdmin();
+      allow list: if false;
+      allow create: if isAdmin();
+      allow update: if isAdmin();
+      allow delete: if isAdmin();
+
     }
 
     /**
-     * @description Controls access to product data. Publicly readable or restricted to admin users.
+     * @description Controls access to product data.
      * @path /products/{productId}
-     * @allow get, list: if true;
-     * @allow create: if false;
-     * @allow update: if false;
-     * @allow delete: if false;
-     * @principle Grants public read access to product information; restricts all write operations.
+     * @allow get: if true;
+     * @allow list: if true;
+     * @allow create: if isAdmin();
+     * @allow update: if isAdmin();
+     * @allow delete: if isAdmin();
+     * @deny get: if false;
+     * @deny list: if false;
+     * @deny create: if false;
+     * @deny update: if false;
+     * @deny delete: if false;
+     * @principle Allows public read access to products, restricts modifications to admins.
      */
     match /products/{productId} {
-      allow get, list: if true;
-      allow create: if false;
-      allow update: if false;
-      allow delete: if false;
+      allow get: if true;
+      allow list: if true;
+      allow create: if isAdmin();
+      allow update: if isAdmin();
+      allow delete: if isAdmin();
     }
 
     /**
-     * @description Controls access to sales data nested under a specific customer.
+     * @description Controls access to sales data associated with a customer.
      * @path /customers/{customerId}/sales/{saleId}
-     * @allow get, list: if false;
-     * @allow create: if false;
-     * @allow update: if false;
-     * @allow delete: if false;
-     * @principle Restricts all access to sales data under customers.
+     * @allow get: if isAdmin() || isCustomer(customerId);
+     * @allow list: if isAdmin() || isCustomer(customerId);
+     * @allow create: if isSignedIn() && request.resource.data.customerId == customerId;
+     * @allow update: if isExistingOwner(customerId, resource.data.customerId) || isAdmin();
+     * @allow delete: if isExistingOwner(customerId, resource.data.customerId) || isAdmin();
+     * @deny get: if false;
+     * @deny list: if false;
+     * @deny create: if false;
+     * @deny update: if false;
+     * @deny delete: if false;
+     * @principle Enforces customer-based ownership of sales data, allows admin override.
      */
     match /customers/{customerId}/sales/{saleId} {
-      allow get, list: if false;
-      allow create: if false;
-      allow update: if false;
-      allow delete: if false;
+      allow get: if isAdmin() || isCustomer(customerId);
+      allow list: if isAdmin() || isCustomer(customerId);
+      allow create: if isSignedIn() && request.resource.data.customerId == customerId;
+      allow update: if isExistingOwner(customerId, resource.data.customerId) || isAdmin();
+      allow delete: if isExistingOwner(customerId, resource.data.customerId) || isAdmin();
     }
 
     /**
-     * @description Controls access to sales overview data. Likely admin controlled.
+     * @description Controls access to sales overview data.
      * @path /sales_overviews/{salesOverviewId}
-     * @allow get, list: if false;
-     * @allow create: if false;
-     * @allow update: if false;
-     * @allow delete: if false;
-     * @principle Restricts all access to sales overview data.
+     * @allow get: if isAdmin();
+     * @allow list: if isAdmin();
+     * @allow create: if isAdmin();
+     * @allow update: if isAdmin();
+     * @allow delete: if isAdmin();
+     * @deny get: if false;
+     * @deny list: if false;
+     * @deny create: if false;
+     * @deny update: if false;
+     * @deny delete: if false;
+     * @principle Restricts sales overview management to admins.
      */
     match /sales_overviews/{salesOverviewId} {
-      allow get, list: if false;
-      allow create: if false;
-      allow update: if false;
-      allow delete: if false;
+      allow get: if isAdmin();
+      allow list: if isAdmin();
+      allow create: if isAdmin();
+      allow update: if isAdmin();
+      allow delete: if isAdmin();
     }
 
     /**
-     * @description Controls access to top product data. Likely admin controlled.
+     * @description Controls access to top product data.
      * @path /top_products/{topProductId}
-     * @allow get, list: if false;
-     * @allow create: if false;
-     * @allow update: if false;
-     * @allow delete: if false;
-     * @principle Restricts all access to top product data.
+     * @allow get: if isAdmin();
+     * @allow list: if isAdmin();
+     * @allow create: if isAdmin();
+     * @allow update: if isAdmin();
+     * @allow delete: if isAdmin();
+     * @deny get: if false;
+     * @deny list: if false;
+     * @deny create: if false;
+     * @deny update: if false;
+     * @deny delete: if false;
+     * @principle Restricts top product management to admins.
      */
     match /top_products/{topProductId} {
-      allow get, list: if false;
-      allow create: if false;
-      allow update: if false;
-      allow delete: if false;
+      allow get: if isAdmin();
+      allow list: if isAdmin();
+      allow create: if isAdmin();
+      allow update: if isAdmin();
+      allow delete: if isAdmin();
     }
-    
-    /**
-     * @description Controls access to invoice number data.  Access is denied as a safe default in this prototype.
-     * @path /invoiceNumbers/{invoiceNumberId}
-     * @allow get: if false;
-     * @allow list: if false;
-     * @allow create: if false;
-     * @allow update: if false;
-     * @allow delete: if false;
-     * @principle Restricts all access to invoice number data.
-     */
-    match /invoiceNumbers/{invoiceNumberId} {
-      allow get: if false;
-      allow list: if false;
-      allow create: if false;
-      allow update: if false;
-      allow delete: if false;
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return request.auth.uid == userId;
+    }
+
+    function isExistingOwner(userId, resourceCustomerId) {
+      return resource != null && isSignedIn() && isOwner(userId) && resourceCustomerId == userId;
+    }
+
+    function isAdmin() {
+      // TODO: Implement admin role check (e.g., check for document existence in /roles_admin/{uid})
+      return false;
+    }
+
+    function isCustomer(customerId) {
+       return isSignedIn() && request.auth.uid == customerId;
     }
   }
 }
