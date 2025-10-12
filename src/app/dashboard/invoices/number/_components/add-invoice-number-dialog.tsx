@@ -50,41 +50,46 @@ export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceDa
   const [amount, setAmount] = useState(0);
 
   useEffect(() => {
-    if (invoiceData) {
-      if (invoiceData.id.startsWith('SAR/')) {
-        setInvoiceType('sar');
-        setPrefix('SAR/');
-        setSuffix('');
-        setMainNumber(invoiceData.id.replace('SAR/', ''));
+    const resetForm = () => {
+        const currentYear = new Date().getFullYear();
+        if (invoiceType === 'sar') {
+          setPrefix('SAR/');
+          setSuffix('');
+          if (isAutoNumber) setMainNumber('25000003');
+          else setMainNumber('');
+        } else { // kw
+          setPrefix('KW/');
+          setSuffix(`/KEU/${currentYear}`);
+          if (isAutoNumber) setMainNumber('0001');
+          else setMainNumber('');
+        }
+        setCustomer('');
+        setSalesOrder('');
+        setDate(new Date());
+        setAmount(0);
+    }
+
+    if (isOpen) {
+      if (invoiceData) {
+        if (invoiceData.id.startsWith('SAR/')) {
+          setInvoiceType('sar');
+          setPrefix('SAR/');
+          setSuffix('');
+          setMainNumber(invoiceData.id.replace('SAR/', ''));
+        } else {
+          setInvoiceType('kw');
+          const parts = invoiceData.id.split('/');
+          setPrefix('KW/');
+          setSuffix(`/${parts[2]}/${parts[3]}`);
+          setMainNumber(parts[1]);
+        }
+        setCustomer(invoiceData.customer);
+        setSalesOrder(invoiceData.salesOrder);
+        setDate(new Date(invoiceData.date.split('/').reverse().join('-')));
+        setAmount(invoiceData.amount);
       } else {
-        setInvoiceType('kw');
-        const parts = invoiceData.id.split('/');
-        setPrefix('KW/');
-        setSuffix(`/${parts[2]}/${parts[3]}`);
-        setMainNumber(parts[1]);
+        resetForm();
       }
-      setCustomer(invoiceData.customer);
-      setSalesOrder(invoiceData.salesOrder);
-      setDate(new Date(invoiceData.date.split('/').reverse().join('-')));
-      setAmount(invoiceData.amount);
-    } else {
-      // Reset for new entry
-      const currentYear = new Date().getFullYear();
-      if (invoiceType === 'sar') {
-        setPrefix('SAR/');
-        setSuffix('');
-        if (isAutoNumber) setMainNumber('25000003');
-        else setMainNumber('');
-      } else { // kw
-        setPrefix('KW/');
-        setSuffix(`/KEU/${currentYear}`);
-        if (isAutoNumber) setMainNumber('0001');
-        else setMainNumber('');
-      }
-      setCustomer('');
-      setSalesOrder('');
-      setDate(new Date());
-      setAmount(0);
     }
   }, [invoiceData, isOpen, invoiceType, isAutoNumber]);
 
@@ -106,6 +111,7 @@ export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceDa
       date: formattedDate,
       amount
     });
+    onOpenChange(false);
   }
 
   const dialogTitle = invoiceData ? "Edit Invoice Number" : "Add New Invoice Number";

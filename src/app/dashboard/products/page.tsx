@@ -32,7 +32,7 @@ import {
     const [editingProduct, setEditingProduct] = useState<ProductListItem | undefined>(undefined);
     const [isDialogOpen, setIsDialogOpen] = useState(false);
 
-    const handleAdd = () => {
+    const handleAddClick = () => {
       setEditingProduct(undefined);
       setIsDialogOpen(true);
     };
@@ -62,9 +62,11 @@ import {
       setEditingProduct(undefined);
     };
 
-    const handleDialogClose = () => {
-      setIsDialogOpen(false);
-      setEditingProduct(undefined);
+    const handleDialogStateChange = (open: boolean) => {
+      setIsDialogOpen(open);
+      if (!open) {
+        setEditingProduct(undefined);
+      }
     }
 
     return (
@@ -97,10 +99,10 @@ import {
                        <Button variant="outline"><Download className="mr-2 h-4 w-4"/> Export</Button>
                        <AddProductDialog
                           isOpen={isDialogOpen}
-                          onOpenChange={handleDialogClose}
+                          onOpenChange={handleDialogStateChange}
                           onSave={handleSave}
                           productData={editingProduct}
-                          onAddClick={handleAdd}
+                          onAddClick={handleAddClick}
                        />
                     </div>
                 </div>
@@ -144,4 +146,3 @@ import {
       </main>
     );
   }
-  

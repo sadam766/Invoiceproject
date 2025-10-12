@@ -39,7 +39,7 @@ import {
     const [editingCustomer, setEditingCustomer] = useState<Customer | undefined>(undefined);
     const [isDialogOpen, setIsDialogOpen] = useState(false);
 
-    const handleAdd = () => {
+    const handleAddClick = () => {
       setEditingCustomer(undefined);
       setIsDialogOpen(true);
     };
@@ -70,9 +70,11 @@ import {
         setEditingCustomer(undefined);
       };
 
-    const handleDialogClose = () => {
-      setIsDialogOpen(false);
-      setEditingCustomer(undefined);
+    const handleDialogStateChange = (open: boolean) => {
+      setIsDialogOpen(open);
+      if (!open) {
+        setEditingCustomer(undefined);
+      }
     }
     
     return (
@@ -96,10 +98,10 @@ import {
                        <Button variant="outline"><Download className="mr-2 h-4 w-4"/> Export</Button>
                        <AddCustomerDialog
                          isOpen={isDialogOpen}
-                         onOpenChange={handleDialogClose}
+                         onOpenChange={handleDialogStateChange}
                          onSave={handleSave}
                          customerData={editingCustomer}
-                         onAddClick={handleAdd}
+                         onAddClick={handleAddClick}
                        />
                     </div>
                 </div>
@@ -150,5 +152,3 @@ import {
       </main>
     );
   }
-
-    

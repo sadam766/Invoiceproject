@@ -30,11 +30,12 @@ export function AddCustomerDialog({ isOpen, onOpenChange, onSave, customerData, 
   const [spdAddress, setSpdAddress] = useState('');
 
   useEffect(() => {
-    if (customerData) {
+    if (customerData && isOpen) {
       setName(customerData.name);
       setAddress(customerData.address);
       setSpdAddress(customerData.spdAddress);
-    } else {
+    } else if (!isOpen) {
+      // Reset form when dialog closes, also prepares for "Add"
       setName('');
       setAddress('');
       setSpdAddress('');

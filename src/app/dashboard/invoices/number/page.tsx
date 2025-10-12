@@ -41,7 +41,7 @@ import {
     const [editingInvoice, setEditingInvoice] = useState<InvoiceNumber | undefined>(undefined);
     const [isDialogOpen, setIsDialogOpen] = useState(false);
 
-    const handleAdd = () => {
+    const handleAddClick = () => {
       setEditingInvoice(undefined);
       setIsDialogOpen(true);
     };
@@ -73,9 +73,11 @@ import {
       setEditingInvoice(undefined);
     };
 
-    const handleDialogClose = () => {
-      setIsDialogOpen(false);
-      setEditingInvoice(undefined);
+    const handleDialogStateChange = (open: boolean) => {
+      setIsDialogOpen(open);
+      if (!open) {
+        setEditingInvoice(undefined);
+      }
     }
 
     return (
@@ -100,10 +102,10 @@ import {
                        <Button variant="outline"><Filter className="mr-2 h-4 w-4"/> Filter Duplikat</Button>
                        <AddInvoiceNumberDialog
                         isOpen={isDialogOpen}
-                        onOpenChange={handleDialogClose}
+                        onOpenChange={handleDialogStateChange}
                         onSave={handleSave}
                         invoiceData={editingInvoice}
-                        onAddClick={handleAdd}
+                        onAddClick={handleAddClick}
                        />
                     </div>
                 </div>
@@ -160,5 +162,3 @@ import {
       </main>
     );
   }
-
-    

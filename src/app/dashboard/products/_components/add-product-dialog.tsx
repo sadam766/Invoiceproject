@@ -39,13 +39,13 @@ export function AddProductDialog({ isOpen, onOpenChange, onSave, productData, on
   const [price, setPrice] = useState(0);
 
   useEffect(() => {
-    if (productData) {
+    if (productData && isOpen) {
       setName(productData.name);
       setCategory(productData.category);
       setQuantity(productData.quantity);
       setUnit(productData.unit);
       setPrice(productData.price);
-    } else {
+    } else if (!isOpen) {
       setName('');
       setCategory('');
       setQuantity(0);
@@ -56,6 +56,7 @@ export function AddProductDialog({ isOpen, onOpenChange, onSave, productData, on
 
   const handleSave = () => {
     onSave({ name, category, quantity, unit, price });
+    onOpenChange(false);
   };
 
   const dialogTitle = productData ? "Edit Product" : "Add New Product";

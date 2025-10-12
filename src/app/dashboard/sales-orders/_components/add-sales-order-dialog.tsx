@@ -40,14 +40,14 @@ export function AddSalesOrderDialog({ isOpen, onOpenChange, onSave, orderData, o
   const [price, setPrice] = useState(0);
 
   useEffect(() => {
-    if (orderData) {
+    if (orderData && isOpen) {
       setSoNumber(orderData.soNumber);
       setProductName(orderData.productName);
       setCategory(orderData.category);
       setQuantity(orderData.quantity);
       setUnit(orderData.unit);
       setPrice(orderData.price);
-    } else {
+    } else if (!isOpen) {
       setSoNumber('');
       setProductName('');
       setCategory('');
@@ -59,6 +59,7 @@ export function AddSalesOrderDialog({ isOpen, onOpenChange, onSave, orderData, o
 
   const handleSave = () => {
     onSave({ soNumber, productName, category, quantity, unit, price });
+    onOpenChange(false);
   };
 
   const dialogTitle = orderData ? "Edit Sales Order" : "Add New Sales Order";
