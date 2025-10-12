@@ -16,27 +16,16 @@ import {
   } from '@/components/ui/table';
   import { Input } from '@/components/ui/input';
   import { Button } from '@/components/ui/button';
-  import { type InvoiceNumber } from '@/app/lib/data';
+  import { invoiceNumberData, type InvoiceNumber } from '@/app/lib/data';
   import { Search, Upload, Download, Filter } from 'lucide-react';
   import { AddInvoiceNumberDialog } from './_components/add-invoice-number-dialog';
   import { DeleteConfirmationDialog } from '@/app/components/delete-confirmation-dialog';
-  import { useCollection, useFirestore, useMemoFirebase, useUser } from '@/firebase';
-  import { collection, doc } from 'firebase/firestore';
-  import { deleteDocumentNonBlocking, updateDocumentNonBlocking, setDocumentNonBlocking } from '@/firebase/non-blocking-updates';
   import { Skeleton } from '@/components/ui/skeleton';
 
   export default function InvoiceNumberPage() {
     const router = useRouter();
-    const firestore = useFirestore();
-    const { user, isUserLoading } = useUser();
-
-    const invoiceNumbersCollection = useMemoFirebase(() => {
-        if (!firestore || !user) return null;
-        return collection(firestore, 'invoiceNumbers');
-    }, [firestore, user]);
-
-    const { data: invoices, isLoading: isInvoicesLoading } = useCollection<InvoiceNumber>(invoiceNumbersCollection);
-    const isLoading = isUserLoading || isInvoicesLoading;
+    const [invoices, setInvoices] = useState(invoiceNumberData);
+    const [isLoading, setIsLoading] = useState(false);
 
     const [editingInvoice, setEditingInvoice] = useState<InvoiceNumber | undefined>(undefined);
     const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -52,26 +41,16 @@ import {
     };
 
     const handleDelete = (invoiceId: string) => {
-        if (!firestore) return;
-        const safeId = invoiceId.replace(/\//g, '_');
-        const invoiceDocRef = doc(firestore, 'invoiceNumbers', safeId);
-        deleteDocumentNonBlocking(invoiceDocRef);
+        setInvoices(invoices.filter((inv) => inv.id !== invoiceId));
     };
 
     const handleSave = (invoice: Omit<InvoiceNumber, 'id'> & {id: string}) => {
-      if (!firestore) return;
-
-      const safeId = invoice.id.replace(/\//g, '_');
-
       if (editingInvoice) {
-        const editingSafeId = editingInvoice.id!.replace(/\//g, '_');
-        const invoiceDocRef = doc(firestore, 'invoiceNumbers', editingSafeId);
-        updateDocumentNonBlocking(invoiceDocRef, invoice);
+        setInvoices(invoices.map(i => i.id === editingInvoice.id ? invoice : i));
       } else {
-        const newDocRef = doc(firestore, 'invoiceNumbers', safeId);
-        // Menggunakan setDocumentNonBlocking untuk error handling yang lebih baik
-        setDocumentNonBlocking(newDocRef, invoice, {});
-        router.push(`/dashboard/invoices/add?invoiceNumberId=${newDocRef.id}`);
+        setInvoices([...invoices, invoice]);
+        const safeId = invoice.id.replace(/\//g, '_');
+        router.push(`/dashboard/invoices/add?invoiceNumberId=${safeId}`);
       }
       
       setIsDialogOpen(false);

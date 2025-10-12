@@ -15,27 +15,13 @@ import {
   } from '@/components/ui/table';
   import { Input } from '@/components/ui/input';
   import { Button } from '@/components/ui/button';
-  import { type Customer } from '@/app/lib/data';
+  import { customerListData, type Customer } from '@/app/lib/data';
   import { Search, Upload, Download, Plus } from 'lucide-react';
   import { AddCustomerDialog } from './_components/add-customer-dialog';
   import { DeleteConfirmationDialog } from '@/app/components/delete-confirmation-dialog';
-  import { useCollection, useFirestore, useMemoFirebase, useUser } from '@/firebase';
-  import { collection, doc } from 'firebase/firestore';
-  import { addDocumentNonBlocking, updateDocumentNonBlocking, deleteDocumentNonBlocking } from '@/firebase/non-blocking-updates';
-  import { Skeleton } from '@/components/ui/skeleton';
   
   export default function CustomerListPage() {
-    const firestore = useFirestore();
-    const { user, isUserLoading } = useUser();
-
-    const customersCollection = useMemoFirebase(() => {
-        if (!firestore || !user) return null;
-        return collection(firestore, 'customers');
-    }, [firestore, user]);
-
-    const { data: customers, isLoading: isCustomersLoading } = useCollection<Customer>(customersCollection);
-    const isLoading = isUserLoading || isCustomersLoading;
-
+    const [customers, setCustomers] = useState(customerListData);
     const [editingCustomer, setEditingCustomer] = useState<Customer | undefined>(undefined);
     const [isDialogOpen, setIsDialogOpen] = useState(false);
 
@@ -50,21 +36,17 @@ import {
     };
 
     const handleDelete = (customerId: string) => {
-        if (!firestore) return;
-        const customerDocRef = doc(firestore, 'customers', customerId);
-        deleteDocumentNonBlocking(customerDocRef);
+        setCustomers(customers.filter((c) => c.id !== customerId));
     };
 
     const handleSave = (customer: Omit<Customer, 'id'>) => {
-        if (!firestore) return;
-    
         if (editingCustomer) {
           // Editing existing customer
-          const customerDocRef = doc(firestore, 'customers', editingCustomer.id!);
-          updateDocumentNonBlocking(customerDocRef, customer);
+          setCustomers(customers.map((c) => c.id === editingCustomer.id ? { ...customer, id: c.id } : c));
         } else {
           // Adding new customer
-          addDocumentNonBlocking(collection(firestore, 'customers'), customer);
+          const newCustomer = { ...customer, id: (Math.random() + 1).toString(36).substring(7) };
+          setCustomers([...customers, newCustomer]);
         }
         setIsDialogOpen(false);
         setEditingCustomer(undefined);
@@ -117,30 +99,19 @@ import {
                             </TableRow>
                         </TableHeader>
                         <TableBody>
-                            {isLoading ? (
-                                Array.from({ length: 3 }).map((_, i) => (
-                                    <TableRow key={i}>
-                                        <TableCell><Skeleton className="h-4 w-48" /></TableCell>
-                                        <TableCell><Skeleton className="h-4 w-64" /></TableCell>
-                                        <TableCell><Skeleton className="h-4 w-64" /></TableCell>
-                                        <TableCell><Skeleton className="h-4 w-20" /></TableCell>
-                                    </TableRow>
-                                ))
-                            ) : (
-                                customers?.map((customer) => (
-                                    <TableRow key={customer.id}>
-                                        <TableCell className="font-medium">{customer.name}</TableCell>
-                                        <TableCell>{customer.address}</TableCell>
-                                        <TableCell>{customer.spdAddress}</TableCell>
-                                        <TableCell>
-                                            <div className="flex gap-2">
-                                                <Button variant="link" className="p-0 h-auto" onClick={() => handleEdit(customer)}>Edit</Button>
-                                                <DeleteConfirmationDialog onConfirm={() => handleDelete(customer.id!)} />
-                                            </div>
-                                        </TableCell>
-                                    </TableRow>
-                                ))
-                            )}
+                            {customers?.map((customer) => (
+                                <TableRow key={customer.id}>
+                                    <TableCell className="font-medium">{customer.name}</TableCell>
+                                    <TableCell>{customer.address}</TableCell>
+                                    <TableCell>{customer.spdAddress}</TableCell>
+                                    <TableCell>
+                                        <div className="flex gap-2">
+                                            <Button variant="link" className="p-0 h-auto" onClick={() => handleEdit(customer)}>Edit</Button>
+                                            <DeleteConfirmationDialog onConfirm={() => handleDelete(customer.id!)} />
+                                        </div>
+                                    </TableCell>
+                                </TableRow>
+                            ))}
                         </TableBody>
                     </Table>
                 </div>

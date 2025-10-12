@@ -41,29 +41,21 @@ import {
   Settings,
 } from 'lucide-react';
 import Link from 'next/link';
-import { useDoc, useFirestore, useMemoFirebase, useUser } from '@/firebase';
-import { doc, collection, addDoc, serverTimestamp } from 'firebase/firestore';
-import { type InvoiceNumber } from '@/app/lib/data';
+import { type InvoiceNumber, invoiceNumberData } from '@/app/lib/data';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
 
 export default function AddInvoicePage() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const firestore = useFirestore();
-  const { user, isUserLoading } = useUser();
   const { toast } = useToast();
 
   const invoiceNumberId = searchParams.get('invoiceNumberId');
 
-  const invoiceNumberDocRef = useMemoFirebase(() => {
-    if (!firestore || !invoiceNumberId || !user) return null;
-    return doc(firestore, 'invoiceNumbers', invoiceNumberId);
-  }, [firestore, invoiceNumberId, user]);
-
-  const { data: invoiceNumberData, isLoading: isInvoiceNumberLoading } = useDoc<InvoiceNumber>(invoiceNumberDocRef);
+  const [invoiceNumberDataState, setInvoiceNumberDataState] = useState<InvoiceNumber | undefined>(undefined);
+  const [isInvoiceNumberLoading, setIsInvoiceNumberLoading] = useState(!!invoiceNumberId);
   
-  const isLoading = isUserLoading || (!!invoiceNumberId && isInvoiceNumberLoading);
+  const isLoading = isInvoiceNumberLoading;
 
   const [invoiceId, setInvoiceId] = useState('');
   const [customerName, setCustomerName] = useState('');
@@ -75,58 +67,41 @@ export default function AddInvoicePage() {
 
 
   useEffect(() => {
-    if (invoiceNumberData) {
-      setInvoiceId(invoiceNumberData.id);
-      setCustomerName(invoiceNumberData.customer);
-      setSoNumber(invoiceNumberData.salesOrder);
-      setTotalAmount(invoiceNumberData.amount);
-      if (invoiceNumberData.date) {
+    if (invoiceNumberId) {
+      setIsInvoiceNumberLoading(true);
+      // Simulate fetching data
+      setTimeout(() => {
+        const foundInvoice = invoiceNumberData.find(inv => inv.id.replace(/\//g, '_') === invoiceNumberId);
+        setInvoiceNumberDataState(foundInvoice);
+        setIsInvoiceNumberLoading(false);
+      }, 500);
+    }
+  }, [invoiceNumberId]);
+
+
+  useEffect(() => {
+    if (invoiceNumberDataState) {
+      setInvoiceId(invoiceNumberDataState.id);
+      setCustomerName(invoiceNumberDataState.customer);
+      setSoNumber(invoiceNumberDataState.salesOrder);
+      setTotalAmount(invoiceNumberDataState.amount);
+      if (invoiceNumberDataState.date) {
         // Assuming date is dd/MM/yyyy
-        const parts = invoiceNumberData.date.split('/');
+        const parts = invoiceNumberDataState.date.split('/');
         if (parts.length === 3) {
             const [day, month, year] = parts;
             setIssueDate(new Date(`${year}-${month}-${day}`));
         }
       }
     }
-  }, [invoiceNumberData]);
+  }, [invoiceNumberDataState]);
   
   const handleSaveInvoice = async (invoiceStatus: 'draft' | 'sent' = 'draft') => {
-    if (!firestore) {
-      toast({
-        variant: "destructive",
-        title: "Error",
-        description: "Firestore is not initialized.",
-      });
-      return;
-    }
-
-    const invoiceData = {
-      id: invoiceId,
-      customer: customerName,
-      soNumber: soNumber,
-      date: issueDate ? format(issueDate, 'yyyy-MM-dd') : '',
-      amount: totalAmount,
-      status: invoiceStatus,
-      spdNumber: '-',
-      createdAt: serverTimestamp(),
-    };
-    
-    try {
-      await addDoc(collection(firestore, 'invoices'), invoiceData);
-      toast({
-        title: "Invoice Saved",
-        description: `Invoice ${invoiceId} has been successfully saved.`,
-      });
-      router.push('/dashboard/invoices');
-    } catch (error) {
-      console.error("Error saving invoice:", error);
-      toast({
-        variant: "destructive",
-        title: "Uh oh! Something went wrong.",
-        description: "There was a problem with your request.",
-      });
-    }
+    toast({
+      title: "Invoice Saved",
+      description: `Invoice ${invoiceId} has been successfully saved as ${invoiceStatus}.`,
+    });
+    router.push('/dashboard/invoices');
   };
 
 
@@ -386,5 +361,3 @@ export default function AddInvoicePage() {
     </main>
   );
 }
-
-    
