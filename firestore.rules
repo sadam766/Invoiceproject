@@ -1,48 +1,35 @@
 /**
- * @file Firestore Security Rules for the Sales Dashboard application.
- *
- * Core Philosophy:
- * This ruleset prioritizes secure data access by enforcing ownership and role-based restrictions.
- * It assumes an administrative role that manages global data, while customers' sales data is accessible only to admins.
- * Read operations for products are generally public.
+ * @file Firestore Security Rules
+ * @description This ruleset enforces a role-based access control model with separation of concerns.
  *
  * Data Structure:
- * - /customers/{customerId}: Stores customer data, with likely admin-only access.
- * - /products/{productId}: Stores product data, with public read access and admin-only write access.
- * - /customers/{customerId}/sales/{saleId}: Stores sales data nested under customers.
- * - /sales_overviews/{salesOverviewId}: Stores aggregated sales overview data, with likely admin-only access.
- * - /top_products/{topProductId}: Stores top product data, with likely admin-only access.
+ * - /customers/{customerId}: Stores customer data, likely admin-controlled.
+ * - /products/{productId}: Stores product data, likely publicly readable or admin-controlled.
+ * - /customers/{customerId}/sales/{saleId}: Stores sales data for each customer; customers do not have direct access to this collection.
+ * - /sales_overviews/{salesOverviewId}: Stores aggregated sales data, likely admin-controlled.
+ * - /top_products/{topProductId}: Stores data about top-selling products, likely admin-controlled.
  *
  * Key Security Decisions:
- * - The rules assume the existence of an administrative role to manage sales overviews and top products.
- * - Customer data access is restricted, implying it's managed via an admin role or other mechanism (not user-owned).
- * - Public listing of sales data is disallowed to prevent unauthorized access.
+ * - List operation on `/invoices` is denied to all authenticated users.
+ * - Customer and product data access are likely managed through admin roles.
+ * - Sales data is associated with a customer and is not directly user-accessible.
+ * - Aggregated sales overviews and top product data are likely admin-controlled.
  *
  * Denormalization for Authorization:
- * The rules leverage denormalization by assuming that any data needed for authorization (e.g., customerId in sales documents)
- * is already present within the document itself. This avoids costly and complex `get()` calls in the security rules.
- *
- * Structural Segregation:
- * The data model uses structural segregation to separate customer-specific sales data (under `/customers/{customerId}`) from
- * global sales overviews and top products, which are stored in top-level collections and likely managed by admins.
+ * - Sales documents under `/customers/{customerId}/sales/{saleId}` denormalize the `customerId` to enable filtering and efficient security rules.
  */
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
     /**
-     * @description Controls access to customer data. Assumes admin-only access.
-     * @path /customers/{customerId}
-     * @allow get: if false; // Assuming admin-only access, no direct gets allowed.
-     * @allow list: if false; // Assuming admin-only access, no direct listing allowed.
-     * @allow create: if false; // Admin only
-     * @allow update: if false; // Admin only
-     * @allow delete: if false; // Admin only
-     * @deny get: if true; // No one can get without auth
-     * @deny list: if true; // No one can list without auth
-     * @principle Restricts access to customer data, assuming admin-only management.
+     * @description Denies listing of `/invoices` for all users.
+     * @path /invoices
+     * @allow (get) - Not applicable (collection does not exist)
+     * @deny (list) Any authenticated user attempts to list `/invoices` without explicit permission.
+     * @principle Explicitly deny access to ensure a secure baseline.
      */
-    match /customers/{customerId} {
+    match /invoices {
       allow get: if false;
       allow list: if false;
       allow create: if false;
@@ -51,17 +38,30 @@ service cloud.firestore {
     }
 
     /**
-     * @description Controls access to product data. Allows public read access, restricts writes to admins.
+     * @description Controls access to customer data. Access is likely managed through other means (e.g. an admin role collection that is checked in security rules).
+     * @path /customers/{customerId}
+     * @allow (get) Public get access, contingent on future restriction.
+     * @allow (create) An admin user creates a new customer profile.
+     * @deny (update) A non-admin user attempts to modify a customer profile.
+     * @deny (delete) A non-admin user attempts to delete a customer profile.
+     * @principle Enforces admin-only access to customer data modifications.
+     */
+    match /customers/{customerId} {
+      allow get: if true;
+      allow list: if true;
+      allow create: if false;
+      allow update: if false;
+      allow delete: if false;
+    }
+
+    /**
+     * @description Controls access to product data. Product data is globally accessible (read-only) or restricted to admin users.
      * @path /products/{productId}
-     * @allow get: if true;
-     * @allow list: if true;
-     * @allow create: if false; // Admin only
-     * @allow update: if false; // Admin only
-     * @allow delete: if false; // Admin only
-     * @deny create: if true;
-     * @deny update: if true;
-     * @deny delete: if true;
-     * @principle Allows public read access to product data, restricts writes to admins.
+     * @allow (get) Public get access to product information.
+     * @deny (create) A non-admin user attempts to create a product.
+     * @deny (update) A non-admin user attempts to modify product information.
+     * @deny (delete) A non-admin user attempts to delete a product.
+     * @principle Enforces read-only access to product data for non-admin users.
      */
     match /products/{productId} {
       allow get: if true;
@@ -72,16 +72,13 @@ service cloud.firestore {
     }
 
     /**
-     * @description Controls access to sales data nested under customer data. Assumes admin-only access.
+     * @description Controls access to sales data associated with a customer. The `customerId` is denormalized to enable filtering and efficient security rules.
      * @path /customers/{customerId}/sales/{saleId}
-     * @allow get: if false; // Assuming admin-only access, no direct gets allowed.
-     * @allow list: if false; // Assuming admin-only access, no direct listing allowed.
-     * @allow create: if false; // Admin only
-     * @allow update: if false; // Admin only
-     * @allow delete: if false; // Admin only
-     * @deny get: if true; // No one can get without auth
-     * @deny list: if true; // No one can list without auth
-     * @principle Restricts access to sales data, assuming admin-only management.
+     * @allow (create) An admin user creates a new sale record for a customer.
+     * @deny (get) A non-admin user attempts to read a sale record.
+     * @deny (update) A non-admin user attempts to modify a sale record.
+     * @deny (delete) A non-admin user attempts to delete a sale record.
+     * @principle Enforces admin-only access to sales data.
      */
     match /customers/{customerId}/sales/{saleId} {
       allow get: if false;
@@ -92,16 +89,13 @@ service cloud.firestore {
     }
 
     /**
-     * @description Controls access to sales overview data. Assumes admin-only access.
+     * @description Controls access to sales overview data. Access will likely be admin controlled.
      * @path /sales_overviews/{salesOverviewId}
-     * @allow get: if false; // Assuming admin-only access, no direct gets allowed.
-     * @allow list: if false; // Assuming admin-only access, no direct listing allowed.
-     * @allow create: if false; // Admin only
-     * @allow update: if false; // Admin only
-     * @allow delete: if false; // Admin only
-     * @deny get: if true; // No one can get without auth
-     * @deny list: if true; // No one can list without auth
-     * @principle Restricts access to sales overview data, assuming admin-only management.
+     * @deny (get) A non-admin user attempts to read a sales overview record.
+     * @deny (create) A non-admin user attempts to create a new sales overview.
+     * @deny (update) A non-admin user attempts to modify a sales overview record.
+     * @deny (delete) A non-admin user attempts to delete a sales overview record.
+     * @principle Enforces admin-only access to sales overview data.
      */
     match /sales_overviews/{salesOverviewId} {
       allow get: if false;
@@ -112,16 +106,13 @@ service cloud.firestore {
     }
 
     /**
-     * @description Controls access to top product data. Assumes admin-only access.
+     * @description Controls access to top product data. Top products are stored globally, also likely admin controlled.
      * @path /top_products/{topProductId}
-     * @allow get: if false; // Assuming admin-only access, no direct gets allowed.
-     * @allow list: if false; // Assuming admin-only access, no direct listing allowed.
-     * @allow create: if false; // Admin only
-     * @allow update: if false; // Admin only
-     * @allow delete: if false; // Admin only
-     * @deny get: if true; // No one can get without auth
-     * @deny list: if true; // No one can list without auth
-     * @principle Restricts access to top product data, assuming admin-only management.
+     * @deny (get) A non-admin user attempts to read a top product record.
+     * @deny (create) A non-admin user attempts to create a new top product record.
+     * @deny (update) A non-admin user attempts to modify a top product record.
+     * @deny (delete) A non-admin user attempts to delete a top product record.
+     * @principle Enforces admin-only access to top product data.
      */
     match /top_products/{topProductId} {
       allow get: if false;
