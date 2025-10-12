@@ -1,111 +1,125 @@
-/**
- * @file Firebase Security Rules for Sales Dashboard Application
- *
- * @corePhilosophy This ruleset enforces a strict user-ownership model for customer-specific data (sales),
- * while allowing public read access to product, sales overview, and top product data.
- *
- * @dataStructure
- * - `/customers/{customerId}`: Stores customer profiles. CustomerId is also stored within the document.
- * - `/customers/{customerId}/sales/{saleId}`: Stores sales records associated with a specific customer.
- *   CustomerId is the root of the path and is also stored within the sales document.
- * - `/products/{productId}`: Stores product details. Publicly readable.
- * - `/salesOverview/{salesOverviewId}`: Stores aggregated sales data. Publicly readable.
- * - `/topProducts/{topProductId}`: Stores information about top-selling products. Publicly readable.
- *
- * @keySecurityDecisions
- * - Customers can only create, update, or delete their own sales records.
- * - Listing of sales records is restricted to the owning customer.
- * - Product, SalesOverview and TopProduct data is publicly readable but not writable by clients. These collections would require a privileged backend to manage their data.
- * - Data validation is minimized for prototyping, focusing only on ownership and relational integrity.
- *
- * @denormalizationForAuthorization
- * - The `customerId` is part of the path for `/customers/{customerId}/sales/{saleId}` and is used to define ownership.
- *   This avoids the need for complex `get()` calls to a parent document to determine ownership.
- *
- * @structuralSegregation
- * - Customer-specific sales data is stored in a subcollection (`/customers/{customerId}/sales/{saleId}`), separate from the top-level product, sales overview and top product data.
- *   This ensures that listing operations can be securely performed without exposing private sales data.
- */
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
     /**
-     * @description Controls access to customer profile documents.
+     * @description Checks if the request is authenticated.
+     */
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    /**
+     * @description Checks if the request is made by the owner (user).
+     */
+    function isOwner(userId) {
+      return request.auth.uid == userId;
+    }
+
+    /**
+     * @description Checks if the request is made by an existing owner (user), verifying the document exists.
+     */
+    function isExistingOwner(userId) {
+      return isOwner(resource.data.userId);
+    }
+
+    /**
+     * @description Rules for the /customers/{customerId} collection.
      * @path /customers/{customerId}
-     * @allow (create) - If the user's ID matches the customerId, they can create a customer document for themselves.
-     * @allow (get, list) - Read access is denied.
-     * @allow (update, delete) - Update and delete access is denied.
-     * @deny (create) - If the user's ID does not match the customerId, they cannot create a customer document.
-     * @principle Enforces document ownership for creation and restricts read access to customer profiles.
+     * @allow (create) - Authenticated user can create a customer document if the customerId matches their UID.
+     * @allow (get, list, update, delete) - Authenticated user can only access their own customer document.
+     * @deny (create) - An unauthenticated user cannot create a customer document.
+     * @deny (update) - A different authenticated user cannot update this customer document.
+     * @principle Enforces document ownership for writes and restricts access to a user's own data tree.
      */
     match /customers/{customerId} {
-      function isOwner(userId) {
-        return request.auth != null && request.auth.uid == userId;
-      }
+      // Read rules
+      allow get: if isOwner(customerId);
+      allow list: if isOwner(customerId);
 
-      allow get, list: if false;
-      allow create: if isOwner(customerId);
-      allow update, delete: if false;
+      // Write rules
+      allow create: if isSignedIn() && isOwner(customerId);
+      allow update: if isSignedIn() && isOwner(customerId);
+      allow delete: if isSignedIn() && isOwner(customerId);
     }
 
     /**
-     * @description Controls access to sales documents associated with a specific customer.
+     * @description Rules for the /customers/{customerId}/sales/{saleId} collection.
      * @path /customers/{customerId}/sales/{saleId}
-     * @allow (create) - If the user is the owner of the customer document, they can create a sale document. Requires the customerId within the document to match the path.
-     * @allow (get, list) - If the user is the owner of the customer document, they can read or list sale documents.
-     * @allow (update, delete) - If the user is the owner of the customer document and the sale document exists, they can update or delete it.
-     * @deny (create) - If the user is not the owner of the customer document, they cannot create a sale document.
-     * @deny (update, delete) - If the sale document does not exist or the user is not the owner of the customer document, they cannot update or delete it.
-     * @principle Enforces document ownership for writes and restricts read access to the owning customer. Validates customerId on create.
+     * @allow (create) - Authenticated user can create a sale document under their customer ID.
+     * @allow (get, list, update, delete) - Authenticated user can only access sales documents under their customer ID.
+     * @deny (create) - An unauthenticated user cannot create a sale document.
+     * @deny (update) - A different authenticated user cannot update this sale document.
+     * @principle Enforces document ownership for writes and restricts access to a user's own data tree.
      */
     match /customers/{customerId}/sales/{saleId} {
-      function isOwner(userId) {
-        return request.auth != null && request.auth.uid == userId;
-      }
+      // Read rules
+      allow get: if isOwner(customerId);
+      allow list: if isOwner(customerId);
 
-      function isExistingOwner(userId) {
-          return isOwner(userId) && resource != null;
-      }
-
-      allow get, list: if isOwner(customerId);
-      allow create: if isOwner(customerId);
-      allow update, delete: if isExistingOwner(customerId);
+      // Write rules
+      allow create: if isSignedIn() && isOwner(customerId);
+      allow update: if isSignedIn() && isOwner(customerId);
+      allow delete: if isSignedIn() && isOwner(customerId);
     }
 
     /**
-     * @description Controls access to product documents.
+     * @description Rules for the /products/{productId} collection.
      * @path /products/{productId}
-     * @allow (get, list) - Allows any user to read or list product documents.
-     * @allow (create, update, delete) - Denies all write operations.
-     * @principle Allows public read access to product information, but requires a privileged backend for writes.
+     * @allow (get, list) - Any user can read product information.
+     * @deny (create, update, delete) - No one can modify product information through the client.
+     * @principle Public read access with no write access.
      */
     match /products/{productId} {
+      // Read rules
       allow get, list: if true;
+
+      // Write rules
       allow create, update, delete: if false;
     }
 
     /**
-     * @description Controls access to sales overview documents.
+     * @description Rules for the /salesOverview/{salesOverviewId} collection.
      * @path /salesOverview/{salesOverviewId}
-     * @allow (get, list) - Allows any user to read or list sales overview documents.
-     * @allow (create, update, delete) - Denies all write operations.
-     * @principle Allows public read access to sales overview data, but requires a privileged backend for writes.
+     * @allow (get, list) - Any user can read sales overview information.
+     * @deny (create, update, delete) - No one can modify sales overview information through the client.
+     * @principle Public read access with no write access.
      */
     match /salesOverview/{salesOverviewId} {
+      // Read rules
       allow get, list: if true;
+
+      // Write rules
       allow create, update, delete: if false;
     }
 
     /**
-     * @description Controls access to top product documents.
+     * @description Rules for the /topProducts/{topProductId} collection.
      * @path /topProducts/{topProductId}
-     * @allow (get, list) - Allows any user to read or list top product documents.
-     * @allow (create, update, delete) - Denies all write operations.
-     * @principle Allows public read access to top product data, but requires a privileged backend for writes.
+     * @allow (get, list) - Any user can read top product information.
+     * @deny (create, update, delete) - No one can modify top product information through the client.
+     * @principle Public read access with no write access.
      */
     match /topProducts/{topProductId} {
+      // Read rules
       allow get, list: if true;
+
+      // Write rules
+      allow create, update, delete: if false;
+    }
+    
+    /**
+     * @description Rules for the /invoiceNumbers/{invoiceNumberId} collection.
+     * @path /invoiceNumbers/{invoiceNumberId}
+     * @allow (get, list) - Any user can read invoice number information.
+     * @deny (create, update, delete) - No one can modify invoice number information through the client.
+     * @principle Public read access with no write access.
+     */
+    match /invoiceNumbers/{invoiceNumberId} {
+      // Read rules
+      allow get, list: if true;
+
+      // Write rules
       allow create, update, delete: if false;
     }
   }
