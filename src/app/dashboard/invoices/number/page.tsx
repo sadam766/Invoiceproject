@@ -21,8 +21,8 @@ import {
   import { AddInvoiceNumberDialog } from './_components/add-invoice-number-dialog';
   import { DeleteConfirmationDialog } from '@/app/components/delete-confirmation-dialog';
   import { useCollection, useFirestore, useMemoFirebase, useUser } from '@/firebase';
-  import { collection, doc, setDoc } from 'firebase/firestore';
-  import { deleteDocumentNonBlocking, updateDocumentNonBlocking } from '@/firebase/non-blocking-updates';
+  import { collection, doc } from 'firebase/firestore';
+  import { deleteDocumentNonBlocking, updateDocumentNonBlocking, setDocumentNonBlocking } from '@/firebase/non-blocking-updates';
   import { Skeleton } from '@/components/ui/skeleton';
 
   export default function InvoiceNumberPage() {
@@ -58,7 +58,7 @@ import {
         deleteDocumentNonBlocking(invoiceDocRef);
     };
 
-    const handleSave = async (invoice: Omit<InvoiceNumber, 'id'> & {id: string}) => {
+    const handleSave = (invoice: Omit<InvoiceNumber, 'id'> & {id: string}) => {
       if (!firestore) return;
 
       const safeId = invoice.id.replace(/\//g, '_');
@@ -69,7 +69,8 @@ import {
         updateDocumentNonBlocking(invoiceDocRef, invoice);
       } else {
         const newDocRef = doc(firestore, 'invoiceNumbers', safeId);
-        await setDoc(newDocRef, invoice);
+        // Menggunakan setDocumentNonBlocking untuk error handling yang lebih baik
+        setDocumentNonBlocking(newDocRef, invoice, {});
         router.push(`/dashboard/invoices/add?invoiceNumberId=${newDocRef.id}`);
       }
       
@@ -141,7 +142,7 @@ import {
                             ) : (
                                 invoices?.map((invoice) => (
                                     <TableRow key={invoice.id}>
-                                        <TableCell className="font-medium">{invoice.id}</TableCell>
+                                        <TableCell className="font-medium">{invoice.id.replace(/_/g, '/')}</TableCell>
                                         <TableCell>{invoice.customer}</TableCell>
                                         <TableCell>{invoice.salesOrder}</TableCell>
                                         <TableCell>{invoice.date}</TableCell>
