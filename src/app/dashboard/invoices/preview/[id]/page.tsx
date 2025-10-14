@@ -163,11 +163,11 @@ export default function InvoicePreviewPage() {
                      <div className="w-1/3 text-right">
                          <div className="grid grid-cols-2 gap-y-1">
                              <p>Goods:</p>
-                             <p>{subtotal.toLocaleString('id-ID', { minimumFractionDigits: 2 })}</p>
-                             <p>DPP VAT (11/12):</p>
-                             <p>0,00</p>
+                             <p>{(subtotal - 0).toLocaleString('id-ID', { minimumFractionDigits: 2 })}</p>
+                             <p>DPP VAT:</p>
+                             <p>{(subtotal / 1.12).toLocaleString('id-ID', { minimumFractionDigits: 2 })}</p>
                              <p>VAT 12%:</p>
-                             <p>0,00</p>
+                             <p>{((subtotal / 1.12) * 0.12).toLocaleString('id-ID', { minimumFractionDigits: 2 })}</p>
                              <p className="font-bold col-span-2 border-t border-black pt-1 mt-1">Total Rp:</p>
                              <p className="font-bold col-span-2">{subtotal.toLocaleString('id-ID', { minimumFractionDigits: 2 })}</p>
                          </div>
@@ -201,4 +201,3 @@ export default function InvoicePreviewPage() {
         </main>
     );
 }
-    

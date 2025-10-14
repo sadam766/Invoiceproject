@@ -129,11 +129,11 @@ export default function AddInvoicePage() {
   useEffect(() => {
     const currentSubtotal = items.reduce((acc, item) => acc + item.total, 0);
     setSubtotal(currentSubtotal);
-
+  
     const numericNegotiation = typeof negotiation === 'string' && negotiation !== '' ? parseFormattedNumber(negotiation) : (typeof negotiation === 'number' ? negotiation : 0);
     
     const baseForCalculations = currentSubtotal - numericNegotiation;
-
+  
     // DP Calculation
     const numericDpPercent = typeof dpPercent === 'string' && dpPercent !== '' ? parseFormattedNumber(dpPercent) : (typeof dpPercent === 'number' ? dpPercent : 0);
     let numericDpValue = typeof dpValue === 'string' && dpValue !== '' ? parseFormattedNumber(dpValue) : (typeof dpValue === 'number' ? dpValue : 0);
@@ -143,26 +143,26 @@ export default function AddInvoicePage() {
       setDpValue(formatNumberWithCommas(calculatedDp));
       numericDpValue = calculatedDp;
     }
-
+  
     // Pelunasan Calculation
     const numericPelunasanPercent = typeof dpPelunasanPercent === 'string' && dpPelunasanPercent !== '' ? parseFormattedNumber(dpPelunasanPercent) : (typeof dpPelunasanPercent === 'number' ? dpPelunasanPercent : 0);
     let numericPelunasan = typeof pelunasan === 'string' && pelunasan !== '' ? parseFormattedNumber(pelunasan) : (typeof pelunasan === 'number' ? pelunasan : 0);
-
+  
     if (numericPelunasanPercent > 0 && (pelunasan === '' || pelunasan === 0)) {
         const calculatedPelunasan = baseForCalculations * (numericPelunasanPercent / 100);
         setPelunasan(formatNumberWithCommas(calculatedPelunasan));
         numericPelunasan = calculatedPelunasan;
     }
-
+  
     const currentGrandTotal = baseForCalculations - numericDpValue - numericPelunasan;
     setGrandTotal(currentGrandTotal);
     
-    const currentDppVat = currentGrandTotal / (1 + 0.12);
+    const currentDppVat = currentGrandTotal / 1.12;
     setDppVat(currentDppVat);
     
     const currentVat12 = currentDppVat * 0.12;
     setVat12(currentVat12);
-
+  
   }, [items, negotiation, dpPercent, dpValue, dpPelunasanPercent, pelunasan]);
 
   
@@ -451,7 +451,7 @@ export default function AddInvoicePage() {
                         <span className="text-sm">Rp {formatNumberWithCommas(grandTotal)}</span>
                     </div>
                      <div className="flex justify-between items-center py-1">
-                        <span className="text-sm text-muted-foreground">DPP VAT (11/12):</span>
+                        <span className="text-sm text-muted-foreground">DPP VAT:</span>
                         <span className="text-sm font-medium">Rp {formatNumberWithCommas(dppVat)}</span>
                     </div>
                      <div className="flex justify-between items-center py-1">
@@ -460,7 +460,7 @@ export default function AddInvoicePage() {
                     </div>
                      <div className="flex justify-between items-center py-2 mt-2 border-t">
                         <span className="text-base font-bold">Total:</span>
-                        <span className="text-base font-bold">Rp {formatNumberWithCommas(grandTotal)}</span>
+                        <span className="text-base font-bold">Rp {formatNumberWithCommas(grandTotal + vat12)}</span>
                     </div>
                 </div>
             </div>
@@ -524,5 +524,3 @@ export default function AddInvoicePage() {
     </main>
   );
 }
-
-    
