@@ -30,6 +30,14 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from '@/components/ui/popover';
+import {
+    Command,
+    CommandEmpty,
+    CommandGroup,
+    CommandInput,
+    CommandItem,
+    CommandList,
+  } from '@/components/ui/command';
 import { cn, formatNumberWithCommas, parseFormattedNumber } from '@/lib/utils';
 import { format } from 'date-fns';
 import {
@@ -40,9 +48,11 @@ import {
   Send,
   Settings,
   Eye,
+  ChevronsUpDown,
+  Check
 } from 'lucide-react';
 import Link from 'next/link';
-import { type InvoiceNumber, invoiceNumberData, salesOrderListData } from '@/app/lib/data';
+import { type InvoiceNumber, invoiceNumberData, salesOrderListData, customerListData, type Customer } from '@/app/lib/data';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
 
@@ -68,8 +78,9 @@ export default function AddInvoicePage() {
   const isLoading = isInvoiceNumberLoading;
 
   const [invoiceId, setInvoiceId] = useState('');
-  const [customerName, setCustomerName] = useState('');
   const [soNumber, setSoNumber] = useState('');
+  const [customer, setCustomer] = useState<Customer | undefined>(undefined);
+
   const [issueDate, setIssueDate] = useState<Date | undefined>(new Date());
   const [dueDate, setDueDate] = useState<Date | undefined>();
   const [status, setStatus] = useState('draft');
@@ -88,6 +99,9 @@ export default function AddInvoicePage() {
   const [dppVat, setDppVat] = useState(0);
   const [vat12, setVat12] = useState(0);
 
+  const [soPopoverOpen, setSoPopoverOpen] = useState(false);
+  const [customerPopoverOpen, setCustomerPopoverOpen] = useState(false);
+  const uniqueSalesOrders = Array.from(new Set(salesOrderListData.map(item => item.soNumber)));
 
   useEffect(() => {
     if (invoiceNumberId) {
@@ -104,8 +118,7 @@ export default function AddInvoicePage() {
   useEffect(() => {
     if (invoiceNumberDataState) {
       setInvoiceId(invoiceNumberDataState.id);
-      setCustomerName(invoiceNumberDataState.customer);
-      setSoNumber(invoiceNumberDataState.salesOrder);
+      handleSoSelect(invoiceNumberDataState.salesOrder);
       if (invoiceNumberDataState.date) {
         const parts = invoiceNumberDataState.date.split('/');
         if (parts.length === 3) {
@@ -113,18 +126,39 @@ export default function AddInvoicePage() {
             setIssueDate(new Date(`${year}-${month}-${day}`));
         }
       }
-      const relatedItems = salesOrderListData.filter(so => so.soNumber === invoiceNumberDataState.salesOrder);
-      const newItems: InvoiceItem[] = relatedItems.map((item, index) => ({
-          id: Date.now() + index,
-          name: item.productName,
-          quantity: item.quantity,
-          unit: item.unit,
-          price: item.price,
-          total: item.quantity * item.price,
-      }));
-      setItems(newItems);
     }
   }, [invoiceNumberDataState]);
+  
+  const handleSoSelect = (selectedSo: string) => {
+    setSoNumber(selectedSo);
+
+    const soItems = salesOrderListData.filter(so => so.soNumber === selectedSo);
+    if (soItems.length > 0) {
+        const newItems: InvoiceItem[] = soItems.map((item, index) => ({
+            id: Date.now() + index,
+            name: item.productName,
+            quantity: item.quantity,
+            unit: item.unit,
+            price: item.price,
+            total: item.quantity * item.price,
+        }));
+        setItems(newItems);
+
+        const soCustomerName = soItems[0].customer;
+        const foundCustomer = customerListData.find(c => c.name === soCustomerName);
+        setCustomer(foundCustomer);
+    } else {
+        setItems([]);
+        setCustomer(undefined);
+    }
+    setSoPopoverOpen(false);
+  }
+
+  const handleCustomerSelect = (customerName: string) => {
+    const foundCustomer = customerListData.find(c => c.name.toLowerCase() === customerName.toLowerCase());
+    setCustomer(foundCustomer);
+    setCustomerPopoverOpen(false);
+  }
 
   useEffect(() => {
     const currentSubtotal = items.reduce((acc, item) => acc + item.total, 0);
@@ -261,7 +295,46 @@ export default function AddInvoicePage() {
               </div>
               <div>
                 <label className="text-sm font-medium">SO/Sales Order</label>
-                <Input placeholder="Search an SO..." value={soNumber} onChange={e => setSoNumber(e.target.value)} />
+                <Popover open={soPopoverOpen} onOpenChange={setSoPopoverOpen}>
+                    <PopoverTrigger asChild>
+                        <Button
+                        variant="outline"
+                        role="combobox"
+                        aria-expanded={soPopoverOpen}
+                        className="w-full justify-between"
+                        >
+                        {soNumber
+                            ? uniqueSalesOrders.find((so) => so === soNumber)
+                            : "Search SO..."}
+                        <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                        </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-[200px] p-0">
+                        <Command>
+                            <CommandInput placeholder="Search sales order..." />
+                            <CommandList>
+                                <CommandEmpty>No sales order found.</CommandEmpty>
+                                <CommandGroup>
+                                    {uniqueSalesOrders.map((so) => (
+                                    <CommandItem
+                                        key={so}
+                                        value={so}
+                                        onSelect={(currentValue) => handleSoSelect(currentValue)}
+                                    >
+                                        <Check
+                                        className={cn(
+                                            "mr-2 h-4 w-4",
+                                            soNumber === so ? "opacity-100" : "opacity-0"
+                                        )}
+                                        />
+                                        {so}
+                                    </CommandItem>
+                                    ))}
+                                </CommandGroup>
+                            </CommandList>
+                        </Command>
+                    </PopoverContent>
+                </Popover>
               </div>
               <div>
                 <label className="text-sm font-medium">No. PO</label>
@@ -272,8 +345,51 @@ export default function AddInvoicePage() {
                 <Input placeholder="e.g. Bank Transfer" />
               </div>
               <div className="lg:col-span-2">
-                <label className="text-sm font-medium">Bill To</label>
-                <Input placeholder="Search for a customer..." value={customerName} onChange={e => setCustomerName(e.target.value)} />
+                 <label className="text-sm font-medium">Bill To</label>
+                 <Popover open={customerPopoverOpen} onOpenChange={setCustomerPopoverOpen}>
+                    <PopoverTrigger asChild>
+                        <Button
+                            variant="outline"
+                            role="combobox"
+                            aria-expanded={customerPopoverOpen}
+                            className="w-full justify-between"
+                        >
+                            {customer?.name ?? "Search for a customer..."}
+                            <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                        </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-full p-0">
+                        <Command>
+                            <CommandInput placeholder="Search customer..." />
+                            <CommandList>
+                                <CommandEmpty>No customer found.</CommandEmpty>
+                                <CommandGroup>
+                                    {customerListData.map((c) => (
+                                    <CommandItem
+                                        key={c.id}
+                                        value={c.name}
+                                        onSelect={(currentValue) => handleCustomerSelect(currentValue)}
+                                    >
+                                        <Check
+                                            className={cn(
+                                                "mr-2 h-4 w-4",
+                                                customer?.name.toLowerCase() === c.name.toLowerCase() ? "opacity-100" : "opacity-0"
+                                            )}
+                                        />
+                                        {c.name}
+                                    </CommandItem>
+                                    ))}
+                                </CommandGroup>
+                            </CommandList>
+                        </Command>
+                    </PopoverContent>
+                 </Popover>
+                 {customer && (
+                    <div className="mt-2 p-2 border rounded-md bg-muted text-sm text-muted-foreground">
+                        <p>{customer.address}</p>
+                        <p>{customer.spdAddress}</p>
+                    </div>
+                 )}
               </div>
               <div>
                 <label className="text-sm font-medium">Issue Date</label>
