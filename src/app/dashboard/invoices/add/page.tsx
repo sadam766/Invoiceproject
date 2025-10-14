@@ -30,7 +30,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from '@/components/ui/popover';
-import { cn } from '@/lib/utils';
+import { cn, formatNumberWithCommas, parseFormattedNumber } from '@/lib/utils';
 import { format } from 'date-fns';
 import {
   ChevronLeft,
@@ -42,9 +42,18 @@ import {
   Eye,
 } from 'lucide-react';
 import Link from 'next/link';
-import { type InvoiceNumber, invoiceNumberData } from '@/app/lib/data';
+import { type InvoiceNumber, invoiceNumberData, salesOrderListData } from '@/app/lib/data';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
+
+type InvoiceItem = {
+    id: number;
+    name: string;
+    quantity: number;
+    unit: string;
+    price: number;
+    total: number;
+};
 
 export default function AddInvoicePage() {
   const router = useRouter();
@@ -63,9 +72,19 @@ export default function AddInvoicePage() {
   const [soNumber, setSoNumber] = useState('');
   const [issueDate, setIssueDate] = useState<Date | undefined>(new Date());
   const [dueDate, setDueDate] = useState<Date | undefined>();
-  const [totalAmount, setTotalAmount] = useState(0);
   const [status, setStatus] = useState('draft');
 
+  const [items, setItems] = useState<InvoiceItem[]>([]);
+  const [subtotal, setSubtotal] = useState(0);
+  const [negotiation, setNegotiation] = useState(0);
+  const [dpPercent, setDpPercent] = useState(0);
+  const [dpValue, setDpValue] = useState(0);
+  const [dpPelunasanPercent, setDpPelunasanPercent] = useState(0);
+  const [pelunasan, setPelunasan] = useState(0);
+  const [goods, setGoods] = useState(0);
+  const [dppVat, setDppVat] = useState(0);
+  const [vat12, setVat12] = useState(0);
+  const [grandTotal, setGrandTotal] = useState(0);
 
   useEffect(() => {
     if (invoiceNumberId) {
@@ -85,7 +104,6 @@ export default function AddInvoicePage() {
       setInvoiceId(invoiceNumberDataState.id);
       setCustomerName(invoiceNumberDataState.customer);
       setSoNumber(invoiceNumberDataState.salesOrder);
-      setTotalAmount(invoiceNumberDataState.amount);
       if (invoiceNumberDataState.date) {
         // Assuming date is dd/MM/yyyy
         const parts = invoiceNumberDataState.date.split('/');
@@ -94,8 +112,37 @@ export default function AddInvoicePage() {
             setIssueDate(new Date(`${year}-${month}-${day}`));
         }
       }
+      // Populate items from sales order data
+      const relatedItems = salesOrderListData.filter(so => so.soNumber === invoiceNumberDataState.salesOrder);
+      const newItems: InvoiceItem[] = relatedItems.map((item, index) => ({
+          id: Date.now() + index,
+          name: item.productName,
+          quantity: item.quantity,
+          unit: item.unit,
+          price: item.price,
+          total: item.quantity * item.price,
+      }));
+      setItems(newItems);
     }
   }, [invoiceNumberDataState]);
+
+  useEffect(() => {
+    const newSubtotal = items.reduce((acc, item) => acc + item.total, 0);
+    setSubtotal(newSubtotal);
+
+    const newGoods = newSubtotal - negotiation;
+    setGoods(newGoods);
+
+    const newDppVat = newGoods * 11 / 12;
+    setDppVat(newDppVat);
+    
+    const newVat12 = newDppVat * 0.12;
+    setVat12(newVat12);
+
+    setGrandTotal(newGoods);
+
+  }, [items, negotiation]);
+
   
   const handleSaveInvoice = async (invoiceStatus: 'draft' | 'sent' = 'draft') => {
     toast({
@@ -105,8 +152,40 @@ export default function AddInvoicePage() {
     router.push('/dashboard/invoices');
   };
 
+  const handleAddItem = () => {
+    setItems([...items, { id: Date.now(), name: '', quantity: 1, unit: 'pcs', price: 0, total: 0 }]);
+  };
 
-  if (isLoading) {
+  const handleItemChange = (id: number, field: keyof InvoiceItem, value: string | number) => {
+    const newItems = items.map(item => {
+      if (item.id === id) {
+        const updatedItem = { ...item, [field]: value };
+        if (field === 'quantity' || field === 'price') {
+            const quantity = field === 'quantity' ? Number(value) : item.quantity;
+            const price = field === 'price' ? Number(value) : item.price;
+            updatedItem.total = quantity * price;
+        }
+        return updatedItem;
+      }
+      return item;
+    });
+    setItems(newItems);
+  };
+  
+  const handleNumericItemChange = (id: number, field: 'quantity' | 'price', value: string) => {
+    const parsedValue = parseFormattedNumber(value);
+    if (!isNaN(parsedValue) || value === '') {
+        handleItemChange(id, field, value === '' ? 0 : parsedValue);
+    }
+  };
+
+
+  const handleRemoveItem = (id: number) => {
+    setItems(items.filter(item => item.id !== id));
+  };
+
+
+  if (isLoading && !invoiceNumberDataState) {
     return (
         <main className="flex flex-1 flex-col gap-4 p-4 md:gap-8 md:p-8">
             <div className="flex items-center gap-4">
@@ -235,27 +314,49 @@ export default function AddInvoicePage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  <TableRow>
+                  {items.map(item => (
+                  <TableRow key={item.id}>
                     <TableCell>
-                      <Input placeholder="Search for a product..." />
+                      <Input 
+                        placeholder="Search for a product..." 
+                        value={item.name} 
+                        onChange={(e) => handleItemChange(item.id, 'name', e.target.value)} 
+                       />
                     </TableCell>
                     <TableCell>
-                      <Input type="number" defaultValue="1" className="w-16" />
+                      <Input 
+                        type="text" 
+                        value={formatNumberWithCommas(item.quantity)}
+                        onChange={(e) => handleNumericItemChange(item.id, 'quantity', e.target.value)}
+                        className="w-16" 
+                      />
                     </TableCell>
-                    <TableCell>pcs</TableCell>
                     <TableCell>
-                      <Input placeholder="Rp 0,00" />
+                        <Input 
+                            value={item.unit}
+                            onChange={(e) => handleItemChange(item.id, 'unit', e.target.value)}
+                            className="w-20"
+                        />
                     </TableCell>
-                    <TableCell className="text-right">Rp {totalAmount.toLocaleString('id-ID')},00</TableCell>
                     <TableCell>
-                      <Button variant="ghost" size="icon">
+                      <Input 
+                        placeholder="Rp 0,00"
+                        value={formatNumberWithCommas(item.price)}
+                        onChange={(e) => handleNumericItemChange(item.id, 'price', e.target.value)}
+                        className="text-right"
+                      />
+                    </TableCell>
+                    <TableCell className="text-right">Rp {formatNumberWithCommas(item.total)}</TableCell>
+                    <TableCell>
+                      <Button variant="ghost" size="icon" onClick={() => handleRemoveItem(item.id)}>
                         <Trash2 className="h-4 w-4" />
                       </Button>
                     </TableCell>
                   </TableRow>
+                  ))}
                 </TableBody>
               </Table>
-              <Button variant="outline" className="mt-4">
+              <Button variant="outline" className="mt-4" onClick={handleAddItem}>
                 <Plus className="mr-2 h-4 w-4" /> Add item
               </Button>
             </div>
@@ -264,11 +365,16 @@ export default function AddInvoicePage() {
                 <div className="lg:col-start-3 lg:col-span-2">
                     <div className="flex justify-between items-center py-1">
                         <span className="text-sm text-muted-foreground">Subtotal:</span>
-                        <span className="text-sm font-medium">Rp {totalAmount.toLocaleString('id-ID')},00</span>
+                        <span className="text-sm font-medium">Rp {formatNumberWithCommas(subtotal)}</span>
                     </div>
                     <div className="flex justify-between items-center py-1">
                         <span className="text-sm text-muted-foreground">A/Negotiation:</span>
-                        <Input className="h-8 w-28 text-right" placeholder="e.g. -10.000"/>
+                        <Input 
+                           className="h-8 w-28 text-right" 
+                           placeholder="e.g. -10.000"
+                           value={formatNumberWithCommas(negotiation)}
+                           onChange={(e) => setNegotiation(parseFormattedNumber(e.target.value) || 0)}
+                        />
                     </div>
                      <div className="flex justify-between items-center py-1">
                         <span className="text-sm text-muted-foreground">DP (%):</span>
@@ -288,19 +394,19 @@ export default function AddInvoicePage() {
                     </div>
                      <div className="flex justify-between items-center py-1">
                         <span className="text-sm text-muted-foreground">Goods:</span>
-                        <span className="text-sm font-medium">Rp 0,00</span>
+                        <span className="text-sm font-medium">Rp {formatNumberWithCommas(goods)}</span>
                     </div>
                      <div className="flex justify-between items-center py-1">
                         <span className="text-sm text-muted-foreground">DPP VAT (11/12):</span>
-                        <span className="text-sm font-medium">Rp 0,00</span>
+                        <span className="text-sm font-medium">Rp {formatNumberWithCommas(dppVat)}</span>
                     </div>
                      <div className="flex justify-between items-center py-1">
-                        <span className="text-sm text-mutedforeground">VAT 12%:</span>
-                        <span className="text-sm font-medium">Rp 0,00</span>
+                        <span className="text-sm text-muted-foreground">VAT 12%:</span>
+                        <span className="text-sm font-medium">Rp {formatNumberWithCommas(vat12)}</span>
                     </div>
                      <div className="flex justify-between items-center py-2 mt-2 border-t">
                         <span className="text-base font-bold">Total:</span>
-                        <span className="text-base font-bold">Rp {totalAmount.toLocaleString('id-ID')},00</span>
+                        <span className="text-base font-bold">Rp {formatNumberWithCommas(grandTotal)}</span>
                     </div>
                 </div>
             </div>
@@ -364,3 +470,5 @@ export default function AddInvoicePage() {
     </main>
   );
 }
+
+    
