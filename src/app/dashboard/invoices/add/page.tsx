@@ -76,7 +76,7 @@ export default function AddInvoicePage() {
 
   const [items, setItems] = useState<InvoiceItem[]>([]);
   const [subtotal, setSubtotal] = useState(0);
-  const [negotiation, setNegotiation] = useState(0);
+  const [negotiation, setNegotiation] = useState<number | string>(0);
   
   const [dpPercent, setDpPercent] = useState<string | number>('');
   const [dpValue, setDpValue] = useState<string | number>('');
@@ -127,40 +127,41 @@ export default function AddInvoicePage() {
   }, [invoiceNumberDataState]);
 
   useEffect(() => {
-    const newSubtotal = items.reduce((acc, item) => acc + item.total, 0);
-    setSubtotal(newSubtotal);
+    const currentSubtotal = items.reduce((acc, item) => acc + item.total, 0);
+    setSubtotal(currentSubtotal);
 
-    const numericNegotiation = typeof negotiation === 'string' ? parseFormattedNumber(negotiation) : negotiation;
-    const baseForDp = newSubtotal - numericNegotiation;
+    const numericNegotiation = typeof negotiation === 'string' && negotiation !== '' ? parseFormattedNumber(negotiation) : (typeof negotiation === 'number' ? negotiation : 0);
     
-    let calculatedDp = 0;
-    const numericDpPercent = typeof dpPercent === 'string' ? parseFormattedNumber(dpPercent) : dpPercent;
-    if (numericDpPercent > 0) {
-      calculatedDp = baseForDp * (numericDpPercent / 100);
-      if (typeof dpValue !== 'string' || dpValue === '') {
-        setDpValue(formatNumberWithCommas(calculatedDp));
-      }
+    const baseForCalculations = currentSubtotal - numericNegotiation;
+
+    // DP Calculation
+    const numericDpPercent = typeof dpPercent === 'string' && dpPercent !== '' ? parseFormattedNumber(dpPercent) : (typeof dpPercent === 'number' ? dpPercent : 0);
+    let numericDpValue = typeof dpValue === 'string' && dpValue !== '' ? parseFormattedNumber(dpValue) : (typeof dpValue === 'number' ? dpValue : 0);
+    
+    if (numericDpPercent > 0 && (dpValue === '' || dpValue === 0)) {
+      const calculatedDp = baseForCalculations * (numericDpPercent / 100);
+      setDpValue(formatNumberWithCommas(calculatedDp));
+      numericDpValue = calculatedDp;
     }
-    const numericDpValue = typeof dpValue === 'string' ? parseFormattedNumber(dpValue) : dpValue;
 
-    let calculatedPelunasan = 0;
-    const numericPelunasanPercent = typeof dpPelunasanPercent === 'string' ? parseFormattedNumber(dpPelunasanPercent) : dpPelunasanPercent;
-    if (numericPelunasanPercent > 0) {
-      calculatedPelunasan = baseForDp * (numericPelunasanPercent / 100);
-      if (typeof pelunasan !== 'string' || pelunasan === '') {
-          setPelunasan(formatNumberWithCommas(calculatedPelunasan));
-      }
+    // Pelunasan Calculation
+    const numericPelunasanPercent = typeof dpPelunasanPercent === 'string' && dpPelunasanPercent !== '' ? parseFormattedNumber(dpPelunasanPercent) : (typeof dpPelunasanPercent === 'number' ? dpPelunasanPercent : 0);
+    let numericPelunasan = typeof pelunasan === 'string' && pelunasan !== '' ? parseFormattedNumber(pelunasan) : (typeof pelunasan === 'number' ? pelunasan : 0);
+
+    if (numericPelunasanPercent > 0 && (pelunasan === '' || pelunasan === 0)) {
+        const calculatedPelunasan = baseForCalculations * (numericPelunasanPercent / 100);
+        setPelunasan(formatNumberWithCommas(calculatedPelunasan));
+        numericPelunasan = calculatedPelunasan;
     }
-    const numericPelunasan = typeof pelunasan === 'string' ? parseFormattedNumber(pelunasan) : pelunasan;
 
-    const newGrandTotal = baseForDp - numericDpValue - numericPelunasan;
-    setGrandTotal(newGrandTotal);
+    const currentGrandTotal = baseForCalculations - numericDpValue - numericPelunasan;
+    setGrandTotal(currentGrandTotal);
     
-    const newDppVat = newGrandTotal * (11 / 12);
-    setDppVat(newDppVat);
+    const currentDppVat = currentGrandTotal / (1 + 0.12);
+    setDppVat(currentDppVat);
     
-    const newVat12 = newDppVat * 0.12;
-    setVat12(newVat12);
+    const currentVat12 = currentDppVat * 0.12;
+    setVat12(currentVat12);
 
   }, [items, negotiation, dpPercent, dpValue, dpPelunasanPercent, pelunasan]);
 
@@ -182,8 +183,8 @@ export default function AddInvoicePage() {
       if (item.id === id) {
         const updatedItem = { ...item, [field]: value };
         if (field === 'quantity' || field === 'price') {
-            const quantity = field === 'quantity' ? Number(value) : item.quantity;
-            const price = field === 'price' ? Number(value) : item.price;
+            const quantity = field === 'quantity' && typeof value === 'number' ? value : item.quantity;
+            const price = field === 'price' && typeof value === 'number' ? value : item.price;
             updatedItem.total = quantity * price;
         }
         return updatedItem;
@@ -196,15 +197,19 @@ export default function AddInvoicePage() {
   const handleNumericInputChange = (setter: React.Dispatch<React.SetStateAction<string | number>>) => (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
     const parsedValue = parseFormattedNumber(value);
-    if (!isNaN(parsedValue) || value === '') {
-        setter(value === '' ? '' : formatNumberWithCommas(parsedValue));
+    if (!isNaN(parsedValue)) {
+        setter(formatNumberWithCommas(parsedValue));
+    } else if (value === '') {
+        setter('');
     }
   };
 
   const handleNumericItemChange = (id: number, field: 'quantity' | 'price', value: string) => {
     const parsedValue = parseFormattedNumber(value);
-    if (!isNaN(parsedValue) || value === '') {
-        handleItemChange(id, field, value === '' ? 0 : parsedValue);
+    if (!isNaN(parsedValue)) {
+        handleItemChange(id, field, parsedValue);
+    } else if (value === '') {
+         handleItemChange(id, field, 0);
     }
   };
 
@@ -401,7 +406,7 @@ export default function AddInvoicePage() {
                         <Input 
                            className="h-8 w-28 text-right" 
                            placeholder="e.g. 10.000"
-                           value={formatNumberWithCommas(negotiation)}
+                           value={negotiation}
                            onChange={handleNumericInputChange(setNegotiation)}
                         />
                     </div>
@@ -520,5 +525,4 @@ export default function AddInvoicePage() {
   );
 }
 
-    
     
