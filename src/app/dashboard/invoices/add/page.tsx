@@ -77,19 +77,21 @@ export default function AddInvoicePage() {
   const [items, setItems] = useState<InvoiceItem[]>([]);
   const [subtotal, setSubtotal] = useState(0);
   const [negotiation, setNegotiation] = useState(0);
-  const [dpPercent, setDpPercent] = useState(0);
-  const [dpValue, setDpValue] = useState(0);
-  const [dpPelunasanPercent, setDpPelunasanPercent] = useState(0);
-  const [pelunasan, setPelunasan] = useState(0);
-  const [goods, setGoods] = useState(0);
+  
+  const [dpPercent, setDpPercent] = useState<string | number>('');
+  const [dpValue, setDpValue] = useState<string | number>('');
+  
+  const [dpPelunasanPercent, setDpPelunasanPercent] = useState<string | number>('');
+  const [pelunasan, setPelunasan] = useState<string | number>('');
+
+  const [grandTotal, setGrandTotal] = useState(0);
   const [dppVat, setDppVat] = useState(0);
   const [vat12, setVat12] = useState(0);
-  const [grandTotal, setGrandTotal] = useState(0);
+
 
   useEffect(() => {
     if (invoiceNumberId) {
       setIsInvoiceNumberLoading(true);
-      // Simulate fetching data
       setTimeout(() => {
         const foundInvoice = invoiceNumberData.find(inv => inv.id.replace(/\//g, '_') === invoiceNumberId);
         setInvoiceNumberDataState(foundInvoice);
@@ -105,14 +107,12 @@ export default function AddInvoicePage() {
       setCustomerName(invoiceNumberDataState.customer);
       setSoNumber(invoiceNumberDataState.salesOrder);
       if (invoiceNumberDataState.date) {
-        // Assuming date is dd/MM/yyyy
         const parts = invoiceNumberDataState.date.split('/');
         if (parts.length === 3) {
             const [day, month, year] = parts;
             setIssueDate(new Date(`${year}-${month}-${day}`));
         }
       }
-      // Populate items from sales order data
       const relatedItems = salesOrderListData.filter(so => so.soNumber === invoiceNumberDataState.salesOrder);
       const newItems: InvoiceItem[] = relatedItems.map((item, index) => ({
           id: Date.now() + index,
@@ -130,18 +130,39 @@ export default function AddInvoicePage() {
     const newSubtotal = items.reduce((acc, item) => acc + item.total, 0);
     setSubtotal(newSubtotal);
 
-    const newGoods = newSubtotal - negotiation;
-    setGoods(newGoods);
+    const numericNegotiation = typeof negotiation === 'string' ? parseFormattedNumber(negotiation) : negotiation;
+    const baseForDp = newSubtotal - numericNegotiation;
+    
+    let calculatedDp = 0;
+    const numericDpPercent = typeof dpPercent === 'string' ? parseFormattedNumber(dpPercent) : dpPercent;
+    if (numericDpPercent > 0) {
+      calculatedDp = baseForDp * (numericDpPercent / 100);
+      if (typeof dpValue !== 'string' || dpValue === '') {
+        setDpValue(formatNumberWithCommas(calculatedDp));
+      }
+    }
+    const numericDpValue = typeof dpValue === 'string' ? parseFormattedNumber(dpValue) : dpValue;
 
-    const newDppVat = newGoods * 11 / 12;
+    let calculatedPelunasan = 0;
+    const numericPelunasanPercent = typeof dpPelunasanPercent === 'string' ? parseFormattedNumber(dpPelunasanPercent) : dpPelunasanPercent;
+    if (numericPelunasanPercent > 0) {
+      calculatedPelunasan = baseForDp * (numericPelunasanPercent / 100);
+      if (typeof pelunasan !== 'string' || pelunasan === '') {
+          setPelunasan(formatNumberWithCommas(calculatedPelunasan));
+      }
+    }
+    const numericPelunasan = typeof pelunasan === 'string' ? parseFormattedNumber(pelunasan) : pelunasan;
+
+    const newGrandTotal = baseForDp - numericDpValue - numericPelunasan;
+    setGrandTotal(newGrandTotal);
+    
+    const newDppVat = newGrandTotal * (11 / 12);
     setDppVat(newDppVat);
     
     const newVat12 = newDppVat * 0.12;
     setVat12(newVat12);
 
-    setGrandTotal(newGoods);
-
-  }, [items, negotiation]);
+  }, [items, negotiation, dpPercent, dpValue, dpPelunasanPercent, pelunasan]);
 
   
   const handleSaveInvoice = async (invoiceStatus: 'draft' | 'sent' = 'draft') => {
@@ -172,6 +193,14 @@ export default function AddInvoicePage() {
     setItems(newItems);
   };
   
+  const handleNumericInputChange = (setter: React.Dispatch<React.SetStateAction<string | number>>) => (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    const parsedValue = parseFormattedNumber(value);
+    if (!isNaN(parsedValue) || value === '') {
+        setter(value === '' ? '' : formatNumberWithCommas(parsedValue));
+    }
+  };
+
   const handleNumericItemChange = (id: number, field: 'quantity' | 'price', value: string) => {
     const parsedValue = parseFormattedNumber(value);
     if (!isNaN(parsedValue) || value === '') {
@@ -371,30 +400,50 @@ export default function AddInvoicePage() {
                         <span className="text-sm text-muted-foreground">A/Negotiation:</span>
                         <Input 
                            className="h-8 w-28 text-right" 
-                           placeholder="e.g. -10.000"
+                           placeholder="e.g. 10.000"
                            value={formatNumberWithCommas(negotiation)}
-                           onChange={(e) => setNegotiation(parseFormattedNumber(e.target.value) || 0)}
+                           onChange={handleNumericInputChange(setNegotiation)}
                         />
                     </div>
                      <div className="flex justify-between items-center py-1">
                         <span className="text-sm text-muted-foreground">DP (%):</span>
-                        <Input className="h-8 w-28 text-right" placeholder="e.g. 20"/>
+                        <Input 
+                          className="h-8 w-28 text-right" 
+                          placeholder="e.g. 20"
+                          value={dpPercent}
+                          onChange={handleNumericInputChange(setDpPercent)}
+                        />
                     </div>
                      <div className="flex justify-between items-center py-1">
                         <span className="text-sm text-muted-foreground">DP Value:</span>
-                        <Input className="h-8 w-28 text-right" placeholder="Override value"/>
+                        <Input 
+                          className="h-8 w-28 text-right" 
+                          placeholder="Override value"
+                          value={dpValue}
+                          onChange={handleNumericInputChange(setDpValue)}
+                        />
                     </div>
                      <div className="flex justify-between items-center py-1">
                         <span className="text-sm text-muted-foreground">DP Pelunasan (%):</span>
-                        <Input className="h-8 w-28 text-right" placeholder="e.g. 10"/>
+                        <Input 
+                          className="h-8 w-28 text-right" 
+                          placeholder="e.g. 10"
+                          value={dpPelunasanPercent}
+                          onChange={handleNumericInputChange(setDpPelunasanPercent)}
+                          />
                     </div>
                      <div className="flex justify-between items-center py-1">
                         <span className="text-sm text-muted-foreground">Pelunasan:</span>
-                         <Input className="h-8 w-28 text-right" placeholder="e.g. 50.000"/>
+                         <Input 
+                           className="h-8 w-28 text-right" 
+                           placeholder="e.g. 50.000"
+                           value={pelunasan}
+                           onChange={handleNumericInputChange(setPelunasan)}
+                           />
                     </div>
-                     <div className="flex justify-between items-center py-1">
-                        <span className="text-sm text-muted-foreground">Goods:</span>
-                        <span className="text-sm font-medium">Rp {formatNumberWithCommas(goods)}</span>
+                     <div className="flex justify-between items-center py-1 font-bold">
+                        <span className="text-sm">Grand Total:</span>
+                        <span className="text-sm">Rp {formatNumberWithCommas(grandTotal)}</span>
                     </div>
                      <div className="flex justify-between items-center py-1">
                         <span className="text-sm text-muted-foreground">DPP VAT (11/12):</span>
@@ -471,4 +520,5 @@ export default function AddInvoicePage() {
   );
 }
 
+    
     
