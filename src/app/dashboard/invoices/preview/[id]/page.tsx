@@ -325,12 +325,15 @@ const InvoicePreviewPage: React.FC = () => {
           const totalPages = itemPages.length;
 
           return (
-            <div key={pageIndex} className="invoice-page relative flex flex-col p-8 text-[10px] leading-tight">
+            <div key={pageIndex} className="invoice-page relative flex flex-col p-8 text-[10px] leading-tight min-h-[29.7cm]">
               <header>
                 <div className="flex justify-between items-start">
                     <div className="w-1/2">
                         <p className="font-bold text-[11px] mb-1">{customer?.name}</p>
                         <p className='whitespace-pre-line'>{customer?.address}</p>
+                        <div className="mt-4">
+                           <p>Customer Code: -</p>
+                        </div>
                     </div>
                      <div className="w-full flex flex-col items-center absolute">
                         <p className="font-bold uppercase text-[14px] mb-1 tracking-tighter">{invoiceTitle}</p>
@@ -341,28 +344,23 @@ const InvoicePreviewPage: React.FC = () => {
                             <span>Sales Order</span><span>: {soNumber || ''}</span>
                             <span>Order Date</span><span>:</span>
                             <span>Reference A</span><span>:</span>
+                            <div className='mt-8'></div>
+                            <div className='mt-8'></div>
+                            <span>Date</span><span>: {formatDate(date)}</span>
                         </div>
-                    </div>
-                </div>
-                 <div className="flex justify-between items-end mt-4">
-                    <div>
-                        <p>Customer Code: -</p>
-                    </div>
-                    <div className="flex flex-col items-end text-[10px]">
-                        <p>Date: {formatDate(date)}</p>
                     </div>
                 </div>
               </header>
 
               <main className='mt-2'>
                 <table className="w-full border-collapse text-[10px]">
-                    <thead className='border-t border-black'>
+                    <thead>
                         <tr>
-                            <th className="p-1 text-left w-[4%] border-x border-t border-black">No.</th>
-                            <th className="p-1 text-left w-[40%] border-r border-t border-black">Item</th>
-                            <th className="p-1 text-left w-[18%] border-r border-t border-black">Quantity Unit</th>
-                            <th className="p-1 text-right w-[19%] border-r border-t border-black">Price</th>
-                            <th className="p-1 text-right w-[19%] border-r border-t border-black">Amount</th>
+                            <th className="p-1 text-left w-[4%] border border-black">No.</th>
+                            <th className="p-1 text-left w-[40%] border-y border-r border-black">Item</th>
+                            <th className="p-1 text-left w-[18%] border-y border-r border-black">Quantity Unit</th>
+                            <th className="p-1 text-right w-[19%] border-y border-r border-black">Price</th>
+                            <th className="p-1 text-right w-[19%] border-y border-r border-black">Amount</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -388,17 +386,19 @@ const InvoicePreviewPage: React.FC = () => {
                  </table>
               </main>
               
-              <div className="mt-8"></div>
-
-              {isLastPage ? (
+              <div className="flex-grow"></div>
+              
+              {isLastPage && (
                 <footer className="pt-2 text-black mt-auto">
-                    <div className="border-t border-black pt-1 text-[10px]">
-                        <div className="flex justify-between items-start">
+                    <div className="text-[10px]">
+                        <div className="flex justify-between items-center">
                             <p>No PO : {poNumber || ''}</p>
                             <div className="font-bold">{formatCurrency(subtotal)}</div>
                         </div>
 
-                        <div className="flex justify-end w-full">
+                        <div className="border-t border-black mt-1 w-full"></div>
+
+                        <div className="flex justify-end w-full mt-1">
                             <div className="w-[240px] py-1">
                                 <div className="grid grid-cols-[auto_1fr] justify-items-end gap-x-4">
                                     <p className="text-right">Goods:</p>
@@ -415,8 +415,8 @@ const InvoicePreviewPage: React.FC = () => {
                                 </div>
                             </div>
                         </div>
+                        <div className="border-t border-black w-full"></div>
                     </div>
-
 
                     <div className="flex mt-4 text-[10px]">
                         <div className='w-1/2 pr-4 text-[9px]'>
@@ -428,7 +428,7 @@ const InvoicePreviewPage: React.FC = () => {
                             <p className="font-bold mt-2">For payment, please transfer to our account:</p>
                             <p className="font-bold mt-2">PT. Jembo Cable Company Tbk</p>
                             
-                           <div className="grid grid-cols-[auto_1fr] gap-x-4 mt-1 items-center">
+                           <div className="grid grid-cols-[max-content_1fr] gap-x-4 mt-1 items-center">
                                 <div className="font-bold">
                                     <p>Bank Mandiri - Jakarta</p>
                                     <p>Cabang Sudirman</p>
@@ -441,8 +441,8 @@ const InvoicePreviewPage: React.FC = () => {
                                   </div>
                                 </div>
                                 
-                                <div className="col-span-2 my-1 flex items-center justify-center">
-                                  <span>OR</span>
+                                <div className="col-span-2 my-1 flex items-center justify-center font-bold">
+                                  OR
                                 </div>
 
                                 <div className="font-bold">
@@ -462,12 +462,14 @@ const InvoicePreviewPage: React.FC = () => {
                                 <p>PT. JEMBO CABLE COMPANY Tbk</p>
                             </div>
                             <div className="text-center mt-auto pt-20">
-                                <p className='ml-4'>Finance</p>
+                                <p>Finance</p>
                             </div>
                         </div>
                     </div>
                 </footer>
-                ) : (
+              )}
+               {
+                !isLastPage && (
                     <div className="text-center text-gray-500 text-[10px] py-4 border-t border-dashed mt-auto">
                         Halaman {pageNumber} dari {totalPages} - Bersambung...
                     </div>
@@ -481,3 +483,4 @@ const InvoicePreviewPage: React.FC = () => {
 };
 
 export default InvoicePreviewPage;
+
