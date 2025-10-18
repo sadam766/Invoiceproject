@@ -68,7 +68,6 @@ export default function InvoicePreviewPage() {
                 }));
                 const subtotal = invoiceItems.reduce((sum, item) => sum + item.total, 0);
                 
-                // Assuming these are not stored in invoiceListData and are 0 for old records
                 const negotiation = 0;
                 const dpValue = 0;
                 const pelunasan = 0;
@@ -97,11 +96,9 @@ export default function InvoicePreviewPage() {
         const dataFromSession = sessionStorage.getItem('invoicePreviewData');
         if (dataFromSession) {
             const parsedData = JSON.parse(dataFromSession);
-            // Ensure the data from session storage matches the current preview ID
             if (decodeURIComponent(id as string) === parsedData.id) {
                 setInvoiceData(parsedData);
             } else {
-                 // If not, fall back to fetching from list data
                  fetchInvoiceFromListData();
             }
         } else if (id) {
@@ -147,14 +144,12 @@ export default function InvoicePreviewPage() {
 
     const formatCurrency = (value: number) => {
         if (typeof value !== 'number' || isNaN(value)) return '0,00';
-        // Use German locale to get comma as decimal separator
         return value.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
     };
 
     const formatDate = (dateString: string) => {
         if (!dateString) return '';
         try {
-            // Handles both 'YYYY-MM-DD' and 'DD/MM/YYYY' from old data
             const cleanDate = dateString.includes('-') ? new Date(dateString) : new Date(dateString.split('/').reverse().join('-'));
             return format(cleanDate, 'dd-MM-yyyy');
         } catch (e) {
@@ -206,16 +201,16 @@ export default function InvoicePreviewPage() {
 
               <main className='flex-grow'>
                 <table className="w-full border-collapse mb-0 text-[10px]">
-                    <thead>
+                    <thead className='border-b border-black'>
                         <tr>
-                            <th className="text-center p-1 w-[4%] border-l border-t border-b border-black">No.</th>
-                            <th className="text-left p-1 w-[40%] border-t border-b border-black">Item</th>
-                            <th className="text-center p-1 w-[18%] border-t border-b border-black">Quantity Unit</th>
-                            <th className="text-right p-1 w-[19%] border-t border-b border-black">Price</th>
-                            <th className="text-right p-1 w-[19%] border-t border-b border-r border-black">Amount</th>
+                            <th className="text-center p-1 w-[4%] border-l border-t border-black">No.</th>
+                            <th className="text-left p-1 w-[40%] border-t border-black">Item</th>
+                            <th className="text-center p-1 w-[18%] border-l border-t border-black">Quantity Unit</th>
+                            <th className="text-right p-1 w-[19%] border-l border-t border-black">Price</th>
+                            <th className="text-right p-1 w-[19%] border-l border-t border-r border-black">Amount</th>
                         </tr>
                     </thead>
-                    <tbody>
+                    <tbody className='border-b border-black'>
                         {items.map((item, index) => (
                             <tr key={index}>
                                 <td className="p-1 text-center border-l border-r border-black">{item.no}</td>
@@ -225,7 +220,7 @@ export default function InvoicePreviewPage() {
                                 <td className="p-1 text-right border-r border-black">{formatCurrency(item.total)}</td>
                             </tr>
                         ))}
-                        {Array.from({ length: Math.max(0, 15 - items.length) }).map((_, i) => (
+                         {Array.from({ length: Math.max(0, 15 - items.length) }).map((_, i) => (
                            <tr key={`empty-${i}`} style={{height: '24px'}}>
                                 <td className='border-l border-r border-black'>&nbsp;</td>
                                 <td className='border-r border-black'>&nbsp;</td>
@@ -239,55 +234,60 @@ export default function InvoicePreviewPage() {
               </main>
 
               <footer className="pt-2">
-                <div className="flex justify-between items-center text-[10px]">
+                 <div className="flex justify-between items-center text-[10px]">
                     <p>No PO : {poNumber || ''}</p>
                     <div className="text-right">
-                        <p className="font-bold">{formatCurrency(subtotal)}</p>
+                        <div className="border-t border-black inline-block px-4 pt-1">
+                            <p className="font-bold">{formatCurrency(subtotal)}</p>
+                        </div>
                     </div>
                 </div>
 
                 <div className="border-t border-black mt-1"></div>
 
-                <div className="flex justify-end w-full text-[10px] mt-1">
-                    <div className="w-1/2 pl-4">
-                        {negotiation > 0 && (
-                            <div className="flex justify-end"><p className="w-28 text-left">A/Negotiation :</p> <p className='w-28 text-right'>({formatCurrency(negotiation)})</p></div>
-                        )}
-                        {dpValue > 0 && (
-                            <div className="flex justify-end"><p className="w-28 text-left">DP :</p> <p className='w-28 text-right'>{formatCurrency(dpValue)}</p></div>
-                        )}
-                         {pelunasan > 0 && (
-                            <div className="flex justify-end"><p className="w-28 text-left">Pelunasan :</p> <p className='w-28 text-right'>({formatCurrency(pelunasan)})</p></div>
-                        )}
+                 {(negotiation > 0 || dpValue > 0 || pelunasan > 0) && (
+                    <div className="flex justify-end w-full text-[10px] my-1">
+                        <div className="w-1/2 pl-4">
+                            {negotiation > 0 && (
+                                <div className="flex justify-end"><p className="w-28 text-left">A/Negotiation :</p> <p className='w-28 text-right'>({formatCurrency(negotiation)})</p></div>
+                            )}
+                            {dpValue > 0 && (
+                                <div className="flex justify-end"><p className="w-28 text-left">DP :</p> <p className='w-28 text-right'>{formatCurrency(dpValue)}</p></div>
+                            )}
+                            {pelunasan > 0 && (
+                                <div className="flex justify-end"><p className="w-28 text-left">Pelunasan :</p> <p className='w-28 text-right'>({formatCurrency(pelunasan)})</p></div>
+                            )}
+                        </div>
                     </div>
-                </div>
+                )}
                 
-                <div className="border-b border-black mt-1"></div>
                 <div className="flex justify-end w-full text-[10px] mt-1">
                     <div className="w-1/2 pl-4">
                         <div className="grid grid-cols-2 gap-y-1 justify-items-end">
                             <p className="text-left w-28">Goods:</p>
                             <p className='text-right w-28'>{formatCurrency(grandTotal)}</p>
-                            
                             <p className="text-left w-28">DPP VAT (11/12):</p>
                             <p className='text-right w-28'>{formatCurrency(dppVat)}</p>
-                            
                             <p className="text-left w-28">VAT 12%:</p>
                             <p className='text-right w-28'>{formatCurrency(vat12)}</p>
                         </div>
-                         <div className="grid grid-cols-2 justify-items-end mt-1">
+                    </div>
+                </div>
+
+                <div className="border-t border-b border-black my-1 py-1 flex justify-end w-full text-[10px]">
+                     <div className="w-1/2 pl-4">
+                        <div className="grid grid-cols-2 justify-items-end">
                             <p className="font-bold text-left w-28">Total Rp:</p>
                             <p className="text-right font-bold w-28">{formatCurrency(totalAmount)}</p>
                         </div>
                     </div>
                 </div>
-                <div className="border-b border-black mt-1"></div>
                 
                 <div className="flex mt-4 text-[10px]">
                     <div className='w-1/2 pr-4 text-[9px]'>
                         <div className="grid grid-cols-[max-content,1fr] gap-x-2">
-                            <p>Payment :</p><p>90 Hari setelah invoice diterima</p>
-                            <p>Please state with your payment:</p><p>{invoiceId}</p>
+                            <p>Payment :</p><p className='ml-2'>90 Hari setelah invoice diterima</p>
+                            <p>Please state with your payment:</p><p className='ml-2'>{invoiceId}</p>
                         </div>
                         <p className="font-bold mt-2">For payment, please transfer to our account:</p>
                         <p className="font-bold mt-2">PT. Jembo Cable Company Tbk</p>
