@@ -48,9 +48,6 @@ export default function SpdPreviewPage() {
     const customerDetails = customerListData.find(c => c.name === spdItem.customer);
     const relatedInvoice = invoiceListData.find(i => i.id === spdItem.noInvoice);
 
-    const [spdNumberPart1, spdNumberPart2] = spdItem.spd.split(/\/(.*)/s);
-
-
     return (
         <main className="bg-gray-100 dark:bg-gray-900 p-4 sm:p-8 font-sans">
             <div className="max-w-5xl mx-auto">
@@ -75,7 +72,11 @@ export default function SpdPreviewPage() {
                     </header>
                     <div className="border-t-2 border-b-2 border-black py-1 text-center mb-6">
                         <h2 className="font-bold text-sm underline">SURAT PENGANTAR DOKUMEN</h2>
-                        <p className="font-bold text-sm">{spdNumberPart1}/ <span className="px-4">1</span> /{spdNumberPart2}</p>
+                        <p className="font-bold text-sm flex items-center justify-center gap-x-2">
+                           <span>PS/</span>
+                           <span>1</span>
+                           <span>-J/KEU/2024/DK</span>
+                        </p>
                     </div>
                     
                     <div className="mb-6">
