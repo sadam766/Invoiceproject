@@ -396,53 +396,53 @@ const InvoicePreviewPage: React.FC = () => {
               {isLastPage && (
                 <footer className="pt-2 text-black mt-auto">
                     <div className="flex justify-between items-center py-1">
-                        <p>No PO : {poNumber || ''}</p>
+                        <p>No PO: {poNumber || ''}</p>
                         <div className="text-right">
                            <div className="inline-block border-t border-black w-28" />
                            <p className="font-bold">{formatCurrency(subtotal)}</p>
                         </div>
                     </div>
-                    <div className="border-t border-black py-1">
-                        <div className="flex justify-between items-start">
+                    <div className="border-t border-black w-full"></div>
+                    <div className="flex justify-between items-start pt-1">
+                        <div className='w-1/2 pr-4 text-[9px]'>
+                            <div className="flex items-start mt-1">
+                                <p className='w-16 shrink-0'>Payment:</p>
+                                <p className='flex-1 ml-2'>{paymentTerms || '90 Hari setelah invoice diterima'}</p>
+                            </div>
+                            <p className="mt-1">Please state with your payment: {invoiceId}</p>
+                            <p className="font-bold mt-1">For payment, please transfer to our account:</p>
+                            <p className="font-bold mt-1">PT. Jembo Cable Company Tbk</p>
                             
-                            <div className='w-1/2 pr-4 text-[9px]'>
-                                <div className="flex items-start mt-2">
-                                    <p className='w-16 shrink-0'>Payment:</p>
-                                    <p className='flex-1 ml-2'>{paymentTerms || '90 Hari setelah invoice diterima'}</p>
+                           <div className="grid grid-cols-[max-content_1fr] gap-x-4 mt-1 items-center">
+                                <div className="font-bold">
+                                    <p>Bank Mandiri - Jakarta</p>
+                                    <p>Cabang Sudirman</p>
                                 </div>
-                                <p className="mt-2">Please state with your payment: {invoiceId}</p>
-                                <p className="font-bold mt-2">For payment, please transfer to our account:</p>
-                                <p className="font-bold mt-2">PT. Jembo Cable Company Tbk</p>
+                                <div className="text-left">
+                                  <div className="grid grid-cols-[max-content_1fr] gap-x-2">
+                                    <span>A/C No.</span><span>: 102-0100206827 (Rp)</span>
+                                    <span>A/C No.</span><span>: 102-0005000218 (Rp)</span>
+                                    <span>A/C No.</span><span>: 102-0005000226 (USD)</span>
+                                  </div>
+                                </div>
                                 
-                               <div className="grid grid-cols-[max-content_1fr] gap-x-4 mt-1 items-center">
-                                    <div className="font-bold">
-                                        <p>Bank Mandiri - Jakarta</p>
-                                        <p>Cabang Sudirman</p>
-                                    </div>
-                                    <div className="text-left">
-                                      <div className="grid grid-cols-[max-content_1fr] gap-x-2">
-                                        <span>A/C No.</span><span>: 102-0100206827 (Rp)</span>
-                                        <span>A/C No.</span><span>: 102-0005000218 (Rp)</span>
-                                        <span>A/C No.</span><span>: 102-0005000226 (USD)</span>
-                                      </div>
-                                    </div>
-                                    
-                                    <div className="col-span-2 my-1 flex items-center">
-                                      <div className="w-[100px] text-center">OR</div>
-                                    </div>
+                                <div className="col-span-2 my-1 flex items-center">
+                                  <div className="w-[100px] text-center">OR</div>
+                                </div>
 
-                                    <div className="font-bold">
-                                        <p>Bank BCA - Jakarta</p>
-                                        <p>Cabang KEM TOWER</p>
-                                    </div>
-                                    <div className="text-left">
-                                       <div className="grid grid-cols-[max-content_1fr] gap-x-2">
-                                         <span>A/C No.</span><span>: 684-0198977 (Rp)</span>
-                                       </div>
-                                    </div>
+                                <div className="font-bold">
+                                    <p>Bank BCA - Jakarta</p>
+                                    <p>Cabang KEM TOWER</p>
+                                </div>
+                                <div className="text-left">
+                                   <div className="grid grid-cols-[max-content_1fr] gap-x-2">
+                                     <span>A/C No.</span><span>: 684-0198977 (Rp)</span>
+                                   </div>
                                 </div>
                             </div>
-                            
+                        </div>
+                        
+                        <div className="w-1/2 flex flex-col items-end">
                             <div className="w-[240px]">
                                 <div className="grid grid-cols-[auto_1fr] justify-items-end gap-x-4">
                                     <p className="text-right">Goods:</p>
@@ -455,24 +455,14 @@ const InvoicePreviewPage: React.FC = () => {
                                     <p className="text-right font-bold">{formatCurrency(totalRp)}</p>
                                 </div>
                             </div>
-                        </div>
-                    </div>
-                    <div className="border-t border-black"></div>
-
-                    <div className="flex mt-4 text-[10px]">
-                         <div className="w-1/2 pl-4 flex flex-col justify-between">
-                         </div>
-
-                        <div className="w-1/2 pl-4 flex flex-col justify-between">
-                            <div className='text-center'>
+                            <div className='text-center mt-4 w-[240px]'>
                                 <p>PT. JEMBO CABLE COMPANY Tbk</p>
                                 <br />
-                                <p>Finance</p>
-                            </div>
-                            <div className="text-center mt-auto">
+                                <p className='mt-12'>Finance</p>
                             </div>
                         </div>
                     </div>
+                    <div className="border-t border-black w-full mt-2"></div>
                 </footer>
               )}
                {
