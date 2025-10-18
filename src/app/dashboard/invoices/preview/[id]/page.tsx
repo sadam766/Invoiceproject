@@ -237,6 +237,8 @@ const InvoicePreviewPage: React.FC = () => {
     exportToExcel(sheetData, `Invoice-${invoiceId.replace('/', '-')}`);
   };
 
+  const emptyRows = ITEMS_PER_PAGE - (items.length % ITEMS_PER_PAGE);
+
   return (
     <div className="bg-gray-100 dark:bg-slate-900 min-h-screen p-4 font-sans text-black">
        <Head>
@@ -318,7 +320,7 @@ const InvoicePreviewPage: React.FC = () => {
           const totalPages = itemPages.length;
 
           return (
-            <div key={pageIndex} className="invoice-page p-8 text-[10px] leading-tight relative" style={{ display: 'flex', flexDirection: 'column' }}>
+            <div key={pageIndex} className="invoice-page p-8 text-[10px] leading-tight" style={{ minHeight: '29.7cm' }}>
               <header>
                 <div className="grid grid-cols-2">
                     <div>
@@ -335,7 +337,7 @@ const InvoicePreviewPage: React.FC = () => {
                      <p>Customer Code: {customer?.id || ''}</p>
                   </div>
                   <div className="w-1/2 text-right pl-4">
-                    <div className="inline-grid grid-cols-2 text-left gap-x-2">
+                    <div className="inline-grid grid-cols-[max-content_1fr] text-left gap-x-2">
                         <span>Sales Order</span><span>: {soNumber || ''}</span>
                         <span>Order Date</span><span>:</span>
                         <span>Reference A</span><span>:</span>
@@ -358,22 +360,24 @@ const InvoicePreviewPage: React.FC = () => {
                             <th className="p-1 text-right w-[19%]">Amount</th>
                         </tr>
                     </thead>
-                      <tbody>
-                          {pageItems.map((item, index) => (
-                              <tr key={item.id} className="h-[24px]">
-                                  <td className="p-1 text-left align-top">{item.no + (pageIndex * ITEMS_PER_PAGE)}</td>
-                                  <td className="p-1 align-top text-left">{item.name}</td>
-                                  <td className="p-1 text-left align-top">{item.quantity.toLocaleString('id-ID')} {item.unit}</td>
-                                  <td className="p-1 text-right align-top">{formatCurrency(item.price)}</td>
-                                  <td className="p-1 text-right align-top">{formatCurrency(item.total)}</td>
-                              </tr>
-                          ))}
-                      </tbody>
-                  </table>
+                    <tbody>
+                        {pageItems.map((item, index) => (
+                            <tr key={item.id} className="h-[24px]">
+                                <td className="p-1 text-left align-top">{item.no + (pageIndex * ITEMS_PER_PAGE)}</td>
+                                <td className="p-1 align-top text-left">{item.name}</td>
+                                <td className="p-1 text-left align-top">{item.quantity.toLocaleString('id-ID')} {item.unit}</td>
+                                <td className="p-1 text-right align-top">{formatCurrency(item.price)}</td>
+                                <td className="p-1 text-right align-top">{formatCurrency(item.total)}</td>
+                            </tr>
+                        ))}
+                    </tbody>
+                 </table>
               </main>
 
               {isLastPage && (
-                <footer className="pt-2 text-black mt-auto">
+                <>
+                <div className="mt-4" /> 
+                <footer className="pt-2 text-black">
                     <div className="flex justify-between items-end text-[10px]">
                         <p>No PO : {poNumber || ''}</p>
                         <div className="text-right font-bold">{formatCurrency(subtotal)}</div>
@@ -433,7 +437,7 @@ const InvoicePreviewPage: React.FC = () => {
                              <div className='text-center'>
                                  <p>PT. JEMBO CABLE COMPANY Tbk</p>
                              </div>
-                             <div className="text-center mt-[7rem]">
+                             <div className="text-center mt-auto pt-24">
                                 <div className="inline-block relative">
                                     <p>Finance</p>
                                 </div>
@@ -441,9 +445,10 @@ const InvoicePreviewPage: React.FC = () => {
                         </div>
                     </div>
                 </footer>
+                </>
               )}
                 {!isLastPage && (
-                    <div className="text-center text-gray-500 text-[10px] py-4 border-t border-dashed mt-4">
+                    <div className="text-center text-gray-500 text-[10px] py-4 border-t border-dashed mt-auto">
                         Halaman {pageNumber} dari {totalPages} - Bersambung...
                     </div>
                 )}
