@@ -112,11 +112,11 @@ const InvoicePreviewPage: React.FC = () => {
         if (decodedId === parsedData.id || decodedId === 'new') {
             const items = parsedData.items || [];
             const subtotalBeforeDeductions = items.reduce((sum, item) => sum + (item.quantity || 0) * (item.price || 0), 0);
-            const negotiationValue = parsedData.negotiationValue || 0;
+            const negotiationValue = parsedData.negotiationValue || parsedData.negotiation || 0;
             const dpValue = parsedData.dpValue || 0;
-            const pelunasanValue = parsedData.pelunasanValue || 0;
+            const pelunasanValue = parsedData.pelunasanValue || parsedData.pelunasan || 0;
 
-            const negotiatedSubtotal = subtotalBeforeDeductions + negotiationValue;
+            const negotiatedSubtotal = subtotalBeforeDeductions - negotiationValue;
             const goods = negotiatedSubtotal - dpValue - pelunasanValue;
             const dppVat = Math.round(goods / 1.12);
             const vat12 = Math.round(dppVat * 0.12);
@@ -127,6 +127,9 @@ const InvoicePreviewPage: React.FC = () => {
                 grandTotal: goods, // This becomes 'goods'
                 dppVat: dppVat,
                 vat12: vat12,
+                negotiationValue: negotiationValue,
+                dpValue: dpValue,
+                pelunasanValue: pelunasanValue,
             });
         } else {
              fetchInvoiceFromListData(decodedId);
@@ -412,17 +415,16 @@ const InvoicePreviewPage: React.FC = () => {
               </main>
               
               {isLastPage && (
-                <footer className="pt-2 text-black mt-auto text-[10px]">
+                 <footer className="pt-2 text-black mt-auto text-[10px]">
                     <div className="flex justify-between items-center">
                         <p>No PO: {poNumber || ''}</p>
-                        <div className="text-right">
-                           <div className="inline-block">
-                                <div className="border-t border-black w-full mb-1"></div>
-                               <p className="font-normal">{formatCurrency(subtotal)}</p>
-                            </div>
+                        <div className="flex flex-col items-end">
+                            <div className="border-t border-black w-28 mb-1"></div>
+                            <p className="font-normal">{formatCurrency(subtotal)}</p>
                         </div>
                     </div>
-                    <div className="w-full flex justify-end mt-0 mb-4">
+                    
+                    <div className="w-full flex justify-end mt-0 mb-2">
                         <div className="w-1/2 pl-4">
                             <div className="w-full">
                                 {negotiationValue !== 0 && (<div className="flex"><div className="w-[150px] text-right">A/Negotiation :</div><div className="flex-1 text-right pr-1"><span>({formatCurrency(Math.abs(negotiationValue))})</span></div></div>)}
@@ -432,13 +434,13 @@ const InvoicePreviewPage: React.FC = () => {
                         </div>
                     </div>
 
-                    <div className="border-t border-black w-full mt-1"></div>
+                    <div className="border-t border-black w-full my-1"></div>
 
                     <div className="flex justify-between items-start pt-1">
                         {/* Left Column: Payment Details */}
-                        <div className='w-1/2 pr-4 text-[9px]'>
+                        <div className='w-[60%] pr-4 text-[9px]'>
                             <div className="flex items-start mt-1">
-                                <p className='w-16 shrink-0'>Payment:</p>
+                                <p className='w-20 shrink-0'>Payment:</p>
                                 <p className='flex-1 ml-2'>{paymentTerms || '90 Hari setelah invoice diterima'}</p>
                             </div>
                             <p className="mt-1">Please state with your payment: {invoiceId}</p>
@@ -476,7 +478,7 @@ const InvoicePreviewPage: React.FC = () => {
                         </div>
                         
                         {/* Right Column: Totals and Signature */}
-                        <div className="w-1/2 flex flex-col items-end">
+                        <div className="w-[40%] flex flex-col items-end">
                             <div className="w-[240px]">
                                 <div className="grid grid-cols-2 justify-items-end gap-x-4">
                                     <p className="text-right">Goods:</p>
@@ -487,7 +489,7 @@ const InvoicePreviewPage: React.FC = () => {
                                     <p className='text-right'>{formatCurrency(vat12)}</p>
                                     
                                     <div className="col-span-2 w-full flex justify-end">
-                                      <div className="border-t border-black w-[100px] my-1"></div>
+                                      <div className="border-t border-black w-28 my-1"></div>
                                     </div>
                                     
                                     <p className="text-right font-bold">Total Rp:</p>
@@ -519,3 +521,4 @@ const InvoicePreviewPage: React.FC = () => {
 };
 
 export default InvoicePreviewPage;
+
