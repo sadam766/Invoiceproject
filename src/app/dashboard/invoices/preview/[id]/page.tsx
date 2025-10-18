@@ -6,7 +6,7 @@ import { useParams, useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { ArrowLeft, Printer, Download } from 'lucide-react';
 import { invoiceListData, salesOrderListData, type Customer, customerListData, type Invoice } from '@/app/lib/data';
-import { exportToExcel } from '@/lib/utils';
+import { exportToExcel, formatNumberWithCommas } from '@/lib/utils';
 import Head from 'next/head';
 
 type InvoiceItem = {
@@ -21,7 +21,7 @@ type InvoiceItem = {
     amount: number;
 };
 
-type PreviewData = Invoice & {
+type PreviewData = Omit<Invoice, 'customer'> & {
     items: InvoiceItem[];
     subtotal: number;
     negotiation: number;
@@ -210,13 +210,13 @@ const InvoicePreviewPage: React.FC = () => {
     return value.toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   };
 
-  const formatDate = (dateString: string) => {
+  const formatDate = (dateString: string | Date | undefined) => {
     if (!dateString) return '';
     try {
-        const cleanDate = dateString.includes('-') ? new Date(dateString) : new Date(dateString.split('/').reverse().join('-'));
-        return new Intl.DateTimeFormat('id-ID', { day: '2-digit', month: '2-digit', year: 'numeric' }).format(cleanDate);
+        const dateObj = typeof dateString === 'string' ? new Date(dateString.split('/').reverse().join('-')) : dateString;
+        return new Intl.DateTimeFormat('id-ID', { day: '2-digit', month: '2-digit', year: 'numeric' }).format(dateObj);
     } catch (e) {
-        return dateString;
+        return String(dateString);
     }
   };
   
@@ -230,7 +230,7 @@ const InvoicePreviewPage: React.FC = () => {
   const handleExportExcel = () => {
     if (!invoiceData) return;
 
-    const formatNumber = (value: number) => Number(value.toFixed(2));
+    const formatNumberForExcel = (value: number) => Number(value.toFixed(2));
 
     const sheetData = [
       [invoiceTitle],
@@ -248,18 +248,18 @@ const InvoicePreviewPage: React.FC = () => {
         item.name,
         item.quantity,
         item.unit,
-        formatNumber(item.price),
-        formatNumber(item.quantity * item.total)
+        formatNumberForExcel(item.price),
+        formatNumberForExcel(item.quantity * item.price)
       ]),
       [],
-      ["", "", "", "", "Subtotal:", formatNumber(subtotal)],
-      negotiation !== 0 ? ["", "", "", "", `A/Negotiation:`, `(${formatNumber(Math.abs(negotiation))})`] : [],
-      dpValue !== 0 ? ["", "", "", "", `DP :`, formatNumber(dpValue)] : [],
-      pelunasan !== 0 ? ["", "", "", "", `Pelunasan :`, `(${formatNumber(pelunasan)})`] : [],
-      ["", "", "", "", "Goods:", formatNumber(grandTotal)],
-      ["", "", "", "", "DPP VAT:", formatNumber(dppVat)],
-      ["", "", "", "", "VAT 12 %:", formatNumber(vat12)],
-      ["", "", "", "", "Total Rp :", formatNumber(totalRp)],
+      ["", "", "", "", "Subtotal:", formatNumberForExcel(subtotal)],
+      negotiationValue !== 0 ? ["", "", "", "", `A/Negotiation:`, `(${formatNumberForExcel(Math.abs(negotiationValue))})`] : [],
+      dpValue !== 0 ? ["", "", "", "", `DP :`, formatNumberForExcel(dpValue)] : [],
+      pelunasanValue !== 0 ? ["", "", "", "", `Pelunasan :`, `(${formatNumberForExcel(pelunasanValue)})`] : [],
+      ["", "", "", "", "Goods:", formatNumberForExcel(grandTotal)],
+      ["", "", "", "", "DPP VAT:", formatNumberForExcel(dppVat)],
+      ["", "", "", "", "VAT 12 %:", formatNumberForExcel(vat12)],
+      ["", "", "", "", "Total Rp :", formatNumberForExcel(totalRp)],
     ].filter(row => row.length > 0);
 
     exportToExcel(sheetData, `Invoice-${invoiceId.replace('/', '-')}`);
@@ -392,50 +392,68 @@ const InvoicePreviewPage: React.FC = () => {
                         </tr>
                     </thead>
                     <tbody>
-                        {pageItems.map((item) => (
+                        {pageItems.map((item, idx) => (
                             <tr key={item.id} className="h-[24px]">
-                                <td className="p-1 text-left align-top">{item.no + (pageIndex * ITEMS_PER_PAGE)}</td>
-                                <td className="p-1 align-top text-left">{item.name}</td>
-                                <td className="p-1 text-center align-top">{item.quantity.toLocaleString('id-ID')} {item.unit}</td>
-                                <td className="p-1 text-right align-top">{formatCurrency(item.price)}</td>
-                                <td className="p-1 text-right align-top">{formatCurrency(item.total)}</td>
+                                <td className="p-1 text-left align-top border-l border-r border-black">{item.no + (pageIndex * ITEMS_PER_PAGE)}</td>
+                                <td className="p-1 align-top text-left border-r border-black">{item.name}</td>
+                                <td className="p-1 text-center align-top border-r border-black">{item.quantity.toLocaleString('id-ID')} {item.unit}</td>
+                                <td className="p-1 text-right align-top border-r border-black">{formatCurrency(item.price)}</td>
+                                <td className="p-1 text-right align-top border-r border-black">{formatCurrency(item.total)}</td>
                             </tr>
                         ))}
                          {isLastPage && Array.from({ length: Math.max(0, emptyRowsCount) }).map((_, index) => (
                             <tr key={`empty-${index}`} className="h-[24px]">
-                                <td className='p-1'>&nbsp;</td>
-                                <td className='p-1'>&nbsp;</td>
-                                <td className='p-1'>&nbsp;</td>
-                                <td className='p-1'>&nbsp;</td>
-                                <td className='p-1'>&nbsp;</td>
+                                <td className='p-1 border-l border-r border-black'>&nbsp;</td>
+                                <td className='p-1 border-r border-black'>&nbsp;</td>
+                                <td className='p-1 border-r border-black'>&nbsp;</td>
+                                <td className='p-1 border-r border-black'>&nbsp;</td>
+                                <td className='p-1 border-r border-black'>&nbsp;</td>
                             </tr>
                         ))}
+                         <tr className="h-[24px]">
+                           <td colSpan={5} className="border-t border-black"></td>
+                         </tr>
                     </tbody>
                  </table>
               </main>
               
               {isLastPage && (
                  <footer className="pt-2 text-black mt-auto text-[10px]">
-                    <div className="w-full flex justify-between items-end">
+                    <div className="flex justify-between items-start">
                         <p className="text-left">No PO: {poNumber || ''}</p>
                         <div className="flex flex-col items-end w-[240px]">
-                            <div className="border-t border-black w-28 mb-1"></div>
-                            <p className="font-normal w-full text-right">{formatCurrency(subtotal)}</p>
+                            <div className="w-full flex justify-end">
+                                <div className="border-t border-black w-[100px] mb-1"></div>
+                            </div>
+                            <p className="w-full text-right">{formatCurrency(subtotal)}</p>
                         </div>
                     </div>
                     
                     <div className="w-full flex justify-end mt-0 mb-2">
                         <div className="w-1/2 pl-4">
-                            <div className="w-full">
-                                {negotiationValue !== 0 && (<div className="flex"><div className="w-[150px] text-right">A/Negotiation :</div><div className="flex-1 text-right pr-1"><span>({formatCurrency(Math.abs(negotiationValue))})</span></div></div>)}
-                                {dpValue !== 0 && (<div className="flex"><div className="w-[150px] text-right">DP {dpPercentage ? `${dpPercentage} %` : ''} :</div><div className="flex-1 text-right pr-1"><span>{formatCurrency(dpValue)}</span></div></div>)}
-                                {pelunasanValue !== 0 && (<div className="flex"><div className="w-[150px] text-right">Pelunasan {pelunasanPercentage ? `(${pelunasanPercentage}%)` : ''} :</div><div className="flex-1 text-right pr-1"><span>({formatCurrency(pelunasanValue)})</span></div></div>)}
+                            <div className="w-full text-right">
+                                {negotiationValue !== 0 && (<div className="flex justify-end"><div className="w-[150px] text-left">A/Negotiation :</div><div className="w-[100px] text-right pr-1"><span>({formatCurrency(Math.abs(negotiationValue))})</span></div></div>)}
+                                {dpValue !== 0 && (<div className="flex justify-end"><div className="w-[150px] text-left">DP {dpPercentage ? `${dpPercentage} %` : ''} :</div><div className="w-[100px] text-right pr-1"><span>{formatCurrency(dpValue)}</span></div></div>)}
+                                {pelunasanValue !== 0 && (<div className="flex justify-end"><div className="w-[150px] text-left">Pelunasan {pelunasanPercentage ? `(${pelunasanPercentage}%)` : ''} :</div><div className="w-[100px] text-right pr-1"><span>({formatCurrency(pelunasanValue)})</span></div></div>)}
                             </div>
                         </div>
                     </div>
 
-                    <div className="border-t border-black w-full my-1"></div>
-
+                    <div className="w-full flex justify-end">
+                        <div className="grid grid-cols-2 gap-x-4 w-[40%]">
+                            <p className="text-right">Goods:</p>
+                            <p className='text-right'>{formatCurrency(grandTotal)}</p>
+                            <p className="text-right">DPP VAT (11/12):</p>
+                            <p className='text-right'>{formatCurrency(dppVat)}</p>
+                            <p className="text-right">VAT 12%:</p>
+                            <p className='text-right'>{formatCurrency(vat12)}</p>
+                            <p className="text-right font-bold">Total Rp:</p>
+                            <p className="text-right font-bold">{formatCurrency(totalRp)}</p>
+                        </div>
+                    </div>
+                    
+                    <div className="border-t border-black w-full mt-2 mb-2"></div>
+                    
                     <div className="flex justify-between items-start pt-1">
                         <div className='w-[60%] pr-4 text-[9px]'>
                             <div className="flex items-start mt-1">
@@ -476,29 +494,12 @@ const InvoicePreviewPage: React.FC = () => {
                             </div>
                         </div>
                         
-                        <div className="w-[40%] flex flex-col">
-                           <div className="w-full">
-                                <div className="grid grid-cols-2 justify-items-end gap-x-4">
-                                    <p className="text-right">Goods:</p>
-                                    <p className='text-right'>{formatCurrency(grandTotal)}</p>
-                                    <p className="text-right">DPP VAT (11/12):</p>
-                                    <p className='text-right'>{formatCurrency(dppVat)}</p>
-                                    <p className="text-right">VAT 12%:</p>
-                                    <p className='text-right'>{formatCurrency(vat12)}</p>
-                                    
-                                    <p className="text-right font-bold">Total Rp:</p>
-                                    <p className="text-right font-bold">{formatCurrency(totalRp)}</p>
-                                </div>
-                            </div>
-                            <div className="flex flex-col items-center mt-4">
+                        <div className="w-[40%] flex flex-col items-center">
                               <p className='text-center'>PT. JEMBO CABLE COMPANY Tbk</p>
                               <div className='h-20' />
                               <p className="text-center">Finance</p>
-                            </div>
                         </div>
                     </div>
-
-                    <div className="border-t border-black w-full mt-2"></div>
                 </footer>
               )}
                {
@@ -516,6 +517,3 @@ const InvoicePreviewPage: React.FC = () => {
 };
 
 export default InvoicePreviewPage;
-
-
-    
