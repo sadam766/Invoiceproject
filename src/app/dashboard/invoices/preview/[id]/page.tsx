@@ -349,32 +349,32 @@ const InvoicePreviewPage: React.FC = () => {
 
               <main className="flex-grow">
                  <table className="w-full border-collapse text-[10px]">
-                      <thead className='border-t border-b border-black'>
+                      <thead className='border-y border-black'>
                           <tr>
-                              <th className="p-1 text-center w-[4%]">No.</th>
-                              <th className="p-1 text-left w-[40%] border-l border-black">Item</th>
-                              <th className="p-1 text-center w-[18%] border-l border-black">Quantity Unit</th>
-                              <th className="p-1 text-right w-[19%] border-l border-black">Price</th>
-                              <th className="p-1 text-right w-[19%] border-l border-black">Amount</th>
+                              <th className="p-1 text-center w-[4%] border-l border-black">No.</th>
+                              <th className="p-1 text-left w-[40%]">Item</th>
+                              <th className="p-1 text-center w-[18%]">Quantity Unit</th>
+                              <th className="p-1 text-right w-[19%]">Price</th>
+                              <th className="p-1 text-right w-[19%] border-r border-black">Amount</th>
                           </tr>
                       </thead>
                       <tbody>
-                          {pageItems.map((item) => (
-                              <tr key={item.no} className="h-[24px]">
-                                  <td className="p-1 text-center align-top">{item.no}</td>
-                                  <td className="p-1 align-top border-l border-black">{item.name}</td>
-                                  <td className="p-1 text-center align-top border-l border-black">{item.quantity.toLocaleString('id-ID')} {item.unit}</td>
-                                  <td className="p-1 text-right align-top border-l border-black">{formatCurrency(item.price)}</td>
-                                  <td className="p-1 text-right align-top border-l border-black">{formatCurrency(item.total)}</td>
+                          {pageItems.map((item, index) => (
+                              <tr key={item.id} className="h-[24px]">
+                                  <td className="p-1 text-center align-top border-l border-black">{item.no + (pageIndex * ITEMS_PER_PAGE)}</td>
+                                  <td className="p-1 align-top">{item.name}</td>
+                                  <td className="p-1 text-center align-top">{item.quantity.toLocaleString('id-ID')} {item.unit}</td>
+                                  <td className="p-1 text-right align-top">{formatCurrency(item.price)}</td>
+                                  <td className="p-1 text-right align-top border-r border-black">{formatCurrency(item.total)}</td>
                               </tr>
                           ))}
                           {Array.from({ length: Math.max(0, ITEMS_PER_PAGE - pageItems.length) }).map((_, i) => (
                             <tr key={`empty-${i}`} style={{height: '24px'}}>
-                                <td className='p-1'>&nbsp;</td>
                                 <td className='p-1 border-l border-black'>&nbsp;</td>
-                                <td className='p-1 border-l border-black'>&nbsp;</td>
-                                <td className='p-1 border-l border-black'>&nbsp;</td>
-                                <td className='p-1 border-l border-black'>&nbsp;</td>
+                                <td>&nbsp;</td>
+                                <td>&nbsp;</td>
+                                <td>&nbsp;</td>
+                                <td className='p-1 border-r border-black'>&nbsp;</td>
                             </tr>
                           ))}
                       </tbody>
@@ -427,7 +427,7 @@ const InvoicePreviewPage: React.FC = () => {
                                     <p>A/C No.: 102-0005000226 (USD)</p>
                                 </div>
                             </div>
-                            <div className='text-center w-[250px] font-bold my-1'>OR</div>
+                            <div className='text-center w-[320px] font-bold my-1'>OR</div>
                              <div className="flex mt-1">
                                 <div className="w-[120px]">
                                     <p className='font-bold'>Bank BCA - Jakarta</p>
@@ -443,7 +443,7 @@ const InvoicePreviewPage: React.FC = () => {
                              <div className='text-center'>
                                  <p>PT. JEMBO CABLE COMPANY Tbk</p>
                              </div>
-                             <div className="text-center mt-20">
+                             <div className="text-center mt-[7.5rem]">
                                 <div className="inline-block">
                                     <div className="h-px w-48 bg-black mb-1"></div>
                                     <p>Finance</p>
@@ -467,5 +467,6 @@ const InvoicePreviewPage: React.FC = () => {
 };
 
 export default InvoicePreviewPage;
+
 
     
