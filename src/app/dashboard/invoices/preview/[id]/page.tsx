@@ -235,8 +235,8 @@ export default function InvoicePreviewPage() {
                   </table>
               </main>
 
-             <footer className="pt-2">
-                <div className="flex justify-between items-center text-[10px] border-t border-black pt-1">
+              <footer className="pt-2">
+                <div className="flex justify-between items-center text-[10px] pt-1">
                     <p>No PO : {poNumber || ''}</p>
                     <div className="flex items-center">
                         <div className="w-28 text-left">Subtotal</div>
@@ -245,49 +245,53 @@ export default function InvoicePreviewPage() {
                 </div>
 
                 <div className="flex justify-end w-full text-[10px] mt-1">
-                    <div className="w-[224px] pl-4">
+                    <div className="w-[224px]">
                         {(negotiation > 0 || dpValue > 0 || pelunasan > 0) && (
                             <>
                                 {negotiation > 0 && (
-                                    <div className="flex justify-end"><p className="w-28 text-left">A/Negotiation :</p> <p className='w-28 text-right'>({formatCurrency(negotiation)})</p></div>
+                                    <div className="flex justify-between"><p className="text-left">A/Negotiation :</p> <p className='text-right'>({formatCurrency(negotiation)})</p></div>
                                 )}
                                 {dpValue > 0 && (
-                                    <div className="flex justify-end"><p className="w-28 text-left">DP :</p> <p className='w-28 text-right'>{formatCurrency(dpValue)}</p></div>
+                                    <div className="flex justify-between"><p className="text-left">DP :</p> <p className='text-right'>{formatCurrency(dpValue)}</p></div>
                                 )}
                                 {pelunasan > 0 && (
-                                    <div className="flex justify-end"><p className="w-28 text-left">Pelunasan :</p> <p className='w-28 text-right'>({formatCurrency(pelunasan)})</p></div>
+                                    <div className="flex justify-between"><p className="text-left">Pelunasan :</p> <p className='text-right'>({formatCurrency(pelunasan)})</p></div>
                                 )}
                             </>
                         )}
                     </div>
                 </div>
-
-                <div className="flex justify-end w-full text-[10px] mt-1">
-                    <div className="w-[224px] pl-4 border-t border-black pt-1">
-                        <div className="grid grid-cols-2 justify-items-end">
-                            <p className="text-left w-28">Goods:</p>
-                            <p className='text-right w-28'>{formatCurrency(grandTotal)}</p>
-                            <p className="text-left w-28">DPP VAT (11/12):</p>
-                            <p className='text-right w-28'>{formatCurrency(dppVat)}</p>
-                            <p className="text-left w-28">VAT 12%:</p>
-                            <p className='text-right w-28'>{formatCurrency(vat12)}</p>
+                
+                <div className="border-t border-b border-black mt-2">
+                    <div className="flex justify-end w-full text-[10px]">
+                        <div className="w-[224px] py-1">
+                            <div className="grid grid-cols-2 justify-items-end">
+                                <p className="text-left">Goods:</p>
+                                <p className='text-right'>{formatCurrency(grandTotal)}</p>
+                                <p className="text-left">DPP VAT (12%):</p>
+                                <p className='text-right'>{formatCurrency(dppVat)}</p>
+                                <p className="text-left">VAT 12%:</p>
+                                <p className='text-right'>{formatCurrency(vat12)}</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div className="border-b border-black">
+                     <div className="flex justify-end w-full text-[10px]">
+                        <div className="w-[224px] py-1">
+                             <div className="grid grid-cols-2 justify-items-end font-bold">
+                                <p className="text-left">Total Rp:</p>
+                                <p className="text-right">{formatCurrency(totalAmount)}</p>
+                            </div>
                         </div>
                     </div>
                 </div>
 
-                <div className="flex justify-end w-full text-[10px] mt-1">
-                    <div className="w-[224px] pl-4">
-                         <div className="grid grid-cols-2 justify-items-end font-bold border-t border-b border-black py-1">
-                            <p className="text-left w-28">Total Rp:</p>
-                            <p className="text-right w-28">{formatCurrency(totalAmount)}</p>
-                        </div>
-                    </div>
-                </div>
                 
                 <div className="flex mt-4 text-[10px]">
                     <div className='w-1/2 pr-4 text-[9px]'>
-                        <div className="grid grid-cols-[max-content,1fr] gap-x-2">
-                            <p>Payment :</p><p>{'90 Hari setelah invoice diterima'}</p>
+                        <div className="flex">
+                            <p className='w-[60px]'>Payment :</p><p className='flex-1'>{'90 Hari setelah invoice diterima'}</p>
                         </div>
                         <p className="mt-2">Please state with your payment: {invoiceId}</p>
                         <p className="font-bold mt-2">For payment, please transfer to our account:</p>
@@ -301,8 +305,10 @@ export default function InvoicePreviewPage() {
                                 <p>A/C No.: 102-0005000218 (Rp)</p>
                                 <p>A/C No.: 102-0005000226 (USD)</p>
                             </div>
+                            <div className='relative w-12'>
+                                <p className="font-bold text-center absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2">OR</p>
+                            </div>
                              <div className="w-1/2 pl-2">
-                                <p className="font-bold text-center mb-1">OR</p>
                                 <p className='font-bold'>Bank BCA - Jakarta</p>
                                 <p>Cabang KEM TOWER</p>
                                 <p>A/C No.: 684-0198977 (Rp)</p>
@@ -316,7 +322,7 @@ export default function InvoicePreviewPage() {
                          </div>
                          <div className="text-center mt-20">
                             <div className="inline-block">
-                                <div className="h-px w-32 bg-black mb-1"></div>
+                                <div className="h-px w-32 bg-black"></div>
                                 <p>Finance</p>
                             </div>
                          </div>
