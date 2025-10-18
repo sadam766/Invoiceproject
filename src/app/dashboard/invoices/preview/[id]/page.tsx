@@ -222,25 +222,20 @@ export default function InvoicePreviewPage() {
               </main>
 
               <footer>
-                  <div className="flex justify-between items-start text-[10px]">
-                      <p>No PO : {poNumber || ''}</p>
-                      <div className="text-right w-1/2 border-t border-black">
-                          <div className="inline-block w-full">
-                            <div className="text-right pr-1 pt-1">{formatCurrency(subtotal)}</div>
-                          </div>
-                      </div>
-                  </div>
+                <div className="flex justify-between items-start text-[10px]">
+                    <p>No PO : {poNumber || ''}</p>
+                    <div className="text-right w-1/2">
+                        <div className="inline-block w-full">
+                        <div className="border-t border-black w-28 ml-auto mb-1"></div>
+                        <div className="text-right pr-1 pt-1 font-bold">{formatCurrency(subtotal)}</div>
+                        </div>
+                    </div>
+                </div>
 
-                  <div className="flex justify-end">
-                      <div className="w-1/2 pl-4 text-[10px]">
-                          {negotiation > 0 && (<div className="flex justify-between"><p>A/Negotiation :</p> <p>({formatCurrency(negotiation)})</p></div>)}
-                          {dpValue > 0 && (<div className="flex justify-between"><p>DP :</p> <p>{formatCurrency(dpValue)}</p></div>)}
-                          {pelunasan > 0 && (<div className="flex justify-between"><p>Pelunasan :</p> <p>({formatCurrency(pelunasan)})</p></div>)}
-                      </div>
-                  </div>
-                  
-                   <div className="flex justify-between mt-1">
-                       <div className='w-2/3 pr-4'>
+                <div className="border-b border-black w-full my-1"></div>
+
+                 <div className="flex justify-between mt-1">
+                       <div className='w-1/2 pr-4'>
                           <div className="text-[9px]">
                               <div className='grid grid-cols-[auto_1fr] gap-x-2'>
                                   <p>Payment :</p><p>90 Hari setelah invoice diterima</p>
@@ -274,8 +269,13 @@ export default function InvoicePreviewPage() {
                               </div>
                           </div>
                        </div>
-                       <div className="w-1/3">
-                            <div className="grid grid-cols-2 gap-y-1 text-[10px]">
+                       <div className="w-1/2 flex flex-col">
+                            <div className="w-full">
+                                {negotiation > 0 && (<div className="flex justify-between"><p>A/Negotiation :</p> <p>({formatCurrency(negotiation)})</p></div>)}
+                                {dpValue > 0 && (<div className="flex justify-between"><p>DP :</p> <p>{formatCurrency(dpValue)}</p></div>)}
+                                {pelunasan > 0 && (<div className="flex justify-between"><p>Pelunasan :</p> <p>({formatCurrency(pelunasan)})</p></div>)}
+                            </div>
+                            <div className="grid grid-cols-2 gap-y-1 text-[10px] mt-2">
                                <p>Goods:</p>
                                <p className='text-right'>{formatCurrency(grandTotal)}</p>
                                
@@ -289,6 +289,7 @@ export default function InvoicePreviewPage() {
                                <p className="font-bold">Total Rp:</p>
                                <p className="text-right font-bold">{formatCurrency(totalAmount)}</p>
                            </div>
+                           <div className="border-b border-black w-full my-1"></div>
 
                           <div className="mt-8 text-center">
                               <p>PT. JEMBO CABLE COMPANY Tbk</p>
@@ -326,4 +327,3 @@ export default function InvoicePreviewPage() {
       </main>
     );
 }
-
