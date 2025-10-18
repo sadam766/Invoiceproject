@@ -253,7 +253,7 @@ const InvoicePreviewPage: React.FC = () => {
                       <div className="w-5/12 text-left pr-4">
                           <p className="font-bold text-[12px] mb-1">{customer?.name}</p>
                       </div>
-                      <div className="w-7/12 text-right pl-8">
+                      <div className="w-7/12 text-right pl-12">
                           <div className="inline-block text-left">
                               <div className="flex gap-x-2">
                                   <span className="font-bold text-left">Sales Order :</span><span className="text-left">{soNumber || ''}</span>
@@ -279,33 +279,33 @@ const InvoicePreviewPage: React.FC = () => {
               </header>
 
               <main className='mt-4 flex-grow'>
-                <table className="w-full border-collapse text-[10px] border border-black">
+                <table className="w-full border-collapse text-[10px]">
                     <thead className="font-bold">
                         <tr>
-                            <th className="p-1 text-left border-r border-black w-[5%]">No.</th>
-                            <th className="p-1 text-left border-r border-black w-[45%]">Item</th>
-                            <th className="p-1 text-center border-r border-black w-[15%]">Quantity Unit</th>
-                            <th className="p-1 text-right border-r border-black w-[15%]">Price</th>
-                            <th className="p-1 text-right w-[20%]">Amount</th>
+                            <th className="p-1 text-left border border-black w-[5%]">No.</th>
+                            <th className="p-1 text-left border-y border-r border-black w-[45%]">Item</th>
+                            <th className="p-1 text-center border-y border-r border-black w-[15%]">Quantity Unit</th>
+                            <th className="p-1 text-right border-y border-r border-black w-[15%]">Price</th>
+                            <th className="p-1 text-right border-y border-r border-black w-[20%]">Amount</th>
                         </tr>
                     </thead>
                     <tbody>
                       {pageItems.map((item, itemIdx) => (
                           <tr key={item.id} className=''>
-                              <td className="p-1 text-left align-top border-r border-black">{pageIndex * ITEMS_PER_PAGE + itemIdx + 1}</td>
-                              <td className="p-1 align-top text-left border-r border-black">{item.name}</td>
-                              <td className="p-1 text-center align-top border-r border-black">{item.quantity.toLocaleString('id-ID')} {item.unit}</td>
-                              <td className="p-1 text-right align-top border-r border-black">{formatCurrency(item.price)}</td>
-                              <td className="p-1 text-right align-top">{formatCurrency(item.total)}</td>
+                              <td className="p-1 text-left align-top border-x border-b border-black">{pageIndex * ITEMS_PER_PAGE + itemIdx + 1}</td>
+                              <td className="p-1 align-top text-left border-r border-b border-black">{item.name}</td>
+                              <td className="p-1 text-center align-top border-r border-b border-black">{item.quantity.toLocaleString('id-ID')} {item.unit}</td>
+                              <td className="p-1 text-right align-top border-r border-b border-black">{formatCurrency(item.price)}</td>
+                              <td className="p-1 text-right align-top border-r border-b border-black">{formatCurrency(item.total)}</td>
                           </tr>
                       ))}
                       {Array.from({ length: ITEMS_PER_PAGE - pageItems.length }).map((_, index) => (
-                          <tr key={`empty-${index}`} className="h-[24px]">
-                              <td className='p-1 border-r border-black'>&nbsp;</td>
-                              <td className='p-1 border-r border-black'>&nbsp;</td>
-                              <td className='p-1 border-r border-black'>&nbsp;</td>
-                              <td className='p-1 border-r border-black'>&nbsp;</td>
-                              <td className='p-1'>&nbsp;</td>
+                           <tr key={`empty-${index}`} className="h-[24px]">
+                              <td className='p-1 border-x border-b border-black'>&nbsp;</td>
+                              <td className='p-1 border-r border-b border-black'>&nbsp;</td>
+                              <td className='p-1 border-r border-b border-black'>&nbsp;</td>
+                              <td className='p-1 border-r border-b border-black'>&nbsp;</td>
+                              <td className='p-1 border-r border-b border-black'>&nbsp;</td>
                           </tr>
                       ))}
                     </tbody>
@@ -354,10 +354,8 @@ const InvoicePreviewPage: React.FC = () => {
                        </div>
                     </div>
 
-                    {/* Payment and Signature Block */}
                     <div className="flex mt-8">
                         <div className="w-1/2 pr-4">
-                            {/* Payment details */}
                             <div className="flex items-start mb-1 text-[9px]">
                                 <p className='w-20 shrink-0'>Payment:</p>
                                 <p className='flex-1'>{paymentTerms || '90 Hari setelah invoice diterima'}</p>
@@ -395,7 +393,6 @@ const InvoicePreviewPage: React.FC = () => {
                         </div>
 
                         <div className="w-1/2 pl-4 flex flex-col justify-between">
-                            {/* Signature */}
                             <div className="text-center mt-4">
                                 <p className="font-semibold mb-16">PT. JEMBO CABLE COMPANY Tbk</p>
                                 <p className="font-semibold">Finance</p>
@@ -404,8 +401,7 @@ const InvoicePreviewPage: React.FC = () => {
                     </div>
                 </footer>
               )}
-               {/* Page number */}
-              <div className="absolute bottom-4 right-8 text-xs text-gray-500">
+               <div className="absolute bottom-4 right-8 text-xs text-gray-500">
                 Page {pageNumber} of {totalPages}
               </div>
             </div>
@@ -417,4 +413,3 @@ const InvoicePreviewPage: React.FC = () => {
 }
 
 export default InvoicePreviewPage;
-
