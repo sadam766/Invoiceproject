@@ -216,79 +216,79 @@ export default function InvoicePreviewPage() {
               </main>
 
               <footer>
-                <div className="flex justify-between items-center text-[10px] border-black border-b">
-                    <p>No PO : {poNumber || ''}</p>
-                    <div className="text-right">
-                        <div className="inline-block border-t border-black px-4">{formatCurrency(subtotal)}</div>
-                    </div>
-                </div>
+                  <div className="flex justify-between items-start text-[10px]">
+                      <p>No PO : {poNumber || ''}</p>
+                      <div className="text-right w-1/2">
+                          <div className="inline-block w-full border-t border-black">
+                            <div className="text-right pr-1 pt-1">{formatCurrency(subtotal)}</div>
+                          </div>
+                      </div>
+                  </div>
 
-                <div className="flex justify-end">
-                    <div className="w-1/2 pl-4 text-[10px]">
-                        {negotiation !== 0 && (<div className="flex justify-between"><p>A/Negotiation :</p> <p>({formatCurrency(Math.abs(negotiation))})</p></div>)}
-                        {dpValue !== 0 && (<div className="flex justify-between"><p>DP :</p> <p>{formatCurrency(dpValue)}</p></div>)}
-                        {pelunasan !== 0 && (<div className="flex justify-between"><p>Pelunasan :</p> <p>({formatCurrency(pelunasan)})</p></div>)}
-                    </div>
-                </div>
-                
-                <div className="border-b-2 border-black w-full mt-1 mb-1"></div>
+                  <div className="flex justify-end">
+                      <div className="w-1/2 pl-4 text-[10px]">
+                          {negotiation !== 0 && (<div className="flex justify-between"><p>A/Negotiation :</p> <p>({formatCurrency(Math.abs(negotiation))})</p></div>)}
+                          {dpValue !== 0 && (<div className="flex justify-between"><p>DP :</p> <p>{formatCurrency(dpValue)}</p></div>)}
+                          {pelunasan !== 0 && (<div className="flex justify-between"><p>Pelunasan :</p> <p>({formatCurrency(pelunasan)})</p></div>)}
+                      </div>
+                  </div>
+                  
+                  <div className="flex justify-between mt-1">
+                       <div className='w-2/3 pr-4'>
+                          <div className="text-[9px]">
+                              <div className='grid grid-cols-[auto_1fr] gap-x-2'>
+                                  <p>Payment :</p><p>90 Hari setelah invoice diterima</p>
+                              </div>
+                              <p>Please state with your payment: {invoiceId}</p>
+                              <p>For payment, please transfer to our account:</p>
+                              <p className="font-bold mt-2">PT. Jembo Cable Company Tbk</p>
+                              <div className="grid grid-cols-[auto_1fr] gap-x-4 mt-1">
+                                  <div>
+                                      <p>Bank Mandiri - Jakarta</p>
+                                      <p>Cabang Sudirman</p>
+                                  </div>
+                                  <div className="text-right">
+                                      <p>A/C No.: 102-0100206827 (Rp)</p>
+                                      <p>A/C No.: 102-0005000218 (Rp)</p>
+                                      <p>A/C No.: 102-0005000226 (USD)</p>
+                                  </div>
+                              </div>
+                              <div className="text-center my-1 font-bold">OR</div>
+                               <div className="grid grid-cols-[auto_1fr] gap-x-4">
+                                  <div>
+                                      <p>Bank BCA - Jakarta</p>
+                                      <p>Cabang KEM TOWER</p>
+                                   </div>
+                                   <div className="text-right">
+                                      <p>A/C No.: 684-0198977 (Rp)</p>
+                                   </div>
+                              </div>
+                          </div>
+                       </div>
+                       <div className="w-1/3">
+                           <div className="grid grid-cols-2 gap-y-1 text-[10px]">
+                               <p>Goods:</p>
+                               <p className='text-right'>{formatCurrency(grandTotal)}</p>
+                               
+                               <p>DPP VAT (11/12):</p>
+                               <p className='text-right'>{formatCurrency(dppVat)}</p>
+                               
+                               <p>VAT 12%:</p>
+                               <p className='text-right'>{formatCurrency(vat12)}</p>
+                           </div>
+                           <div className="border-t border-black pt-1 mt-1 grid grid-cols-2">
+                               <p className="font-bold">Total Rp:</p>
+                               <p className="text-right font-bold">{formatCurrency(totalAmount)}</p>
+                           </div>
 
-                 <div className="flex justify-between mt-1">
-                     <div className='w-2/3 pr-4'>
-                        <div className="text-[9px]">
-                            <div className='grid grid-cols-[auto_1fr] gap-x-2'>
-                                <p>Payment :</p><p>90 Hari setelah invoice diterima</p>
-                            </div>
-                            <p>Please state with your payment: {invoiceId}</p>
-                            <p>For payment, please transfer to our account:</p>
-                            <p className="font-bold mt-2">PT. Jembo Cable Company Tbk</p>
-                            <div className="grid grid-cols-[auto_1fr] gap-x-4 mt-1">
-                                <div>
-                                    <p>Bank Mandiri - Jakarta</p>
-                                    <p>Cabang Sudirman</p>
-                                </div>
-                                <div className="text-right">
-                                    <p>A/C No.: 102-0100206827 (Rp)</p>
-                                    <p>A/C No.: 102-0005000218 (Rp)</p>
-                                    <p>A/C No.: 102-0005000226 (USD)</p>
-                                </div>
-                            </div>
-                            <div className="text-center my-1 font-bold">OR</div>
-                             <div className="grid grid-cols-[auto_1fr] gap-x-4">
-                                <div>
-                                    <p>Bank BCA - Jakarta</p>
-                                    <p>Cabang KEM TOWER</p>
-                                 </div>
-                                 <div className="text-right">
-                                    <p>A/C No.: 684-0198977 (Rp)</p>
-                                 </div>
-                            </div>
-                        </div>
-                     </div>
-                     <div className="w-1/3">
-                         <div className="grid grid-cols-2 gap-y-1 text-[10px]">
-                             <p>Goods:</p>
-                             <p className='text-right'>{formatCurrency(grandTotal)}</p>
-                             
-                             <p>DPP VAT (11/12):</p>
-                             <p className='text-right'>{formatCurrency(dppVat)}</p>
-                             
-                             <p>VAT 12%:</p>
-                             <p className='text-right'>{formatCurrency(vat12)}</p>
-                         </div>
-                         <div className="border-t border-black pt-1 mt-1 grid grid-cols-2">
-                             <p className="font-bold">Total Rp:</p>
-                             <p className="text-right font-bold">{formatCurrency(totalAmount)}</p>
-                         </div>
-
-                        <div className="mt-4 text-center">
-                            <p>PT. JEMBO CABLE COMPANY Tbk</p>
-                            <div className="h-16"></div>
-                            <p className="border-t border-black pt-1 mx-8">Finance</p>
-                        </div>
-                     </div>
-                 </div>
-            </footer>
+                          <div className="mt-4 text-center">
+                              <p>PT. JEMBO CABLE COMPANY Tbk</p>
+                              <div className="h-16"></div>
+                              <p className="border-t border-black pt-1 mx-8">Finance</p>
+                          </div>
+                       </div>
+                   </div>
+              </footer>
 
             <style jsx global>{`
                 @media print {
