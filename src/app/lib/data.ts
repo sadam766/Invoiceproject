@@ -137,7 +137,7 @@ export function getSalesMonitoringData(): SalesMonitoringData[] {
     return Object.values(soData).map(so => {
         const invoice = invoiceListData.find(inv => inv.soNumber === so.soNumber);
         const taxInvoice = taxInvoiceData.find(ti => ti.taxInvoiceNumber.includes(so.soNumber.slice(-4))); // Simplified logic
-        const spd = spdData.find(s => s.noInvoice === (invoice?.id || ''));
+        const spd = spdData.find(s => s.noInvoice.includes(invoice?.id || ''));
 
         const paymentStatus = (invoice?.status === 'paid') ? 'Paid' : 'Unpaid';
 
@@ -336,6 +336,12 @@ export const customerListData: Customer[] = [
     address: 'Jl. Gajah Mada No. 10, Surabaya',
     spdAddress: 'Jl. Gajah Mada No. 10, Surabaya',
   },
+  { 
+    id: '3',
+    name: 'Toko Listrik Sinar Jaya',
+    address: 'Jl. Hayam Wuruk No. 5, Jakarta',
+    spdAddress: 'Jl. Hayam Wuruk No. 5, Jakarta',
+  },
 ];
 
 export type SalesListItem = {
@@ -401,3 +407,5 @@ export const spdData: SpdData[] = [
         suratJalan: '-',
     }
 ];
+
+    

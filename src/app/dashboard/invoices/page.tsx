@@ -5,7 +5,6 @@ import { useState, useMemo } from 'react';
 import {
     Card,
     CardContent,
-    CardDescription,
     CardHeader,
     CardTitle,
   } from '@/components/ui/card';
@@ -22,8 +21,8 @@ import {
   import { Button } from '@/components/ui/button';
   import { Badge } from '@/components/ui/badge';
   import { Checkbox } from '@/components/ui/checkbox';
-  import { invoiceListData, type Invoice } from '@/app/lib/data';
-  import { Search, Filter, MoreHorizontal, ArrowUpDown, Plus, Eye, Pencil, Trash2 } from 'lucide-react';
+  import { invoiceListData, type Invoice, spdData, type SpdData } from '@/app/lib/data';
+  import { Search, Filter, MoreHorizontal, ArrowUpDown, Plus, Eye, Pencil } from 'lucide-react';
   import { Skeleton } from '@/components/ui/skeleton';
   import {
     DropdownMenu,
@@ -32,29 +31,33 @@ import {
     DropdownMenuTrigger,
   } from '@/components/ui/dropdown-menu';
   import { DeleteConfirmationDialog } from '@/app/components/delete-confirmation-dialog';
+  import { useToast } from '@/hooks/use-toast';
 
 
   export default function InvoiceListPage() {
-    const [invoices, setInvoices] = useState(invoiceListData);
+    const [invoices, setInvoices] = useState<Invoice[]>(invoiceListData);
+    const [currentSpdData, setCurrentSpdData] = useState<SpdData[]>(spdData);
     const [isLoading, setIsLoading] = useState(false);
     const [activeTab, setActiveTab] = useState('all');
     const [searchQuery, setSearchQuery] = useState('');
+    const [selectedInvoices, setSelectedInvoices] = useState<Set<string>>(new Set());
+    const { toast } = useToast();
     
     const filteredInvoices = useMemo(() => {
         let filtered = invoices;
         if (activeTab !== 'all') {
-            if (activeTab === 'paid') {
-                filtered = invoices.filter(i => i.status === 'paid');
-            } else if (activeTab === 'unpaid') {
-                filtered = invoices.filter(i => i.status !== 'paid');
-            }
+            filtered = invoices.filter(i => {
+                if (activeTab === 'paid') return i.status === 'paid';
+                if (activeTab === 'unpaid') return i.status !== 'paid';
+                return true;
+            });
         }
 
         if (searchQuery) {
             filtered = filtered.filter(invoice => 
-                invoice.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                invoice.soNumber.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                invoice.customer.toLowerCase().includes(searchQuery.toLowerCase())
+                Object.values(invoice).some(value => 
+                    String(value).toLowerCase().includes(searchQuery.toLowerCase())
+                )
             );
         }
 
@@ -63,7 +66,7 @@ import {
 
     const totalFiltered = filteredInvoices?.reduce((sum, item) => sum + item.amount, 0) || 0;
     const totalPaid = invoices?.filter(item => item.status === 'Paid' || item.status === 'paid').reduce((sum, item) => sum + item.amount, 0) || 0;
-    const totalUnpaid = invoices?.filter(item => item.status === 'Unpaid' || item.status === 'unpaid' || item.status === 'sent').reduce((sum, item) => sum + item.amount, 0) || 0;
+    const totalUnpaid = invoices?.filter(item => item.status === 'unpaid' || item.status === 'sent' || item.status === 'draft').reduce((sum, item) => sum + item.amount, 0) || 0;
 
     const handleDelete = (invoiceId: string) => {
         setInvoices(invoices.filter((inv) => inv.id !== invoiceId));
@@ -73,6 +76,89 @@ import {
       // Logic to handle editing, for now we can just log it
       console.log('Editing invoice:', invoice.id);
     }
+
+    const handleSelectionChange = (invoiceId: string) => {
+        setSelectedInvoices(prev => {
+            const newSelection = new Set(prev);
+            if (newSelection.has(invoiceId)) {
+                newSelection.delete(invoiceId);
+            } else {
+                newSelection.add(invoiceId);
+            }
+            return newSelection;
+        });
+    };
+
+    const handleSelectAll = (checked: boolean) => {
+        if (checked) {
+            setSelectedInvoices(new Set(filteredInvoices.map(i => i.id)));
+        } else {
+            setSelectedInvoices(new Set());
+        }
+    };
+    
+    const handleCreateSpd = () => {
+        if (selectedInvoices.size === 0) {
+            toast({
+                variant: 'destructive',
+                title: 'No Invoices Selected',
+                description: 'Please select at least one invoice to create an SPD.',
+            });
+            return;
+        }
+
+        const selected = invoices.filter(inv => selectedInvoices.has(inv.id));
+        
+        // Cek jika ada invoice yang sudah punya SPD
+        const alreadyHasSpd = selected.some(inv => inv.spdNumber && inv.spdNumber !== '-');
+        if (alreadyHasSpd) {
+            toast({
+                variant: "destructive",
+                title: "SPD Already Exists",
+                description: "One or more selected invoices already have an SPD number.",
+            });
+            return;
+        }
+        
+        const newSpdNumber = `SPD-${Date.now().toString().slice(-6)}`;
+        const totalAmount = selected.reduce((sum, inv) => sum + inv.amount, 0);
+        const customerNames = Array.from(new Set(selected.map(inv => inv.customer))).join(', ');
+        const invoiceNumbers = selected.map(inv => inv.id).join(', ');
+
+        const newSpdEntry: SpdData = {
+            spd: newSpdNumber,
+            tanggal: new Date().toISOString().split('T')[0],
+            sales: 'System', // Placeholder
+            customer: customerNames,
+            noInvoice: invoiceNumbers,
+            tanggalInvoice: selected[0]?.date || new Date().toISOString().split('T')[0],
+            tglTerimaCustomer: '-',
+            tglJatuhTempo: '-',
+            totalPiutang: totalAmount,
+            keterangan: `Generated from ${selected.length} invoices.`,
+            noKuitansi: '-',
+            noFakturPajak: '-',
+            suratJalan: '-',
+        };
+        
+        // This is a simulation, in a real app you would send this to a server
+        setCurrentSpdData(prev => [...prev, newSpdEntry]);
+        console.log("New SPD created:", newSpdEntry); // For debugging
+
+        // Update invoices with the new SPD number
+        setInvoices(prevInvoices => 
+            prevInvoices.map(inv => 
+                selectedInvoices.has(inv.id) ? { ...inv, spdNumber: newSpdNumber } : inv
+            )
+        );
+
+        toast({
+            title: 'SPD Created Successfully',
+            description: `SPD ${newSpdNumber} has been created for ${selected.size} invoices.`,
+        });
+
+        setSelectedInvoices(new Set());
+    };
   
     return (
       <main className="flex flex-1 flex-col gap-4 p-4 md:gap-8 md:p-8">
@@ -92,11 +178,6 @@ import {
                        background: 'linear-gradient(180deg, rgba(255,255,255,0) 0%, rgba(167,207,255,0.2) 50%, rgba(132,189,255,0.4) 100%)',
                        clipPath: 'polygon(0 80%, 30% 60%, 70% 85%, 100% 70%, 100% 100%, 0% 100%)'
                    }}>
-                       <div className="w-full h-px bg-primary/50" style={{
-                           position: 'absolute',
-                           bottom: 'calc(20% + (85% - 70%) / 2)',
-                           clipPath: 'polygon(0 80%, 30% 60%, 70% 85%, 100% 70%)'
-                       }}></div>
                    </div>
                    <div className="absolute bottom-0 left-0 right-0 h-10 w-full" style={{
                         backgroundImage: 'linear-gradient(to top, #DBEAFE, transparent)'
@@ -151,7 +232,7 @@ import {
                             <h2 className="text-xl font-bold">Invoices</h2>
                         </div>
                         <div className="flex items-center gap-2">
-                           <Button variant="outline">Buat SPD dari Pilihan</Button>
+                           <Button variant="outline" onClick={handleCreateSpd} disabled={selectedInvoices.size === 0}>Buat SPD dari Pilihan</Button>
                            <Link href="/dashboard/invoices/add" passHref>
                             <Button><Plus className="mr-2 h-4 w-4"/> New Invoice</Button>
                            </Link>
@@ -183,7 +264,11 @@ import {
                             <TableHeader>
                                 <TableRow>
                                     <TableHead className="w-[40px]">
-                                        <Checkbox />
+                                        <Checkbox 
+                                          onCheckedChange={handleSelectAll}
+                                          checked={filteredInvoices.length > 0 && selectedInvoices.size === filteredInvoices.length}
+                                          aria-label="Select all rows"
+                                        />
                                     </TableHead>
                                     <TableHead>INVOICE <ArrowUpDown className="inline-block ml-2 h-4 w-4" /></TableHead>
                                     <TableHead>SO NUMBER <ArrowUpDown className="inline-block ml-2 h-4 w-4" /></TableHead>
@@ -212,9 +297,13 @@ import {
                                     ))
                                 ) : (
                                     filteredInvoices?.map((invoice) => (
-                                    <TableRow key={invoice.id}>
+                                    <TableRow key={invoice.id} data-state={selectedInvoices.has(invoice.id) ? "selected" : ""}>
                                         <TableCell>
-                                            <Checkbox />
+                                            <Checkbox
+                                              onCheckedChange={() => handleSelectionChange(invoice.id)}
+                                              checked={selectedInvoices.has(invoice.id)}
+                                              aria-label={`Select row ${invoice.id}`}
+                                            />
                                         </TableCell>
                                         <TableCell className="font-medium">{invoice.id}</TableCell>
                                         <TableCell>{invoice.soNumber}</TableCell>
@@ -246,10 +335,8 @@ import {
                                                         <Pencil className="mr-2 h-4 w-4" />
                                                         Edit
                                                     </DropdownMenuItem>
-                                                    <DropdownMenuItem className="text-destructive">
-                                                        <div className="w-full">
+                                                    <DropdownMenuItem className="text-destructive focus:text-destructive focus:bg-destructive/10">
                                                         <DeleteConfirmationDialog onConfirm={() => handleDelete(invoice.id)} />
-                                                        </div>
                                                     </DropdownMenuItem>
                                                 </DropdownMenuContent>
                                             </DropdownMenu>

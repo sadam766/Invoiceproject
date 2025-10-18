@@ -1,6 +1,6 @@
 
 'use client';
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import {
     Card,
     CardContent,
@@ -15,15 +15,23 @@ import {
   } from '@/components/ui/table';
   import { Input } from '@/components/ui/input';
   import { Button } from '@/components/ui/button';
-  import { spdData, type SpdData } from '@/app/lib/data';
+  import { spdData as initialSpdData, type SpdData } from '@/app/lib/data';
   import { Search, Plus } from 'lucide-react';
   import { AddSpdDialog } from './_components/add-spd-dialog';
+  import { useToast } from '@/hooks/use-toast';
   
   export default function SpdPage() {
-    const [data, setData] = useState(spdData);
+    const [data, setData] = useState(initialSpdData);
     const [editingSpd, setEditingSpd] = useState<SpdData | undefined>(undefined);
     const [isDialogOpen, setIsDialogOpen] = useState(false);
     const [searchQuery, setSearchQuery] = useState('');
+    const { toast } = useToast();
+
+    useEffect(() => {
+        // This is a trick to re-fetch data if it was updated on another page.
+        // In a real app, this would be handled by a state management library like Redux or Zustand.
+        setData(initialSpdData);
+    }, []);
 
     const filteredData = useMemo(() => {
         if (!searchQuery) {
@@ -50,16 +58,22 @@ import {
 
         if (editingSpd) {
             setData(data.map((item) => (item.spd === editingSpd.spd ? newItemWithNumber : item)));
+            toast({ title: "SPD Updated", description: `SPD ${newItem.spd} has been updated.` });
         } else {
             setData([...data, newItemWithNumber]);
+            toast({ title: "SPD Added", description: `New SPD ${newItem.spd} has been added.` });
         }
         setIsDialogOpen(false);
         setEditingSpd(undefined);
     };
 
-    const handleDialogClose = () => {
-      setIsDialogOpen(false);
-      setEditingSpd(undefined);
+    const handleDialogClose = (open: boolean) => {
+      if (!open) {
+        setIsDialogOpen(false);
+        setEditingSpd(undefined);
+      } else {
+        setIsDialogOpen(true);
+      }
     }
   
     return (
@@ -141,4 +155,5 @@ import {
       </main>
     );
   }
-  
+
+    
