@@ -68,6 +68,7 @@ export default function InvoicePreviewPage() {
                 }));
                 const subtotal = invoiceItems.reduce((sum, item) => sum + item.total, 0);
                 
+                // Placeholder values if not present in invoice list data
                 const negotiation = 0;
                 const dpValue = 0;
                 const pelunasan = 0;
@@ -200,53 +201,51 @@ export default function InvoicePreviewPage() {
               </header>
 
               <main className='flex-grow'>
-                <table className="w-full border-collapse mb-0 text-[10px]">
-                    <thead className='border-b border-black'>
-                        <tr>
-                            <th className="text-center p-1 w-[4%] border-l border-t border-black">No.</th>
-                            <th className="text-left p-1 w-[40%] border-t border-black">Item</th>
-                            <th className="text-center p-1 w-[18%] border-l border-t border-black">Quantity Unit</th>
-                            <th className="text-right p-1 w-[19%] border-l border-t border-black">Price</th>
-                            <th className="text-right p-1 w-[19%] border-l border-t border-r border-black">Amount</th>
-                        </tr>
-                    </thead>
-                    <tbody className='border-b border-black'>
-                        {items.map((item, index) => (
-                            <tr key={index}>
-                                <td className="p-1 text-center border-l border-r border-black">{item.no}</td>
-                                <td className="p-1 border-r border-black">{item.name}</td>
-                                <td className="p-1 text-center border-r border-black">{item.quantity.toLocaleString('id-ID')} {item.unit}</td>
-                                <td className="p-1 text-right border-r border-black">{formatCurrency(item.price)}</td>
-                                <td className="p-1 text-right border-r border-black">{formatCurrency(item.total)}</td>
+                  <table className="w-full border-collapse text-[10px]">
+                      <thead className='border-t border-b border-black'>
+                          <tr>
+                              <th className="p-1 text-center w-[4%]">No.</th>
+                              <th className="p-1 text-left w-[40%] border-l border-black">Item</th>
+                              <th className="p-1 text-center w-[18%] border-l border-black">Quantity Unit</th>
+                              <th className="p-1 text-right w-[19%] border-l border-black">Price</th>
+                              <th className="p-1 text-right w-[19%] border-l border-black">Amount</th>
+                          </tr>
+                      </thead>
+                      <tbody className='border-b border-black'>
+                          {items.map((item) => (
+                              <tr key={item.no}>
+                                  <td className="p-1 text-center">{item.no}</td>
+                                  <td className="p-1 border-l border-black">{item.name}</td>
+                                  <td className="p-1 text-center border-l border-black">{item.quantity.toLocaleString('id-ID')} {item.unit}</td>
+                                  <td className="p-1 text-right border-l border-black">{formatCurrency(item.price)}</td>
+                                  <td className="p-1 text-right border-l border-black">{formatCurrency(item.total)}</td>
+                              </tr>
+                          ))}
+                          {Array.from({ length: Math.max(0, 15 - items.length) }).map((_, i) => (
+                            <tr key={`empty-${i}`} style={{height: '24px'}}>
+                                <td className='p-1 text-center'>&nbsp;</td>
+                                <td className='p-1 border-l border-black'>&nbsp;</td>
+                                <td className='p-1 text-center border-l border-black'>&nbsp;</td>
+                                <td className='p-1 text-right border-l border-black'>&nbsp;</td>
+                                <td className='p-1 text-right border-l border-black'>&nbsp;</td>
                             </tr>
-                        ))}
-                         {Array.from({ length: Math.max(0, 15 - items.length) }).map((_, i) => (
-                           <tr key={`empty-${i}`} style={{height: '24px'}}>
-                                <td className='border-l border-r border-black'>&nbsp;</td>
-                                <td className='border-r border-black'>&nbsp;</td>
-                                <td className='border-r border-black'>&nbsp;</td>
-                                <td className='border-r border-black'>&nbsp;</td>
-                                <td className='border-r border-black'>&nbsp;</td>
-                           </tr>
-                        ))}
-                    </tbody>
-                </table>
+                          ))}
+                      </tbody>
+                  </table>
               </main>
 
               <footer className="pt-2">
-                 <div className="flex justify-between items-center text-[10px]">
+                <div className="flex justify-between items-center text-[10px] mt-1">
                     <p>No PO : {poNumber || ''}</p>
                     <div className="text-right">
-                        <div className="border-t border-black inline-block px-4 pt-1">
+                        <div className="inline-block px-4 pt-1">
                             <p className="font-bold">{formatCurrency(subtotal)}</p>
                         </div>
                     </div>
                 </div>
 
-                <div className="border-t border-black mt-1"></div>
-
-                 {(negotiation > 0 || dpValue > 0 || pelunasan > 0) && (
-                    <div className="flex justify-end w-full text-[10px] my-1">
+                {(negotiation > 0 || dpValue > 0 || pelunasan > 0) && (
+                    <div className="flex justify-end w-full text-[10px]">
                         <div className="w-1/2 pl-4">
                             {negotiation > 0 && (
                                 <div className="flex justify-end"><p className="w-28 text-left">A/Negotiation :</p> <p className='w-28 text-right'>({formatCurrency(negotiation)})</p></div>
@@ -261,6 +260,8 @@ export default function InvoicePreviewPage() {
                     </div>
                 )}
                 
+                <div className="border-t border-black mt-1"></div>
+
                 <div className="flex justify-end w-full text-[10px] mt-1">
                     <div className="w-1/2 pl-4">
                         <div className="grid grid-cols-2 gap-y-1 justify-items-end">
@@ -286,8 +287,8 @@ export default function InvoicePreviewPage() {
                 <div className="flex mt-4 text-[10px]">
                     <div className='w-1/2 pr-4 text-[9px]'>
                         <div className="grid grid-cols-[max-content,1fr] gap-x-2">
-                            <p>Payment :</p><p className='ml-2'>90 Hari setelah invoice diterima</p>
-                            <p>Please state with your payment:</p><p className='ml-2'>{invoiceId}</p>
+                            <p>Payment :</p><p>{'90 Hari setelah invoice diterima'}</p>
+                            <p>Please state with your payment:</p><p>{invoiceId}</p>
                         </div>
                         <p className="font-bold mt-2">For payment, please transfer to our account:</p>
                         <p className="font-bold mt-2">PT. Jembo Cable Company Tbk</p>
