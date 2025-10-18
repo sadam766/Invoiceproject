@@ -126,7 +126,8 @@ export default function InvoicePreviewPage() {
     const invoiceTitle = invoiceId.startsWith('KW/') ? 'PROFORMA INVOICE' : 'INVOICE/OFFICIAL RECEIPT';
 
     const formatCurrency = (value: number) => {
-        return (value || 0).toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        if (typeof value !== 'number') return '0,00';
+        return value.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
     };
 
     const formatDate = (dateString: string) => {
@@ -201,7 +202,6 @@ export default function InvoicePreviewPage() {
                                 <td className="p-1 text-right">{formatCurrency(item.total)}</td>
                             </tr>
                         ))}
-                         {/* Fill remaining rows to ensure consistent height */}
                         {Array.from({ length: Math.max(0, 15 - items.length) }).map((_, i) => (
                            <tr key={`empty-${i}`} style={{height: '24px'}}>
                                 <td>&nbsp;</td>
@@ -216,23 +216,22 @@ export default function InvoicePreviewPage() {
               </main>
 
               <footer>
-                <div className="w-full flex justify-end items-center mt-2 pb-1 border-b-2 border-black">
-                     <p className="font-bold">{formatCurrency(subtotal)}</p>
-                </div>
-                 <div className="w-full flex justify-end mt-0 mb-4">
-                    <div className="w-1/2 pl-4">
-                        <div className="w-full text-[10px]">
-                            {negotiation !== 0 && (<div className="flex justify-between"><p>A/Negotiation :</p> <p>({formatCurrency(Math.abs(negotiation))})</p></div>)}
-                            {dpValue !== 0 && (<div className="flex justify-between"><p>DP :</p> <p>{formatCurrency(dpValue)}</p></div>)}
-                            {pelunasan !== 0 && (<div className="flex justify-between"><p>Pelunasan :</p> <p>({formatCurrency(pelunasan)})</p></div>)}
-                        </div>
+                <div className="flex justify-between items-center text-[10px] border-black border-b">
+                    <p>No PO : {poNumber || ''}</p>
+                    <div className="text-right">
+                        <div className="inline-block border-t border-black px-4">{formatCurrency(subtotal)}</div>
                     </div>
                 </div>
 
-                <div className="flex justify-between items-center text-[10px] mt-[-1rem]">
-                    <p>No PO : {poNumber || ''}</p>
+                <div className="flex justify-end">
+                    <div className="w-1/2 pl-4 text-[10px]">
+                        {negotiation !== 0 && (<div className="flex justify-between"><p>A/Negotiation :</p> <p>({formatCurrency(Math.abs(negotiation))})</p></div>)}
+                        {dpValue !== 0 && (<div className="flex justify-between"><p>DP :</p> <p>{formatCurrency(dpValue)}</p></div>)}
+                        {pelunasan !== 0 && (<div className="flex justify-between"><p>Pelunasan :</p> <p>({formatCurrency(pelunasan)})</p></div>)}
+                    </div>
                 </div>
-                 <div className="border-b-2 border-black w-full mt-1 mb-1"></div>
+                
+                <div className="border-b-2 border-black w-full mt-1 mb-1"></div>
 
                  <div className="flex justify-between mt-1">
                      <div className='w-2/3 pr-4'>
@@ -282,14 +281,13 @@ export default function InvoicePreviewPage() {
                              <p className="text-right font-bold">{formatCurrency(totalAmount)}</p>
                          </div>
 
-                        <div className="mt-12 text-center">
+                        <div className="mt-4 text-center">
                             <p>PT. JEMBO CABLE COMPANY Tbk</p>
-                            <div className="h-20"></div>
-                            <p className="border-t border-black pt-1">Finance</p>
+                            <div className="h-16"></div>
+                            <p className="border-t border-black pt-1 mx-8">Finance</p>
                         </div>
                      </div>
                  </div>
-
             </footer>
 
             <style jsx global>{`
