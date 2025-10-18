@@ -216,7 +216,7 @@ export default function InvoicePreviewPage() {
               </main>
 
               <footer>
-                  <div className="flex justify-between items-start text-[10px]">
+                  <div className="flex justify-between items-start text-[10px] mt-1">
                       <p>No PO : {poNumber || ''}</p>
                       <div className="text-right w-1/2">
                           <div className="inline-block w-full border-t border-black">
@@ -227,9 +227,9 @@ export default function InvoicePreviewPage() {
 
                   <div className="flex justify-end">
                       <div className="w-1/2 pl-4 text-[10px]">
-                          {negotiation !== 0 && (<div className="flex justify-between"><p>A/Negotiation :</p> <p>({formatCurrency(Math.abs(negotiation))})</p></div>)}
-                          {dpValue !== 0 && (<div className="flex justify-between"><p>DP :</p> <p>{formatCurrency(dpValue)}</p></div>)}
-                          {pelunasan !== 0 && (<div className="flex justify-between"><p>Pelunasan :</p> <p>({formatCurrency(pelunasan)})</p></div>)}
+                          {negotiation > 0 && (<div className="flex justify-between"><p>A/Negotiation :</p> <p>({formatCurrency(negotiation)})</p></div>)}
+                          {dpValue > 0 && (<div className="flex justify-between"><p>DP :</p> <p>{formatCurrency(dpValue)}</p></div>)}
+                          {pelunasan > 0 && (<div className="flex justify-between"><p>Pelunasan :</p> <p>({formatCurrency(pelunasan)})</p></div>)}
                       </div>
                   </div>
                   
@@ -281,9 +281,9 @@ export default function InvoicePreviewPage() {
                                <p className="text-right font-bold">{formatCurrency(totalAmount)}</p>
                            </div>
 
-                          <div className="mt-4 text-center">
+                          <div className="mt-8 text-center">
                               <p>PT. JEMBO CABLE COMPANY Tbk</p>
-                              <div className="h-16"></div>
+                              <div className="h-12"></div>
                               <p className="border-t border-black pt-1 mx-8">Finance</p>
                           </div>
                        </div>
