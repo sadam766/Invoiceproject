@@ -118,7 +118,15 @@ export default function AddInvoicePage() {
   useEffect(() => {
     if (invoiceNumberDataState) {
       setInvoiceId(invoiceNumberDataState.id);
-      handleSoSelect(invoiceNumberDataState.salesOrder);
+      
+      // Pre-fill SO and customer if they exist
+      if (invoiceNumberDataState.salesOrder) {
+        handleSoSelect(invoiceNumberDataState.salesOrder);
+      } else {
+        const foundCustomer = customerListData.find(c => c.name === invoiceNumberDataState.customer);
+        setCustomer(foundCustomer);
+      }
+
       if (invoiceNumberDataState.date) {
         const parts = invoiceNumberDataState.date.split('/');
         if (parts.length === 3) {
@@ -169,7 +177,7 @@ export default function AddInvoicePage() {
     const baseForCalculations = currentSubtotal - numericNegotiation;
   
     // DP Calculation
-    const numericDpPercent = typeof dpPercent === 'string' && dpPercent !== '' ? parseFormattedNumber(dpPercent) : (typeof dpPercent === 'number' ? dpPercent : 0);
+    const numericDpPercent = typeof dpPercent === 'string' && dpPercent !== '' ? parseFloat(dpPercent.toString()) : (typeof dpPercent === 'number' ? dpPercent : 0);
     let numericDpValue = typeof dpValue === 'string' && dpValue !== '' ? parseFormattedNumber(dpValue) : (typeof dpValue === 'number' ? dpValue : 0);
     
     if (numericDpPercent > 0 && (dpValue === '' || dpValue === 0)) {
@@ -179,7 +187,7 @@ export default function AddInvoicePage() {
     }
   
     // Pelunasan Calculation
-    const numericPelunasanPercent = typeof dpPelunasanPercent === 'string' && dpPelunasanPercent !== '' ? parseFormattedNumber(dpPelunasanPercent) : (typeof dpPelunasanPercent === 'number' ? dpPelunasanPercent : 0);
+    const numericPelunasanPercent = typeof dpPelunasanPercent === 'string' && dpPelunasanPercent !== '' ? parseFloat(dpPelunasanPercent.toString()) : (typeof dpPelunasanPercent === 'number' ? dpPelunasanPercent : 0);
     let numericPelunasan = typeof pelunasan === 'string' && pelunasan !== '' ? parseFormattedNumber(pelunasan) : (typeof pelunasan === 'number' ? pelunasan : 0);
   
     if (numericPelunasanPercent > 0 && (pelunasan === '' || pelunasan === 0)) {
@@ -217,8 +225,8 @@ export default function AddInvoicePage() {
       if (item.id === id) {
         const updatedItem = { ...item, [field]: value };
         if (field === 'quantity' || field === 'price') {
-            const quantity = field === 'quantity' && typeof value === 'number' ? value : item.quantity;
-            const price = field === 'price' && typeof value === 'number' ? value : item.price;
+            const quantity = field === 'quantity' ? (typeof value === 'string' ? parseFormattedNumber(value) : value) : item.quantity;
+            const price = field === 'price' ? (typeof value === 'string' ? parseFormattedNumber(value) : value) : item.price;
             updatedItem.total = quantity * price;
         }
         return updatedItem;
@@ -241,9 +249,25 @@ export default function AddInvoicePage() {
   const handleNumericItemChange = (id: number, field: 'quantity' | 'price', value: string) => {
     const parsedValue = parseFormattedNumber(value);
     if (!isNaN(parsedValue)) {
-        handleItemChange(id, field, parsedValue);
+        const newItems = items.map(item => {
+            if (item.id === id) {
+                const updatedItem = { ...item, [field]: parsedValue };
+                updatedItem.total = updatedItem.quantity * updatedItem.price;
+                return updatedItem;
+            }
+            return item;
+        });
+        setItems(newItems);
     } else if (value === '') {
-         handleItemChange(id, field, 0);
+         const newItems = items.map(item => {
+            if (item.id === id) {
+                const updatedItem = { ...item, [field]: 0 };
+                updatedItem.total = updatedItem.quantity * updatedItem.price;
+                return updatedItem;
+            }
+            return item;
+        });
+        setItems(newItems);
     }
   };
 
@@ -332,7 +356,7 @@ export default function AddInvoicePage() {
                         className="w-full justify-between"
                         >
                         {soNumber
-                            ? uniqueSalesOrders.find((so) => so === soNumber)
+                            ? uniqueSalesOrders.find((so) => so.toLowerCase() === soNumber.toLowerCase())
                             : "Search SO..."}
                         <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                         </Button>
@@ -347,12 +371,12 @@ export default function AddInvoicePage() {
                                     <CommandItem
                                         key={so}
                                         value={so}
-                                        onSelect={(currentValue) => handleSoSelect(currentValue)}
+                                        onSelect={(currentValue) => handleSoSelect(currentValue.toUpperCase())}
                                     >
                                         <Check
                                         className={cn(
                                             "mr-2 h-4 w-4",
-                                            soNumber === so ? "opacity-100" : "opacity-0"
+                                            soNumber.toLowerCase() === so.toLowerCase() ? "opacity-100" : "opacity-0"
                                         )}
                                         />
                                         {so}
@@ -560,7 +584,7 @@ export default function AddInvoicePage() {
                           className="h-8 w-28 text-right" 
                           placeholder="e.g. 20"
                           value={dpPercent}
-                          onChange={handleNumericInputChange(setDpPercent)}
+                          onChange={(e) => setDpPercent(e.target.value)}
                         />
                     </div>
                      <div className="flex justify-between items-center py-1">
@@ -578,7 +602,7 @@ export default function AddInvoicePage() {
                           className="h-8 w-28 text-right" 
                           placeholder="e.g. 10"
                           value={dpPelunasanPercent}
-                          onChange={handleNumericInputChange(setDpPelunasanPercent)}
+                          onChange={(e) => setDpPelunasanPercent(e.target.value)}
                           />
                     </div>
                      <div className="flex justify-between items-center py-1">
@@ -666,3 +690,5 @@ export default function AddInvoicePage() {
     </main>
   );
 }
+
+    
