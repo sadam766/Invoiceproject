@@ -1,5 +1,7 @@
+
 'use client';
 import { useState, useMemo, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import {
     Card,
     CardContent,
@@ -26,10 +28,9 @@ import {
     const [isDialogOpen, setIsDialogOpen] = useState(false);
     const [searchQuery, setSearchQuery] = useState('');
     const { toast } = useToast();
+    const router = useRouter();
 
     useEffect(() => {
-        // This is a trick to re-fetch data if it was updated on another page.
-        // In a real app, this would be handled by a state management library like Redux or Zustand.
         const storedSpdData = initialSpdData;
         setData(storedSpdData);
     }, []);
@@ -59,6 +60,11 @@ import {
     const handleDelete = (spdId: string) => {
         setData(prevData => prevData.filter(item => item.spd !== spdId));
         toast({ title: "SPD Deleted", description: `SPD ${spdId} has been removed.` });
+    };
+
+    const handlePreview = (spdItem: SpdData) => {
+      sessionStorage.setItem('spdPreviewData', JSON.stringify(spdItem));
+      router.push(`/dashboard/invoices/spd/preview/${encodeURIComponent(spdItem.spd)}`);
     };
 
 
@@ -157,7 +163,7 @@ import {
                                     <TableCell>{item.suratJalan}</TableCell>
                                     <TableCell>
                                         <div className="flex gap-2">
-                                            <Button variant="link" className="p-0 h-auto text-blue-600">Pratinjau</Button>
+                                            <Button variant="link" className="p-0 h-auto text-blue-600" onClick={() => handlePreview(item)}>Pratinjau</Button>
                                             <Button variant="link" className="p-0 h-auto" onClick={() => handleEdit(item)}>Edit</Button>
                                             <div className="text-red-600">
                                                 <DeleteConfirmationDialog onConfirm={() => handleDelete(item.spd)} />
