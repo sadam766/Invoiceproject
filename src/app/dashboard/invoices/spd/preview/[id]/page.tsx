@@ -72,9 +72,9 @@ export default function SpdPreviewPage() {
                     </header>
                     <div className="border-t-2 border-b-2 border-black py-1 text-center mb-6">
                         <h2 className="font-bold text-sm underline">SURAT PENGANTAR DOKUMEN</h2>
-                        <p className="font-bold text-sm flex items-center justify-center gap-x-2">
+                        <p className="font-bold text-sm flex items-center justify-center">
                            <span>PS/</span>
-                           <span>1</span>
+                           <span className="px-2">1</span>
                            <span>-J/KEU/2024/DK</span>
                         </p>
                     </div>
@@ -161,4 +161,3 @@ export default function SpdPreviewPage() {
         </main>
     );
 }
-
