@@ -41,8 +41,6 @@ export default function InvoicePreviewPage() {
         if (dataFromSession) {
             const parsedData = JSON.parse(dataFromSession);
             setInvoiceData(parsedData);
-            // Optional: Clear session storage after use
-            // sessionStorage.removeItem('invoicePreviewData');
         } else if (id) {
             const decodedId = decodeURIComponent(id as string);
             const foundInvoice = invoiceListData.find(inv => inv.id === decodedId);
@@ -106,9 +104,13 @@ export default function InvoicePreviewPage() {
 
     const totalAmount = grandTotal + vat12;
 
+    const formatCurrency = (value: number) => {
+        return value.toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).replace(/\./g, 'TEMP').replace(/,/g, '.').replace(/TEMP/g, ',');
+    }
+
 
     return (
-        <main className="bg-gray-100 p-4 sm:p-8">
+        <main className="bg-gray-100 dark:bg-gray-800 p-4 sm:p-8">
              <div className="flex justify-between items-center mb-4 print:hidden">
                 <Button onClick={() => router.back()} variant="outline">
                     <ArrowLeft className="mr-2 h-4 w-4" /> Back
@@ -117,95 +119,60 @@ export default function InvoicePreviewPage() {
                     <Printer className="mr-2 h-4 w-4" /> Print Invoice
                 </Button>
             </div>
-            <div className="print-container bg-white p-8 max-w-4xl mx-auto border font-sans text-xs">
+            <div className="print-container bg-white dark:bg-gray-900 p-8 max-w-4xl mx-auto border font-sans text-[10px]">
+                {/* Header */}
                 <div className="flex justify-between items-start mb-4">
                     <div>
-                        <h1 className="text-sm font-bold">INVOICE/OFFICIAL RECEIPT</h1>
-                        <p className="text-sm">{invoiceId}</p>
+                        <h1 className="text-xs font-bold">INVOICE/OFFICIAL RECEIPT</h1>
+                        <p className="text-xs">{invoiceId}</p>
                     </div>
                     <div className="text-right">
-                        <p className="font-bold text-sm">Original</p>
-                    </div>
-                </div>
-
-                <div className="flex justify-between items-end mb-2">
-                    <div>
-                        <p>Customer Code: </p>
-                    </div>
-                    <div className="text-right">
-                        <div className="grid grid-cols-[auto_auto] gap-x-2">
-                            <p className="text-left">Sales Order:</p>
-                            <p className="text-left">{soNumber}</p>
-                            <p className="text-left">Order Date:</p>
-                            <p className="text-left"></p>
-                            <p className="text-left">Reference A:</p>
-                            <p className="text-left"></p>
+                        <div className="grid grid-cols-[auto_auto] gap-x-2 text-left">
+                            <p>Sales Order:</p><span>{soNumber}</span>
+                            <p>Order Date:</p><span></span>
+                            <p>Reference A:</p><span></span>
                         </div>
-                        {date && (
-                            <p className="mt-2">Date: {format(new Date(date), 'dd-MM-yyyy')}</p>
-                        )}
+                        <p className="font-bold text-xs mt-2">Original</p>
+                        {date && <p className="mt-2">Date: {format(new Date(date), 'dd-MM-yyyy')}</p>}
                     </div>
                 </div>
 
+                <p>Customer Code: </p>
+                
                 {/* Items Table */}
-                <div className="w-full">
-                    <div className="flex bg-white border-t border-b border-black font-bold">
-                        <div className="p-1 border-l border-black w-10 text-center">No.</div>
-                        <div className="p-1 border-l border-r border-black flex-1">Item</div>
-                        <div className="p-1 border-r border-black w-24 text-center">Quantity Unit</div>
-                        <div className="p-1 border-r border-black w-32 text-right">Price</div>
-                        <div className="p-1 border-r border-black w-32 text-right">Amount</div>
+                <div className="w-full mt-2 border-t-2 border-b-2 border-black">
+                    <div className="flex font-bold">
+                        <div className="p-1 w-10 text-center">No.</div>
+                        <div className="p-1 flex-1">Item</div>
+                        <div className="p-1 w-24 text-center">Quantity Unit</div>
+                        <div className="p-1 w-32 text-right">Price</div>
+                        <div className="p-1 w-32 text-right">Amount</div>
                     </div>
-                    {items.map((item, index) => (
-                        <div key={index} className="flex border-b border-black">
-                            <div className="p-1 border-l border-r border-black w-10 text-center">{item.no}</div>
-                            <div className="p-1 border-r border-black flex-1">{item.item}</div>
-                            <div className="p-1 border-r border-black w-24 text-center">{item.quantity} {item.unit}</div>
-                            <div className="p-1 border-r border-black w-32 text-right">{item.price.toLocaleString('id-ID', { minimumFractionDigits: 2 })}</div>
-                            <div className="p-1 border-r border-black w-32 text-right">{item.amount.toLocaleString('id-ID', { minimumFractionDigits: 2 })}</div>
-                        </div>
-                    ))}
-                     <div className="flex border-b border-black h-40">
-                        <div className="border-l border-r border-black w-10"></div>
-                        <div className="border-r border-black flex-1"></div>
-                        <div className="border-r border-black w-24"></div>
-                        <div className="border-r border-black w-32"></div>
-                        <div className="border-r border-black w-32"></div>
+                    <div className="min-h-[300px]">
+                        {items.map((item, index) => (
+                            <div key={index} className="flex">
+                                <div className="p-1 w-10 text-center">{item.no}</div>
+                                <div className="p-1 flex-1">{item.item}</div>
+                                <div className="p-1 w-24 text-center">{item.quantity} {item.unit}</div>
+                                <div className="p-1 w-32 text-right">{formatCurrency(item.price)}</div>
+                                <div className="p-1 w-32 text-right">{formatCurrency(item.amount)}</div>
+                            </div>
+                        ))}
                     </div>
                 </div>
 
-                <div className="flex justify-end items-start mt-1">
-                    <div className="w-80">
-                         <div className="flex justify-between">
-                            <span>Subtotal</span>
-                            <span className="font-bold w-32 text-right">{subtotal.toLocaleString('id-ID', { minimumFractionDigits: 2 })}</span>
-                         </div>
-                         {negotiation > 0 && (
-                            <div className="flex justify-between">
-                                <span>Negotiation</span>
-                                <span className="font-bold w-32 text-right">({negotiation.toLocaleString('id-ID', { minimumFractionDigits: 2 })})</span>
-                            </div>
-                         )}
-                         {dpValue > 0 && (
-                            <div className="flex justify-between">
-                                <span>DP</span>
-                                <span className="font-bold w-32 text-right">({dpValue.toLocaleString('id-ID', { minimumFractionDigits: 2 })})</span>
-                            </div>
-                         )}
-                         {pelunasan > 0 && (
-                            <div className="flex justify-between">
-                                <span>Pelunasan</span>
-                                <span className="font-bold w-32 text-right">({pelunasan.toLocaleString('id-ID', { minimumFractionDigits: 2 })})</span>
-                            </div>
-                         )}
-                    </div>
+                {/* PO Number and Subtotal */}
+                <div className="flex justify-between items-center mt-2 pb-1 border-b-2 border-black">
+                    <p>No PO :</p>
+                    <p className='font-mono'>{formatCurrency(0)}</p>
                 </div>
-                 <div className="border-b-2 border-black mt-1"></div>
 
+                {/* Footer */}
                  <div className="flex justify-between mt-4">
-                     <div>
-                        <p>No PO :</p>
-                        <p>Payment: &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 50 Hari setelah invoice diterima</p>
+                     <div className='w-2/3'>
+                        <div className='grid grid-cols-[auto_1fr] gap-x-2'>
+                            <p>Payment :</p><p>90 Hari setelah invoice diterima</p>
+                        </div>
                         <p>Please state with your payment: {invoiceId}</p>
                         <p>For payment, please transfer to our account:</p>
                         <p className="font-bold mt-2">PT. Jembo Cable Company Tbk</p>
@@ -222,16 +189,19 @@ export default function InvoicePreviewPage() {
                              <p>A/C No.: 684-0198977 (Rp)</p>
                         </div>
                      </div>
-                     <div className="w-1/3 text-right">
-                         <div className="grid grid-cols-2 gap-y-1">
-                             <p>Goods:</p>
-                             <p>{grandTotal.toLocaleString('id-ID', { minimumFractionDigits: 2 })}</p>
-                             <p>DPP VAT:</p>
-                             <p>{dppVat.toLocaleString('id-ID', { minimumFractionDigits: 2 })}</p>
-                             <p>VAT 12%:</p>
-                             <p>{vat12.toLocaleString('id-ID', { minimumFractionDigits: 2 })}</p>
-                             <p className="font-bold col-span-2 border-t border-black pt-1 mt-1">Total Rp:</p>
-                             <p className="font-bold col-span-2">{totalAmount.toLocaleString('id-ID', { minimumFractionDigits: 2 })}</p>
+                     <div className="w-1/3">
+                         <div className="grid grid-cols-2 gap-y-1 font-mono">
+                             <p className='font-sans'>Goods:</p>
+                             <p className='text-right'>{formatCurrency(grandTotal)}</p>
+                             
+                             <p className='font-sans'>DPP VAT (11/12):</p>
+                             <p className='text-right'>{formatCurrency(dppVat)}</p>
+                             
+                             <p className='font-sans'>VAT 12%:</p>
+                             <p className='text-right'>{formatCurrency(vat12)}</p>
+                             
+                             <p className="font-sans font-bold col-span-2 border-t border-black pt-1 mt-1">Total Rp:</p>
+                             <p className="font-bold col-span-2 text-right">{formatCurrency(totalAmount)}</p>
                          </div>
                         <div className="mt-12 text-center">
                             <p>PT. JEMBO CABLE COMPANY Tbk</p>
@@ -254,10 +224,18 @@ export default function InvoicePreviewPage() {
                         left: 0;
                         top: 0;
                         width: 100%;
+                        border: none !important;
+                        box-shadow: none !important;
+                        padding: 0.5in;
+                        font-size: 10px;
                     }
                     .print-hidden {
                         display: none;
                     }
+                }
+                @page {
+                    size: A4;
+                    margin: 0;
                 }
             `}</style>
         </main>
