@@ -147,6 +147,7 @@ export default function InvoicePreviewPage() {
 
     const formatCurrency = (value: number) => {
         if (typeof value !== 'number' || isNaN(value)) return '0,00';
+        // Use German locale to get comma as decimal separator
         return value.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
     };
 
@@ -237,46 +238,50 @@ export default function InvoicePreviewPage() {
                 </table>
               </main>
 
-              <footer>
-                <div className="border-t border-black pt-1">
-                  <div className="flex justify-between items-center text-[10px]">
-                      <p>No PO : {poNumber || ''}</p>
-                      <div className="text-right">
-                          <p className="font-bold">{formatCurrency(subtotal)}</p>
-                      </div>
-                  </div>
+              <footer className="pt-2">
+                <div className="flex justify-between items-center text-[10px]">
+                    <p>No PO : {poNumber || ''}</p>
+                    <div className="text-right">
+                        <p className="font-bold">{formatCurrency(subtotal)}</p>
+                    </div>
                 </div>
 
-                <div className="border-t border-b border-black py-2">
-                    <div className="flex justify-end w-full text-[10px]">
-                        <div className="w-1/2 pl-4">
-                             {negotiation > 0 && (
-                                <div className="flex justify-end"><p className="w-28 text-left">A/Negotiation :</p> <p className='w-28 text-right'>({formatCurrency(negotiation)})</p></div>
-                            )}
-                            {dpValue > 0 && (
-                                <div className="flex justify-end"><p className="w-28 text-left">DP :</p> <p className='w-28 text-right'>{formatCurrency(dpValue)}</p></div>
-                            )}
-                             {pelunasan > 0 && (
-                                <div className="flex justify-end"><p className="w-28 text-left">Pelunasan :</p> <p className='w-28 text-right'>({formatCurrency(pelunasan)})</p></div>
-                            )}
+                <div className="border-t border-black mt-1"></div>
+
+                <div className="flex justify-end w-full text-[10px] mt-1">
+                    <div className="w-1/2 pl-4">
+                        {negotiation > 0 && (
+                            <div className="flex justify-end"><p className="w-28 text-left">A/Negotiation :</p> <p className='w-28 text-right'>({formatCurrency(negotiation)})</p></div>
+                        )}
+                        {dpValue > 0 && (
+                            <div className="flex justify-end"><p className="w-28 text-left">DP :</p> <p className='w-28 text-right'>{formatCurrency(dpValue)}</p></div>
+                        )}
+                         {pelunasan > 0 && (
+                            <div className="flex justify-end"><p className="w-28 text-left">Pelunasan :</p> <p className='w-28 text-right'>({formatCurrency(pelunasan)})</p></div>
+                        )}
+                    </div>
+                </div>
+                
+                <div className="border-b border-black mt-1"></div>
+                <div className="flex justify-end w-full text-[10px] mt-1">
+                    <div className="w-1/2 pl-4">
+                        <div className="grid grid-cols-2 gap-y-1 justify-items-end">
+                            <p className="text-left w-28">Goods:</p>
+                            <p className='text-right w-28'>{formatCurrency(grandTotal)}</p>
                             
-                            <div className="grid grid-cols-2 gap-y-1 text-[10px] mt-2 justify-items-end">
-                                <p className="text-left w-28">Goods:</p>
-                                <p className='text-right w-28'>{formatCurrency(grandTotal)}</p>
-                                
-                                <p className="text-left w-28">DPP VAT (11/12):</p>
-                                <p className='text-right w-28'>{formatCurrency(dppVat)}</p>
-                                
-                                <p className="text-left w-28">VAT 12%:</p>
-                                <p className='text-right w-28'>{formatCurrency(vat12)}</p>
-                            </div>
-                             <div className="grid grid-cols-2 justify-items-end mt-1">
-                                <p className="font-bold text-left w-28">Total Rp:</p>
-                                <p className="text-right font-bold w-28">{formatCurrency(totalAmount)}</p>
-                            </div>
+                            <p className="text-left w-28">DPP VAT (11/12):</p>
+                            <p className='text-right w-28'>{formatCurrency(dppVat)}</p>
+                            
+                            <p className="text-left w-28">VAT 12%:</p>
+                            <p className='text-right w-28'>{formatCurrency(vat12)}</p>
+                        </div>
+                         <div className="grid grid-cols-2 justify-items-end mt-1">
+                            <p className="font-bold text-left w-28">Total Rp:</p>
+                            <p className="text-right font-bold w-28">{formatCurrency(totalAmount)}</p>
                         </div>
                     </div>
                 </div>
+                <div className="border-b border-black mt-1"></div>
                 
                 <div className="flex mt-4 text-[10px]">
                     <div className='w-1/2 pr-4 text-[9px]'>
