@@ -357,7 +357,7 @@ const InvoicePreviewPage: React.FC = () => {
                 </div>
               </header>
 
-              <main className='mt-2'>
+              <main className='mt-2 flex-grow'>
                  <table className="w-full border-collapse text-[10px]">
                     <thead>
                         <tr>
@@ -389,24 +389,25 @@ const InvoicePreviewPage: React.FC = () => {
                         ))}
                     </tbody>
                  </table>
+
+                 {isLastPage && (
+                    <div className="flex justify-end text-right mt-4">
+                        <div>
+                            <div className="inline-block border-t border-black w-[128px]" />
+                            <div>{formatCurrency(subtotal)}</div>
+                        </div>
+                    </div>
+                 )}
+
               </main>
               
-              {isLastPage && (
-                <div className="flex justify-end mt-4">
-                    <div className="text-right">
-                        <div className="inline-block border-t border-black w-[128px]" />
-                        <div className="">{formatCurrency(subtotal)}</div>
-                    </div>
-                </div>
-              )}
               
               {isLastPage && (
                 <footer className="pt-2 text-black mt-auto">
-                    <div className="w-full">
-                        <div className="border-b border-black w-full" />
-                        <div className="flex justify-between items-start pt-1">
+                    <div className="border-t border-b border-black py-1">
+                        <div className="flex justify-between items-start">
                             <p>No PO : {poNumber || ''}</p>
-                            <div className="w-[240px] py-1">
+                            <div className="w-[240px]">
                                 <div className="grid grid-cols-[auto_1fr] justify-items-end gap-x-4">
                                     <p className="text-right">Goods:</p>
                                     <p className='text-right'>{formatCurrency(grandTotal)}</p>
@@ -419,9 +420,7 @@ const InvoicePreviewPage: React.FC = () => {
                                 </div>
                             </div>
                         </div>
-                        <div className="border-b border-black w-full" />
                     </div>
-
 
                     <div className="flex mt-4 text-[10px]">
                         <div className='w-1/2 pr-4 text-[9px]'>
