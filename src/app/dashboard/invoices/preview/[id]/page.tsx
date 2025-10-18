@@ -8,6 +8,9 @@ import { ArrowLeft, Printer, Download } from 'lucide-react';
 import { invoiceListData, salesOrderListData, type Customer, customerListData, type Invoice } from '@/app/lib/data';
 import { exportToExcel } from '@/lib/utils';
 import Head from 'next/head';
+import { format } from 'date-fns';
+import { id as indonesiaLocale } from 'date-fns/locale';
+
 
 type InvoiceItem = {
     id: number;
@@ -355,7 +358,7 @@ const InvoicePreviewPage: React.FC = () => {
                         <tr>
                             <th className="p-1 text-left w-[4%]">No.</th>
                             <th className="p-1 text-left w-[40%]">Item</th>
-                            <th className="p-1 text-left w-[18%]">Quantity Unit</th>
+                            <th className="p-1 text-center w-[18%]">Quantity Unit</th>
                             <th className="p-1 text-right w-[19%]">Price</th>
                             <th className="p-1 text-right w-[19%]">Amount</th>
                         </tr>
@@ -370,13 +373,22 @@ const InvoicePreviewPage: React.FC = () => {
                                 <td className="p-1 text-right align-top">{formatCurrency(item.total)}</td>
                             </tr>
                         ))}
+                         {isLastPage && Array.from({ length: Math.max(0, emptyRows) }).map((_, index) => (
+                            <tr key={`empty-${index}`} className="h-[24px]">
+                                <td>&nbsp;</td>
+                                <td>&nbsp;</td>
+                                <td>&nbsp;</td>
+                                <td>&nbsp;</td>
+                                <td>&nbsp;</td>
+                            </tr>
+                        ))}
                     </tbody>
                  </table>
               </main>
 
-              {isLastPage && (
-                <>
-                <div className="mt-4" /> 
+              <div className="mt-12" />
+
+              {isLastPage ? (
                 <footer className="pt-2 text-black">
                     <div className="flex justify-between items-end text-[10px]">
                         <p>No PO : {poNumber || ''}</p>
@@ -410,25 +422,30 @@ const InvoicePreviewPage: React.FC = () => {
                             <p className="font-bold mt-2">For payment, please transfer to our account:</p>
                             <p className="font-bold mt-2">PT. Jembo Cable Company Tbk</p>
                             
-                            <div className="grid grid-cols-[max-content_1fr] gap-x-4 mt-1">
+                             <div className="grid grid-cols-[max-content_1fr] gap-x-4 mt-1">
                                 <div>
                                     <p className='font-bold'>Bank Mandiri - Jakarta</p>
                                     <p>Cabang Sudirman</p>
                                 </div>
                                 <div className="text-left">
-                                    <p>A/C No.: 102-0100206827 (Rp)</p>
-                                    <p>A/C No.: 102-0005000218 (Rp)</p>
-                                    <p>A/C No.: 102-0005000226 (USD)</p>
+                                    <p>A/C No. : 102-0100206827 (Rp)</p>
+                                    <p>A/C No. : 102-0005000218 (Rp)</p>
+                                    <p>A/C No. : 102-0005000226 (USD)</p>
                                 </div>
                                 
-                                <div className="col-span-2 text-center font-bold my-1">OR</div>
+                                <div className="col-span-2 my-1 flex items-center">
+                                  <span className="flex-grow border-t border-dotted border-black"></span>
+                                  <span className="px-2">OR</span>
+                                  <span className="flex-grow border-t border-dotted border-black"></span>
+                                </div>
+
 
                                 <div>
                                     <p className='font-bold'>Bank BCA - Jakarta</p>
                                     <p>Cabang KEM TOWER</p>
                                 </div>
                                 <div className="text-left">
-                                    <p>A/C No.: 684-0198977 (Rp)</p>
+                                    <p>A/C No. : 684-0198977 (Rp)</p>
                                 </div>
                             </div>
                         </div>
@@ -445,9 +462,7 @@ const InvoicePreviewPage: React.FC = () => {
                         </div>
                     </div>
                 </footer>
-                </>
-              )}
-                {!isLastPage && (
+                ) : (
                     <div className="text-center text-gray-500 text-[10px] py-4 border-t border-dashed mt-auto">
                         Halaman {pageNumber} dari {totalPages} - Bersambung...
                     </div>
