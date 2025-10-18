@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { useEffect, useState } from 'react';
@@ -239,8 +240,8 @@ const InvoicePreviewPage: React.FC = () => {
     exportToExcel(sheetData, `Invoice-${invoiceId.replace('/', '-')}`);
   };
 
-  const emptyRows = ITEMS_PER_PAGE - (items.length % ITEMS_PER_PAGE);
-
+  const emptyRows = items.length < ITEMS_PER_PAGE ? ITEMS_PER_PAGE - items.length : 0;
+  
   return (
     <div className="bg-gray-100 dark:bg-slate-900 min-h-screen p-4 font-sans text-black">
        <Head>
@@ -283,7 +284,6 @@ const InvoicePreviewPage: React.FC = () => {
           padding: 0.5in !important;
           box-shadow: none !important;
           border: none !important;
-          min-height: auto !important;
         }
          @page {
             size: A4;
@@ -323,7 +323,7 @@ const InvoicePreviewPage: React.FC = () => {
           const totalPages = itemPages.length;
 
           return (
-            <div key={pageIndex} className="invoice-page relative flex flex-col p-8 text-[10px] leading-tight min-h-[26cm]">
+            <div key={pageIndex} className="invoice-page relative flex flex-col p-8 text-[10px] leading-tight">
               <header>
                 <div className="flex justify-between items-start">
                     <div className="w-1/2">
@@ -335,13 +335,13 @@ const InvoicePreviewPage: React.FC = () => {
                         <p className="font-bold uppercase text-[14px]">{invoiceId}</p>
                     </div>
                 </div>
-                <div className="flex justify-between items-end mt-2">
-                    <div className="w-1/2">
-                         <div className="mt-8">
+                 <div className="flex justify-between items-end mt-2">
+                    <div>
+                        <div className="mt-8">
                              <p>Customer Code: -</p>
                          </div>
                     </div>
-                     <div className="w-1/2 flex flex-col items-end text-[10px]">
+                     <div className="flex flex-col items-end text-[10px]">
                          <div className="inline-grid grid-cols-[max-content_max-content] text-left gap-x-2">
                             <span>Sales Order</span><span>: {soNumber || ''}</span>
                             <span>Order Date</span><span>:</span>
@@ -356,13 +356,13 @@ const InvoicePreviewPage: React.FC = () => {
 
               <main>
                 <table className="w-full border-collapse text-[10px] mt-2">
-                    <thead className='border-t border-black'>
+                    <thead className='border-y border-black'>
                         <tr>
-                            <th className="p-1 text-left w-[4%] border-l border-b border-black">No.</th>
-                            <th className="p-1 text-left w-[40%] border-l border-b border-black">Item</th>
-                            <th className="p-1 text-left w-[18%] border-l border-b border-black">Quantity Unit</th>
-                            <th className="p-1 text-right w-[19%] border-l border-b border-black">Price</th>
-                            <th className="p-1 text-right w-[19%] border-l border-b border-r border-black">Amount</th>
+                            <th className="p-1 text-left w-[4%] border-x border-black">No.</th>
+                            <th className="p-1 text-left w-[40%] border-r border-black">Item</th>
+                            <th className="p-1 text-left w-[18%] border-r border-black">Quantity Unit</th>
+                            <th className="p-1 text-right w-[19%] border-r border-black">Price</th>
+                            <th className="p-1 text-right w-[19%] border-r border-black">Amount</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -388,32 +388,31 @@ const InvoicePreviewPage: React.FC = () => {
                  </table>
               </main>
 
-              <div className="mt-8" />
-              
               {isLastPage ? (
                 <footer className="pt-2 text-black">
-                    <div className="flex justify-between items-end text-[10px] border-t border-black">
+                    <div className="mt-8" />
+                    
+                    <div className="flex justify-between items-end text-[10px] border-t border-black pt-1">
                         <p>No PO : {poNumber || ''}</p>
-                        <div className="text-right font-bold">{formatCurrency(subtotal)}</div>
+                        <div className="font-bold">{formatCurrency(subtotal)}</div>
                     </div>
                     
-                    <div className="border-b-2 border-black my-2">
-                        <div className="flex justify-end w-full text-[10px]">
-                            <div className="w-[224px] py-1">
-                                <div className="grid grid-cols-2 justify-items-end">
-                                    <p className="text-left">Goods:</p>
-                                    <p className='text-right'>{formatCurrency(grandTotal)}</p>
-                                    <p className="text-left">DPP VAT:</p>
-                                    <p className='text-right'>{formatCurrency(dppVat)}</p>
-                                    <p className="text-left">VAT 12%:</p>
-                                    <p className='text-right'>{formatCurrency(vat12)}</p>
-                                    <p className="text-left font-bold">Total Rp:</p>
-                                    <p className="text-right font-bold">{formatCurrency(totalRp)}</p>
-                                </div>
+                    <div className="flex justify-end w-full text-[10px]">
+                        <div className="w-[240px] py-1">
+                            <div className="grid grid-cols-[auto_1fr] justify-items-end gap-x-4">
+                                <p className="text-left">Goods:</p>
+                                <p className='text-right'>{formatCurrency(grandTotal)}</p>
+                                <p className="text-left">DPP VAT (11/12):</p>
+                                <p className='text-right'>{formatCurrency(dppVat)}</p>
+                                <p className="text-left">VAT 12%:</p>
+                                <p className='text-right'>{formatCurrency(vat12)}</p>
+                                <div className="col-span-2 w-full border-t border-black my-1"></div>
+                                <p className="text-left font-bold">Total Rp:</p>
+                                <p className="text-right font-bold">{formatCurrency(totalRp)}</p>
                             </div>
                         </div>
                     </div>
-                    
+
                     <div className="flex mt-4 text-[10px]">
                         <div className='w-1/2 pr-4 text-[9px]'>
                             <div className="flex items-start">
@@ -424,19 +423,19 @@ const InvoicePreviewPage: React.FC = () => {
                             <p className="font-bold mt-2">For payment, please transfer to our account:</p>
                             <p className="font-bold mt-2">PT. Jembo Cable Company Tbk</p>
                             
-                           <div className="grid grid-cols-[max-content_1fr] gap-x-4 mt-1">
+                           <div className="grid grid-cols-[auto_1fr] gap-x-4 mt-1">
                                 <div className="font-bold">
                                     <p>Bank Mandiri - Jakarta</p>
                                     <p>Cabang Sudirman</p>
                                 </div>
                                 <div className="text-left">
-                                  <div className="flex justify-between items-center"><span className="pr-2">A/C No.</span><span className='pl-2'>: 102-0100206827 (Rp)</span></div>
-                                  <div className="flex justify-between items-center"><span className="pr-2">A/C No.</span><span className='pl-2'>: 102-0005000218 (Rp)</span></div>
-                                  <div className="flex justify-between items-center"><span className="pr-2">A/C No.</span><span className='pl-2'>: 102-0005000226 (USD)</span></div>
+                                  <div className="flex justify-between items-center"><span className="pr-2">A/C No.</span><span>: 102-0100206827 (Rp)</span></div>
+                                  <div className="flex justify-between items-center"><span className="pr-2">A/C No.</span><span>: 102-0005000218 (Rp)</span></div>
+                                  <div className="flex justify-between items-center"><span className="pr-2">A/C No.</span><span>: 102-0005000226 (USD)</span></div>
                                 </div>
                                 
                                 <div className="col-span-2 my-1 flex items-center justify-center">
-                                  <span className='px-4'>OR</span>
+                                  <span>OR</span>
                                 </div>
 
                                 <div className="font-bold">
@@ -444,7 +443,7 @@ const InvoicePreviewPage: React.FC = () => {
                                     <p>Cabang KEM TOWER</p>
                                 </div>
                                 <div className="text-left">
-                                  <div className="flex justify-between items-center"><span className="pr-2">A/C No.</span><span className='pl-2'>: 684-0198977 (Rp)</span></div>
+                                  <div className="flex justify-between items-center"><span className="pr-2">A/C No.</span><span>: 684-0198977 (Rp)</span></div>
                                 </div>
                             </div>
                         </div>
@@ -454,7 +453,7 @@ const InvoicePreviewPage: React.FC = () => {
                                 <p>PT. JEMBO CABLE COMPANY Tbk</p>
                             </div>
                             <div className="text-center mt-auto pt-24">
-                                <p className='-ml-8'>Finance</p>
+                                <p className='ml-4'>Finance</p>
                             </div>
                         </div>
                     </div>
