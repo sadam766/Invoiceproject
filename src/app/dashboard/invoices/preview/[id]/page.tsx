@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { ArrowLeft, Printer, Download } from 'lucide-react';
 import { invoiceListData, salesOrderListData, type Customer, customerListData, type Invoice } from '@/app/lib/data';
 import { exportToExcel } from '@/lib/utils';
+import Head from 'next/head';
 
 type InvoiceItem = {
     id: number;
@@ -45,8 +46,15 @@ const InvoicePreviewPage: React.FC = () => {
   const { id } = params;
   
   const [invoiceData, setInvoiceData] = useState<PreviewData | null>(null);
+  const [isClient, setIsClient] = useState(false);
 
   useEffect(() => {
+    setIsClient(true);
+  }, []);
+
+  useEffect(() => {
+    if (!isClient) return;
+
     function fetchInvoiceFromListData(invoiceId: string) {
         const foundInvoice = invoiceListData.find(inv => inv.id === invoiceId);
         
@@ -97,10 +105,8 @@ const InvoicePreviewPage: React.FC = () => {
 
     if (dataFromSession) {
         const parsedData = JSON.parse(dataFromSession);
-        if (decodedId === parsedData.id) {
+        if (decodedId === parsedData.id || decodedId === 'new') {
             setInvoiceData(parsedData);
-            // Clean up session storage after use
-            // sessionStorage.removeItem('invoicePreviewData');
         } else {
              fetchInvoiceFromListData(decodedId);
         }
@@ -108,13 +114,32 @@ const InvoicePreviewPage: React.FC = () => {
         fetchInvoiceFromListData(decodedId);
     }
 
-  }, [id]);
+  }, [id, isClient]);
+
+  const handlePdfExport = () => {
+    if (isClient) {
+      const html2pdf = (window as any).html2pdf;
+      if (html2pdf) {
+        const element = document.getElementById('invoice-paper');
+        const opt = {
+          margin: [0.5, 0.2, 0.5, 0.2],
+          filename: `Invoice-${invoiceData?.id?.replace('/', '-')}.pdf`,
+          image: { type: 'jpeg', quality: 0.98 },
+          html2canvas: { scale: 2, useCORS: true },
+          jsPDF: { unit: 'in', format: 'a4', orientation: 'portrait' }
+        };
+        html2pdf().from(element).set(opt).save();
+      } else {
+        alert("PDF generation library is not loaded yet.");
+      }
+    }
+  };
 
 
   if (!invoiceData) {
     return (
       <div className="bg-gray-100 dark:bg-slate-900 min-h-screen p-4 flex flex-col items-center justify-center">
-        <p className="text-gray-700 dark:text-gray-300 text-lg mb-4">Tidak ada data invoice untuk pratinjau.</p>
+        <p className="text-gray-700 dark:text-gray-300 text-lg mb-4">Loading or Invoice not found...</p>
         <Button
           onClick={() => router.back()}
           className="flex items-center"
@@ -161,7 +186,7 @@ const InvoicePreviewPage: React.FC = () => {
     if (!dateString) return '';
     try {
         const cleanDate = dateString.includes('-') ? new Date(dateString) : new Date(dateString.split('/').reverse().join('-'));
-        return new Intl.DateTimeFormat('de-DE').format(cleanDate);
+        return new Intl.DateTimeFormat('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' }).format(cleanDate);
     } catch (e) {
         return dateString;
     }
@@ -174,10 +199,6 @@ const InvoicePreviewPage: React.FC = () => {
     window.print();
   };
   
-  const handleExportPDF = () => {
-     alert("Fungsi ekspor PDF sedang dalam pengembangan.");
-  };
-
   const handleExportExcel = () => {
     if (!invoiceData) return;
 
@@ -217,7 +238,10 @@ const InvoicePreviewPage: React.FC = () => {
   };
 
   return (
-    <div className="bg-gray-100 dark:bg-slate-900 min-h-screen p-4 font-sans">
+    <div className="bg-gray-100 dark:bg-slate-900 min-h-screen p-4 font-sans text-black">
+       <Head>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.9.2/html2pdf.bundle.min.js" integrity="sha512-pdizPidlry3pMMda2S1sI1up/gY2SKproofDdgZaGzDyr+p/b2knKen/gv0yD5g4b/b/i0/24i/c4sD6xBu/g==" crossOrigin="anonymous" referrerPolicy="no-referrer"></script>
+      </Head>
       <style>{`
       .invoice-page {
         page-break-after: always;
@@ -229,9 +253,11 @@ const InvoicePreviewPage: React.FC = () => {
         body {
             -webkit-print-color-adjust: exact;
             print-color-adjust: exact;
+            background-color: white !important;
         }
         body * {
           visibility: hidden;
+          color: black !important;
         }
         .action-bar {
           display: none;
@@ -274,7 +300,7 @@ const InvoicePreviewPage: React.FC = () => {
               <Download className="w-5 h-5 mr-2"/>
               <span>Excel</span>
             </Button>
-            <Button onClick={handleExportPDF} variant="outline">
+            <Button onClick={handlePdfExport} variant="outline">
               <Download className="w-5 h-5 mr-2"/>
               <span>PDF</span>
             </Button>
@@ -294,31 +320,30 @@ const InvoicePreviewPage: React.FC = () => {
           return (
             <div key={pageIndex} className="invoice-page p-8 text-[10px] leading-tight relative" style={{ display: 'flex', flexDirection: 'column', minHeight: '27cm' }}>
               <header>
-                <div className="h-[70px] w-full"></div>
-                <div className="text-center mb-4">
-                  <p className="font-bold uppercase text-[14px] mb-1 tracking-tighter">{invoiceTitle}</p>
-                  <p className="font-bold uppercase text-[14px]">{invoiceId}</p>
+                <div className="grid grid-cols-2">
+                    <div>
+                        <p className="font-bold text-[11px] mb-1">{customer?.name}</p>
+                    </div>
+                    <div className="text-center">
+                        <p className="font-bold uppercase text-[14px] mb-1 tracking-tighter">{invoiceTitle}</p>
+                        <p className="font-bold uppercase text-[14px]">{invoiceId}</p>
+                    </div>
                 </div>
-                <div className="flex justify-between items-start mb-4">
+
+                <div className="flex justify-between items-start text-[10px] mt-8 mb-2">
                   <div className="w-1/2 text-left pr-4">
-                    <p className="font-bold text-[11px] mb-1">{customer?.name}</p>
-                    {customer?.address && <p className="font-bold text-[9px] whitespace-pre-wrap">{customer.address}</p>}
+                     <p>Customer Code: {customer?.id || ''}</p>
                   </div>
-                  <div className="w-1/2 text-right pt-2">
-                    <p className="font-bold text-[12px]">{printType || 'Original'}</p>
-                  </div>
-                </div>
-                <div className="flex justify-between items-start text-[10px] mb-2">
-                  <div className="w-1/2 text-left pr-4"></div>
                   <div className="w-1/2 text-right pl-4">
-                    <div className="flex justify-between py-[0px]"><div className="w-[120px] text-right">Sales Order :</div><div className="flex-1 text-left ml-2">{soNumber || ''}</div></div>
-                    <div className="flex justify-between py-[0px]"><div className="w-[120px] text-right">Order Date :</div><div className="flex-1 text-left ml-2"></div></div>
-                    <div className="flex justify-between py-[0px]"><div className="w-[120px] text-right">Reference A :</div><div className="flex-1 text-left ml-2"></div></div>
+                    <div className="inline-grid grid-cols-2 text-left gap-x-2">
+                        <span>Sales Order</span><span>: {soNumber || ''}</span>
+                        <span>Order Date</span><span>:</span>
+                        <span>Reference A</span><span>:</span>
+                    </div>
                   </div>
                 </div>
-                <div className="flex justify-between items-end text-[10px] mb-4">
-                  <div className="w-1/2 text-left"><div className="flex"><div className="w-[100px]">Customer Code :</div><div className="flex-1 text-left">{customer?.id || ''}</div></div></div>
-                  <div className="w-1/2 text-right"><p>Date: {formatDate(date)}</p></div>
+                 <div className="flex justify-end items-end text-[10px] mb-2">
+                    <p>Date: {formatDate(date)}</p>
                 </div>
               </header>
 
@@ -335,7 +360,7 @@ const InvoicePreviewPage: React.FC = () => {
                       </thead>
                       <tbody>
                           {pageItems.map((item) => (
-                              <tr key={item.no}>
+                              <tr key={item.no} className="h-[24px]">
                                   <td className="p-1 text-center align-top">{item.no}</td>
                                   <td className="p-1 align-top border-l border-black">{item.name}</td>
                                   <td className="p-1 text-center align-top border-l border-black">{item.quantity.toLocaleString('id-ID')} {item.unit}</td>
@@ -357,80 +382,58 @@ const InvoicePreviewPage: React.FC = () => {
               </main>
 
               {isLastPage && (
-                <footer className="pt-2">
+                <footer className="pt-2 text-black">
                     <div className="flex justify-between items-center text-[10px] pt-1">
                         <p>No PO : {poNumber || ''}</p>
                         <div className="flex items-center">
-                            <div className="w-28 text-left">Subtotal</div>
                             <div className="w-28 text-right font-bold">{formatCurrency(subtotal)}</div>
                         </div>
                     </div>
-
-                     {(negotiation > 0 || dpValue > 0 || pelunasan > 0) && (
-                        <div className="flex justify-end w-full text-[10px] mt-1">
-                            <div className="w-[224px]">
-                                {negotiation > 0 && (
-                                    <div className="flex justify-between"><p className="text-left">A/Negotiation :</p> <p className='text-right'>({formatCurrency(negotiation)})</p></div>
-                                )}
-                                {dpValue > 0 && (
-                                    <div className="flex justify-between"><p className="text-left">DP :</p> <p className='text-right'>{formatCurrency(dpValue)}</p></div>
-                                )}
-                                {pelunasan > 0 && (
-                                    <div className="flex justify-between"><p className="text-left">Pelunasan :</p> <p className='text-right'>({formatCurrency(pelunasan)})</p></div>
-                                )}
-                            </div>
-                        </div>
-                     )}
                     
-                    <div className="border-t border-b border-black mt-2">
+                    <div className="border-t border-b border-black mt-2 py-1">
                         <div className="flex justify-end w-full text-[10px]">
                             <div className="w-[224px] py-1">
                                 <div className="grid grid-cols-2 justify-items-end">
                                     <p className="text-left">Goods:</p>
                                     <p className='text-right'>{formatCurrency(grandTotal)}</p>
-                                    <p className="text-left">DPP VAT (12%):</p>
+                                    <p className="text-left">DPP VAT:</p>
                                     <p className='text-right'>{formatCurrency(dppVat)}</p>
                                     <p className="text-left">VAT 12%:</p>
                                     <p className='text-right'>{formatCurrency(vat12)}</p>
+                                    <p className="text-left font-bold">Total Rp:</p>
+                                    <p className="text-right font-bold">{formatCurrency(totalRp)}</p>
                                 </div>
                             </div>
                         </div>
                     </div>
-                    <div className="border-b border-black">
-                         <div className="flex justify-end w-full text-[10px]">
-                            <div className="w-[224px] py-1">
-                                 <div className="grid grid-cols-2 justify-items-end font-bold">
-                                    <p className="text-left">Total Rp:</p>
-                                    <p className="text-right">{formatCurrency(totalRp)}</p>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
                     
                     <div className="flex mt-4 text-[10px]">
                         <div className='w-1/2 pr-4 text-[9px]'>
                             <div className="flex items-start">
-                                <p className='w-[60px] shrink-0'>Payment :</p><p className='flex-1'>{paymentTerms || '90 Hari setelah invoice diterima'}</p>
+                                <p className='w-[60px] shrink-0'>Payment:</p><p className='flex-1'>{paymentTerms || '90 Hari setelah invoice diterima'}</p>
                             </div>
                             <p className="mt-2">Please state with your payment: {invoiceId}</p>
                             <p className="font-bold mt-2">For payment, please transfer to our account:</p>
                             <p className="font-bold mt-2">PT. Jembo Cable Company Tbk</p>
                             
                              <div className="flex mt-1">
-                                <div className="w-1/2 pr-2">
+                                <div className="w-[120px]">
                                     <p className='font-bold'>Bank Mandiri - Jakarta</p>
                                     <p>Cabang Sudirman</p>
+                                </div>
+                                <div className="w-[200px] text-right">
                                     <p>A/C No.: 102-0100206827 (Rp)</p>
                                     <p>A/C No.: 102-0005000218 (Rp)</p>
                                     <p>A/C No.: 102-0005000226 (USD)</p>
                                 </div>
-                                <div className='relative w-12'>
-                                    <p className="font-bold text-center absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2">OR</p>
-                                </div>
-                                 <div className="w-1/2 pl-2">
+                            </div>
+                            <div className='text-center w-[250px] font-bold my-1'>OR</div>
+                             <div className="flex mt-1">
+                                <div className="w-[120px]">
                                     <p className='font-bold'>Bank BCA - Jakarta</p>
                                     <p>Cabang KEM TOWER</p>
+                                </div>
+                                <div className="w-[200px] text-right">
                                     <p>A/C No.: 684-0198977 (Rp)</p>
                                 </div>
                             </div>
@@ -442,7 +445,7 @@ const InvoicePreviewPage: React.FC = () => {
                              </div>
                              <div className="text-center mt-20">
                                 <div className="inline-block">
-                                    <div className="h-px w-32 bg-black mb-1"></div>
+                                    <div className="h-px w-48 bg-black mb-1"></div>
                                     <p>Finance</p>
                                 </div>
                              </div>
@@ -450,7 +453,7 @@ const InvoicePreviewPage: React.FC = () => {
                     </div>
                 </footer>
               )}
-                {itemPages.length > 1 && !isLastPage && (
+                {!isLastPage && (
                     <div className="text-center text-gray-500 text-[10px] py-4 border-t border-dashed mt-4">
                         Halaman {pageNumber} dari {totalPages} - Bersambung...
                     </div>
