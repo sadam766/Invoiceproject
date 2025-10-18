@@ -5,7 +5,7 @@ import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { invoiceListData, salesOrderListData, type Customer, customerListData } from '@/app/lib/data';
-import { ArrowLeft, Printer, FileDown } from 'lucide-react';
+import { ArrowLeft, Printer } from 'lucide-react';
 import { format } from 'date-fns';
 
 type InvoiceItem = {
@@ -52,8 +52,18 @@ export default function InvoicePreviewPage() {
         const dataFromSession = sessionStorage.getItem('invoicePreviewData');
         if (dataFromSession) {
             const parsedData = JSON.parse(dataFromSession);
-            setInvoiceData(parsedData);
+            // Ensure the data from session storage matches the current preview ID
+            if (decodeURIComponent(id as string) === parsedData.id) {
+                setInvoiceData(parsedData);
+            } else {
+                 // If not, fall back to fetching from list data
+                 fetchInvoiceFromListData();
+            }
         } else if (id) {
+            fetchInvoiceFromListData();
+        }
+
+        function fetchInvoiceFromListData() {
             const decodedId = decodeURIComponent(id as string);
             const foundInvoice = invoiceListData.find(inv => inv.id === decodedId);
             
@@ -72,6 +82,7 @@ export default function InvoicePreviewPage() {
                 }));
                 const subtotal = invoiceItems.reduce((sum, item) => sum + item.total, 0);
                 
+                // Assuming these are not stored in invoiceListData and are 0 for old records
                 const negotiation = 0;
                 const dpValue = 0;
                 const pelunasan = 0;
@@ -141,7 +152,9 @@ export default function InvoicePreviewPage() {
     const formatDate = (dateString: string) => {
         if (!dateString) return '';
         try {
-            return format(new Date(dateString), 'dd-MM-yyyy');
+            // Handles both 'YYYY-MM-DD' and 'DD/MM/YYYY' from old data
+            const cleanDate = dateString.includes('-') ? new Date(dateString) : new Date(dateString.split('/').reverse().join('-'));
+            return format(cleanDate, 'dd-MM-yyyy');
         } catch (e) {
             return dateString;
         }
@@ -194,9 +207,9 @@ export default function InvoicePreviewPage() {
                     <thead>
                         <tr>
                             <th className="text-center p-1 w-[4%] border-l border-t border-b border-black">No.</th>
-                            <th className="text-left p-1 w-[40%] border-t border-b border-r border-black">Item</th>
-                            <th className="text-center p-1 w-[18%] border-t border-b border-r border-black">Quantity Unit</th>
-                            <th className="text-right p-1 w-[19%] border-t border-b border-r border-black">Price</th>
+                            <th className="text-left p-1 w-[40%] border-t border-b border-black">Item</th>
+                            <th className="text-center p-1 w-[18%] border-t border-b border-black">Quantity Unit</th>
+                            <th className="text-right p-1 w-[19%] border-t border-b border-black">Price</th>
                             <th className="text-right p-1 w-[19%] border-t border-b border-r border-black">Amount</th>
                         </tr>
                     </thead>
@@ -224,7 +237,7 @@ export default function InvoicePreviewPage() {
               </main>
 
               <footer>
-                <div className="flex justify-between items-start text-[10px] border-t border-b border-black py-1">
+                <div className="flex justify-between items-center text-[10px] border-t border-b border-black py-1">
                     <p>No PO : {poNumber || ''}</p>
                     <div className="text-right">
                         <div className="inline-block">
@@ -233,71 +246,71 @@ export default function InvoicePreviewPage() {
                     </div>
                 </div>
 
-                 <div className="flex justify-between mt-1">
-                       <div className='w-1/2 pr-4'>
-                           <div className="grid grid-cols-[auto_1fr] gap-x-2 text-[9px]">
+                <div className="flex justify-between mt-1">
+                    <div className='w-1/2 pr-4'>
+                        <div className="text-[9px] mt-2">
+                            <div className="grid grid-cols-[auto_1fr] gap-x-2">
                                 <p>Payment :</p><p>90 Hari setelah invoice diterima</p>
                                 <p>Please state with your payment:</p><p>{invoiceId}</p>
-                           </div>
-                           <div className="text-[9px] mt-2">
-                              <p>For payment, please transfer to our account:</p>
-                              <p className="font-bold mt-2">PT. Jembo Cable Company Tbk</p>
-                              
-                              <div className="grid grid-cols-[max-content_1fr] gap-x-4 mt-1">
-                                  <div>
-                                      <p>Bank Mandiri - Jakarta</p>
-                                      <p>Cabang Sudirman</p>
-                                  </div>
-                                  <div className="text-left">
-                                      <p>A/C No.: 102-0100206827 (Rp)</p>
-                                      <p>A/C No.: 102-0005000218 (Rp)</p>
-                                      <p>A/C No.: 102-0005000226 (USD)</p>
-                                  </div>
-                              </div>
-                              
-                              <div className="text-center my-1 font-bold" style={{width: "80%"}}>OR</div>
+                            </div>
+                            <p className="font-bold mt-2">For payment, please transfer to our account:</p>
+                            <p className="font-bold mt-2">PT. Jembo Cable Company Tbk</p>
+                            
+                            <div className="grid grid-cols-[max-content_1fr] gap-x-4 mt-1">
+                                <div>
+                                    <p>Bank Mandiri - Jakarta</p>
+                                    <p>Cabang Sudirman</p>
+                                </div>
+                                <div className="text-left">
+                                    <p>A/C No.: 102-0100206827 (Rp)</p>
+                                    <p>A/C No.: 102-0005000218 (Rp)</p>
+                                    <p>A/C No.: 102-0005000226 (USD)</p>
+                                </div>
+                            </div>
+                            
+                            <div className="text-center my-1 font-bold" style={{width: "80%"}}>OR</div>
 
-                               <div className="grid grid-cols-[max-content_1fr] gap-x-4">
-                                  <div>
-                                      <p>Bank BCA - Jakarta</p>
-                                      <p>Cabang KEM TOWER</p>
-                                   </div>
-                                   <div className="text-left">
-                                      <p>A/C No.: 684-0198977 (Rp)</p>
-                                   </div>
-                              </div>
-                          </div>
-                       </div>
+                            <div className="grid grid-cols-[max-content_1fr] gap-x-4">
+                                <div>
+                                    <p>Bank BCA - Jakarta</p>
+                                    <p>Cabang KEM TOWER</p>
+                                </div>
+                                <div className="text-left">
+                                    <p>A/C No.: 684-0198977 (Rp)</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
 
-                       <div className="w-1/2 flex flex-col justify-between">
-                            <div className="w-full text-right text-[10px]">
-                                {negotiation > 0 && (<div className="flex justify-between"><p>A/Negotiation :</p> <p>({formatCurrency(negotiation)})</p></div>)}
-                                {dpValue > 0 && (<div className="flex justify-between"><p>DP :</p> <p>{formatCurrency(dpValue)}</p></div>)}
-                                {pelunasan > 0 && (<div className="flex justify-between"><p>Pelunasan :</p> <p>({formatCurrency(pelunasan)})</p></div>)}
+                    <div className="w-1/2 flex flex-col justify-between">
+                         <div className="w-full text-right text-[10px]">
+                            {negotiation > 0 && (<div className="flex justify-end"><p className="w-28 text-left">A/Negotiation :</p> <p className='w-28 text-right'>({formatCurrency(negotiation)})</p></div>)}
+                            {dpValue > 0 && (<div className="flex justify-end"><p className="w-28 text-left">DP :</p> <p className='w-28 text-right'>{formatCurrency(dpValue)}</p></div>)}
+                            {pelunasan > 0 && (<div className="flex justify-end"><p className="w-28 text-left">Pelunasan :</p> <p className='w-28 text-right'>({formatCurrency(pelunasan)})</p></div>)}
+                            
+                            <div className="grid grid-cols-2 gap-y-1 text-[10px] mt-2 justify-items-end">
+                                <p className="text-left w-28">Goods:</p>
+                                <p className='text-right w-28'>{formatCurrency(grandTotal)}</p>
                                 
-                                <div className="grid grid-cols-2 gap-y-1 text-[10px] mt-2">
-                                    <p>Goods:</p>
-                                    <p className='text-right'>{formatCurrency(grandTotal)}</p>
-                                    
-                                    <p>DPP VAT (11/12):</p>
-                                    <p className='text-right'>{formatCurrency(dppVat)}</p>
-                                    
-                                    <p>VAT 12%:</p>
-                                    <p className='text-right'>{formatCurrency(vat12)}</p>
-                                </div>
-                                <div className="border-t border-black pt-1 mt-1 grid grid-cols-2">
-                                    <p className="font-bold">Total Rp:</p>
-                                    <p className="text-right font-bold">{formatCurrency(totalAmount)}</p>
-                                </div>
+                                <p className="text-left w-28">DPP VAT (11/12):</p>
+                                <p className='text-right w-28'>{formatCurrency(dppVat)}</p>
+                                
+                                <p className="text-left w-28">VAT 12%:</p>
+                                <p className='text-right w-28'>{formatCurrency(vat12)}</p>
                             </div>
-                           
-                            <div className="text-center">
-                                <p>PT. JEMBO CABLE COMPANY Tbk</p>
-                                <div className="h-16"></div>
-                                <p className="pt-1 mx-8">Finance</p>
+                            <div className="border-t border-black pt-1 mt-1 grid grid-cols-2 justify-items-end">
+                                <p className="font-bold text-left w-28">Total Rp:</p>
+                                <p className="text-right font-bold w-28">{formatCurrency(totalAmount)}</p>
                             </div>
-                       </div>
-                   </div>
+                        </div>
+                        
+                         <div className="text-center mt-4">
+                             <p>PT. JEMBO CABLE COMPANY Tbk</p>
+                             <div className="h-16"></div>
+                             <p className="pt-1 mx-8 border-t border-black">Finance</p>
+                         </div>
+                    </div>
+                </div>
               </footer>
 
             <style jsx global>{`
@@ -327,3 +340,5 @@ export default function InvoicePreviewPage() {
       </main>
     );
 }
+
+    
