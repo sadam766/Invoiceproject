@@ -38,7 +38,9 @@ export function AddSpdDialog({ isOpen, onOpenChange, onSave, spdData, onAddClick
   const [keterangan, setKeterangan] = useState('');
   const [noKuitansi, setNoKuitansi] = useState('');
   const [noFakturPajak, setNoFakturPajak] = useState('');
-  const [suratJalan, setSuratJalan] = useState('');
+  const [suratJalan1, setSuratJalan1] = useState('');
+  const [suratJalan2, setSuratJalan2] = useState('');
+  const [suratJalan3, setSuratJalan3] = useState('');
 
   useEffect(() => {
     if (spdData) {
@@ -54,7 +56,10 @@ export function AddSpdDialog({ isOpen, onOpenChange, onSave, spdData, onAddClick
       setKeterangan(spdData.keterangan);
       setNoKuitansi(spdData.noKuitansi);
       setNoFakturPajak(spdData.noFakturPajak);
-      setSuratJalan(spdData.suratJalan);
+      const suratJalanParts = spdData.suratJalan.split(', ');
+      setSuratJalan1(suratJalanParts[0] || '');
+      setSuratJalan2(suratJalanParts[1] || '');
+      setSuratJalan3(suratJalanParts[2] || '');
     } else {
       // Reset form
       setTanggal('');
@@ -69,7 +74,9 @@ export function AddSpdDialog({ isOpen, onOpenChange, onSave, spdData, onAddClick
       setKeterangan('');
       setNoKuitansi('');
       setNoFakturPajak('');
-      setSuratJalan('');
+      setSuratJalan1('');
+      setSuratJalan2('');
+      setSuratJalan3('');
     }
   }, [spdData, isOpen]);
 
@@ -83,6 +90,7 @@ export function AddSpdDialog({ isOpen, onOpenChange, onSave, spdData, onAddClick
 
   const handleSave = () => {
     const numericTotalPiutang = typeof totalPiutang === 'string' ? parseFormattedNumber(totalPiutang) : totalPiutang;
+    const allSuratJalan = [suratJalan1, suratJalan2, suratJalan3].filter(Boolean).join(', ');
     onSave({
       tanggal,
       sales,
@@ -96,7 +104,7 @@ export function AddSpdDialog({ isOpen, onOpenChange, onSave, spdData, onAddClick
       keterangan,
       noKuitansi,
       noFakturPajak,
-      suratJalan,
+      suratJalan: allSuratJalan,
     });
   };
 
@@ -166,9 +174,13 @@ export function AddSpdDialog({ isOpen, onOpenChange, onSave, spdData, onAddClick
             <Label htmlFor="noFakturPajak">No. Faktur Pajak</Label>
             <Input id="noFakturPajak" value={noFakturPajak} onChange={(e) => setNoFakturPajak(e.target.value)} />
           </div>
-          <div className="space-y-2">
-            <Label htmlFor="suratJalan">Surat Jalan</Label>
-            <Input id="suratJalan" value={suratJalan} onChange={(e) => setSuratJalan(e.target.value)} />
+          <div className="space-y-2 md:col-span-2">
+            <Label htmlFor="suratJalan1">Surat Jalan</Label>
+            <div className='flex flex-col gap-2'>
+              <Input id="suratJalan1" value={suratJalan1} onChange={(e) => setSuratJalan1(e.target.value)} />
+              <Input id="suratJalan2" value={suratJalan2} onChange={(e) => setSuratJalan2(e.target.value)} />
+              <Input id="suratJalan3" value={suratJalan3} onChange={(e) => setSuratJalan3(e.target.value)} />
+            </div>
           </div>
         </div>
         <DialogFooter>

@@ -71,10 +71,10 @@ export default function SpdPreviewPage() {
                         <p>Mega Glodok Kemayoran Office Tower B 6th Floor Jl.Angkasa Kav.B-6 Kota Baru Bandar Kemayoran Jakarta Pusat</p>
                     </header>
                     <div className="text-center mb-6">
-                        <h2 className="font-bold text-sm underline">SURAT PENGANTAR DOKUMEN</h2>
+                        <h2 className="font-bold text-sm">SURAT PENGANTAR DOKUMEN</h2>
                         <p className="font-bold text-sm flex items-center justify-center">
                            <span>PS/</span>
-                           <span className="px-1">1</span>
+                           <span className="px-1"> 1 </span>
                            <span>-J/KEU/2024/DK</span>
                         </p>
                     </div>
