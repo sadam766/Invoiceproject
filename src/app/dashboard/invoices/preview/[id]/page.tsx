@@ -356,11 +356,11 @@ const InvoicePreviewPage: React.FC = () => {
                  <table className="w-full border-collapse text-[10px]">
                     <thead className='border-y-2 border-black'>
                         <tr>
-                            <th className="p-1 text-left w-[4%]">No.</th>
+                            <th className="p-1 text-left w-[4%] border-x-2 border-black">No.</th>
                             <th className="p-1 text-left w-[40%]">Item</th>
                             <th className="p-1 text-center w-[18%]">Quantity Unit</th>
                             <th className="p-1 text-right w-[19%]">Price</th>
-                            <th className="p-1 text-right w-[19%]">Amount</th>
+                            <th className="p-1 text-right w-[19%] border-x-2 border-black">Amount</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -386,7 +386,7 @@ const InvoicePreviewPage: React.FC = () => {
                  </table>
               </main>
 
-              <div className="mt-12" />
+              <div className="mt-8" />
 
               {isLastPage ? (
                 <footer className="pt-2 text-black">
@@ -422,15 +422,15 @@ const InvoicePreviewPage: React.FC = () => {
                             <p className="font-bold mt-2">For payment, please transfer to our account:</p>
                             <p className="font-bold mt-2">PT. Jembo Cable Company Tbk</p>
                             
-                             <div className="grid grid-cols-[max-content_1fr] gap-x-4 mt-1">
-                                <div>
-                                    <p className='font-bold'>Bank Mandiri - Jakarta</p>
+                            <div className="grid grid-cols-[max-content_1fr] gap-x-4 mt-1">
+                                <div className="font-bold">
+                                    <p>Bank Mandiri - Jakarta</p>
                                     <p>Cabang Sudirman</p>
                                 </div>
                                 <div className="text-left">
-                                    <p>A/C No. : 102-0100206827 (Rp)</p>
-                                    <p>A/C No. : 102-0005000218 (Rp)</p>
-                                    <p>A/C No. : 102-0005000226 (USD)</p>
+                                  <div className="flex justify-between"><span>A/C No.</span><span>: 102-0100206827 (Rp)</span></div>
+                                  <div className="flex justify-between"><span>A/C No.</span><span>: 102-0005000218 (Rp)</span></div>
+                                  <div className="flex justify-between"><span>A/C No.</span><span>: 102-0005000226 (USD)</span></div>
                                 </div>
                                 
                                 <div className="col-span-2 my-1 flex items-center">
@@ -440,25 +440,23 @@ const InvoicePreviewPage: React.FC = () => {
                                 </div>
 
 
-                                <div>
-                                    <p className='font-bold'>Bank BCA - Jakarta</p>
+                                <div className="font-bold">
+                                    <p>Bank BCA - Jakarta</p>
                                     <p>Cabang KEM TOWER</p>
                                 </div>
                                 <div className="text-left">
-                                    <p>A/C No. : 684-0198977 (Rp)</p>
+                                  <div className="flex justify-between"><span>A/C No.</span><span>: 684-0198977 (Rp)</span></div>
                                 </div>
                             </div>
                         </div>
 
                         <div className="w-1/2 pl-4 flex flex-col justify-between">
-                             <div className='text-center'>
-                                 <p>PT. JEMBO CABLE COMPANY Tbk</p>
-                             </div>
-                             <div className="text-center mt-auto pt-24">
-                                <div className="inline-block relative">
-                                    <p>Finance</p>
-                                </div>
-                             </div>
+                            <div className='text-center'>
+                                <p>PT. JEMBO CABLE COMPANY Tbk</p>
+                            </div>
+                            <div className="text-center mt-auto pt-24">
+                                <p>Finance</p>
+                            </div>
                         </div>
                     </div>
                 </footer>
