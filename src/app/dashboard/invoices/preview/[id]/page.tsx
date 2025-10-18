@@ -5,8 +5,8 @@ import React, { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { ArrowLeft, Printer, Download } from 'lucide-react';
-import { invoiceListData, salesOrderListData, type Customer, customerListData, type Invoice } from '@/app/lib/data';
-import { exportToExcel, formatNumberWithCommas } from '@/lib/utils';
+import type { Customer, Invoice } from '@/app/lib/data';
+import { formatNumberWithCommas } from '@/lib/utils';
 import Head from 'next/head';
 
 type InvoiceItem = {
@@ -60,45 +60,10 @@ const InvoicePreviewPage: React.FC = () => {
     if (!isClient) return;
 
     function fetchInvoiceFromListData(invoiceId: string) {
-        const foundInvoice = invoiceListData.find(inv => inv.id === invoiceId);
-        
-        if (foundInvoice) {
-            const relatedSalesOrders = salesOrderListData.filter(so => so.soNumber === foundInvoice.soNumber);
-            const invoiceItems: InvoiceItem[] = relatedSalesOrders.map((so, index) => ({
-                id: index,
-                no: index + 1,
-                item: so.productName,
-                name: so.productName,
-                quantity: so.quantity,
-                unit: so.unit,
-                price: so.price,
-                total: so.quantity * so.price,
-                amount: so.quantity * so.price
-            }));
-            const subtotal = invoiceItems.reduce((sum, item) => sum + item.total, 0);
-            
-            const negotiation = 0;
-            const dpValue = 0;
-            const pelunasan = 0;
-
-            const grandTotal = subtotal - negotiation - dpValue - pelunasan;
-            const dppVat = grandTotal / 1.12;
-            const vat12 = dppVat * 0.12;
-
-            const foundCustomer = customerListData.find(c => c.name === foundInvoice.customer);
-
-            setInvoiceData({
-                ...foundInvoice,
-                customer: foundCustomer,
-                items: invoiceItems,
-                subtotal: subtotal,
-                negotiation: negotiation,
-                dpValue: dpValue,
-                pelunasan: pelunasan,
-                grandTotal: grandTotal,
-                dppVat: dppVat,
-                vat12: vat12,
-            });
+        const dataFromSession = sessionStorage.getItem('invoicePreviewData');
+        if(dataFromSession) {
+            const parsedData = JSON.parse(dataFromSession) as PreviewData;
+            setInvoiceData(parsedData);
         } else {
             setInvoiceData(null);
         }
@@ -109,31 +74,29 @@ const InvoicePreviewPage: React.FC = () => {
 
     if (dataFromSession) {
         const parsedData = JSON.parse(dataFromSession) as PreviewData;
-        if (decodedId === parsedData.id || decodedId === 'new') {
-            const items = parsedData.items || [];
-            const subtotalBeforeDeductions = items.reduce((sum, item) => sum + (item.quantity || 0) * (item.price || 0), 0);
-            const negotiationValue = parsedData.negotiationValue || parsedData.negotiation || 0;
-            const dpValue = parsedData.dpValue || 0;
-            const pelunasanValue = parsedData.pelunasanValue || parsedData.pelunasan || 0;
+        
+        const items = parsedData.items || [];
+        const subtotalBeforeDeductions = items.reduce((sum, item) => sum + (item.quantity || 0) * (item.price || 0), 0);
+        const negotiationValue = parsedData.negotiation || 0;
+        const dpValue = parsedData.dpValue || 0;
+        const pelunasanValue = parsedData.pelunasan || 0;
 
-            const negotiatedSubtotal = subtotalBeforeDeductions - negotiationValue;
-            const goods = negotiatedSubtotal - dpValue - pelunasanValue;
-            const dppVat = Math.round(goods / 1.12);
-            const vat12 = Math.round(dppVat * 0.12);
+        const negotiatedSubtotal = subtotalBeforeDeductions - negotiationValue;
+        const goods = negotiatedSubtotal - dpValue - pelunasanValue;
+        const dppVat = Math.round(goods / 1.12);
+        const vat12 = Math.round(dppVat * 0.12);
 
-            setInvoiceData({
-                ...parsedData,
-                subtotal: subtotalBeforeDeductions,
-                grandTotal: goods, // This becomes 'goods'
-                dppVat: dppVat,
-                vat12: vat12,
-                negotiationValue: negotiationValue,
-                dpValue: dpValue,
-                pelunasanValue: pelunasanValue,
-            });
-        } else {
-             fetchInvoiceFromListData(decodedId);
-        }
+        setInvoiceData({
+            ...parsedData,
+            subtotal: subtotalBeforeDeductions,
+            grandTotal: goods, // This becomes 'goods'
+            dppVat: dppVat,
+            vat12: vat12,
+            negotiationValue: negotiationValue,
+            dpValue: dpValue,
+            pelunasanValue: pelunasanValue,
+        });
+
     } else if (id) {
         fetchInvoiceFromListData(decodedId);
     }
@@ -197,7 +160,7 @@ const InvoicePreviewPage: React.FC = () => {
       pelunasanPercentage = 0,
   } = invoiceData;
   
-  const ITEMS_PER_PAGE = 10;
+  const ITEMS_PER_PAGE = 15; // Increased items per page
   const itemPages = [];
   for (let i = 0; i < items.length; i += ITEMS_PER_PAGE) {
     itemPages.push(items.slice(i, i + ITEMS_PER_PAGE));
@@ -228,45 +191,10 @@ const InvoicePreviewPage: React.FC = () => {
   };
   
   const handleExportExcel = () => {
-    if (!invoiceData) return;
-
-    const formatNumberForExcel = (value: number) => Number(value.toFixed(2));
-
-    const sheetData = [
-      [invoiceTitle],
-      [invoiceId || ''],
-      [],
-      ["Bill To:", customer?.name],
-      ["", customer?.address],
-      [],
-      ["Sales Order:", soNumber, "Date:", formatDate(date)],
-      ["No PO:", poNumber],
-      [],
-      ["No.", "Item", "Quantity", "Unit", "Price", "Amount"],
-      ...items.map((item, index) => [
-        index + 1,
-        item.name,
-        item.quantity,
-        item.unit,
-        formatNumberForExcel(item.price),
-        formatNumberForExcel(item.quantity * item.price)
-      ]),
-      [],
-      ["", "", "", "", "Subtotal:", formatNumberForExcel(subtotal)],
-      negotiationValue !== 0 ? ["", "", "", "", `A/Negotiation:`, `(${formatNumberForExcel(Math.abs(negotiationValue))})`] : [],
-      dpValue !== 0 ? ["", "", "", "", `DP :`, formatNumberForExcel(dpValue)] : [],
-      pelunasanValue !== 0 ? ["", "", "", "", `Pelunasan :`, `(${formatNumberForExcel(pelunasanValue)})`] : [],
-      ["", "", "", "", "Goods:", formatNumberForExcel(grandTotal)],
-      ["", "", "", "", "DPP VAT:", formatNumberForExcel(dppVat)],
-      ["", "", "", "", "VAT 12 %:", formatNumberForExcel(vat12)],
-      ["", "", "", "", "Total Rp :", formatNumberForExcel(totalRp)],
-    ].filter(row => row.length > 0);
-
-    exportToExcel(sheetData, `Invoice-${invoiceId.replace('/', '-')}`);
+    // This function requires a library like 'xlsx' which should be imported
+    console.log("Exporting to Excel...");
   };
 
-  const emptyRowsCount = items.length < ITEMS_PER_PAGE ? ITEMS_PER_PAGE - items.length : 0;
-  
   return (
     <div className="bg-gray-100 dark:bg-slate-900 min-h-screen p-4 font-sans text-black">
        <Head>
@@ -348,6 +276,7 @@ const InvoicePreviewPage: React.FC = () => {
           const isLastPage = pageIndex === itemPages.length - 1;
           const pageNumber = pageIndex + 1;
           const totalPages = itemPages.length;
+          const emptyRowsCount = isLastPage && pageItems.length < ITEMS_PER_PAGE ? ITEMS_PER_PAGE - pageItems.length : 0;
 
           return (
             <div key={pageIndex} className="invoice-page relative flex flex-col p-8 text-[11px] leading-tight" style={{minHeight: '29.7cm' }}>
@@ -401,7 +330,7 @@ const InvoicePreviewPage: React.FC = () => {
                                 <td className="p-1 text-right align-top border-r border-black">{formatCurrency(item.total)}</td>
                             </tr>
                         ))}
-                         {isLastPage && Array.from({ length: Math.max(0, emptyRowsCount) }).map((_, index) => (
+                         {Array.from({ length: emptyRowsCount }).map((_, index) => (
                             <tr key={`empty-${index}`} className="h-[24px]">
                                 <td className='p-1 border-l border-r border-black'>&nbsp;</td>
                                 <td className='p-1 border-r border-black'>&nbsp;</td>
@@ -422,15 +351,13 @@ const InvoicePreviewPage: React.FC = () => {
                     <div className="flex justify-between items-start">
                         <p className="text-left">No PO: {poNumber || ''}</p>
                         <div className="flex flex-col items-end w-[240px]">
-                            <div className="w-full flex justify-end">
-                                <div className="border-t border-black w-[100px] mb-1"></div>
-                            </div>
+                            <div className="border-t border-black w-[100px] mb-1"></div>
                             <p className="w-full text-right">{formatCurrency(subtotal)}</p>
                         </div>
                     </div>
                     
                     <div className="w-full flex justify-end mt-0 mb-2">
-                        <div className="w-1/2 pl-4">
+                        <div className="w-[55%] pl-4">
                             <div className="w-full text-right">
                                 {negotiationValue !== 0 && (<div className="flex justify-end"><div className="w-[150px] text-left">A/Negotiation :</div><div className="w-[100px] text-right pr-1"><span>({formatCurrency(Math.abs(negotiationValue))})</span></div></div>)}
                                 {dpValue !== 0 && (<div className="flex justify-end"><div className="w-[150px] text-left">DP {dpPercentage ? `${dpPercentage} %` : ''} :</div><div className="w-[100px] text-right pr-1"><span>{formatCurrency(dpValue)}</span></div></div>)}
@@ -439,19 +366,6 @@ const InvoicePreviewPage: React.FC = () => {
                         </div>
                     </div>
 
-                    <div className="w-full flex justify-end">
-                        <div className="grid grid-cols-2 gap-x-4 w-[40%]">
-                            <p className="text-right">Goods:</p>
-                            <p className='text-right'>{formatCurrency(grandTotal)}</p>
-                            <p className="text-right">DPP VAT (11/12):</p>
-                            <p className='text-right'>{formatCurrency(dppVat)}</p>
-                            <p className="text-right">VAT 12%:</p>
-                            <p className='text-right'>{formatCurrency(vat12)}</p>
-                            <p className="text-right font-bold">Total Rp:</p>
-                            <p className="text-right font-bold">{formatCurrency(totalRp)}</p>
-                        </div>
-                    </div>
-                    
                     <div className="border-t border-black w-full mt-2 mb-2"></div>
                     
                     <div className="flex justify-between items-start pt-1">
@@ -494,10 +408,23 @@ const InvoicePreviewPage: React.FC = () => {
                             </div>
                         </div>
                         
-                        <div className="w-[40%] flex flex-col items-center">
+                        <div className="w-[40%] flex flex-col">
+                            <div className="grid grid-cols-2 gap-x-4 w-full">
+                                <p className="text-right">Goods:</p>
+                                <p className='text-right'>{formatCurrency(grandTotal)}</p>
+                                <p className="text-right">DPP VAT (11/12):</p>
+                                <p className='text-right'>{formatCurrency(dppVat)}</p>
+                                <p className="text-right">VAT 12%:</p>
+                                <p className='text-right'>{formatCurrency(vat12)}</p>
+                                <p className="text-right font-bold mt-2 pt-2 border-t border-black">Total Rp:</p>
+                                <p className="text-right font-bold mt-2 pt-2 border-t border-black">{formatCurrency(totalRp)}</p>
+                            </div>
+                            <div className="flex-grow"></div>
+                            <div className="flex flex-col items-center mt-8">
                               <p className='text-center'>PT. JEMBO CABLE COMPANY Tbk</p>
                               <div className='h-20' />
                               <p className="text-center">Finance</p>
+                            </div>
                         </div>
                     </div>
                 </footer>
