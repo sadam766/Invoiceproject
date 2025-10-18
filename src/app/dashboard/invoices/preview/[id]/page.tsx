@@ -323,7 +323,7 @@ const InvoicePreviewPage: React.FC = () => {
           const totalPages = itemPages.length;
 
           return (
-            <div key={pageIndex} className="invoice-page p-8 text-[10px] leading-tight" style={{ minHeight: '29.7cm' }}>
+            <div key={pageIndex} className="invoice-page relative flex flex-col p-8 text-[10px] leading-tight">
               <header>
                 <div className="grid grid-cols-2">
                     <div>
@@ -357,9 +357,9 @@ const InvoicePreviewPage: React.FC = () => {
                     <thead className='border-y-2 border-black'>
                         <tr>
                             <th className="p-1 text-left w-[4%] border-x-2 border-black">No.</th>
-                            <th className="p-1 text-left w-[40%]">Item</th>
-                            <th className="p-1 text-center w-[18%]">Quantity Unit</th>
-                            <th className="p-1 text-right w-[19%]">Price</th>
+                            <th className="p-1 text-center w-[40%] border-r-2 border-black">Item</th>
+                            <th className="p-1 text-center w-[18%] border-r-2 border-black">Quantity Unit</th>
+                            <th className="p-1 text-center w-[19%] border-r-2 border-black">Price</th>
                             <th className="p-1 text-right w-[19%] border-x-2 border-black">Amount</th>
                         </tr>
                     </thead>
@@ -368,7 +368,7 @@ const InvoicePreviewPage: React.FC = () => {
                             <tr key={item.id} className="h-[24px]">
                                 <td className="p-1 text-left align-top">{item.no + (pageIndex * ITEMS_PER_PAGE)}</td>
                                 <td className="p-1 align-top text-left">{item.name}</td>
-                                <td className="p-1 text-left align-top">{item.quantity.toLocaleString('id-ID')} {item.unit}</td>
+                                <td className="p-1 text-center align-top">{item.quantity.toLocaleString('id-ID')} {item.unit}</td>
                                 <td className="p-1 text-right align-top">{formatCurrency(item.price)}</td>
                                 <td className="p-1 text-right align-top">{formatCurrency(item.total)}</td>
                             </tr>
@@ -433,12 +433,9 @@ const InvoicePreviewPage: React.FC = () => {
                                   <div className="flex justify-between"><span>A/C No.</span><span>: 102-0005000226 (USD)</span></div>
                                 </div>
                                 
-                                <div className="col-span-2 my-1 flex items-center">
-                                  <span className="flex-grow border-t border-dotted border-black"></span>
-                                  <span className="px-2">OR</span>
-                                  <span className="flex-grow border-t border-dotted border-black"></span>
+                                <div className="col-span-2 my-1 flex items-center justify-center">
+                                  <span>OR</span>
                                 </div>
-
 
                                 <div className="font-bold">
                                     <p>Bank BCA - Jakarta</p>
