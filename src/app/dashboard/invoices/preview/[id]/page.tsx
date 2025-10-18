@@ -211,7 +211,7 @@ export default function InvoicePreviewPage() {
                               <th className="p-1 text-right w-[19%] border-l border-black">Amount</th>
                           </tr>
                       </thead>
-                      <tbody className='border-b border-black'>
+                      <tbody>
                           {items.map((item) => (
                               <tr key={item.no}>
                                   <td className="p-1 text-center">{item.no}</td>
@@ -235,10 +235,10 @@ export default function InvoicePreviewPage() {
               </main>
 
               <footer className="pt-2">
-                <div className="flex justify-between items-center text-[10px] mt-1">
+                <div className="flex justify-between items-center text-[10px] mt-1 border-t border-black pt-1">
                     <p>No PO : {poNumber || ''}</p>
                     <div className="text-right">
-                        <div className="inline-block px-4 pt-1">
+                        <div className="inline-block px-4">
                             <p className="font-bold">{formatCurrency(subtotal)}</p>
                         </div>
                     </div>
@@ -260,24 +260,15 @@ export default function InvoicePreviewPage() {
                     </div>
                 )}
                 
-                <div className="border-t border-black mt-1"></div>
-
-                <div className="flex justify-end w-full text-[10px] mt-1">
-                    <div className="w-1/2 pl-4">
-                        <div className="grid grid-cols-2 gap-y-1 justify-items-end">
+                <div className="border-t border-b border-black my-1 py-1 flex justify-end w-full text-[10px]">
+                     <div className="w-1/2 pl-4">
+                        <div className="grid grid-cols-2 justify-items-end">
                             <p className="text-left w-28">Goods:</p>
                             <p className='text-right w-28'>{formatCurrency(grandTotal)}</p>
                             <p className="text-left w-28">DPP VAT (11/12):</p>
                             <p className='text-right w-28'>{formatCurrency(dppVat)}</p>
                             <p className="text-left w-28">VAT 12%:</p>
                             <p className='text-right w-28'>{formatCurrency(vat12)}</p>
-                        </div>
-                    </div>
-                </div>
-
-                <div className="border-t border-b border-black my-1 py-1 flex justify-end w-full text-[10px]">
-                     <div className="w-1/2 pl-4">
-                        <div className="grid grid-cols-2 justify-items-end">
                             <p className="font-bold text-left w-28">Total Rp:</p>
                             <p className="text-right font-bold w-28">{formatCurrency(totalAmount)}</p>
                         </div>
