@@ -246,18 +246,16 @@ const InvoicePreviewPage: React.FC = () => {
               <div key={pageIndex} className="invoice-page relative flex flex-col p-8 text-[11px] leading-tight" style={{minHeight: '29.7cm' }}>
                 <header>
                     <div className="h-[70px] w-full"></div>
-                    <div className="text-center mb-4">
+                    <div className="text-center mb-10">
                         <p className="font-bold uppercase text-[15px] mb-1 tracking-tighter">{invoiceTitle}</p>
                         <p className="font-bold uppercase text-[15px]">{invoiceId || 'INV/2024/05/001'}</p>
                     </div>
 
                     <div className="flex justify-between items-start text-[10px] mt-8">
-                        {/* Left side */}
                         <div className="w-1/2 text-left pr-4">
                             <p className="font-bold text-[12px] mb-1">{customer?.name}</p>
                         </div>
-                        {/* Right side */}
-                        <div className="w-1/2 text-right pl-8">
+                        <div className="w-5/12 text-right pl-16">
                             <div className="inline-block text-left">
                                 <div className="flex gap-x-2">
                                     <span className="font-bold text-left">Sales Order :</span><span className="text-left">{soNumber || ''}</span>
@@ -274,7 +272,7 @@ const InvoicePreviewPage: React.FC = () => {
                     
                     <div className="flex justify-between items-end text-[10px] mt-4 mb-4">
                         <div className="w-1/2">
-                            <p>Customer Code :</p>
+                            <p className='mt-12'>Customer Code :</p>
                         </div>
                         <div className="w-1/2 text-right">
                             <p>Date: {formatDate(date)}</p>
@@ -283,32 +281,32 @@ const InvoicePreviewPage: React.FC = () => {
                 </header>
 
                 <main className='mt-4 flex-grow'>
-                   <table className="w-full border-collapse text-[10px]">
+                   <table className="w-full border-collapse text-[10px] border border-black">
                       <thead className="font-bold">
-                          <tr className="border-y-2 border-black">
-                              <th className="p-1 text-left border-x-2 border-black w-[5%]">No.</th>
-                              <th className="p-1 text-left border-r-2 border-black w-[45%]">Item</th>
-                              <th className="p-1 text-center border-r-2 border-black w-[15%]">Quantity Unit</th>
-                              <th className="p-1 text-right border-r-2 border-black w-[15%]">Price</th>
-                              <th className="p-1 text-right border-x-2 border-black w-[20%]">Amount</th>
+                          <tr>
+                              <th className="p-1 text-left border-r border-black w-[5%]">No.</th>
+                              <th className="p-1 text-left border-r border-black w-[45%]">Item</th>
+                              <th className="p-1 text-center border-r border-black w-[15%]">Quantity Unit</th>
+                              <th className="p-1 text-right border-r border-black w-[15%]">Price</th>
+                              <th className="p-1 text-right w-[20%]">Amount</th>
                           </tr>
                       </thead>
                       <tbody>
                           {pageItems.map((item, itemIdx) => (
                               <tr key={item.id}>
-                                  <td className="p-1 text-left align-top">{item.no + (pageIndex * ITEMS_PER_PAGE)}</td>
-                                  <td className="p-1 align-top text-left">{item.name}</td>
-                                  <td className="p-1 text-center align-top">{item.quantity.toLocaleString('id-ID')} {item.unit}</td>
-                                  <td className="p-1 text-right align-top">{formatCurrency(item.price)}</td>
+                                  <td className="p-1 text-left align-top border-r border-black">{pageIndex * ITEMS_PER_PAGE + itemIdx + 1}</td>
+                                  <td className="p-1 align-top text-left border-r border-black">{item.name}</td>
+                                  <td className="p-1 text-center align-top border-r border-black">{item.quantity.toLocaleString('id-ID')} {item.unit}</td>
+                                  <td className="p-1 text-right align-top border-r border-black">{formatCurrency(item.price)}</td>
                                   <td className="p-1 text-right align-top">{formatCurrency(item.total)}</td>
                               </tr>
                           ))}
                            {Array.from({ length: emptyRowsCount }).map((_, index) => (
                               <tr key={`empty-${index}`} className="h-[24px]">
-                                  <td className='p-1'>&nbsp;</td>
-                                  <td className='p-1'>&nbsp;</td>
-                                  <td className='p-1'>&nbsp;</td>
-                                  <td className='p-1'>&nbsp;</td>
+                                  <td className='p-1 border-r border-black'>&nbsp;</td>
+                                  <td className='p-1 border-r border-black'>&nbsp;</td>
+                                  <td className='p-1 border-r border-black'>&nbsp;</td>
+                                  <td className='p-1 border-r border-black'>&nbsp;</td>
                                   <td className='p-1'>&nbsp;</td>
                               </tr>
                           ))}
@@ -321,32 +319,35 @@ const InvoicePreviewPage: React.FC = () => {
                    <footer className="pt-2 text-black mt-auto text-[10px]">
                         <div className="flex justify-between items-center mb-1">
                           <p className="text-left">No PO: {poNumber || ''}</p>
-                          <div className="flex items-center space-x-4">
-                              <span>Subtotal</span>
-                              <div className="text-right w-32 relative">
-                                 <div className="absolute -top-1 right-0 border-t border-black w-full"></div>
-                                 <p>{formatCurrency(subtotal)}</p>
-                              </div>
-                          </div>
-                      </div>
-                      
-                      <div className="border-t border-black w-full mt-2 pt-2 mb-2"></div>
-                      
-                      <div className="grid grid-cols-2">
-                        <div></div>
-                        <div className="text-right text-[10px] space-y-1">
-                            <div className="grid grid-cols-2 gap-x-4">
-                                  <span>Goods:</span><span className="text-right">{formatCurrency(grandTotal)}</span>
-                                  <span>DPP VAT (11/12):</span><span className="text-right">{formatCurrency(dppVat)}</span>
-                                  <span>VAT 12%:</span><span className="text-right">{formatCurrency(vat12)}</span>
-                            </div>
-                            <div className="grid grid-cols-2 gap-x-4 pt-1 font-bold">
-                                <span>Total Rp:</span><span className="text-right">{formatCurrency(totalRp)}</span>
+                            <div className="flex items-center space-x-4">
+                                <span>Subtotal</span>
+                                <div className="text-right w-32 relative">
+                                    <div className="absolute -top-1 right-0 border-t border-black w-full"></div>
+                                    <p>{formatCurrency(subtotal)}</p>
+                                </div>
                             </div>
                         </div>
-                      </div>
 
-                      <div className="border-t border-black w-full mt-2 mb-2"></div>
+                        <div className="border-t border-black w-full mt-2 pt-2 mb-2"></div>
+                        
+                        <div className="grid grid-cols-2">
+                            <div></div>
+                            <div className="text-right text-[10px] space-y-1">
+                                <div className="grid grid-cols-[1fr_auto] gap-x-4">
+                                    <span>Goods:</span><span className="text-right">{formatCurrency(grandTotal)}</span>
+                                    <span>DPP VAT (11/12):</span><span className="text-right">{formatCurrency(dppVat)}</span>
+                                    <span>VAT 12%:</span><span className="text-right">{formatCurrency(vat12)}</span>
+                                </div>
+                                <div className="col-span-2 w-full flex justify-end">
+                                    <div className="border-t border-black w-[150px] my-1"></div>
+                                </div>
+                                <div className="grid grid-cols-[1fr_auto] gap-x-4 font-bold">
+                                    <span>Total Rp:</span><span className="text-right">{formatCurrency(totalRp)}</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="border-t border-black w-full mt-2 mb-2"></div>
 
                       <div className="flex justify-between items-start text-[9px] mt-2">
                          <div className='w-1/2 pr-4'>
