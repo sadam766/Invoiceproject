@@ -2,6 +2,7 @@
 'use client';
 import Link from 'next/link';
 import { useState, useMemo } from 'react';
+import { useRouter } from 'next/navigation';
 import {
     Card,
     CardContent,
@@ -21,7 +22,7 @@ import {
   import { Button } from '@/components/ui/button';
   import { Badge } from '@/components/ui/badge';
   import { Checkbox } from '@/components/ui/checkbox';
-  import { invoiceListData, type Invoice, spdData, type SpdData } from '@/app/lib/data';
+  import { invoiceListData, type Invoice, spdData, type SpdData, salesOrderListData, customerListData } from '@/app/lib/data';
   import { Search, Filter, MoreHorizontal, ArrowUpDown, Plus, Eye, Pencil } from 'lucide-react';
   import { Skeleton } from '@/components/ui/skeleton';
   import {
@@ -35,6 +36,7 @@ import {
 
 
   export default function InvoiceListPage() {
+    const router = useRouter();
     const [invoices, setInvoices] = useState<Invoice[]>(invoiceListData);
     const [currentSpdData, setCurrentSpdData] = useState<SpdData[]>(spdData);
     const [isLoading, setIsLoading] = useState(false);
@@ -76,6 +78,51 @@ import {
       // Logic to handle editing, for now we can just log it
       console.log('Editing invoice:', invoice.id);
     }
+
+    const handlePreview = (invoice: Invoice) => {
+        const relatedSalesOrders = salesOrderListData.filter(so => so.soNumber === invoice.soNumber);
+        const invoiceItems = relatedSalesOrders.map((so, index) => ({
+            id: index,
+            no: index + 1,
+            item: so.productName,
+            name: so.productName,
+            quantity: so.quantity,
+            unit: so.unit,
+            price: so.price,
+            total: so.quantity * so.price,
+            amount: so.quantity * so.price
+        }));
+        const subtotal = invoiceItems.reduce((sum, item) => sum + item.total, 0);
+        
+        const negotiation = 0;
+        const dpValue = 0;
+        const pelunasan = 0;
+
+        const grandTotal = subtotal - negotiation - dpValue - pelunasan;
+        const dppVat = grandTotal / 1.12;
+        const vat12 = dppVat * 0.12;
+
+        const foundCustomer = customerListData.find(c => c.name === invoice.customer);
+
+        const previewData = {
+            id: invoice.id,
+            soNumber: invoice.soNumber,
+            customer: foundCustomer,
+            date: invoice.date,
+            amount: invoice.amount,
+            status: invoice.status,
+            items: invoiceItems,
+            subtotal,
+            dppVat,
+            vat12,
+            negotiation,
+            dpValue,
+            pelunasan,
+            grandTotal,
+        };
+        sessionStorage.setItem('invoicePreviewData', JSON.stringify(previewData));
+        router.push(`/dashboard/invoices/preview/${encodeURIComponent(invoice.id)}`);
+    };
 
     const handleSelectionChange = (invoiceId: string) => {
         setSelectedInvoices(prev => {
@@ -325,11 +372,9 @@ import {
                                                     </Button>
                                                 </DropdownMenuTrigger>
                                                 <DropdownMenuContent align="end">
-                                                    <DropdownMenuItem asChild>
-                                                        <Link href={`/dashboard/invoices/preview/${encodeURIComponent(invoice.id)}`}>
-                                                            <Eye className="mr-2 h-4 w-4" />
-                                                            Preview
-                                                        </Link>
+                                                    <DropdownMenuItem onClick={() => handlePreview(invoice)}>
+                                                        <Eye className="mr-2 h-4 w-4" />
+                                                        Preview
                                                     </DropdownMenuItem>
                                                     <DropdownMenuItem onClick={() => handleEdit(invoice)}>
                                                         <Pencil className="mr-2 h-4 w-4" />
@@ -357,5 +402,7 @@ import {
       </main>
     );
   }
+
+    
 
     
