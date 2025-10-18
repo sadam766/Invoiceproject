@@ -251,6 +251,34 @@ export default function AddInvoicePage() {
   const handleRemoveItem = (id: number) => {
     setItems(items.filter(item => item.id !== id));
   };
+  
+  const handlePreview = () => {
+    const previewData = {
+      id: invoiceId,
+      soNumber,
+      customer,
+      date: issueDate ? format(issueDate, 'yyyy-MM-dd') : '',
+      amount: grandTotal + vat12,
+      status,
+      items: items.map((item, index) => ({
+        no: index + 1,
+        item: item.name,
+        quantity: item.quantity,
+        unit: item.unit,
+        price: item.price,
+        amount: item.total
+      })),
+      subtotal,
+      dppVat,
+      vat12,
+      negotiation: typeof negotiation === 'string' ? parseFormattedNumber(negotiation) : negotiation,
+      dpValue: typeof dpValue === 'string' ? parseFormattedNumber(dpValue) : dpValue,
+      pelunasan: typeof pelunasan === 'string' ? parseFormattedNumber(pelunasan) : pelunasan,
+      grandTotal,
+    };
+    sessionStorage.setItem('invoicePreviewData', JSON.stringify(previewData));
+    router.push(`/dashboard/invoices/preview/${encodeURIComponent(invoiceId || 'new')}`);
+  };
 
 
   if (isLoading && !invoiceNumberDataState) {
@@ -593,11 +621,9 @@ export default function AddInvoicePage() {
                   <Settings className="h-4 w-4" />
                 </Button>
               </div>
-              <Link href={`/dashboard/invoices/preview/${encodeURIComponent(invoiceId)}`} passHref>
-                <Button variant="outline" className="w-full">
+                <Button variant="outline" className="w-full" onClick={handlePreview}>
                     <Eye className="mr-2 h-4 w-4" /> Preview
                 </Button>
-              </Link>
               <Button variant="outline" className="w-full" onClick={() => handleSaveInvoice('draft')}>
                 Save
               </Button>

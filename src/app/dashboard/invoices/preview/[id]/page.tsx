@@ -4,7 +4,7 @@
 import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
-import { invoiceListData, salesOrderListData, type Invoice, type SalesOrder } from '@/app/lib/data';
+import { invoiceListData, salesOrderListData, type Invoice, type SalesOrder, type Customer } from '@/app/lib/data';
 import { ArrowLeft, Printer } from 'lucide-react';
 import { format } from 'date-fns';
 
@@ -17,22 +17,37 @@ type InvoiceItem = {
     amount: number;
 };
 
+type PreviewData = Invoice & {
+    items: InvoiceItem[];
+    customer?: Customer;
+    subtotal: number;
+    negotiation: number;
+    dpValue: number;
+    pelunasan: number;
+    grandTotal: number;
+    dppVat: number;
+    vat12: number;
+}
+
 export default function InvoicePreviewPage() {
     const router = useRouter();
     const params = useParams();
     const { id } = params;
 
-    const [invoice, setInvoice] = useState<Invoice | null>(null);
-    const [items, setItems] = useState<InvoiceItem[]>([]);
+    const [invoiceData, setInvoiceData] = useState<PreviewData | null>(null);
 
     useEffect(() => {
-        if (id) {
+        const dataFromSession = sessionStorage.getItem('invoicePreviewData');
+        if (dataFromSession) {
+            const parsedData = JSON.parse(dataFromSession);
+            setInvoiceData(parsedData);
+            // Optional: Clear session storage after use
+            // sessionStorage.removeItem('invoicePreviewData');
+        } else if (id) {
             const decodedId = decodeURIComponent(id as string);
             const foundInvoice = invoiceListData.find(inv => inv.id === decodedId);
             
             if (foundInvoice) {
-                setInvoice(foundInvoice);
-
                 const relatedSalesOrders = salesOrderListData.filter(so => so.soNumber === foundInvoice.soNumber);
                 const invoiceItems: InvoiceItem[] = relatedSalesOrders.map((so, index) => ({
                     no: index + 1,
@@ -42,7 +57,19 @@ export default function InvoicePreviewPage() {
                     price: so.price,
                     amount: so.quantity * so.price
                 }));
-                setItems(invoiceItems);
+                const subtotal = invoiceItems.reduce((sum, item) => sum + item.amount, 0);
+
+                setInvoiceData({
+                    ...foundInvoice,
+                    items: invoiceItems,
+                    subtotal: subtotal,
+                    negotiation: 0,
+                    dpValue: 0,
+                    pelunasan: 0,
+                    grandTotal: subtotal,
+                    dppVat: subtotal / 1.12,
+                    vat12: (subtotal / 1.12) * 0.12,
+                });
             }
         }
     }, [id]);
@@ -51,7 +78,7 @@ export default function InvoicePreviewPage() {
         window.print();
     };
     
-    if (!invoice) {
+    if (!invoiceData) {
         return (
             <div className="p-8">
                 <Button onClick={() => router.back()} variant="outline" className="mb-4 print:hidden">
@@ -62,13 +89,29 @@ export default function InvoicePreviewPage() {
         );
     }
     
-    const subtotal = items.reduce((sum, item) => sum + item.amount, 0);
+    const {
+        id: invoiceId,
+        soNumber,
+        date,
+        customer,
+        items,
+        subtotal,
+        negotiation,
+        dpValue,
+        pelunasan,
+        grandTotal,
+        dppVat,
+        vat12
+      } = invoiceData;
+
+    const totalAmount = grandTotal + vat12;
+
 
     return (
         <main className="bg-gray-100 p-4 sm:p-8">
              <div className="flex justify-between items-center mb-4 print:hidden">
                 <Button onClick={() => router.back()} variant="outline">
-                    <ArrowLeft className="mr-2 h-4 w-4" /> Back to Invoices
+                    <ArrowLeft className="mr-2 h-4 w-4" /> Back
                 </Button>
                 <Button onClick={handlePrint}>
                     <Printer className="mr-2 h-4 w-4" /> Print Invoice
@@ -78,7 +121,7 @@ export default function InvoicePreviewPage() {
                 <div className="flex justify-between items-start mb-4">
                     <div>
                         <h1 className="text-sm font-bold">INVOICE/OFFICIAL RECEIPT</h1>
-                        <p className="text-sm">{invoice.id}</p>
+                        <p className="text-sm">{invoiceId}</p>
                     </div>
                     <div className="text-right">
                         <p className="font-bold text-sm">Original</p>
@@ -92,14 +135,14 @@ export default function InvoicePreviewPage() {
                     <div className="text-right">
                         <div className="grid grid-cols-[auto_auto] gap-x-2">
                             <p className="text-left">Sales Order:</p>
-                            <p className="text-left">{invoice.soNumber}</p>
+                            <p className="text-left">{soNumber}</p>
                             <p className="text-left">Order Date:</p>
                             <p className="text-left"></p>
                             <p className="text-left">Reference A:</p>
                             <p className="text-left"></p>
                         </div>
-                        {invoice.date && (
-                            <p className="mt-2">Date: {format(new Date(invoice.date), 'dd-MM-yyyy')}</p>
+                        {date && (
+                            <p className="mt-2">Date: {format(new Date(date), 'dd-MM-yyyy')}</p>
                         )}
                     </div>
                 </div>
@@ -131,20 +174,39 @@ export default function InvoicePreviewPage() {
                     </div>
                 </div>
 
-                <div className="flex justify-between items-start mt-1">
-                    <div>
-                        <p>No PO :</p>
-                    </div>
-                    <div className="w-32 text-right font-bold border-b-2 border-black">
-                        {subtotal.toLocaleString('id-ID', { minimumFractionDigits: 2 })}
+                <div className="flex justify-end items-start mt-1">
+                    <div className="w-80">
+                         <div className="flex justify-between">
+                            <span>Subtotal</span>
+                            <span className="font-bold w-32 text-right">{subtotal.toLocaleString('id-ID', { minimumFractionDigits: 2 })}</span>
+                         </div>
+                         {negotiation > 0 && (
+                            <div className="flex justify-between">
+                                <span>Negotiation</span>
+                                <span className="font-bold w-32 text-right">({negotiation.toLocaleString('id-ID', { minimumFractionDigits: 2 })})</span>
+                            </div>
+                         )}
+                         {dpValue > 0 && (
+                            <div className="flex justify-between">
+                                <span>DP</span>
+                                <span className="font-bold w-32 text-right">({dpValue.toLocaleString('id-ID', { minimumFractionDigits: 2 })})</span>
+                            </div>
+                         )}
+                         {pelunasan > 0 && (
+                            <div className="flex justify-between">
+                                <span>Pelunasan</span>
+                                <span className="font-bold w-32 text-right">({pelunasan.toLocaleString('id-ID', { minimumFractionDigits: 2 })})</span>
+                            </div>
+                         )}
                     </div>
                 </div>
                  <div className="border-b-2 border-black mt-1"></div>
 
                  <div className="flex justify-between mt-4">
                      <div>
+                        <p>No PO :</p>
                         <p>Payment: &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 50 Hari setelah invoice diterima</p>
-                        <p>Please state with your payment: {invoice.id}</p>
+                        <p>Please state with your payment: {invoiceId}</p>
                         <p>For payment, please transfer to our account:</p>
                         <p className="font-bold mt-2">PT. Jembo Cable Company Tbk</p>
                         <div className="grid grid-cols-[auto_1fr] gap-x-4 mt-1">
@@ -163,13 +225,13 @@ export default function InvoicePreviewPage() {
                      <div className="w-1/3 text-right">
                          <div className="grid grid-cols-2 gap-y-1">
                              <p>Goods:</p>
-                             <p>{(subtotal - 0).toLocaleString('id-ID', { minimumFractionDigits: 2 })}</p>
+                             <p>{grandTotal.toLocaleString('id-ID', { minimumFractionDigits: 2 })}</p>
                              <p>DPP VAT:</p>
-                             <p>{(subtotal / 1.12).toLocaleString('id-ID', { minimumFractionDigits: 2 })}</p>
+                             <p>{dppVat.toLocaleString('id-ID', { minimumFractionDigits: 2 })}</p>
                              <p>VAT 12%:</p>
-                             <p>{((subtotal / 1.12) * 0.12).toLocaleString('id-ID', { minimumFractionDigits: 2 })}</p>
+                             <p>{vat12.toLocaleString('id-ID', { minimumFractionDigits: 2 })}</p>
                              <p className="font-bold col-span-2 border-t border-black pt-1 mt-1">Total Rp:</p>
-                             <p className="font-bold col-span-2">{subtotal.toLocaleString('id-ID', { minimumFractionDigits: 2 })}</p>
+                             <p className="font-bold col-span-2">{totalAmount.toLocaleString('id-ID', { minimumFractionDigits: 2 })}</p>
                          </div>
                         <div className="mt-12 text-center">
                             <p>PT. JEMBO CABLE COMPANY Tbk</p>
