@@ -1,4 +1,3 @@
-
 'use client';
 import { useState, useMemo, useEffect } from 'react';
 import {
@@ -19,6 +18,7 @@ import {
   import { Search, Plus } from 'lucide-react';
   import { AddSpdDialog } from './_components/add-spd-dialog';
   import { useToast } from '@/hooks/use-toast';
+  import { DeleteConfirmationDialog } from '@/app/components/delete-confirmation-dialog';
   
   export default function SpdPage() {
     const [data, setData] = useState(initialSpdData);
@@ -30,7 +30,8 @@ import {
     useEffect(() => {
         // This is a trick to re-fetch data if it was updated on another page.
         // In a real app, this would be handled by a state management library like Redux or Zustand.
-        setData(initialSpdData);
+        const storedSpdData = initialSpdData;
+        setData(storedSpdData);
     }, []);
 
     const filteredData = useMemo(() => {
@@ -49,6 +50,17 @@ import {
       setEditingSpd(undefined);
       setIsDialogOpen(true);
     };
+
+    const handleEdit = (spdItem: SpdData) => {
+        setEditingSpd(spdItem);
+        setIsDialogOpen(true);
+    }
+    
+    const handleDelete = (spdId: string) => {
+        setData(prevData => prevData.filter(item => item.spd !== spdId));
+        toast({ title: "SPD Deleted", description: `SPD ${spdId} has been removed.` });
+    };
+
 
     const handleSave = (newItem: Omit<SpdData, 'totalPiutang'> & { totalPiutang: number | string }) => {
         const newItemWithNumber = {
@@ -124,6 +136,7 @@ import {
                                 <TableHead>No. Kuitansi</TableHead>
                                 <TableHead>No. Faktur Pajak</TableHead>
                                 <TableHead>Surat Jalan</TableHead>
+                                <TableHead>Tindakan</TableHead>
                             </TableRow>
                         </TableHeader>
                         <TableBody>
@@ -142,6 +155,15 @@ import {
                                     <TableCell>{item.noKuitansi}</TableCell>
                                     <TableCell>{item.noFakturPajak}</TableCell>
                                     <TableCell>{item.suratJalan}</TableCell>
+                                    <TableCell>
+                                        <div className="flex gap-2">
+                                            <Button variant="link" className="p-0 h-auto text-blue-600">Pratinjau</Button>
+                                            <Button variant="link" className="p-0 h-auto" onClick={() => handleEdit(item)}>Edit</Button>
+                                            <div className="text-red-600">
+                                                <DeleteConfirmationDialog onConfirm={() => handleDelete(item.spd)} />
+                                            </div>
+                                        </div>
+                                    </TableCell>
                                 </TableRow>
                             ))}
                         </TableBody>
@@ -155,5 +177,3 @@ import {
       </main>
     );
   }
-
-    

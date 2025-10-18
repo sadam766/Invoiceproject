@@ -24,10 +24,10 @@ export function DeleteConfirmationDialog({ onConfirm }: DeleteConfirmationDialog
   return (
     <AlertDialog>
       <AlertDialogTrigger asChild>
-        <div className='flex items-center w-full'>
+        <button className='flex items-center text-red-600 hover:text-red-800'>
           <Trash2 className="mr-2 h-4 w-4" />
           <span>Hapus</span>
-        </div>
+        </button>
       </AlertDialogTrigger>
       <AlertDialogContent>
         <AlertDialogHeader>
@@ -49,5 +49,3 @@ export function DeleteConfirmationDialog({ onConfirm }: DeleteConfirmationDialog
     </AlertDialog>
   );
 }
-
-    
