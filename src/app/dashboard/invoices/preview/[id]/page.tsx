@@ -325,12 +325,8 @@ const InvoicePreviewPage: React.FC = () => {
           const totalPages = itemPages.length;
 
           return (
-            <div key={pageIndex} className="invoice-page relative flex flex-col p-8 text-[10px] leading-tight">
+            <div key={pageIndex} className="invoice-page relative flex flex-col p-8 text-[10px] leading-tight" style={{minHeight: isLastPage ? 'auto' : '29.7cm' }}>
               <header>
-                 <div className="w-full flex flex-col items-center absolute">
-                    <p className="font-bold uppercase text-[14px] mb-1 tracking-tighter">{invoiceTitle}</p>
-                    <p className="font-bold uppercase text-[14px]">{invoiceId}</p>
-                </div>
                 <div className="flex justify-between items-start">
                     <div className="w-1/2">
                         <p className="font-bold text-[11px] mb-1">{customer?.name}</p>
@@ -338,6 +334,10 @@ const InvoicePreviewPage: React.FC = () => {
                         <div className="mt-4">
                            <p>Customer Code: -</p>
                         </div>
+                    </div>
+                    <div className="w-1/2 flex flex-col items-center">
+                        <p className="font-bold uppercase text-[14px] mb-1 tracking-tighter">{invoiceTitle}</p>
+                        <p className="font-bold uppercase text-[14px]">{invoiceId}</p>
                     </div>
                     <div className="w-1/2 flex flex-col items-end text-[10px]">
                          <div className="inline-grid grid-cols-[max-content_max-content] text-left gap-x-2">
@@ -385,20 +385,23 @@ const InvoicePreviewPage: React.FC = () => {
                     </tbody>
                  </table>
               </main>
-              
-              <div className="mt-8" />
+
+              {isLastPage && (
+                <div className="mt-4 text-[10px]">
+                  <div className="flex justify-end">
+                      <div className="text-right">
+                          <div className="inline-block border-t border-black w-32" />
+                          <div className="font-bold">{formatCurrency(subtotal)}</div>
+                      </div>
+                  </div>
+                </div>
+              )}
               
               {isLastPage && (
                 <footer className="pt-2 text-black mt-auto">
                     <div className="text-[10px]">
-                        <div className="flex justify-between items-center mt-1">
-                            <p>No PO : {poNumber || ''}</p>
-                            <div className="text-right">
-                                <div className="border-t border-black w-32" />
-                                <div className="font-bold">{formatCurrency(subtotal)}</div>
-                            </div>
-                        </div>
-
+                        <div className="border-b border-black w-full my-1" />
+                        <p>No PO : {poNumber || ''}</p>
                         <div className="border-b border-black w-full my-1" />
 
                         <div className="flex justify-end w-full mt-1">
@@ -410,13 +413,11 @@ const InvoicePreviewPage: React.FC = () => {
                                     <p className='text-right'>{formatCurrency(dppVat)}</p>
                                     <p className="text-right">VAT 12%:</p>
                                     <p className='text-right'>{formatCurrency(vat12)}</p>
-                                    
                                     <p className="text-right font-bold">Total Rp:</p>
                                     <p className="text-right font-bold">{formatCurrency(totalRp)}</p>
                                 </div>
                             </div>
                         </div>
-                        <div className="border-t border-black w-full"></div>
                     </div>
 
 
