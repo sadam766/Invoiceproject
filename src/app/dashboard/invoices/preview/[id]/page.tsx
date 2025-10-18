@@ -390,8 +390,8 @@ const InvoicePreviewPage: React.FC = () => {
                     </tbody>
                  </table>
                   {isLastPage && (
-                    <div className="text-right mt-4">
-                        <div className="inline-block text-right">
+                    <div className="mt-4 text-right">
+                       <div className="inline-block text-right">
                            <div className="border-t border-black w-28 mb-1" />
                            <p className="font-bold">{formatCurrency(subtotal)}</p>
                         </div>
@@ -402,10 +402,8 @@ const InvoicePreviewPage: React.FC = () => {
               
               {isLastPage && (
                 <footer className="pt-2 text-black mt-auto">
-                    <div className="flex justify-between items-center py-1">
-                        <p>No PO: {poNumber || ''}</p>
-                    </div>
-                    <div className="border-t border-black w-full"></div>
+                    <p>No PO: {poNumber || ''}</p>
+                    <div className="border-t border-black w-full mt-1"></div>
                     <div className="flex justify-between items-start pt-1">
                         <div className='w-1/2 pr-4 text-[9px]'>
                             <div className="flex items-start mt-1">
@@ -447,7 +445,7 @@ const InvoicePreviewPage: React.FC = () => {
                         
                         <div className="w-1/2 flex flex-col items-end">
                             <div className="w-[240px]">
-                                <div className="grid grid-cols-[auto_1fr] justify-items-end gap-x-4">
+                                <div className="grid grid-cols-2 justify-items-end gap-x-4">
                                     <p className="text-right">Goods:</p>
                                     <p className='text-right'>{formatCurrency(grandTotal)}</p>
                                     <p className="text-right">DPP VAT (11/12):</p>
@@ -486,7 +484,3 @@ const InvoicePreviewPage: React.FC = () => {
 };
 
 export default InvoicePreviewPage;
-
-    
-
-    
