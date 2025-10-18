@@ -1,4 +1,3 @@
-
 'use client';
 
 import React, { useEffect, useState } from 'react';
@@ -284,6 +283,7 @@ const InvoicePreviewPage: React.FC = () => {
           padding: 0.5in !important;
           box-shadow: none !important;
           border: none !important;
+          min-height: auto !important;
         }
          @page {
             size: A4;
@@ -323,21 +323,23 @@ const InvoicePreviewPage: React.FC = () => {
           const totalPages = itemPages.length;
 
           return (
-            <div key={pageIndex} className="invoice-page relative flex flex-col p-8 text-[10px] leading-tight">
+            <div key={pageIndex} className="invoice-page relative flex flex-col p-8 text-[10px] leading-tight min-h-[26cm]">
               <header>
-                 <div className="flex justify-between items-start">
+                <div className="flex justify-between items-start">
                     <div className="w-1/2">
                         <p className="font-bold text-[11px] mb-1">{customer?.name}</p>
                         <p className='whitespace-pre-line'>{customer?.address}</p>
                     </div>
-                    <div className="w-1/2 flex flex-col items-center">
+                    <div className="w-full flex flex-col items-center absolute">
                         <p className="font-bold uppercase text-[14px] mb-1 tracking-tighter">{invoiceTitle}</p>
                         <p className="font-bold uppercase text-[14px]">{invoiceId}</p>
                     </div>
                 </div>
                 <div className="flex justify-between items-end mt-2">
                     <div className="w-1/2">
-                        <p>Customer Code: -</p>
+                         <div className="mt-8">
+                             <p>Customer Code: -</p>
+                         </div>
                     </div>
                      <div className="w-1/2 flex flex-col items-end text-[10px]">
                          <div className="inline-grid grid-cols-[max-content_max-content] text-left gap-x-2">
@@ -356,30 +358,30 @@ const InvoicePreviewPage: React.FC = () => {
                 <table className="w-full border-collapse text-[10px] mt-2">
                     <thead className='border-t border-black'>
                         <tr>
-                            <th className="p-1 text-left w-[4%] border-l border-r border-black">No.</th>
-                            <th className="p-1 text-left w-[40%] border-r border-black">Item</th>
-                            <th className="p-1 text-left w-[18%] border-r border-black">Quantity Unit</th>
-                            <th className="p-1 text-right w-[19%] border-r border-black">Price</th>
-                            <th className="p-1 text-right w-[19%] border-r border-black">Amount</th>
+                            <th className="p-1 text-left w-[4%] border-l border-b border-black">No.</th>
+                            <th className="p-1 text-left w-[40%] border-l border-b border-black">Item</th>
+                            <th className="p-1 text-left w-[18%] border-l border-b border-black">Quantity Unit</th>
+                            <th className="p-1 text-right w-[19%] border-l border-b border-black">Price</th>
+                            <th className="p-1 text-right w-[19%] border-l border-b border-r border-black">Amount</th>
                         </tr>
                     </thead>
                     <tbody>
                         {pageItems.map((item, index) => (
                             <tr key={item.id} className="h-[24px]">
-                                <td className="p-1 text-left align-top border-l border-r border-black">{item.no + (pageIndex * ITEMS_PER_PAGE)}</td>
-                                <td className="p-1 align-top text-left border-r border-black">{item.name}</td>
-                                <td className="p-1 text-center align-top border-r border-black">{item.quantity.toLocaleString('id-ID')} {item.unit}</td>
-                                <td className="p-1 text-right align-top border-r border-black">{formatCurrency(item.price)}</td>
-                                <td className="p-1 text-right align-top border-r border-black">{formatCurrency(item.total)}</td>
+                                <td className="p-1 text-left align-top">{item.no + (pageIndex * ITEMS_PER_PAGE)}</td>
+                                <td className="p-1 align-top text-left">{item.name}</td>
+                                <td className="p-1 text-center align-top">{item.quantity.toLocaleString('id-ID')} {item.unit}</td>
+                                <td className="p-1 text-right align-top">{formatCurrency(item.price)}</td>
+                                <td className="p-1 text-right align-top">{formatCurrency(item.total)}</td>
                             </tr>
                         ))}
                          {isLastPage && Array.from({ length: Math.max(0, emptyRows) }).map((_, index) => (
                             <tr key={`empty-${index}`} className="h-[24px]">
-                                <td className="border-l border-r border-black">&nbsp;</td>
-                                <td className="border-r border-black">&nbsp;</td>
-                                <td className="border-r border-black">&nbsp;</td>
-                                <td className="border-r border-black">&nbsp;</td>
-                                <td className="border-r border-black">&nbsp;</td>
+                                <td>&nbsp;</td>
+                                <td>&nbsp;</td>
+                                <td>&nbsp;</td>
+                                <td>&nbsp;</td>
+                                <td>&nbsp;</td>
                             </tr>
                         ))}
                     </tbody>
@@ -428,13 +430,13 @@ const InvoicePreviewPage: React.FC = () => {
                                     <p>Cabang Sudirman</p>
                                 </div>
                                 <div className="text-left">
-                                  <div className="flex justify-between items-center"><span>A/C No.</span><span className='pl-2'>: 102-0100206827 (Rp)</span></div>
-                                  <div className="flex justify-between items-center"><span>A/C No.</span><span className='pl-2'>: 102-0005000218 (Rp)</span></div>
-                                  <div className="flex justify-between items-center"><span>A/C No.</span><span className='pl-2'>: 102-0005000226 (USD)</span></div>
+                                  <div className="flex justify-between items-center"><span className="pr-2">A/C No.</span><span className='pl-2'>: 102-0100206827 (Rp)</span></div>
+                                  <div className="flex justify-between items-center"><span className="pr-2">A/C No.</span><span className='pl-2'>: 102-0005000218 (Rp)</span></div>
+                                  <div className="flex justify-between items-center"><span className="pr-2">A/C No.</span><span className='pl-2'>: 102-0005000226 (USD)</span></div>
                                 </div>
                                 
                                 <div className="col-span-2 my-1 flex items-center justify-center">
-                                  <span>OR</span>
+                                  <span className='px-4'>OR</span>
                                 </div>
 
                                 <div className="font-bold">
@@ -442,7 +444,7 @@ const InvoicePreviewPage: React.FC = () => {
                                     <p>Cabang KEM TOWER</p>
                                 </div>
                                 <div className="text-left">
-                                  <div className="flex justify-between items-center"><span>A/C No.</span><span className='pl-2'>: 684-0198977 (Rp)</span></div>
+                                  <div className="flex justify-between items-center"><span className="pr-2">A/C No.</span><span className='pl-2'>: 684-0198977 (Rp)</span></div>
                                 </div>
                             </div>
                         </div>
@@ -471,5 +473,3 @@ const InvoicePreviewPage: React.FC = () => {
 };
 
 export default InvoicePreviewPage;
-
-    
