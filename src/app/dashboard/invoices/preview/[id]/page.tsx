@@ -4,7 +4,7 @@
 import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
-import { invoiceListData, salesOrderListData, type Customer } from '@/app/lib/data';
+import { invoiceListData, salesOrderListData, type Customer, customerListData } from '@/app/lib/data';
 import { ArrowLeft, Printer, FileDown } from 'lucide-react';
 import { format } from 'date-fns';
 
@@ -72,7 +72,6 @@ export default function InvoicePreviewPage() {
                 }));
                 const subtotal = invoiceItems.reduce((sum, item) => sum + item.total, 0);
                 
-                // Simplified calculations for existing data
                 const negotiation = 0;
                 const dpValue = 0;
                 const pelunasan = 0;
@@ -81,8 +80,11 @@ export default function InvoicePreviewPage() {
                 const dppVat = grandTotal / 1.12;
                 const vat12 = dppVat * 0.12;
 
+                const foundCustomer = customerListData.find(c => c.name === foundInvoice.customer);
+
                 setInvoiceData({
                     ...foundInvoice,
+                    customer: foundCustomer,
                     items: invoiceItems,
                     subtotal: subtotal,
                     negotiation: negotiation,
@@ -201,20 +203,20 @@ export default function InvoicePreviewPage() {
                     <tbody>
                         {items.map((item, index) => (
                             <tr key={index}>
-                                <td className="p-1 text-center">{item.no}</td>
-                                <td className="p-1">{item.name}</td>
-                                <td className="p-1 text-center">{item.quantity.toLocaleString('id-ID')} {item.unit}</td>
-                                <td className="p-1 text-right">{formatCurrency(item.price)}</td>
-                                <td className="p-1 text-right">{formatCurrency(item.total)}</td>
+                                <td className="p-1 text-center border-l border-r border-black">{item.no}</td>
+                                <td className="p-1 border-r border-black">{item.name}</td>
+                                <td className="p-1 text-center border-r border-black">{item.quantity.toLocaleString('id-ID')} {item.unit}</td>
+                                <td className="p-1 text-right border-r border-black">{formatCurrency(item.price)}</td>
+                                <td className="p-1 text-right border-r border-black">{formatCurrency(item.total)}</td>
                             </tr>
                         ))}
                         {Array.from({ length: Math.max(0, 15 - items.length) }).map((_, i) => (
                            <tr key={`empty-${i}`} style={{height: '24px'}}>
-                                <td>&nbsp;</td>
-                                <td>&nbsp;</td>
-                                <td>&nbsp;</td>
-                                <td>&nbsp;</td>
-                                <td>&nbsp;</td>
+                                <td className='border-l border-r border-black'>&nbsp;</td>
+                                <td className='border-r border-black'>&nbsp;</td>
+                                <td className='border-r border-black'>&nbsp;</td>
+                                <td className='border-r border-black'>&nbsp;</td>
+                                <td className='border-r border-black'>&nbsp;</td>
                            </tr>
                         ))}
                     </tbody>
@@ -222,25 +224,22 @@ export default function InvoicePreviewPage() {
               </main>
 
               <footer>
-                <div className="flex justify-between items-start text-[10px]">
+                <div className="flex justify-between items-start text-[10px] border-t border-b border-black py-1">
                     <p>No PO : {poNumber || ''}</p>
-                    <div className="text-right w-1/2">
-                        <div className="inline-block w-full">
-                        <div className="border-t border-black w-28 ml-auto mb-1"></div>
+                    <div className="text-right">
+                        <div className="inline-block">
                         <div className="text-right pr-1 pt-1 font-bold">{formatCurrency(subtotal)}</div>
                         </div>
                     </div>
                 </div>
 
-                <div className="border-b border-black w-full my-1"></div>
-
                  <div className="flex justify-between mt-1">
                        <div className='w-1/2 pr-4'>
-                          <div className="text-[9px]">
-                              <div className='grid grid-cols-[auto_1fr] gap-x-2'>
-                                  <p>Payment :</p><p>90 Hari setelah invoice diterima</p>
-                              </div>
-                              <p>Please state with your payment: {invoiceId}</p>
+                           <div className="grid grid-cols-[auto_1fr] gap-x-2 text-[9px]">
+                                <p>Payment :</p><p>90 Hari setelah invoice diterima</p>
+                                <p>Please state with your payment:</p><p>{invoiceId}</p>
+                           </div>
+                           <div className="text-[9px] mt-2">
                               <p>For payment, please transfer to our account:</p>
                               <p className="font-bold mt-2">PT. Jembo Cable Company Tbk</p>
                               
@@ -269,33 +268,34 @@ export default function InvoicePreviewPage() {
                               </div>
                           </div>
                        </div>
-                       <div className="w-1/2 flex flex-col">
-                            <div className="w-full">
+
+                       <div className="w-1/2 flex flex-col justify-between">
+                            <div className="w-full text-right text-[10px]">
                                 {negotiation > 0 && (<div className="flex justify-between"><p>A/Negotiation :</p> <p>({formatCurrency(negotiation)})</p></div>)}
                                 {dpValue > 0 && (<div className="flex justify-between"><p>DP :</p> <p>{formatCurrency(dpValue)}</p></div>)}
                                 {pelunasan > 0 && (<div className="flex justify-between"><p>Pelunasan :</p> <p>({formatCurrency(pelunasan)})</p></div>)}
+                                
+                                <div className="grid grid-cols-2 gap-y-1 text-[10px] mt-2">
+                                    <p>Goods:</p>
+                                    <p className='text-right'>{formatCurrency(grandTotal)}</p>
+                                    
+                                    <p>DPP VAT (11/12):</p>
+                                    <p className='text-right'>{formatCurrency(dppVat)}</p>
+                                    
+                                    <p>VAT 12%:</p>
+                                    <p className='text-right'>{formatCurrency(vat12)}</p>
+                                </div>
+                                <div className="border-t border-black pt-1 mt-1 grid grid-cols-2">
+                                    <p className="font-bold">Total Rp:</p>
+                                    <p className="text-right font-bold">{formatCurrency(totalAmount)}</p>
+                                </div>
                             </div>
-                            <div className="grid grid-cols-2 gap-y-1 text-[10px] mt-2">
-                               <p>Goods:</p>
-                               <p className='text-right'>{formatCurrency(grandTotal)}</p>
-                               
-                               <p>DPP VAT (11/12):</p>
-                               <p className='text-right'>{formatCurrency(dppVat)}</p>
-                               
-                               <p>VAT 12%:</p>
-                               <p className='text-right'>{formatCurrency(vat12)}</p>
-                           </div>
-                           <div className="border-t border-black pt-1 mt-1 grid grid-cols-2">
-                               <p className="font-bold">Total Rp:</p>
-                               <p className="text-right font-bold">{formatCurrency(totalAmount)}</p>
-                           </div>
-                           <div className="border-b border-black w-full my-1"></div>
-
-                          <div className="mt-8 text-center">
-                              <p>PT. JEMBO CABLE COMPANY Tbk</p>
-                              <div className="h-12"></div>
-                              <p className="border-t border-black pt-1 mx-8">Finance</p>
-                          </div>
+                           
+                            <div className="text-center">
+                                <p>PT. JEMBO CABLE COMPANY Tbk</p>
+                                <div className="h-16"></div>
+                                <p className="pt-1 mx-8">Finance</p>
+                            </div>
                        </div>
                    </div>
               </footer>
