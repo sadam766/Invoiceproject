@@ -47,6 +47,7 @@ export default function SpdPreviewPage() {
     
     const customerDetails = customerListData.find(c => c.name === spdItem.customer);
     const relatedInvoice = invoiceListData.find(i => i.id === spdItem.noInvoice);
+    const suratJalanParts = spdItem.suratJalan.split(',').map(s => s.trim());
 
     return (
         <main className="bg-gray-100 dark:bg-gray-900 p-4 sm:p-8 font-sans">
@@ -99,7 +100,7 @@ export default function SpdPreviewPage() {
                                     <td className="border border-black p-1 text-center w-32">NILAI</td>
                                     <td className="border border-black p-1 text-center">NO. FAKTUR PAJAK</td>
                                     <td className="border border-black p-1 text-center">NO. SO.</td>
-                                    <td className="border border-black p-1 text-center">NO. SURAT JALAN</td>
+                                    <td colSpan={3} className="border border-black p-1 text-center">NO. SURAT JALAN</td>
                                 </tr>
                             </thead>
                             <tbody>
@@ -114,7 +115,9 @@ export default function SpdPreviewPage() {
                                             <td className="border border-black p-1 text-right">{isFirstRow ? `Rp. ${spdItem.totalPiutang.toLocaleString('id-ID')}` : ''}</td>
                                             <td className="border border-black p-1">{isFirstRow ? spdItem.noFakturPajak : ''}</td>
                                             <td className="border border-black p-1">{isFirstRow ? relatedInvoice?.soNumber : ''}</td>
-                                            <td className="border border-black p-1">{isFirstRow ? spdItem.suratJalan : ''}</td>
+                                            <td className="border border-black p-1 text-center w-[7%]">{isFirstRow ? suratJalanParts[0] : ''}</td>
+                                            <td className="border border-black p-1 text-center w-[7%]">{isFirstRow ? suratJalanParts[1] : ''}</td>
+                                            <td className="border border-black p-1 text-center w-[7%]">{isFirstRow ? suratJalanParts[2] : ''}</td>
                                         </tr>
                                     );
                                 })}
