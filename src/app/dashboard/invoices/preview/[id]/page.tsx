@@ -215,19 +215,19 @@ export default function InvoicePreviewPage() {
                           {items.map((item) => (
                               <tr key={item.no}>
                                   <td className="p-1 text-center">{item.no}</td>
-                                  <td className="p-1 border-l border-black">{item.name}</td>
-                                  <td className="p-1 text-center border-l border-black">{item.quantity.toLocaleString('id-ID')} {item.unit}</td>
-                                  <td className="p-1 text-right border-l border-black">{formatCurrency(item.price)}</td>
-                                  <td className="p-1 text-right border-l border-black">{formatCurrency(item.total)}</td>
+                                  <td className="p-1">{item.name}</td>
+                                  <td className="p-1 text-center">{item.quantity.toLocaleString('id-ID')} {item.unit}</td>
+                                  <td className="p-1 text-right">{formatCurrency(item.price)}</td>
+                                  <td className="p-1 text-right">{formatCurrency(item.total)}</td>
                               </tr>
                           ))}
                           {Array.from({ length: Math.max(0, 15 - items.length) }).map((_, i) => (
                             <tr key={`empty-${i}`} style={{height: '24px'}}>
                                 <td className='p-1 text-center'>&nbsp;</td>
-                                <td className='p-1 border-l border-black'>&nbsp;</td>
-                                <td className='p-1 text-center border-l border-black'>&nbsp;</td>
-                                <td className='p-1 text-right border-l border-black'>&nbsp;</td>
-                                <td className='p-1 text-right border-l border-black'>&nbsp;</td>
+                                <td className='p-1'>&nbsp;</td>
+                                <td className='p-1 text-center'>&nbsp;</td>
+                                <td className='p-1 text-right'>&nbsp;</td>
+                                <td className='p-1 text-right'>&nbsp;</td>
                             </tr>
                           ))}
                       </tbody>
@@ -279,8 +279,8 @@ export default function InvoicePreviewPage() {
                     <div className='w-1/2 pr-4 text-[9px]'>
                         <div className="grid grid-cols-[max-content,1fr] gap-x-2">
                             <p>Payment :</p><p>{'90 Hari setelah invoice diterima'}</p>
-                            <p>Please state with your payment:</p><p>{invoiceId}</p>
                         </div>
+                        <p className="mt-2">Please state with your payment: {invoiceId}</p>
                         <p className="font-bold mt-2">For payment, please transfer to our account:</p>
                         <p className="font-bold mt-2">PT. Jembo Cable Company Tbk</p>
                         
