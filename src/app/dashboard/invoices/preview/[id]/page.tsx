@@ -238,19 +238,19 @@ export default function InvoicePreviewPage() {
               </main>
 
               <footer>
-                <div className="flex justify-between items-center text-[10px] py-1">
-                    <p>No PO : {poNumber || ''}</p>
-                    <div className="text-right">
-                        <div className="inline-block border-t border-black pt-1">
-                            <p className="font-bold">{formatCurrency(subtotal)}</p>
-                        </div>
-                    </div>
+                <div className="border-t border-black pt-1">
+                  <div className="flex justify-between items-center text-[10px]">
+                      <p>No PO : {poNumber || ''}</p>
+                      <div className="text-right">
+                          <p className="font-bold">{formatCurrency(subtotal)}</p>
+                      </div>
+                  </div>
                 </div>
 
                 <div className="border-t border-b border-black py-2">
                     <div className="flex justify-end w-full text-[10px]">
                         <div className="w-1/2 pl-4">
-                            {negotiation > 0 && (
+                             {negotiation > 0 && (
                                 <div className="flex justify-end"><p className="w-28 text-left">A/Negotiation :</p> <p className='w-28 text-right'>({formatCurrency(negotiation)})</p></div>
                             )}
                             {dpValue > 0 && (
@@ -270,7 +270,7 @@ export default function InvoicePreviewPage() {
                                 <p className="text-left w-28">VAT 12%:</p>
                                 <p className='text-right w-28'>{formatCurrency(vat12)}</p>
                             </div>
-                            <div className="grid grid-cols-2 justify-items-end mt-1">
+                             <div className="grid grid-cols-2 justify-items-end mt-1">
                                 <p className="font-bold text-left w-28">Total Rp:</p>
                                 <p className="text-right font-bold w-28">{formatCurrency(totalAmount)}</p>
                             </div>
@@ -299,7 +299,7 @@ export default function InvoicePreviewPage() {
                             </div>
                         </div>
                         
-                        <div className="text-center my-1 font-bold" style={{width: "80%"}}>OR</div>
+                        <div className="text-center my-1 font-bold">OR</div>
 
                         <div className="grid grid-cols-[max-content,1fr] gap-x-4">
                             <div>
@@ -312,12 +312,15 @@ export default function InvoicePreviewPage() {
                         </div>
                     </div>
 
-                    <div className="w-1/2 pl-4 text-center flex flex-col justify-between">
-                         <div className='self-start'>
+                    <div className="w-1/2 pl-4 flex flex-col justify-between">
+                         <div className='text-center'>
                              <p>PT. JEMBO CABLE COMPANY Tbk</p>
                          </div>
-                         <div className="self-end">
-                             <p className="pt-1">Finance</p>
+                         <div className="text-center mt-20">
+                            <div className="inline-block">
+                                <div className="h-px w-32 bg-black"></div>
+                                <p className="pt-1">Finance</p>
+                            </div>
                          </div>
                     </div>
                 </div>
