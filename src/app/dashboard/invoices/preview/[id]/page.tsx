@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { invoiceListData, salesOrderListData, type Customer, customerListData } from '@/app/lib/data';
 import { ArrowLeft, Printer } from 'lucide-react';
 import { format } from 'date-fns';
+import { id as indonesiaLocale } from 'date-fns/locale';
 
 type InvoiceItem = {
     no: number;
@@ -214,54 +215,55 @@ export default function InvoicePreviewPage() {
                       <tbody>
                           {items.map((item) => (
                               <tr key={item.no}>
-                                  <td className="p-1 text-center">{item.no}</td>
-                                  <td className="p-1">{item.name}</td>
-                                  <td className="p-1 text-center">{item.quantity.toLocaleString('id-ID')} {item.unit}</td>
-                                  <td className="p-1 text-right">{formatCurrency(item.price)}</td>
-                                  <td className="p-1 text-right">{formatCurrency(item.total)}</td>
+                                  <td className="p-1 text-center align-top">{item.no}</td>
+                                  <td className="p-1 align-top border-l border-black">{item.name}</td>
+                                  <td className="p-1 text-center align-top border-l border-black">{item.quantity.toLocaleString('id-ID')} {item.unit}</td>
+                                  <td className="p-1 text-right align-top border-l border-black">{formatCurrency(item.price)}</td>
+                                  <td className="p-1 text-right align-top border-l border-black">{formatCurrency(item.total)}</td>
                               </tr>
                           ))}
                           {Array.from({ length: Math.max(0, 15 - items.length) }).map((_, i) => (
                             <tr key={`empty-${i}`} style={{height: '24px'}}>
-                                <td className='p-1 text-center'>&nbsp;</td>
                                 <td className='p-1'>&nbsp;</td>
-                                <td className='p-1 text-center'>&nbsp;</td>
-                                <td className='p-1 text-right'>&nbsp;</td>
-                                <td className='p-1 text-right'>&nbsp;</td>
+                                <td className='p-1 border-l border-black'>&nbsp;</td>
+                                <td className='p-1 border-l border-black'>&nbsp;</td>
+                                <td className='p-1 border-l border-black'>&nbsp;</td>
+                                <td className='p-1 border-l border-black'>&nbsp;</td>
                             </tr>
                           ))}
                       </tbody>
                   </table>
               </main>
 
-              <footer className="pt-2">
-                <div className="flex justify-between items-center text-[10px] mt-1 border-t border-black pt-1">
+             <footer className="pt-2">
+                <div className="flex justify-between items-center text-[10px] border-t border-black pt-1">
                     <p>No PO : {poNumber || ''}</p>
-                    <div className="text-right">
-                        <div className="inline-block px-4">
-                            <p className="font-bold">{formatCurrency(subtotal)}</p>
-                        </div>
+                    <div className="flex items-center">
+                        <div className="w-28 text-left">Subtotal</div>
+                        <div className="w-28 text-right font-bold">{formatCurrency(subtotal)}</div>
                     </div>
                 </div>
 
-                {(negotiation > 0 || dpValue > 0 || pelunasan > 0) && (
-                    <div className="flex justify-end w-full text-[10px]">
-                        <div className="w-1/2 pl-4">
-                            {negotiation > 0 && (
-                                <div className="flex justify-end"><p className="w-28 text-left">A/Negotiation :</p> <p className='w-28 text-right'>({formatCurrency(negotiation)})</p></div>
-                            )}
-                            {dpValue > 0 && (
-                                <div className="flex justify-end"><p className="w-28 text-left">DP :</p> <p className='w-28 text-right'>{formatCurrency(dpValue)}</p></div>
-                            )}
-                            {pelunasan > 0 && (
-                                <div className="flex justify-end"><p className="w-28 text-left">Pelunasan :</p> <p className='w-28 text-right'>({formatCurrency(pelunasan)})</p></div>
-                            )}
-                        </div>
+                <div className="flex justify-end w-full text-[10px] mt-1">
+                    <div className="w-[224px] pl-4">
+                        {(negotiation > 0 || dpValue > 0 || pelunasan > 0) && (
+                            <>
+                                {negotiation > 0 && (
+                                    <div className="flex justify-end"><p className="w-28 text-left">A/Negotiation :</p> <p className='w-28 text-right'>({formatCurrency(negotiation)})</p></div>
+                                )}
+                                {dpValue > 0 && (
+                                    <div className="flex justify-end"><p className="w-28 text-left">DP :</p> <p className='w-28 text-right'>{formatCurrency(dpValue)}</p></div>
+                                )}
+                                {pelunasan > 0 && (
+                                    <div className="flex justify-end"><p className="w-28 text-left">Pelunasan :</p> <p className='w-28 text-right'>({formatCurrency(pelunasan)})</p></div>
+                                )}
+                            </>
+                        )}
                     </div>
-                )}
-                
-                <div className="border-t border-b border-black my-1 py-1 flex justify-end w-full text-[10px]">
-                     <div className="w-1/2 pl-4">
+                </div>
+
+                <div className="flex justify-end w-full text-[10px] mt-1">
+                    <div className="w-[224px] pl-4 border-t border-black pt-1">
                         <div className="grid grid-cols-2 justify-items-end">
                             <p className="text-left w-28">Goods:</p>
                             <p className='text-right w-28'>{formatCurrency(grandTotal)}</p>
@@ -269,8 +271,15 @@ export default function InvoicePreviewPage() {
                             <p className='text-right w-28'>{formatCurrency(dppVat)}</p>
                             <p className="text-left w-28">VAT 12%:</p>
                             <p className='text-right w-28'>{formatCurrency(vat12)}</p>
-                            <p className="font-bold text-left w-28">Total Rp:</p>
-                            <p className="text-right font-bold w-28">{formatCurrency(totalAmount)}</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div className="flex justify-end w-full text-[10px] mt-1">
+                    <div className="w-[224px] pl-4">
+                         <div className="grid grid-cols-2 justify-items-end font-bold border-t border-b border-black py-1">
+                            <p className="text-left w-28">Total Rp:</p>
+                            <p className="text-right w-28">{formatCurrency(totalAmount)}</p>
                         </div>
                     </div>
                 </div>
@@ -284,26 +293,18 @@ export default function InvoicePreviewPage() {
                         <p className="font-bold mt-2">For payment, please transfer to our account:</p>
                         <p className="font-bold mt-2">PT. Jembo Cable Company Tbk</p>
                         
-                        <div className="grid grid-cols-[max-content,1fr] gap-x-4 mt-1">
-                            <div>
-                                <p>Bank Mandiri - Jakarta</p>
+                         <div className="flex mt-1">
+                            <div className="w-1/2 pr-2">
+                                <p className='font-bold'>Bank Mandiri - Jakarta</p>
                                 <p>Cabang Sudirman</p>
-                            </div>
-                            <div className="text-left">
                                 <p>A/C No.: 102-0100206827 (Rp)</p>
                                 <p>A/C No.: 102-0005000218 (Rp)</p>
                                 <p>A/C No.: 102-0005000226 (USD)</p>
                             </div>
-                        </div>
-                        
-                        <div className="text-center my-1 font-bold">OR</div>
-
-                        <div className="grid grid-cols-[max-content,1fr] gap-x-4">
-                            <div>
-                                <p>Bank BCA - Jakarta</p>
+                             <div className="w-1/2 pl-2">
+                                <p className="font-bold text-center mb-1">OR</p>
+                                <p className='font-bold'>Bank BCA - Jakarta</p>
                                 <p>Cabang KEM TOWER</p>
-                            </div>
-                            <div className="text-left">
                                 <p>A/C No.: 684-0198977 (Rp)</p>
                             </div>
                         </div>
@@ -315,8 +316,8 @@ export default function InvoicePreviewPage() {
                          </div>
                          <div className="text-center mt-20">
                             <div className="inline-block">
-                                <div className="h-px w-32 bg-black"></div>
-                                <p className="pt-1">Finance</p>
+                                <div className="h-px w-32 bg-black mb-1"></div>
+                                <p>Finance</p>
                             </div>
                          </div>
                     </div>
