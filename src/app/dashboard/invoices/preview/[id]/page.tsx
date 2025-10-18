@@ -326,48 +326,48 @@ const InvoicePreviewPage: React.FC = () => {
             <div key={pageIndex} className="invoice-page relative flex flex-col p-8 text-[10px] leading-tight">
               <header>
                 <div className="flex justify-between items-start">
-                    {/* Left block for Customer */}
-                    <div className="w-1/3">
+                    {/* Left block for Customer Info */}
+                    <div className="w-1/2">
+                        {/* This space is intentionally left blank for now */}
+                    </div>
+
+                    {/* Center & Right block for Invoice Title and details */}
+                    <div className="w-1/2">
+                        <div className="text-center">
+                            <p className="font-bold uppercase text-[14px] mb-1 tracking-tighter">{invoiceTitle}</p>
+                            <p className="font-bold uppercase text-[14px]">{invoiceId}</p>
+                        </div>
+                        <div className="flex justify-end mt-8 mb-2 text-[10px]">
+                            <div className="inline-grid grid-cols-[max-content_max-content] text-left gap-x-2">
+                                <span>Sales Order</span><span>: {soNumber || ''}</span>
+                                <span>Order Date</span><span>:</span>
+                                <span>Reference A</span><span>:</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                {/* Customer Details and Date */}
+                <div className="flex justify-between items-start text-[10px] mb-2">
+                    <div className="w-1/2">
                         <p className="font-bold text-[11px] mb-1">{customer?.name}</p>
                         <p className='whitespace-pre-line'>{customer?.address}</p>
+                        <p className='mt-4'>Customer Code: -</p>
                     </div>
-
-                    {/* Center block for Invoice Title */}
-                    <div className="w-1/3 text-center">
-                        <p className="font-bold uppercase text-[14px] mb-1 tracking-tighter">{invoiceTitle}</p>
-                        <p className="font-bold uppercase text-[14px]">{invoiceId}</p>
+                    <div className="w-1/2 text-right">
+                        <p>Date: {formatDate(date)}</p>
                     </div>
-
-                    {/* Right block for 'Original' */}
-                    <div className="w-1/3 text-right">
-                        <p className="font-bold text-[13px]">{printType}</p>
-                    </div>
-                </div>
-
-                {/* Second row for Order Details */}
-                <div className="flex justify-end items-start mt-8 mb-2 text-[10px]">
-                    <div className="inline-grid grid-cols-[max-content_max-content] text-left gap-x-2">
-                        <span>Sales Order</span><span>: {soNumber || ''}</span>
-                        <span>Order Date</span><span>:</span>
-                        <span>Reference A</span><span>:</span>
-                    </div>
-                </div>
-
-                {/* Third row for Customer Code and Date */}
-                 <div className="flex justify-between items-end text-[10px] mb-2">
-                    <p>Customer Code : -</p>
-                    <p>Date: {formatDate(date)}</p>
                 </div>
               </header>
 
               <main>
-                 <table className="w-full border-collapse text-[10px]">
+                <table className="w-full border-collapse text-[10px]">
                     <thead className='border-y-2 border-black'>
                         <tr>
                             <th className="p-1 text-left w-[4%] border-x-2 border-black">No.</th>
-                            <th className="p-1 text-left w-[40%] border-r-2 border-black">Item</th>
-                            <th className="p-1 text-center w-[18%] border-r-2 border-black">Quantity Unit</th>
-                            <th className="p-1 text-right w-[19%] border-r-2 border-black">Price</th>
+                            <th className="p-1 text-left w-[40%]">Item</th>
+                            <th className="p-1 text-center w-[18%]">Quantity Unit</th>
+                            <th className="p-1 text-right w-[19%]">Price</th>
                             <th className="p-1 text-right w-[19%] border-x-2 border-black">Amount</th>
                         </tr>
                     </thead>
@@ -395,7 +395,7 @@ const InvoicePreviewPage: React.FC = () => {
               </main>
 
               <div className="mt-8" />
-
+              
               {isLastPage ? (
                 <footer className="pt-2 text-black">
                     <div className="flex justify-between items-end text-[10px]">
@@ -479,4 +479,5 @@ const InvoicePreviewPage: React.FC = () => {
 };
 
 export default InvoicePreviewPage;
+
 
