@@ -66,15 +66,15 @@ export default function SpdPreviewPage() {
                 </div>
 
                 <div className="print-container bg-white dark:bg-gray-800 p-8 shadow-md text-xs">
-                    <header className="text-center mb-6">
+                    <header className="mb-6">
                         <h1 className="font-bold text-sm">PT. JEMBO CABLE COMPANY Tbk</h1>
                         <p>Mega Glodok Kemayoran Office Tower B 6th Floor Jl.Angkasa Kav.B-6 Kota Baru Bandar Kemayoran Jakarta Pusat</p>
                     </header>
-                    <div className="border-t-2 border-b-2 border-black py-1 text-center mb-6">
+                    <div className="text-center mb-6">
                         <h2 className="font-bold text-sm underline">SURAT PENGANTAR DOKUMEN</h2>
                         <p className="font-bold text-sm flex items-center justify-center">
                            <span>PS/</span>
-                           <span className="px-2">1</span>
+                           <span className="px-1">1</span>
                            <span>-J/KEU/2024/DK</span>
                         </p>
                     </div>
