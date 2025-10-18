@@ -325,29 +325,37 @@ const InvoicePreviewPage: React.FC = () => {
           return (
             <div key={pageIndex} className="invoice-page relative flex flex-col p-8 text-[10px] leading-tight">
               <header>
-                <div className="grid grid-cols-2">
-                    <div>
+                <div className="flex justify-between items-start">
+                    {/* Left block for Customer */}
+                    <div className="w-1/3">
                         <p className="font-bold text-[11px] mb-1">{customer?.name}</p>
+                        <p className='whitespace-pre-line'>{customer?.address}</p>
                     </div>
-                    <div className="text-center">
+
+                    {/* Center block for Invoice Title */}
+                    <div className="w-1/3 text-center">
                         <p className="font-bold uppercase text-[14px] mb-1 tracking-tighter">{invoiceTitle}</p>
                         <p className="font-bold uppercase text-[14px]">{invoiceId}</p>
                     </div>
+
+                    {/* Right block for 'Original' */}
+                    <div className="w-1/3 text-right">
+                        <p className="font-bold text-[13px]">{printType}</p>
+                    </div>
                 </div>
 
-                <div className="flex justify-between items-start text-[10px] mt-8 mb-2">
-                  <div className="w-1/2 text-left pr-4">
-                     <p>Customer Code: {customer?.id || ''}</p>
-                  </div>
-                  <div className="w-1/2 text-right pl-4">
-                    <div className="inline-grid grid-cols-[max-content_1fr] text-left gap-x-2">
+                {/* Second row for Order Details */}
+                <div className="flex justify-end items-start mt-8 mb-2 text-[10px]">
+                    <div className="inline-grid grid-cols-[max-content_max-content] text-left gap-x-2">
                         <span>Sales Order</span><span>: {soNumber || ''}</span>
                         <span>Order Date</span><span>:</span>
                         <span>Reference A</span><span>:</span>
                     </div>
-                  </div>
                 </div>
-                 <div className="flex justify-end items-end text-[10px] mb-2">
+
+                {/* Third row for Customer Code and Date */}
+                 <div className="flex justify-between items-end text-[10px] mb-2">
+                    <p>Customer Code : -</p>
                     <p>Date: {formatDate(date)}</p>
                 </div>
               </header>
@@ -357,9 +365,9 @@ const InvoicePreviewPage: React.FC = () => {
                     <thead className='border-y-2 border-black'>
                         <tr>
                             <th className="p-1 text-left w-[4%] border-x-2 border-black">No.</th>
-                            <th className="p-1 text-center w-[40%] border-r-2 border-black">Item</th>
+                            <th className="p-1 text-left w-[40%] border-r-2 border-black">Item</th>
                             <th className="p-1 text-center w-[18%] border-r-2 border-black">Quantity Unit</th>
-                            <th className="p-1 text-center w-[19%] border-r-2 border-black">Price</th>
+                            <th className="p-1 text-right w-[19%] border-r-2 border-black">Price</th>
                             <th className="p-1 text-right w-[19%] border-x-2 border-black">Amount</th>
                         </tr>
                     </thead>
@@ -422,15 +430,15 @@ const InvoicePreviewPage: React.FC = () => {
                             <p className="font-bold mt-2">For payment, please transfer to our account:</p>
                             <p className="font-bold mt-2">PT. Jembo Cable Company Tbk</p>
                             
-                            <div className="grid grid-cols-[max-content_1fr] gap-x-4 mt-1">
+                           <div className="grid grid-cols-[max-content_1fr] gap-x-4 mt-1">
                                 <div className="font-bold">
                                     <p>Bank Mandiri - Jakarta</p>
                                     <p>Cabang Sudirman</p>
                                 </div>
                                 <div className="text-left">
-                                  <div className="flex justify-between"><span>A/C No.</span><span>: 102-0100206827 (Rp)</span></div>
-                                  <div className="flex justify-between"><span>A/C No.</span><span>: 102-0005000218 (Rp)</span></div>
-                                  <div className="flex justify-between"><span>A/C No.</span><span>: 102-0005000226 (USD)</span></div>
+                                  <div className="flex justify-between"><span>A/C No. :</span><span>102-0100206827 (Rp)</span></div>
+                                  <div className="flex justify-between"><span>A/C No. :</span><span>102-0005000218 (Rp)</span></div>
+                                  <div className="flex justify-between"><span>A/C No. :</span><span>102-0005000226 (USD)</span></div>
                                 </div>
                                 
                                 <div className="col-span-2 my-1 flex items-center justify-center">
@@ -442,7 +450,7 @@ const InvoicePreviewPage: React.FC = () => {
                                     <p>Cabang KEM TOWER</p>
                                 </div>
                                 <div className="text-left">
-                                  <div className="flex justify-between"><span>A/C No.</span><span>: 684-0198977 (Rp)</span></div>
+                                  <div className="flex justify-between"><span>A/C No. :</span><span>684-0198977 (Rp)</span></div>
                                 </div>
                             </div>
                         </div>
@@ -452,7 +460,7 @@ const InvoicePreviewPage: React.FC = () => {
                                 <p>PT. JEMBO CABLE COMPANY Tbk</p>
                             </div>
                             <div className="text-center mt-auto pt-24">
-                                <p>Finance</p>
+                                <p className='-ml-8'>Finance</p>
                             </div>
                         </div>
                     </div>
@@ -471,3 +479,4 @@ const InvoicePreviewPage: React.FC = () => {
 };
 
 export default InvoicePreviewPage;
+
