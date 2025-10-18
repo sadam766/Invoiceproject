@@ -349,13 +349,13 @@ const InvoicePreviewPage: React.FC = () => {
 
               <main className="flex-grow">
                  <table className="w-full border-collapse text-[10px]">
-                    <thead className='border-y border-black'>
+                    <thead className='border-y-2 border-black'>
                         <tr>
-                            <th className="p-1 text-left w-[4%] border-x border-black">No.</th>
-                            <th className="p-1 text-left w-[40%] border-r border-black">Item</th>
-                            <th className="p-1 text-left w-[18%] border-r border-black">Quantity Unit</th>
-                            <th className="p-1 text-left w-[19%] border-r border-black">Price</th>
-                            <th className="p-1 text-left w-[19%] border-r border-black">Amount</th>
+                            <th className="p-1 text-left w-[4%]">No.</th>
+                            <th className="p-1 text-left w-[40%]">Item</th>
+                            <th className="p-1 text-left w-[18%]">Quantity Unit</th>
+                            <th className="p-1 text-right w-[19%]">Price</th>
+                            <th className="p-1 text-right w-[19%]">Amount</th>
                         </tr>
                     </thead>
                       <tbody>
@@ -415,26 +415,24 @@ const InvoicePreviewPage: React.FC = () => {
                             <p className="font-bold mt-2">For payment, please transfer to our account:</p>
                             <p className="font-bold mt-2">PT. Jembo Cable Company Tbk</p>
                             
-                             <div className="flex mt-1">
-                                <div className="w-[120px]">
+                            <div className="grid grid-cols-[max-content_1fr] gap-x-4 mt-1">
+                                <div>
                                     <p className='font-bold'>Bank Mandiri - Jakarta</p>
                                     <p>Cabang Sudirman</p>
                                 </div>
-                                <div className="w-[200px] text-right">
+                                <div className="text-left">
                                     <p>A/C No.: 102-0100206827 (Rp)</p>
                                     <p>A/C No.: 102-0005000218 (Rp)</p>
                                     <p>A/C No.: 102-0005000226 (USD)</p>
                                 </div>
-                            </div>
-                            <div className='flex justify-center my-1'>
-                                <div className='w-full text-center font-bold'>OR</div>
-                            </div>
-                             <div className="flex mt-1">
-                                <div className="w-[120px]">
+                                
+                                <div className="col-span-2 text-center font-bold my-1">OR</div>
+
+                                <div>
                                     <p className='font-bold'>Bank BCA - Jakarta</p>
                                     <p>Cabang KEM TOWER</p>
                                 </div>
-                                <div className="w-[200px] text-right">
+                                <div className="text-left">
                                     <p>A/C No.: 684-0198977 (Rp)</p>
                                 </div>
                             </div>
@@ -444,9 +442,8 @@ const InvoicePreviewPage: React.FC = () => {
                              <div className='text-center'>
                                  <p>PT. JEMBO CABLE COMPANY Tbk</p>
                              </div>
-                             <div className="text-center mt-[7rem]">
+                             <div className="text-center mt-[7rem] ml-10">
                                 <div className="inline-block relative">
-                                    <div className="absolute bottom-0 w-full h-px bg-black"></div>
                                     <p className="pb-1">Finance</p>
                                 </div>
                              </div>
@@ -468,5 +465,3 @@ const InvoicePreviewPage: React.FC = () => {
 };
 
 export default InvoicePreviewPage;
-
-    
