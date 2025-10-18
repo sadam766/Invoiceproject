@@ -389,7 +389,14 @@ const InvoicePreviewPage: React.FC = () => {
                         ))}
                     </tbody>
                  </table>
-
+                  {isLastPage && (
+                    <div className="text-right mt-4">
+                        <div className="inline-block text-right">
+                           <div className="border-t border-black w-28 mb-1" />
+                           <p className="font-bold">{formatCurrency(subtotal)}</p>
+                        </div>
+                    </div>
+                  )}
               </main>
               
               
@@ -397,10 +404,6 @@ const InvoicePreviewPage: React.FC = () => {
                 <footer className="pt-2 text-black mt-auto">
                     <div className="flex justify-between items-center py-1">
                         <p>No PO: {poNumber || ''}</p>
-                        <div className="text-right">
-                           <div className="inline-block border-t border-black w-28" />
-                           <p className="font-bold">{formatCurrency(subtotal)}</p>
-                        </div>
                     </div>
                     <div className="border-t border-black w-full"></div>
                     <div className="flex justify-between items-start pt-1">
@@ -451,6 +454,9 @@ const InvoicePreviewPage: React.FC = () => {
                                     <p className='text-right'>{formatCurrency(dppVat)}</p>
                                     <p className="text-right">VAT 12%:</p>
                                     <p className='text-right'>{formatCurrency(vat12)}</p>
+                                    <div className="col-span-2 w-full">
+                                        <div className="border-t border-black w-full my-1"></div>
+                                    </div>
                                     <p className="text-right font-bold">Total Rp:</p>
                                     <p className="text-right font-bold">{formatCurrency(totalRp)}</p>
                                 </div>
@@ -480,5 +486,7 @@ const InvoicePreviewPage: React.FC = () => {
 };
 
 export default InvoicePreviewPage;
+
+    
 
     
