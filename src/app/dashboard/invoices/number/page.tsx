@@ -57,14 +57,30 @@ import {
     };
 
     const handleDelete = (invoiceId: string) => {
-        setInvoices(invoices.filter((inv) => inv.id !== invoiceId));
+        const updatedInvoices = invoices.filter((inv) => inv.id !== invoiceId);
+        setInvoices(updatedInvoices);
+        // Also update the source data
+        const index = invoiceNumberData.findIndex(inv => inv.id === invoiceId);
+        if (index > -1) {
+            invoiceNumberData.splice(index, 1);
+        }
     };
 
     const handleSave = (invoice: Omit<InvoiceNumber, 'id'> & {id: string}) => {
       if (editingInvoice) {
-        setInvoices(invoices.map(i => i.id === editingInvoice.id ? invoice : i));
+        const updatedInvoices = invoices.map(i => i.id === editingInvoice.id ? invoice : i);
+        setInvoices(updatedInvoices);
+        // Also update the source data
+        const index = invoiceNumberData.findIndex(i => i.id === editingInvoice.id);
+        if (index > -1) {
+            invoiceNumberData[index] = invoice;
+        }
       } else {
-        setInvoices([...invoices, invoice]);
+        // Add to the source data directly
+        invoiceNumberData.push(invoice);
+        // Update the state from the source to ensure consistency
+        setInvoices([...invoiceNumberData]);
+        
         const safeId = invoice.id.replace(/\//g, '_');
         router.push(`/dashboard/invoices/add?invoiceNumberId=${safeId}`);
       }
@@ -92,10 +108,11 @@ import {
       const file = event.target.files?.[0];
       if (file) {
         try {
-          const data = await importFromExcel(file);
-          // Assuming the Excel columns match the InvoiceNumber type
-          // You might need to add validation or mapping here
-          setInvoices(prevInvoices => [...prevInvoices, ...data as InvoiceNumber[]]);
+          const data = await importFromExcel(file) as InvoiceNumber[];
+          // Add to the source data directly
+          invoiceNumberData.push(...data);
+          // Update the state from the source
+          setInvoices([...invoiceNumberData]);
           toast({
             title: "Success",
             description: `${data.length} records imported successfully.`,

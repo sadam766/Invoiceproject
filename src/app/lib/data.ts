@@ -168,7 +168,7 @@ export type Invoice = {
   spdNumber: string;
 };
 
-export const invoiceListData: Invoice[] = [
+export let invoiceListData: Invoice[] = [
   {
     id: 'INV/2024/001',
     soNumber: 'SO-2024-001',
@@ -197,7 +197,7 @@ export type InvoiceNumber = {
   amount: number;
 };
 
-export const invoiceNumberData: InvoiceNumber[] = [
+export let invoiceNumberData: InvoiceNumber[] = [
     {
         id: 'SAR/25000001',
         customer: 'PT. Sejahtera Abadi',
@@ -243,7 +243,7 @@ export type ProductListItem = {
     price: number;
 };
 
-export const productListData: ProductListItem[] = [
+export let productListData: ProductListItem[] = [
     {
         name: 'Kabel Fiber Optik',
         category: 'Kabel',
@@ -277,7 +277,7 @@ export type SalesOrder = {
     price: number;
 };
 
-export const salesOrderListData: SalesOrder[] = [
+export let salesOrderListData: SalesOrder[] = [
     {
         soNumber: 'SO-2024-001',
         customer: 'PT. Sejahtera Abadi',
@@ -323,7 +323,7 @@ export type Customer = {
   spdAddress: string;
 };
 
-export const customerListData: Customer[] = [
+export let customerListData: Customer[] = [
   {
     id: '1',
     name: 'PT. Sejahtera Abadi',
@@ -390,7 +390,7 @@ export type SpdData = {
     suratJalan: string;
 };
   
-export const spdData: SpdData[] = [
+export let spdData: SpdData[] = [
     {
         tanggal: '2024-05-20',
         sales: 'Budi',
@@ -407,5 +407,3 @@ export const spdData: SpdData[] = [
         suratJalan: '-',
     }
 ];
-
-    
