@@ -349,32 +349,32 @@ const InvoicePreviewPage: React.FC = () => {
 
               <main className="flex-grow">
                  <table className="w-full border-collapse text-[10px]">
-                      <thead className='border-y border-black'>
-                          <tr>
-                              <th className="p-1 text-center w-[4%] border-x border-black">No.</th>
-                              <th className="p-1 text-center w-[40%]">Item</th>
-                              <th className="p-1 text-center w-[18%]">Quantity Unit</th>
-                              <th className="p-1 text-center w-[19%] border-l border-black">Price</th>
-                              <th className="p-1 text-center w-[19%] border-x border-black">Amount</th>
-                          </tr>
-                      </thead>
+                    <thead className='border-y border-black'>
+                        <tr>
+                            <th className="p-1 text-left w-[4%] border-x border-black">No.</th>
+                            <th className="p-1 text-left w-[40%] border-r border-black">Item</th>
+                            <th className="p-1 text-left w-[18%] border-r border-black">Quantity Unit</th>
+                            <th className="p-1 text-left w-[19%] border-r border-black">Price</th>
+                            <th className="p-1 text-left w-[19%] border-r border-black">Amount</th>
+                        </tr>
+                    </thead>
                       <tbody>
                           {pageItems.map((item, index) => (
                               <tr key={item.id} className="h-[24px]">
-                                  <td className="p-1 text-center align-top border-x border-black">{item.no + (pageIndex * ITEMS_PER_PAGE)}</td>
-                                  <td className="p-1 align-top text-center">{item.name}</td>
-                                  <td className="p-1 text-center align-top">{item.quantity.toLocaleString('id-ID')} {item.unit}</td>
-                                  <td className="p-1 text-right align-top border-l border-black">{formatCurrency(item.price)}</td>
-                                  <td className="p-1 text-right align-top border-x border-black">{formatCurrency(item.total)}</td>
+                                  <td className="p-1 text-left align-top">{item.no + (pageIndex * ITEMS_PER_PAGE)}</td>
+                                  <td className="p-1 align-top text-left">{item.name}</td>
+                                  <td className="p-1 text-left align-top">{item.quantity.toLocaleString('id-ID')} {item.unit}</td>
+                                  <td className="p-1 text-right align-top">{formatCurrency(item.price)}</td>
+                                  <td className="p-1 text-right align-top">{formatCurrency(item.total)}</td>
                               </tr>
                           ))}
-                          {Array.from({ length: Math.max(0, ITEMS_PER_PAGE - pageItems.length) }).map((_, i) => (
+                           {Array.from({ length: Math.max(0, ITEMS_PER_PAGE - pageItems.length) }).map((_, i) => (
                             <tr key={`empty-${i}`} style={{height: '24px'}}>
-                                <td className='p-1 border-x border-black'>&nbsp;</td>
                                 <td>&nbsp;</td>
                                 <td>&nbsp;</td>
-                                <td className='border-l border-black'>&nbsp;</td>
-                                <td className='p-1 border-x border-black'>&nbsp;</td>
+                                <td>&nbsp;</td>
+                                <td>&nbsp;</td>
+                                <td>&nbsp;</td>
                             </tr>
                           ))}
                       </tbody>
@@ -385,7 +385,7 @@ const InvoicePreviewPage: React.FC = () => {
                 <footer className="pt-2 text-black">
                     <div className="flex justify-between items-center text-[10px]">
                         <p>No PO : {poNumber || ''}</p>
-                        <div className="w-[224px] text-right font-bold">{formatCurrency(subtotal)}</div>
+                        <div className="text-right font-bold">{formatCurrency(subtotal)}</div>
                     </div>
                     
                     <div className="border-t-2 border-b-2 border-black my-2">
@@ -427,7 +427,7 @@ const InvoicePreviewPage: React.FC = () => {
                                 </div>
                             </div>
                             <div className='flex justify-center my-1'>
-                                <div className='w-[320px] text-center font-bold'>OR</div>
+                                <div className='w-full text-center font-bold'>OR</div>
                             </div>
                              <div className="flex mt-1">
                                 <div className="w-[120px]">
@@ -445,9 +445,9 @@ const InvoicePreviewPage: React.FC = () => {
                                  <p>PT. JEMBO CABLE COMPANY Tbk</p>
                              </div>
                              <div className="text-center mt-[7rem]">
-                                <div className="inline-block">
-                                    <div className="h-px w-48 bg-black mb-1"></div>
-                                    <p>Finance</p>
+                                <div className="inline-block relative">
+                                    <div className="absolute bottom-0 w-full h-px bg-black"></div>
+                                    <p className="pb-1">Finance</p>
                                 </div>
                              </div>
                         </div>
@@ -468,3 +468,5 @@ const InvoicePreviewPage: React.FC = () => {
 };
 
 export default InvoicePreviewPage;
+
+    
