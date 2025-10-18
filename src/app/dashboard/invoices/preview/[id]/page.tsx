@@ -351,30 +351,30 @@ const InvoicePreviewPage: React.FC = () => {
                  <table className="w-full border-collapse text-[10px]">
                       <thead className='border-y border-black'>
                           <tr>
-                              <th className="p-1 text-center w-[4%] border-l border-black">No.</th>
-                              <th className="p-1 text-left w-[40%]">Item</th>
+                              <th className="p-1 text-center w-[4%] border-x border-black">No.</th>
+                              <th className="p-1 text-center w-[40%]">Item</th>
                               <th className="p-1 text-center w-[18%]">Quantity Unit</th>
-                              <th className="p-1 text-right w-[19%]">Price</th>
-                              <th className="p-1 text-right w-[19%] border-r border-black">Amount</th>
+                              <th className="p-1 text-center w-[19%] border-l border-black">Price</th>
+                              <th className="p-1 text-center w-[19%] border-x border-black">Amount</th>
                           </tr>
                       </thead>
                       <tbody>
                           {pageItems.map((item, index) => (
                               <tr key={item.id} className="h-[24px]">
-                                  <td className="p-1 text-center align-top border-l border-black">{item.no + (pageIndex * ITEMS_PER_PAGE)}</td>
-                                  <td className="p-1 align-top">{item.name}</td>
+                                  <td className="p-1 text-center align-top border-x border-black">{item.no + (pageIndex * ITEMS_PER_PAGE)}</td>
+                                  <td className="p-1 align-top text-center">{item.name}</td>
                                   <td className="p-1 text-center align-top">{item.quantity.toLocaleString('id-ID')} {item.unit}</td>
-                                  <td className="p-1 text-right align-top">{formatCurrency(item.price)}</td>
-                                  <td className="p-1 text-right align-top border-r border-black">{formatCurrency(item.total)}</td>
+                                  <td className="p-1 text-right align-top border-l border-black">{formatCurrency(item.price)}</td>
+                                  <td className="p-1 text-right align-top border-x border-black">{formatCurrency(item.total)}</td>
                               </tr>
                           ))}
                           {Array.from({ length: Math.max(0, ITEMS_PER_PAGE - pageItems.length) }).map((_, i) => (
                             <tr key={`empty-${i}`} style={{height: '24px'}}>
-                                <td className='p-1 border-l border-black'>&nbsp;</td>
+                                <td className='p-1 border-x border-black'>&nbsp;</td>
                                 <td>&nbsp;</td>
                                 <td>&nbsp;</td>
-                                <td>&nbsp;</td>
-                                <td className='p-1 border-r border-black'>&nbsp;</td>
+                                <td className='border-l border-black'>&nbsp;</td>
+                                <td className='p-1 border-x border-black'>&nbsp;</td>
                             </tr>
                           ))}
                       </tbody>
@@ -383,14 +383,12 @@ const InvoicePreviewPage: React.FC = () => {
 
               {isLastPage && (
                 <footer className="pt-2 text-black">
-                    <div className="flex justify-between items-center text-[10px] pt-1">
+                    <div className="flex justify-between items-center text-[10px]">
                         <p>No PO : {poNumber || ''}</p>
-                        <div className="flex items-center">
-                            <div className="w-28 text-right font-bold">{formatCurrency(subtotal)}</div>
-                        </div>
+                        <div className="w-[224px] text-right font-bold">{formatCurrency(subtotal)}</div>
                     </div>
                     
-                    <div className="border-t border-b border-black mt-2 py-1">
+                    <div className="border-t-2 border-b-2 border-black my-2">
                         <div className="flex justify-end w-full text-[10px]">
                             <div className="w-[224px] py-1">
                                 <div className="grid grid-cols-2 justify-items-end">
@@ -410,7 +408,8 @@ const InvoicePreviewPage: React.FC = () => {
                     <div className="flex mt-4 text-[10px]">
                         <div className='w-1/2 pr-4 text-[9px]'>
                             <div className="flex items-start">
-                                <p className='w-[60px] shrink-0'>Payment:</p><p className='flex-1'>{paymentTerms || '90 Hari setelah invoice diterima'}</p>
+                                <p className='w-14 shrink-0'>Payment:</p>
+                                <p className='flex-1'>{paymentTerms || '90 Hari setelah invoice diterima'}</p>
                             </div>
                             <p className="mt-2">Please state with your payment: {invoiceId}</p>
                             <p className="font-bold mt-2">For payment, please transfer to our account:</p>
@@ -427,7 +426,9 @@ const InvoicePreviewPage: React.FC = () => {
                                     <p>A/C No.: 102-0005000226 (USD)</p>
                                 </div>
                             </div>
-                            <div className='text-center w-[320px] font-bold my-1'>OR</div>
+                            <div className='flex justify-center my-1'>
+                                <div className='w-[320px] text-center font-bold'>OR</div>
+                            </div>
                              <div className="flex mt-1">
                                 <div className="w-[120px]">
                                     <p className='font-bold'>Bank BCA - Jakarta</p>
@@ -443,7 +444,7 @@ const InvoicePreviewPage: React.FC = () => {
                              <div className='text-center'>
                                  <p>PT. JEMBO CABLE COMPANY Tbk</p>
                              </div>
-                             <div className="text-center mt-[7.5rem]">
+                             <div className="text-center mt-[7rem]">
                                 <div className="inline-block">
                                     <div className="h-px w-48 bg-black mb-1"></div>
                                     <p>Finance</p>
@@ -467,6 +468,3 @@ const InvoicePreviewPage: React.FC = () => {
 };
 
 export default InvoicePreviewPage;
-
-
-    
