@@ -221,7 +221,7 @@ const InvoicePreviewPage: React.FC = () => {
         item.quantity,
         item.unit,
         formatNumber(item.price),
-        formatNumber(item.quantity * item.price)
+        formatNumber(item.quantity * item.total)
       ]),
       [],
       ["", "", "", "", "Subtotal:", formatNumber(subtotal)],
@@ -318,7 +318,7 @@ const InvoicePreviewPage: React.FC = () => {
           const totalPages = itemPages.length;
 
           return (
-            <div key={pageIndex} className="invoice-page p-8 text-[10px] leading-tight relative" style={{ display: 'flex', flexDirection: 'column', minHeight: '27cm' }}>
+            <div key={pageIndex} className="invoice-page p-8 text-[10px] leading-tight relative" style={{ display: 'flex', flexDirection: 'column' }}>
               <header>
                 <div className="grid grid-cols-2">
                     <div>
@@ -347,7 +347,7 @@ const InvoicePreviewPage: React.FC = () => {
                 </div>
               </header>
 
-              <main className="flex-grow">
+              <main>
                  <table className="w-full border-collapse text-[10px]">
                     <thead className='border-y-2 border-black'>
                         <tr>
@@ -368,22 +368,13 @@ const InvoicePreviewPage: React.FC = () => {
                                   <td className="p-1 text-right align-top">{formatCurrency(item.total)}</td>
                               </tr>
                           ))}
-                           {Array.from({ length: Math.max(0, ITEMS_PER_PAGE - pageItems.length) }).map((_, i) => (
-                            <tr key={`empty-${i}`} style={{height: '24px'}}>
-                                <td>&nbsp;</td>
-                                <td>&nbsp;</td>
-                                <td>&nbsp;</td>
-                                <td>&nbsp;</td>
-                                <td>&nbsp;</td>
-                            </tr>
-                          ))}
                       </tbody>
                   </table>
               </main>
 
               {isLastPage && (
-                <footer className="pt-2 text-black">
-                    <div className="flex justify-between items-center text-[10px]">
+                <footer className="pt-2 text-black mt-auto">
+                    <div className="flex justify-between items-end text-[10px]">
                         <p>No PO : {poNumber || ''}</p>
                         <div className="text-right font-bold">{formatCurrency(subtotal)}</div>
                     </div>
@@ -408,8 +399,8 @@ const InvoicePreviewPage: React.FC = () => {
                     <div className="flex mt-4 text-[10px]">
                         <div className='w-1/2 pr-4 text-[9px]'>
                             <div className="flex items-start">
-                                <p className='w-14 shrink-0'>Payment:</p>
-                                <p className='flex-1'>{paymentTerms || '90 Hari setelah invoice diterima'}</p>
+                                <p className='w-16 shrink-0'>Payment:</p>
+                                <p className='flex-1 ml-2'>{paymentTerms || '90 Hari setelah invoice diterima'}</p>
                             </div>
                             <p className="mt-2">Please state with your payment: {invoiceId}</p>
                             <p className="font-bold mt-2">For payment, please transfer to our account:</p>
@@ -442,9 +433,9 @@ const InvoicePreviewPage: React.FC = () => {
                              <div className='text-center'>
                                  <p>PT. JEMBO CABLE COMPANY Tbk</p>
                              </div>
-                             <div className="text-center mt-[7rem] ml-10">
+                             <div className="text-center mt-[7rem]">
                                 <div className="inline-block relative">
-                                    <p className="pb-1">Finance</p>
+                                    <p>Finance</p>
                                 </div>
                              </div>
                         </div>
