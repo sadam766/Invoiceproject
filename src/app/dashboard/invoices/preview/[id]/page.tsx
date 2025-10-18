@@ -71,7 +71,13 @@ export default function InvoicePreviewPage() {
                     amount: so.quantity * so.price
                 }));
                 const subtotal = invoiceItems.reduce((sum, item) => sum + item.total, 0);
-                const grandTotal = subtotal; // Simplified for existing data
+                
+                // Simplified calculations for existing data
+                const negotiation = 0;
+                const dpValue = 0;
+                const pelunasan = 0;
+
+                const grandTotal = subtotal - negotiation - dpValue - pelunasan;
                 const dppVat = grandTotal / 1.12;
                 const vat12 = dppVat * 0.12;
 
@@ -79,9 +85,9 @@ export default function InvoicePreviewPage() {
                     ...foundInvoice,
                     items: invoiceItems,
                     subtotal: subtotal,
-                    negotiation: 0,
-                    dpValue: 0,
-                    pelunasan: 0,
+                    negotiation: negotiation,
+                    dpValue: dpValue,
+                    pelunasan: pelunasan,
                     grandTotal: grandTotal,
                     dppVat: dppVat,
                     vat12: vat12,
@@ -126,7 +132,7 @@ export default function InvoicePreviewPage() {
     const invoiceTitle = invoiceId.startsWith('KW/') ? 'PROFORMA INVOICE' : 'INVOICE/OFFICIAL RECEIPT';
 
     const formatCurrency = (value: number) => {
-        if (typeof value !== 'number') return '0,00';
+        if (typeof value !== 'number' || isNaN(value)) return '0,00';
         return value.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
     };
 
@@ -216,10 +222,10 @@ export default function InvoicePreviewPage() {
               </main>
 
               <footer>
-                  <div className="flex justify-between items-start text-[10px] mt-1">
+                  <div className="flex justify-between items-start text-[10px]">
                       <p>No PO : {poNumber || ''}</p>
-                      <div className="text-right w-1/2">
-                          <div className="inline-block w-full border-t border-black">
+                      <div className="text-right w-1/2 border-t border-black">
+                          <div className="inline-block w-full">
                             <div className="text-right pr-1 pt-1">{formatCurrency(subtotal)}</div>
                           </div>
                       </div>
@@ -233,7 +239,7 @@ export default function InvoicePreviewPage() {
                       </div>
                   </div>
                   
-                  <div className="flex justify-between mt-1">
+                   <div className="flex justify-between mt-1">
                        <div className='w-2/3 pr-4'>
                           <div className="text-[9px]">
                               <div className='grid grid-cols-[auto_1fr] gap-x-2'>
@@ -242,31 +248,34 @@ export default function InvoicePreviewPage() {
                               <p>Please state with your payment: {invoiceId}</p>
                               <p>For payment, please transfer to our account:</p>
                               <p className="font-bold mt-2">PT. Jembo Cable Company Tbk</p>
-                              <div className="grid grid-cols-[auto_1fr] gap-x-4 mt-1">
+                              
+                              <div className="grid grid-cols-[max-content_1fr] gap-x-4 mt-1">
                                   <div>
                                       <p>Bank Mandiri - Jakarta</p>
                                       <p>Cabang Sudirman</p>
                                   </div>
-                                  <div className="text-right">
+                                  <div className="text-left">
                                       <p>A/C No.: 102-0100206827 (Rp)</p>
                                       <p>A/C No.: 102-0005000218 (Rp)</p>
                                       <p>A/C No.: 102-0005000226 (USD)</p>
                                   </div>
                               </div>
-                              <div className="text-center my-1 font-bold">OR</div>
-                               <div className="grid grid-cols-[auto_1fr] gap-x-4">
+                              
+                              <div className="text-center my-1 font-bold" style={{width: "80%"}}>OR</div>
+
+                               <div className="grid grid-cols-[max-content_1fr] gap-x-4">
                                   <div>
                                       <p>Bank BCA - Jakarta</p>
                                       <p>Cabang KEM TOWER</p>
                                    </div>
-                                   <div className="text-right">
+                                   <div className="text-left">
                                       <p>A/C No.: 684-0198977 (Rp)</p>
                                    </div>
                               </div>
                           </div>
                        </div>
                        <div className="w-1/3">
-                           <div className="grid grid-cols-2 gap-y-1 text-[10px]">
+                            <div className="grid grid-cols-2 gap-y-1 text-[10px]">
                                <p>Goods:</p>
                                <p className='text-right'>{formatCurrency(grandTotal)}</p>
                                
@@ -317,3 +326,4 @@ export default function InvoicePreviewPage() {
       </main>
     );
 }
+
