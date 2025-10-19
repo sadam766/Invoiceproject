@@ -214,16 +214,16 @@ const InvoicePreviewPage: React.FC = () => {
             </div>
             
             <div className='flex justify-between mt-16'>
-                <div className='w-7/12'>
+                <div className='w-1/2'>
                     <p className="font-bold text-xs">{customer?.name || 'PT Sejahtera Abadi'}</p>
                 </div>
-                <div className='w-5/12 text-left pl-12'>
+                <div className='w-1/2 text-left pl-12'>
                      <p>Sales Order : {soNumber || 'SO-2024-001'}</p>
                      <p>Order Date : </p>
                      <p>Reference A : </p>
                 </div>
             </div>
-             <div className='flex justify-between mt-8'>
+             <div className='flex justify-between mt-12'>
                 <div className='w-1/2'>
                     <p>Customer Code :</p>
                 </div>
