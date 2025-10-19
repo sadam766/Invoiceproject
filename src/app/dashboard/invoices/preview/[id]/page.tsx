@@ -212,7 +212,7 @@ const InvoicePreviewPage: React.FC = () => {
 
       <div id="invoice-paper" className="w-full max-w-4xl mx-auto bg-white shadow-lg p-10 my-8 text-[10px] leading-tight flex flex-col" style={{ minHeight: '29.7cm' }}>
         
-      <header className="relative h-[150px]">
+        <header className="relative h-[150px]">
             <div className="absolute top-0 w-full text-center">
                 <p className="font-bold uppercase text-sm mb-1 tracking-tighter">INVOICE/OFFICIAL RECEIPT</p>
                 <p className="font-bold uppercase text-sm">{invoiceId || 'INV/2024/001'}</p>
@@ -299,7 +299,7 @@ const InvoicePreviewPage: React.FC = () => {
             
             <div className="mt-8 border-t border-black pt-2">
                  <div className="flex">
-                    <div className="w-1/2 pr-4 text-[9px]">
+                 <div className="w-1/2 pr-4 text-[9px]">
                         <div className="flex items-start mb-1">
                             <p className='w-20 shrink-0'>Payment:</p>
                             <p className='flex-1'>{paymentTerms || '90 Hari setelah invoice diterima'}</p>
@@ -309,28 +309,28 @@ const InvoicePreviewPage: React.FC = () => {
                             <p className='flex-1'>{invoiceId || 'INV/2024/001'}</p>
                         </div>
                         <p className="mb-2">For payment, please transfer to our account:</p>
-                        <div className="font-normal">
+                        <div className="font-normal space-y-2">
                             <p className="mb-1 font-semibold">PT.Jembo Cable Company Tbk</p>
-                            <div className="flex mb-1">
+                            <div className="flex">
                                <div className="w-2/5">
-                                    <p className="mb-0">Bank Mandiri -</p>
-                                    <p className="mb-0">Jakarta Cabang</p>
-                                    <p className="mb-0">Sudirman</p>
+                                    <p>Bank Mandiri -</p>
+                                    <p>Jakarta Cabang</p>
+                                    <p>Sudirman</p>
                                 </div>
-                                <div className="w-3/5 text-right whitespace-nowrap">
-                                    <p className="mb-0">A/C No. : 102-0100206827 (Rp)</p>
-                                    <p className="mb-0">A/C No. : 102-0005000218 (Rp)</p>
-                                    <p className="mb-0">A/C No. : 102-0005000226 (USD)</p>
+                                <div className="w-3/5 text-left">
+                                    <p>A/C No. : 102-0100206827 (Rp)</p>
+                                    <p>A/C No. : 102-0005000218 (Rp)</p>
+                                    <p>A/C No. : 102-0005000226 (USD)</p>
                                 </div>
                            </div>
-                            <div className="text-center my-2">OR</div>
+                            <div className="text-center my-1">OR</div>
                             <div className="flex">
                               <div className="w-2/5">
-                                    <p className="mb-0">Bank BCA - Jakarta</p>
-                                    <p className="mb-0">Cabang KEM TOWER</p>
+                                    <p>Bank BCA - Jakarta</p>
+                                    <p>Cabang KEM TOWER</p>
                                 </div>
-                                <div className="w-3/5 text-right whitespace-nowrap">
-                                    <p className="mb-0">A/C No. : 684-0198977 (Rp)</p>
+                                <div className="w-3/5 text-left">
+                                    <p>A/C No. : 684-0198977 (Rp)</p>
                                 </div>
                             </div>
                          </div>
@@ -351,5 +351,3 @@ const InvoicePreviewPage: React.FC = () => {
 }
 
 export default InvoicePreviewPage;
-
-    
