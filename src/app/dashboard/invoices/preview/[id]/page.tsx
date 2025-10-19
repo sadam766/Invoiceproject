@@ -206,7 +206,7 @@ const InvoicePreviewPage: React.FC = () => {
         </div>
       </div>
 
-      <div id="invoice-paper" className="w-full max-w-4xl mx-auto bg-white shadow-lg p-10 text-[10px] leading-tight" style={{ minHeight: '29.7cm' }}>
+      <div id="invoice-paper" className="w-full max-w-4xl mx-auto bg-white shadow-lg p-10 text-[10px] leading-tight flex flex-col" style={{ minHeight: '29.7cm' }}>
         
         {/* Header Section */}
         <header className="relative h-[150px]">
@@ -215,21 +215,23 @@ const InvoicePreviewPage: React.FC = () => {
                 <p className="font-bold uppercase text-sm">{invoiceId || 'INV/2024/05/001'}</p>
             </div>
             
-            <div className="absolute top-16 left-0">
-                <p className="font-bold text-xs">{customer?.name || 'PT Sejahtera Abadi'}</p>
+            <div className='flex justify-between mt-16'>
+                <div className='w-1/2'>
+                    <p className="font-bold text-xs">{customer?.name || 'PT Sejahtera Abadi'}</p>
+                </div>
+                <div className='w-1/2 text-left pl-12'>
+                     <p>Sales Order : {soNumber || 'SO-2024-001'}</p>
+                     <p>Order Date : </p>
+                     <p>Reference A : </p>
+                </div>
             </div>
-            
-            <div className="absolute top-24 right-0 text-left">
-                <p>Sales Order : {soNumber || 'SO-2024-001'}</p>
-                <p>Order Date : </p>
-                <p>Reference A : </p>
-            </div>
-
-            <div className="absolute" style={{top: '110px', left: '0'}}>
-                <p>Customer Code :</p>
-            </div>
-            <div className="absolute" style={{top: '125px', right: '0'}}>
-                <p>Date: {formatDate(date)}</p>
+             <div className='flex justify-between mt-4'>
+                <div className='w-1/2'>
+                    <p>Customer Code :</p>
+                </div>
+                <div className='w-1/2 text-left pl-12'>
+                    <p>Date: {formatDate(date)}</p>
+                </div>
             </div>
         </header>
 
@@ -257,7 +259,7 @@ const InvoicePreviewPage: React.FC = () => {
                     </tr>
                   ))}
                   {/* Empty Rows for spacing */}
-                  {Array.from({ length: 25 - items.length }).map((_, index) => (
+                  {Array.from({ length: Math.max(0, 25 - items.length) }).map((_, index) => (
                       <tr key={`empty-${index}`} className="h-[18px]">
                           <td className='p-1 border-r border-black'>&nbsp;</td>
                           <td className='p-1 border-r border-black'>&nbsp;</td>
@@ -272,19 +274,19 @@ const InvoicePreviewPage: React.FC = () => {
         
         {/* Footer Section */}
         <footer className="pt-2 text-black mt-auto text-[10px]">
-            <div className="flex justify-between items-start border-b border-black pb-2">
+            <div className="flex justify-between items-center">
                 <div className="w-1/2">
                     <p>No PO : {poNumber || ''}</p>
                 </div>
-                <div className="w-1/2 flex justify-end">
-                    <div className="w-fit relative">
-                        <div className="absolute -top-1 right-0 border-t border-black w-[100px]"></div>
-                        <span className="font-bold">{formatCurrency(subtotal)}</span>
+                <div className="w-1/2 flex items-center justify-end">
+                    <div className='relative w-[120px] text-right pr-1'>
+                        <span className="font-bold ">{formatCurrency(subtotal)}</span>
                     </div>
                 </div>
             </div>
+            <div className='w-full border-t border-black my-1'></div>
 
-            <div className="flex justify-end mt-2">
+            <div className="flex justify-end">
                 <div className="w-1/2">
                     <div className="grid grid-cols-2">
                         <span>Goods:</span><span className="text-right">{formatCurrency(grandTotal)}</span>
