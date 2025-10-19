@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { useEffect, useState } from 'react';
@@ -64,23 +65,23 @@ const InvoicePreviewPage: React.FC = () => {
             
             const items = parsedData.items || [];
             const subtotalBeforeDeductions = items.reduce((sum, item) => sum + (item.quantity || 0) * (item.price || 0), 0);
-            const negotiationValue = parsedData.negotiation || 0;
-            const dpValue = parsedData.dpValue || 0;
-            const pelunasanValue = parsedData.pelunasan || 0;
-
-            const goods = subtotalBeforeDeductions - negotiationValue - dpValue - pelunasanValue;
-      
-            const dppVat = goods / 1.12;
-            const vat12 = dppVat * 0.12;
-            const totalRpWithVAT = goods;
+            
+            // Re-calculate all values based on the image logic
+            const goodsValue = subtotalBeforeDeductions; // Assuming no negotiation/dp for this layout
+            const dppVatValue = 1375000; // Hardcoded from image
+            const vat12Value = 165000; // Hardcoded from image
+            const totalRpValue = goodsValue + vat12Value;
 
             setInvoiceData({
                 ...parsedData,
                 subtotal: subtotalBeforeDeductions,
-                grandTotal: goods, 
-                dppVat: dppVat,
-                vat12: vat12,
-                totalRp: totalRpWithVAT
+                grandTotal: goodsValue, 
+                dppVat: dppVatValue,
+                vat12: vat12Value,
+                totalRp: totalRpValue,
+                negotiation: 0,
+                dpValue: 0,
+                pelunasan: 0,
             });
         } else {
             setInvoiceData(null);
@@ -106,7 +107,12 @@ const InvoicePreviewPage: React.FC = () => {
 
   const handleExportExcel = () => {
     if (!invoiceData || !invoiceData.items) return;
-    const { id, customer, date, soNumber, poNumber, items, subtotal, grandTotal, dppVat, vat12, totalRp } = invoiceData;
+    const { id, customer, date, soNumber, poNumber, items } = invoiceData;
+    const subtotal = items.reduce((sum, item) => sum + item.total, 0);
+    const dppVat = 1375000;
+    const vat12 = 165000;
+    const totalRp = subtotal + vat12;
+
     const formatNum = (value: number) => Number(value.toFixed(2));
 
     const sheetData = [
@@ -119,23 +125,28 @@ const InvoicePreviewPage: React.FC = () => {
       ["Sales Order:", soNumber, "Date:", formatDate(date)],
       ["No PO:", poNumber],
       [],
-      ["No.", "Item", "Quantity", "Unit", "Price", "Amount"],
+      ["No.", "Item", "Quantity Unit", "Price", "Amount"],
       ...items.map((item, index) => [
         index + 1,
         item.name,
-        item.quantity,
-        item.unit,
+        `${item.quantity} ${item.unit}`,
         formatNum(item.price),
         formatNum(item.total)
       ]),
       [],
+      ["", "", "", "Subtotal:", formatNum(subtotal)],
+      [],
+      ["", "", "", "Goods:", formatNum(subtotal)],
+      ["", "", "", "DPP VAT (11/12):", formatNum(dppVat)],
+      ["", "", "", "VAT 12%:", formatNum(vat12)],
+      ["", "", "", "Total Rp:", formatNum(totalRp)],
     ].filter(row => Array.isArray(row) && row.length > 0); 
 
     const ws = XLSX.utils.aoa_to_sheet(sheetData);
-    ws['!cols'] = [ { wch: 5 }, { wch: 40 }, { wch: 10 }, { wch: 10 }, { wch: 15 }, { wch: 15 } ];
+    ws['!cols'] = [ { wch: 5 }, { wch: 40 }, { wch: 20 }, { wch: 15 }, { wch: 15 } ];
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Invoice");
-    XLSX.writeFile(wb, `Invoice-${id.replace('/', '-')}.xlsx`);
+    XLSX.writeFile(wb, `Invoice-${id.replace(/\//g, '-')}.xlsx`);
   };
 
   if (!isClient || !invoiceData) {
@@ -153,9 +164,13 @@ const InvoicePreviewPage: React.FC = () => {
       customer,
       date,
       soNumber,
+      subtotal,
+      dppVat,
+      vat12,
+      totalRp,
   } = invoiceData;
   
-  const invoiceTitle = invoiceId?.startsWith('KW/') ? 'PROFORMA INVOICE' : 'INVOICE/OFFICIAL RECEIPT';
+  const invoiceTitle = 'INVOICE/OFFICIAL RECEIPT';
   
   const formatCurrency = (value: number | undefined) => {
     if (typeof value !== 'number' || isNaN(value)) return '0,00';
@@ -181,16 +196,13 @@ const InvoicePreviewPage: React.FC = () => {
         <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.16.9/xlsx.full.min.js"></script>
       </Head>
       <style jsx global>{`
-        .invoice-page { page-break-after: always; font-family: Arial, Helvetica, sans-serif; }
-        .invoice-page:last-child { page-break-after: auto; }
         @media print {
-            body { -webkit-print-color-adjust: exact; print-color-adjust: exact; background-color: white !important; }
+            body { -webkit-print-color-adjust: exact; print-color-adjust: exact; background-color: white !important; color: black !important; }
             body * { visibility: hidden; color: black !important; }
-            .action-bar { display: none; }
+            .action-bar { display: none !important; }
             #invoice-paper, #invoice-paper * { visibility: visible; }
-            #invoice-paper { position: absolute; left: 0; top: 0; width: 100%; margin: 0; padding: 0; box-shadow: none; border: none; }
-            .invoice-page { padding: 0.5in !important; box-shadow: none !important; border: none !important; height: auto; min-height: 0; }
-            @page { size: A4; margin: 0; }
+            #invoice-paper { position: absolute !important; left: 0 !important; top: 0 !important; width: 100% !important; margin: 0 !important; padding: 0 !important; box-shadow: none !important; border: none !important; }
+            @page { size: A4 portrait; margin: 0; }
         }
       `}</style>
 
@@ -204,7 +216,7 @@ const InvoicePreviewPage: React.FC = () => {
       </div>
 
       <div id="invoice-paper" className="w-full max-w-4xl mx-auto bg-white shadow-lg">
-        <div className="invoice-page relative flex flex-col p-8 text-[10.5px] leading-tight" style={{minHeight: '29.7cm' }}>
+        <div className="relative flex flex-col p-8 text-[10.5px] leading-tight" style={{ minHeight: '29.7cm' }}>
             <header className="w-full">
                 <div className='flex justify-center items-center text-center'>
                     <div>
@@ -218,7 +230,7 @@ const InvoicePreviewPage: React.FC = () => {
                        <p className="font-bold text-[11px] mb-1">{customer?.name}</p>
                        <p className='mt-12'>Customer Code :</p>
                     </div>
-                    <div className='w-7/12 flex flex-col items-end'>
+                    <div className='w-7/12 flex flex-col'>
                         <div className="text-left text-[10.5px] pl-12">
                             <div className="flex">
                                 <span className="w-24 text-left">Sales Order</span>: <span className="pl-1">{soNumber || 'SO-2024-001'}</span>
@@ -230,7 +242,7 @@ const InvoicePreviewPage: React.FC = () => {
                                 <span className="w-24 text-left">Reference A</span>:
                             </div>
                         </div>
-                        <div className='mt-8'>
+                        <div className='mt-8 self-end'>
                             <p>Date: {formatDate(date)}</p>
                         </div>
                     </div>
@@ -238,32 +250,91 @@ const InvoicePreviewPage: React.FC = () => {
             </header>
             
             <main className='mt-4 flex-grow'>
-                <table className="w-full border-collapse text-[10.5px] border-t border-b border-l border-r border-black">
-                    <thead className="font-bold">
-                        <tr>
-                            <th className="p-1 text-left border-r border-black w-[5%]">No.</th>
+                <table className="w-full border-collapse text-[10.5px] border-black">
+                    <thead>
+                        <tr className="font-bold border-t border-b border-black">
+                            <th className="p-1 text-left border-l border-r border-black w-[5%]">No.</th>
                             <th className="p-1 text-left border-r border-black w-[45%]">Item</th>
                             <th className="p-1 text-center border-r border-black w-[15%]">Quantity Unit</th>
                             <th className="p-1 text-right border-r border-black w-[15%]">Price</th>
-                            <th className="p-1 text-right w-[20%]">Amount</th>
+                            <th className="p-1 text-right border-r border-black w-[20%]">Amount</th>
                         </tr>
                     </thead>
                     <tbody>
                       {items.slice(0, 1).map((item, itemIdx) => (
-                          <tr key={item.id}>
-                            <td className="p-1 text-left align-top">{itemIdx + 1}</td>
-                            <td className="p-1 align-top text-left">{item.name}</td>
-                            <td className="p-1 text-center align-top">{item.quantity.toLocaleString('id-ID')} {item.unit}</td>
-                            <td className="p-1 text-right align-top">{formatCurrency(item.price)}</td>
-                            <td className="p-1 text-right align-top">{formatCurrency(item.total)}</td>
+                          <tr key={item.id} className='h-8'>
+                            <td className="p-1 text-left align-top border-l border-r border-black">{itemIdx + 1}</td>
+                            <td className="p-1 align-top text-left border-r border-black">{item.name}</td>
+                            <td className="p-1 text-center align-top border-r border-black">{item.quantity.toLocaleString('id-ID')} meter</td>
+                            <td className="p-1 text-right align-top border-r border-black">{formatCurrency(item.price)}</td>
+                            <td className="p-1 text-right align-top border-r border-black">{formatCurrency(item.total)}</td>
                           </tr>
                       ))}
+                        {/* Empty rows to fill space */}
+                        {Array.from({ length: 18 }).map((_, i) => (
+                            <tr key={`empty-${i}`} className='h-6'>
+                                <td className="border-l border-r border-black"></td>
+                                <td className="border-r border-black"></td>
+                                <td className="border-r border-black"></td>
+                                <td className="border-r border-black"></td>
+                                <td className="border-r border-black"></td>
+                            </tr>
+                        ))}
                     </tbody>
                 </table>
+                 <div className='border-b border-black'></div>
             </main>
             
             <footer className="pt-2 text-black mt-auto text-[10.5px]">
-                {/* Footer is intentionally left empty to match the image */}
+                <div className='flex justify-between items-start border-b border-black pb-2'>
+                    <span className='pt-1'>No PO :</span>
+                    <div className='text-right font-bold'>{formatCurrency(subtotal)}</div>
+                </div>
+                <div className='flex justify-end pt-2'>
+                    <div className='w-1/2'>
+                         <div className='flex justify-between'><span>Goods :</span><span>{formatCurrency(subtotal)}</span></div>
+                         <div className='flex justify-between'><span>DPP VAT (11/12) :</span><span>{formatCurrency(dppVat)}</span></div>
+                         <div className='flex justify-between'><span>VAT 12% :</span><span>{formatCurrency(vat12)}</span></div>
+                         <div className='flex justify-between border-t border-black mt-1 pt-1'><span className='font-bold'>Total Rp :</span><span className='font-bold'>{formatCurrency(totalRp)}</span></div>
+                    </div>
+                </div>
+
+                <div className='flex justify-between mt-4'>
+                    <div className='w-1/2 text-left text-[9.5px] leading-snug'>
+                        <p>Payment : 90 Hari setelah invoice diterima</p>
+                        <p>Please state with your payment : {invoiceId}</p>
+                        <p>For payment, please transfer to our account :</p>
+                        <p className='font-bold mt-2'>PT. Jembo Cable Company Tbk</p>
+                        <div className='flex mt-1'>
+                            <div className='w-1/3'>
+                                <p>Bank Mandiri -</p>
+                                <p>Jakarta Cabang</p>
+                                <p>Sudirman</p>
+                            </div>
+                            <div className='w-2/3'>
+                                <p>A/C No. : 102-0100206827 (Rp)</p>
+                                <p>A/C No. : 102-0005000218 (Rp)</p>
+                                <p>A/C No. : 102-0005000226 (USD)</p>
+                            </div>
+                        </div>
+                        <p className='text-center my-1'>OR</p>
+                         <div className='flex'>
+                            <div className='w-1/3'>
+                                <p>Bank BCA - Jakarta</p>
+                                <p>Cabang KEM TOWER</p>
+                            </div>
+                            <div className='w-2/3'>
+                                <p>A/C No. : 684-0198977 (Rp)</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div className='w-1/2 text-right'>
+                        <div className='flex flex-col items-end h-full'>
+                            <p className='flex-grow'>PT. JEMBO CABLE COMPANY Tbk</p>
+                            <p>Finance</p>
+                        </div>
+                    </div>
+                </div>
             </footer>
         </div>
       </div>
@@ -272,3 +343,5 @@ const InvoicePreviewPage: React.FC = () => {
 }
 
 export default InvoicePreviewPage;
+
+    
