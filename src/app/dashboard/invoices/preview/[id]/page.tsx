@@ -210,9 +210,9 @@ const InvoicePreviewPage: React.FC = () => {
         </div>
       </div>
 
-      <div id="invoice-paper" className="w-full max-w-4xl mx-auto bg-white shadow-lg p-10 text-[10px] leading-tight flex flex-col" style={{ minHeight: '29.7cm' }}>
+      <div id="invoice-paper" className="w-full max-w-4xl mx-auto bg-white shadow-lg p-10 my-8 text-[10px] leading-tight flex flex-col" style={{ minHeight: '29.7cm' }}>
         
-        <header className="relative h-[150px]">
+      <header className="relative h-[150px]">
             <div className="absolute top-0 w-full text-center">
                 <p className="font-bold uppercase text-sm mb-1 tracking-tighter">INVOICE/OFFICIAL RECEIPT</p>
                 <p className="font-bold uppercase text-sm">{invoiceId || 'INV/2024/001'}</p>
@@ -222,7 +222,7 @@ const InvoicePreviewPage: React.FC = () => {
                 <div className='w-1/2'>
                     <p className="font-bold text-xs">{customer?.name || 'PT Sejahtera Abadi'}</p>
                 </div>
-                <div className='w-1/2 text-left pl-16'>
+                <div className='w-1/2 text-left pl-12'>
                      <p>Sales Order : {soNumber || 'SO-2024-001'}</p>
                      <p>Order Date : </p>
                      <p>Reference A : </p>
@@ -232,16 +232,16 @@ const InvoicePreviewPage: React.FC = () => {
                 <div className='w-1/2'>
                     <p>Customer Code :</p>
                 </div>
-                <div className='w-1/2 text-left pl-16'>
+                <div className='w-1/2 text-left pl-12'>
                     <p>Date: {formatDate(date)}</p>
                 </div>
             </div>
         </header>
-
+        
         <main className='mt-4 flex-grow'>
           <table className="w-full border-collapse border border-black text-[10px]">
-              <thead>
-                  <tr className="border-b border-black">
+              <thead className='border-b border-black'>
+                  <tr >
                       <th className="p-1 text-left w-[8%] border-r border-black">No.</th>
                       <th className="p-1 text-left w-[34%] border-r border-black">Item</th>
                       <th className="p-1 text-center w-[20%] border-r border-black">Quantity Unit</th>
@@ -251,8 +251,8 @@ const InvoicePreviewPage: React.FC = () => {
               </thead>
               <tbody>
                   {items.map((item, itemIdx) => (
-                      <tr key={item.id} style={{height: '18px'}}>
-                          <td className="p-1 align-top border-r border-black">{itemIdx + 1}</td>
+                      <tr key={item.id}>
+                          <td className="p-1 align-top border-r border-black h-[18px]">{itemIdx + 1}</td>
                           <td className="p-1 align-top border-r border-black">{item.name}</td>
                           <td className="p-1 text-center align-top border-r border-black">{item.quantity.toLocaleString('id-ID')} {item.unit}</td>
                           <td className="p-1 text-right align-top border-r border-black">{formatCurrency(item.price)}</td>
@@ -261,7 +261,7 @@ const InvoicePreviewPage: React.FC = () => {
                   ))}
                   {Array.from({ length: Math.max(0, 25 - items.length) }).map((_, index) => (
                       <tr key={`empty-${index}`} style={{height: '18px'}}>
-                          <td className="border-r border-black">&nbsp;</td>
+                           <td className="border-r border-black">&nbsp;</td>
                           <td className="border-r border-black"></td>
                           <td className="border-r border-black"></td>
                           <td className="border-r border-black"></td>
@@ -278,7 +278,7 @@ const InvoicePreviewPage: React.FC = () => {
                     <p>No PO : {poNumber || ''}</p>
                 </div>
                 <div className="w-1/2 flex justify-end font-bold">
-                    1.000.000,00
+                    {formatCurrency(subtotal)}
                 </div>
             </div>
 
