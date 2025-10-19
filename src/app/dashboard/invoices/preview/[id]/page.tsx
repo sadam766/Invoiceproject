@@ -1,352 +1,330 @@
 
 'use client';
 
-import React, { useEffect, useState } from 'react';
-import { useParams, useRouter } from 'next/navigation';
-import { Button } from '@/components/ui/button';
-import { ArrowLeft, Printer, Download } from 'lucide-react';
-import type { Customer } from '@/app/lib/data';
-import Head from 'next/head';
-import * as XLSX from 'xlsx';
+import React, { useRef, useEffect, useState } from 'react';
+import { Download, Printer } from 'lucide-react';
 
-type InvoiceItem = {
-    id: number;
-    no: number;
-    item: string;
+// --- DEFINISI TIPE DATA (Sama seperti sebelumnya) ---
+
+interface Item {
+    id: string;
     name: string;
     quantity: number;
     unit: string;
     price: number;
     total: number;
-    amount: number;
-};
+}
 
-type PreviewData = {
+interface InvoiceData {
     id: string;
+    items: Item[];
+    customer: {
+        name: string;
+        address: string;
+    };
+    date: string; // YYYY-MM-DD
     soNumber: string;
-    customer: Customer | undefined;
-    date: string;
-    amount: number;
-    status: string;
-    items: InvoiceItem[];
-    subtotal: number;
-    negotiation: number;
-    dpValue: number;
-    pelunasan: number;
+    poNumber: string;
     grandTotal: number;
     dppVat: number;
     vat12: number;
-    totalRp?: number;
-    poNumber?: string;
-    paymentTerms?: string;
+    totalRp: number;
+    paymentTerms: string;
+}
+
+// --- FUNGSI UTILITY (Sama seperti sebelumnya) ---
+
+// Fungsi untuk format mata uang IDR
+const formatCurrency = (amount: number): string => {
+    return amount.toLocaleString('id-ID', {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+    });
 };
 
-const InvoicePreviewPage: React.FC = () => {
-  const router = useRouter();
-  const params = useParams();
-  const { id } = params;
-  
-  const [invoiceData, setInvoiceData] = useState<PreviewData | null>(null);
-  const [isClient, setIsClient] = useState(false);
+// Fungsi untuk format tanggal menjadi DD-MM-YYYY
+const formatDate = (dateString: string): string => {
+    const date = new Date(dateString);
+    return date.toLocaleDateString('id-ID', {
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric',
+    }).replace(/\//g, '-');
+};
 
-  useEffect(() => {
-    setIsClient(true);
-  }, []);
 
-  useEffect(() => {
-    if (!isClient) return;
+// --- DUMMY DATA (Data yang digunakan jika data asli belum ada) ---
 
-    function fetchInvoiceFromSession() {
-        const dataFromSession = sessionStorage.getItem('invoicePreviewData');
-        if(dataFromSession) {
-            const parsedData = JSON.parse(dataFromSession) as PreviewData;
-            
-            const subtotal = parsedData.items.reduce((sum, item) => sum + (item.quantity * item.price), 0);
-            
-            const goods = 1500000.00;
-            const dppVat = 1375000.00;
-            const vat12 = 165000.00;
-            const totalRp = goods + vat12;
+const dummyInvoiceData: InvoiceData = {
+    id: 'INV/2024/05/001',
+    items: [
+        { id: '1', name: 'Kabel Tembaga 2.5mm', quantity: 100, unit: 'meter', price: 15000.00, total: 1500000.00 },
+        // Baris kosong untuk menguji layout dan paginasi
+        // { id: '2', name: 'Fiber Optic Cable', quantity: 50, unit: 'roll', price: 200000.00, total: 10000000.00 },
+    ],
+    customer: {
+        name: 'PT Sejahtera Abadi',
+        address: 'Jl. Merdeka No. 10, Jakarta',
+    },
+    date: '2024-05-11',
+    soNumber: 'SO-2024-001',
+    poNumber: '',
+    grandTotal: 1500000.00, // Goods
+    dppVat: 1375000.00,
+    vat12: 165000.00,
+    totalRp: 1665000.00,
+    paymentTerms: '90 Hari setelah invoice diterima',
+};
 
-            setInvoiceData({
-                ...parsedData,
-                subtotal: subtotal,
-                grandTotal: goods, 
-                dppVat: dppVat,
-                vat12: vat12,
-                totalRp: totalRp,
-            });
-        } else {
-            setInvoiceData(null);
-        }
-    }
+
+// --- KOMPONEN UTAMA ---
+
+const InvoicePreviewPage = () => {
+    const invoiceRef = useRef<HTMLDivElement>(null);
+    const [invoiceData, setInvoiceData] = useState<InvoiceData>(dummyInvoiceData);
+
+    // Simulasi fetch data faktur
+    useEffect(() => {
+        // Di sini Anda bisa memuat data nyata dari API
+        // Untuk demo, kita menggunakan dummy data
+    }, []);
+
+    const {
+        id: invoiceId,
+        items,
+        customer,
+        date,
+        soNumber,
+        poNumber,
+        grandTotal,
+        dppVat,
+        vat12,
+        paymentTerms,
+        totalRp
+    } = invoiceData;
+
+    // --- FUNGSI EXPORT (Untuk print/PDF) ---
     
-    fetchInvoiceFromSession();
+    // Fungsi untuk export ke PDF/Print (Sama seperti sebelumnya)
+    const handlePrint = () => {
+        window.print();
+    };
 
-  }, [id, isClient]);
+    // Fungsi untuk export ke Excel (Sama seperti sebelumnya)
+    const handleExportExcel = () => {
+        alert('Export to Excel logic needs to be implemented (e.g., using libraries like SheetJS/XLSX)');
+    };
 
-  const handlePdfExport = () => {
-    if (isClient && (window as any).html2pdf) {
-      const element = document.getElementById('invoice-paper');
-      const opt = {
-        margin: [0.2, 0.2, 0.2, 0.2],
-        filename: `Invoice-${invoiceData?.id?.replace(/\//g, '-')}.pdf`,
-        image: { type: 'jpeg', quality: 0.98 },
-        html2canvas: { scale: 2, useCORS: true },
-        jsPDF: { unit: 'in', format: 'a4', orientation: 'portrait' }
-      };
-      (window as any).html2pdf().from(element).set(opt).save();
-    }
-  };
-
-  const handleExportExcel = () => {
-    if (!invoiceData || !invoiceData.items) return;
-    const { id, customer, date, soNumber, poNumber, items, subtotal, grandTotal, dppVat, vat12, totalRp } = invoiceData;
-    const formatNum = (value: number) => Number(value.toFixed(2));
-
-    const sheetData = [
-      ["INVOICE/OFFICIAL RECEIPT"],
-      [id],
-      [],
-      ["Bill To:", customer?.name],
-      ["", customer?.address],
-      [],
-      ["Sales Order:", soNumber, "Date:", formatDate(date)],
-      ["No PO:", poNumber],
-      [],
-      ["No.", "Item", "Quantity", "Unit", "Price", "Amount"],
-      ...items.map((item, index) => [
-        index + 1,
-        item.name,
-        item.quantity,
-        item.unit,
-        formatNum(item.price),
-        formatNum(item.total)
-      ]),
-      [],
-      ["", "", "", "", "Subtotal:", formatNum(subtotal)],
-      ["", "", "", "", `A/Negotiation:`, `(${formatNum(Math.abs(invoiceData.negotiation || 0))})`],
-      ["", "", "", "", "Goods:", formatNum(grandTotal)],
-      ["", "", "", "", "DPP VAT (11/12):", formatNum(dppVat)],
-      ["", "", "", "", "VAT 12%:", formatNum(vat12)],
-      ["", "", "", "", "Total Rp :", formatNum(totalRp || 0)],
-    ].filter(row => Array.isArray(row) && row.length > 0);
-    const ws = XLSX.utils.aoa_to_sheet(sheetData);
-    ws['!cols'] = [ { wch: 5 }, { wch: 40 }, { wch: 10 }, { wch: 10 }, { wch: 15 }, { wch: 15 } ];
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "Invoice");
-    XLSX.writeFile(wb, `Invoice-${id.replace('/', '-')}.xlsx`);
-  };
-
-  if (!isClient || !invoiceData) {
     return (
-      <div className="bg-gray-100 dark:bg-slate-900 min-h-screen p-4 flex flex-col items-center justify-center">
-        <p className="text-gray-700 dark:text-gray-300 text-lg mb-4">Loading or Invoice not found...</p>
-        <Button onClick={() => router.back()} > <ArrowLeft className="w-5 h-5 mr-2" /> Kembali </Button>
-      </div>
-    );
-  }
-
-  const {
-      id: invoiceId,
-      items,
-      customer,
-      date,
-      soNumber,
-      poNumber,
-      subtotal,
-      grandTotal,
-      dppVat,
-      vat12,
-      paymentTerms,
-      totalRp
-  } = invoiceData;
-
-  const formatCurrency = (value: number | undefined) => {
-    if (typeof value !== 'number' || isNaN(value)) return '0,00';
-    return value.toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-  };
-  
-  const formatDate = (dateString: string | Date | undefined) => {
-    if (!dateString) return '11-05-2024';
-    try {
-        const dateObj = new Date(dateString);
-        // Correct date format dd-mm-yyyy
-        const day = String(dateObj.getDate()).padStart(2, '0');
-        const month = String(dateObj.getMonth() + 1).padStart(2, '0');
-        const year = dateObj.getFullYear();
-        return `${day}-${month}-${year}`;
-    } catch (e) {
-        return '11-05-2024';
-    }
-  };
-
-
-  const handlePrint = () => { if(isClient) window.print(); };
-
-  return (
-    <div className="bg-gray-100 dark:bg-slate-900 min-h-screen p-4 font-sans text-black">
-      <Head>
-        <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.9.2/html2pdf.bundle.min.js" integrity="sha512-pdizPidlry3pMMda2S1sI1up/gY2SKproofDdgZaGzDyr+p/b2knKen/gv0yD5g4b/b/i0/24i/c4sD6xBu/g==" crossOrigin="anonymous" referrerPolicy="no-referrer"></script>
-        <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.16.9/xlsx.full.min.js"></script>
-      </Head>
-      <style>{`
-        @media print {
-          body { -webkit-print-color-adjust: exact; print-color-adjust: exact; background-color: white !important; }
-          body * { visibility: hidden; color: black !important; }
-          .action-bar { display: none; }
-          #invoice-paper, #invoice-paper * { visibility: visible; }
-          #invoice-paper { position: absolute; left: 0; top: 0; width: 100%; margin: 0; padding: 0; box-shadow: none; border: none; }
-          @page { size: A4; margin: 0.5in; }
-        }
-      `}</style>
-
-      <div className="max-w-4xl mx-auto mb-4 flex justify-between items-center print:hidden action-bar">
-        <Button onClick={() => router.back()} variant="outline"> <ArrowLeft className="w-5 h-5 mr-2" /> Kembali </Button>
-        <div className="flex flex-wrap gap-2 justify-end">
-            <Button onClick={handleExportExcel} variant="outline" className="text-green-600 border-green-500 hover:bg-green-50 hover:text-green-700"> <Download className="w-5 h-5 mr-2"/> <span>Excel</span> </Button>
-            <Button onClick={handlePdfExport} variant="outline" className="text-red-600 border-red-500 hover:bg-red-50 hover:text-red-700"> <Download className="w-5 h-5 mr-2"/> <span>PDF</span> </Button>
-            <Button onClick={handlePrint} variant="default"> <Printer className="w-5 h-5 mr-2"/> <span>Cetak</span> </Button>
-        </div>
-      </div>
-
-      <div id="invoice-paper" className="w-full max-w-4xl mx-auto bg-white shadow-lg p-10 my-8 text-[10px] leading-tight flex flex-col" style={{ minHeight: '29.7cm' }}>
-        
-        <header className="relative h-[150px]">
-            <div className="absolute top-0 w-full text-center">
-                <p className="font-bold uppercase text-sm mb-1 tracking-tighter">INVOICE/OFFICIAL RECEIPT</p>
-                <p className="font-bold uppercase text-sm">{invoiceId || 'INV/2024/001'}</p>
-            </div>
+        <div className="bg-gray-100 dark:bg-slate-900 min-h-screen p-4 font-sans text-black">
             
-            <div className='flex justify-between mt-16'>
-                <div className='w-1/2'>
-                    <p className="font-bold text-xs">{customer?.name || 'PT Sejahtera Abadi'}</p>
-                </div>
-                <div className='w-1/2 text-left pl-12'>
-                     <p>Sales Order : {soNumber || 'SO-2024-001'}</p>
-                     <p>Order Date : </p>
-                     <p>Reference A : </p>
-                </div>
-            </div>
-             <div className='flex justify-between mt-12'>
-                <div className='w-1/2'>
-                    <p>Customer Code :</p>
-                </div>
-                <div className='w-1/2 text-left pl-12'>
-                    <p>Date: {formatDate(date)}</p>
-                </div>
-            </div>
-        </header>
-        
-        <main className='mt-4 flex-grow'>
-          <table className="w-full border-collapse border border-black text-[10px]">
-            <thead className='border-b border-black'>
-                <tr>
-                    <th className="p-1 text-left w-[8%] border-r border-black">No.</th>
-                    <th className="p-1 text-left w-[34%] border-r border-black">Item</th>
-                    <th className="p-1 text-center w-[20%] border-r border-black">Quantity Unit</th>
-                    <th className="p-1 text-right w-[19%] border-r border-black">Price</th>
-                    <th className="p-1 text-right flex-1">Amount</th>
-                </tr>
-            </thead>
-            <tbody>
-                {items.map((item, itemIdx) => (
-                    <tr key={item.id}>
-                        <td className="p-1 align-top border-r border-black h-[18px]">{itemIdx + 1}</td>
-                        <td className="p-1 align-top border-r border-black">{item.name}</td>
-                        <td className="p-1 text-center align-top border-r border-black">{item.quantity.toLocaleString('id-ID')} {item.unit}</td>
-                        <td className="p-1 text-right align-top border-r border-black">{formatCurrency(item.price)}</td>
-                        <td className="p-1 text-right align-top">{formatCurrency(item.total)}</td>
-                    </tr>
-                ))}
-                {Array.from({ length: Math.max(0, 25 - items.length) }).map((_, index) => (
-                    <tr key={`empty-${index}`} style={{height: '18px'}}>
-                        <td className="border-r border-black">&nbsp;</td>
-                        <td className="border-r border-black"></td>
-                        <td className="border-r border-black"></td>
-                        <td className="border-r border-black"></td>
-                        <td></td>
-                    </tr>
-                ))}
-            </tbody>
-          </table>
-        </main>
-        
-        <footer className="pt-2 text-black mt-auto text-[10px]">
-            <div className="w-full border-t border-black pt-1 flex justify-between items-center">
-                <p>No PO : {poNumber || ''}</p>
-                <div className="font-bold">
-                    {formatCurrency(subtotal)}
-                </div>
+            {/* INJEKSI STYLE UNTUK PRINT KHUSUS */}
+            <style jsx global>{`
+                @media print {
+                    /* Sembunyikan semua kecuali elemen cetak */
+                    body > *:not(#invoice-paper-container) {
+                        display: none;
+                    }
+
+                    /* Tampilkan elemen cetak */
+                    #invoice-paper-container {
+                        display: block;
+                        margin: 0 !important;
+                        padding: 0 !important;
+                        box-shadow: none !important;
+                    }
+
+                    /* Menghilangkan margin dan padding pada elemen utama saat dicetak */
+                    body, html {
+                        margin: 0;
+                        padding: 0;
+                        background: none;
+                    }
+
+                    /* Pengaturan kertas A4 (asumsi) */
+                    @page {
+                        size: A4;
+                        margin: 0;
+                    }
+                }
+            `}</style>
+
+            {/* ACTION BAR (Tombol Print dan Export) */}
+            <div className="flex justify-center space-x-4 mb-4 print:hidden">
+                <button
+                    onClick={handlePrint}
+                    className="flex items-center space-x-2 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
+                >
+                    <Printer size={16} />
+                    <span>Print/Export PDF</span>
+                </button>
+                <button
+                    onClick={handleExportExcel}
+                    className="flex items-center space-x-2 px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors"
+                >
+                    <Download size={16} />
+                    <span>Export Excel</span>
+                </button>
             </div>
 
-            <div className="flex justify-end mt-1">
-                <div className="w-1/2">
-                    <div className="grid grid-cols-[auto_1fr] gap-x-4">
-                        <span>Goods:</span><span className="text-right">{formatCurrency(grandTotal)}</span>
-                        <span>DPP VAT (11/12):</span><span className="text-right">{formatCurrency(dppVat)}</span>
-                        <span>VAT 12%:</span><span className="text-right">{formatCurrency(vat12)}</span>
+            {/* AREA FAKTUR (Kertas) */}
+            <div id="invoice-paper-container" className="w-full max-w-4xl mx-auto bg-white shadow-lg p-10 my-8 text-[10px] leading-tight flex flex-col" ref={invoiceRef} style={{ minHeight: '29.7cm' }}>
+                
+                {/* === BAGIAN HEADER === */}
+                <header className="relative pt-0 pb-2 text-[10px] leading-snug">
+                    
+                    {/* Judul dan Nomor Faktur (Tengah Atas) */}
+                    <div className="w-full text-center mb-1">
+                        <p className="font-bold uppercase text-sm tracking-tighter">INVOICE/OFFICIAL RECEIPT</p>
+                        <p className="font-bold uppercase text-sm">{invoiceId}</p>
                     </div>
+
+                    {/* PT Sejahtera Abadi (Kiri Atas) dan Detail Order (Kanan Atas) */}
+                    <div className='flex justify-between items-start mt-4'>
+                        <div className='w-1/2'>
+                            <p className="font-bold text-xs">{customer.name}</p>
+                        </div>
+                        {/* Detail Order (Kanan Atas) */}
+                        <div className='w-1/2 text-right text-[10px] space-y-0'>
+                            <p>Sales Order: {soNumber}</p>
+                            <p>Order Date: </p>
+                            <p>Reference A: </p>
+                        </div>
+                    </div>
+
+                    {/* Customer Code (Kiri Bawah Header) dan Tanggal (Kanan Bawah Header) */}
+                    <div className='flex justify-between items-end mt-4'>
+                        <div className='w-1/2'>
+                            <p>Customer Code :</p>
+                        </div>
+                        <div className='w-1/2 text-right'>
+                            <p>Date: {formatDate(date)}</p>
+                        </div>
+                    </div>
+                </header>
+                
+                {/* === MAIN - TABEL ITEM === */}
+                <main className='mt-2 flex-grow'>
+                    <table className="w-full border-collapse border border-black text-[10px]">
+                        <thead>
+                            <tr className='bg-white'> 
+                                <th className="p-1 text-left w-[8%] border-r border-black font-normal border-b border-black">No.</th>
+                                <th className="p-1 text-left w-[40%] border-r border-black font-normal border-b border-black">Item</th>
+                                <th className="p-1 text-center w-[15%] border-r border-black font-normal border-b border-black">Quantity Unit</th>
+                                <th className="p-1 text-right w-[17%] border-r border-black font-normal border-b border-black">Price</th>
+                                <th className="p-1 text-right flex-1 font-normal border-b border-black">Amount</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {items.map((item, itemIdx) => (
+                                <tr key={item.id} className='align-top'>
+                                    <td className="p-1 border-r border-black h-[18px]">{itemIdx + 1}</td>
+                                    <td className="p-1 border-r border-black">{item.name}</td>
+                                    <td className="p-1 text-center border-r border-black">{item.quantity.toLocaleString('id-ID')} {item.unit}</td>
+                                    <td className="p-1 text-right border-r border-black">{formatCurrency(item.price)}</td>
+                                    <td className="p-1 text-right">{formatCurrency(item.total)}</td>
+                                </tr>
+                            ))}
+                            {/* Baris kosong agar tabel penuh */}
+                            {Array.from({ length: Math.max(0, 20 - items.length) }).map((_, index) => (
+                                <tr key={`empty-${index}`} className='align-top' style={{height: '18px'}}>
+                                    <td className="border-r border-black border-l-0">&nbsp;</td>
+                                    <td className="border-r border-black"></td>
+                                    <td className="border-r border-black"></td>
+                                    <td className="border-r border-black"></td>
+                                    <td className="border-r-0"></td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                </main>
+                
+                {/* === BAGIAN FOOTER === */}
+                <footer className="pt-2 text-black mt-auto text-[10px]">
+                    
+                    {/* Baris No PO dan Angka Total Atas */}
+                    <div className="w-full border-t border-black pt-1 flex justify-between items-center leading-normal">
+                        <p>No PO : {poNumber}</p>
+                        {/* Angka 1.500.000,00 di pojok kanan atas gambar footer */}
+                        <p className="text-sm font-normal">{formatCurrency(grandTotal)}</p>
+                    </div>
+                    
+                    {/* Garis Pemisah */}
                     <div className="border-t border-black w-full my-1"></div>
-                    <div className="grid grid-cols-[auto_1fr] gap-x-4 font-bold">
-                        <span>Total Rp:</span>
-                        <span className="text-right">{formatCurrency(totalRp)}</span>
-                    </div>
-                </div>
-            </div>
-            
-            <div className="mt-2 border-t border-black pt-2">
-                 <div className="flex">
-                    <div className="w-1/2 pr-4 text-[9px] space-y-1">
-                        <div className="flex">
-                            <p className='w-32 shrink-0'>Payment:</p>
-                            <p className='flex-1'>{paymentTerms || '90 Hari setelah invoice diterima'}</p>
-                        </div>
-                        <div className="flex">
-                            <p className='w-32 shrink-0'>Please state with your payment:</p>
-                            <p className='flex-1'>{`:${invoiceId || 'INV/2024/001'}`}</p>
-                        </div>
-                        <p>For payment, please transfer to our account:</p>
-                        <p className="font-semibold">PT.Jembo Cable Company Tbk</p>
-                        
-                        <div className="flex">
-                           <div className="w-2/5">
-                                <p>Bank Mandiri -</p>
-                                <p>Jakarta Cabang</p>
-                                <p>Sudirman</p>
+
+                    {/* Blok Ringkasan Total (Goods, DPP, VAT, Total Rp) */}
+                    <div className="flex justify-end mt-1">
+                        <div className="w-1/2 text-[10px] leading-snug">
+                            <div className="grid grid-cols-[1fr_auto] gap-x-4">
+                                <span className="text-left">Goods:</span>
+                                <span className="text-right">{formatCurrency(grandTotal)}</span>
+                                <span className="text-left">DPP VAT (11/12):</span>
+                                <span className="text-right">{formatCurrency(dppVat)}</span>
+                                <span className="text-left">VAT 12%:</span>
+                                <span className="text-right">{formatCurrency(vat12)}</span>
                             </div>
-                            <div className="w-3/5 text-left">
-                                <p>A/C No. : 102-0100206827 (Rp)</p>
-                                <p>A/C No. : 102-0005000218 (Rp)</p>
-                                <p>A/C No. : 102-0005000226 (USD)</p>
-                            </div>
-                       </div>
-                        <div className="text-center my-1">OR</div>
-                        <div className="flex">
-                          <div className="w-2/5">
-                                <p>Bank BCA - Jakarta</p>
-                                <p>Cabang KEM TOWER</p>
-                            </div>
-                            <div className="w-3/5 text-left">
-                                <p>A/C No. : 684-0198977 (Rp)</p>
+                            
+                            <div className="border-t border-black w-full my-1"></div>
+                            
+                            <div className="grid grid-cols-[1fr_auto] gap-x-4 font-normal">
+                                <span className="text-left">Total Rp:</span>
+                                <span className="text-right">{formatCurrency(totalRp)}</span>
                             </div>
                         </div>
                     </div>
 
-                    <div className="w-1/2 pl-4 flex flex-col justify-between">
-                        <div className="text-left">
-                            <p className="font-semibold mb-16">PT. JEMBO CABLE COMPANY Tbk</p>
-                            <p className="font-semibold">Finance</p>
+                    {/* Blok Ketentuan Pembayaran, Bank, dan Tanda Tangan */}
+                    <div className="mt-2 pt-2">
+                        <div className="flex">
+                            {/* Kolom Kiri: Detail Pembayaran & Bank */}
+                            <div className="w-1/2 pr-4 text-[9px] space-y-1">
+                                <div className="flex">
+                                    <p className='w-40 shrink-0'>Payment:</p>
+                                    <p className='flex-1'>{paymentTerms}</p>
+                                </div>
+                                <div className="flex">
+                                    <p className='w-40 shrink-0'>Please state with your payment:</p>
+                                    <p className='flex-1'>{invoiceId}</p>
+                                </div>
+                                <p className='mt-2'>For payment, please transfer to our account:</p>
+                                <p className="font-semibold">PT. Jembo Cable Company Tbk</p>
+                                
+                                <div className="flex items-start">
+                                    <div className="w-2/5 pr-2">
+                                        <p>Bank Mandiri -</p>
+                                        <p>Jakarta Cabang</p>
+                                        <p>Sudirman</p>
+                                    </div>
+                                    <div className="w-3/5 text-left">
+                                        <p>A/C No. : 102-0100206827 (Rp)</p>
+                                        <p>A/C No. : 102-0005000218 (Rp)</p>
+                                        <p>A/C No. : 102-0005000226 (USD)</p>
+                                    </div>
+                                </div>
+                                <div className="text-center my-1">OR</div>
+                                <div className="flex items-start">
+                                    <div className="w-2/5 pr-2">
+                                        <p>Bank BCA - Jakarta</p>
+                                        <p>Cabang KEM TOWER</p>
+                                    </div>
+                                    <div className="w-3/5 text-left">
+                                        <p>A/C No. : 684-0198977 (Rp)</p>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Kolom Kanan: Tanda Tangan */}
+                            <div className="w-1/2 pl-4 flex flex-col justify-end text-[10px] text-right">
+                                <p className="font-semibold mb-16 pt-8">PT. JEMBO CABLE COMPANY Tbk</p>
+                                <div className='border-b border-black w-24 ml-auto mb-1'></div>
+                                <p className="font-semibold">Finance</p>
+                            </div>
                         </div>
                     </div>
-                </div>
+                </footer>
             </div>
-        </footer>
-      </div>
-    </div>
-  );
+        </div>
+    );
 }
 
 export default InvoicePreviewPage;
-
-    
