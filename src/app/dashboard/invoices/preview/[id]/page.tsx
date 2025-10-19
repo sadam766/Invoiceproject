@@ -240,44 +240,42 @@ const InvoicePreviewPage: React.FC = () => {
         
         <main className='mt-4 flex-grow'>
           <table className="w-full border-collapse border border-black text-[10px]">
-              <thead className='border-b border-black'>
-                  <tr >
-                      <th className="p-1 text-left w-[8%] border-r border-black">No.</th>
-                      <th className="p-1 text-left w-[34%] border-r border-black">Item</th>
-                      <th className="p-1 text-center w-[20%] border-r border-black">Quantity Unit</th>
-                      <th className="p-1 text-right w-[19%] border-r border-black">Price</th>
-                      <th className="p-1 text-right flex-1">Amount</th>
-                  </tr>
-              </thead>
-              <tbody>
-                  {items.map((item, itemIdx) => (
-                      <tr key={item.id}>
-                          <td className="p-1 align-top border-r border-black h-[18px]">{itemIdx + 1}</td>
-                          <td className="p-1 align-top border-r border-black">{item.name}</td>
-                          <td className="p-1 text-center align-top border-r border-black">{item.quantity.toLocaleString('id-ID')} {item.unit}</td>
-                          <td className="p-1 text-right align-top border-r border-black">{formatCurrency(item.price)}</td>
-                          <td className="p-1 text-right align-top">{formatCurrency(item.total)}</td>
-                      </tr>
-                  ))}
-                  {Array.from({ length: Math.max(0, 25 - items.length) }).map((_, index) => (
-                      <tr key={`empty-${index}`} style={{height: '18px'}}>
-                           <td className="border-r border-black">&nbsp;</td>
-                          <td className="border-r border-black"></td>
-                          <td className="border-r border-black"></td>
-                          <td className="border-r border-black"></td>
-                          <td></td>
-                      </tr>
-                  ))}
-              </tbody>
+            <thead className='border-b border-black'>
+                <tr>
+                    <th className="p-1 text-left w-[8%] border-r border-black">No.</th>
+                    <th className="p-1 text-left w-[34%] border-r border-black">Item</th>
+                    <th className="p-1 text-center w-[20%] border-r border-black">Quantity Unit</th>
+                    <th className="p-1 text-right w-[19%] border-r border-black">Price</th>
+                    <th className="p-1 text-right flex-1">Amount</th>
+                </tr>
+            </thead>
+            <tbody>
+                {items.map((item, itemIdx) => (
+                    <tr key={item.id}>
+                        <td className="p-1 align-top border-r border-black h-[18px]">{itemIdx + 1}</td>
+                        <td className="p-1 align-top border-r border-black">{item.name}</td>
+                        <td className="p-1 text-center align-top border-r border-black">{item.quantity.toLocaleString('id-ID')} {item.unit}</td>
+                        <td className="p-1 text-right align-top border-r border-black">{formatCurrency(item.price)}</td>
+                        <td className="p-1 text-right align-top">{formatCurrency(item.total)}</td>
+                    </tr>
+                ))}
+                {Array.from({ length: Math.max(0, 25 - items.length) }).map((_, index) => (
+                    <tr key={`empty-${index}`} style={{height: '18px'}}>
+                        <td className="border-r border-black">&nbsp;</td>
+                        <td className="border-r border-black"></td>
+                        <td className="border-r border-black"></td>
+                        <td className="border-r border-black"></td>
+                        <td></td>
+                    </tr>
+                ))}
+            </tbody>
           </table>
         </main>
         
         <footer className="pt-2 text-black mt-auto text-[10px]">
-            <div className="flex justify-between items-center border-t border-black pt-1">
-                <div className="w-1/2">
-                    <p>No PO : {poNumber || ''}</p>
-                </div>
-                <div className="w-1/2 flex justify-end font-bold">
+            <div className="w-full border-t border-black pt-1 flex justify-between items-center">
+                <p>No PO : {poNumber || ''}</p>
+                <div className="font-bold">
                     {formatCurrency(subtotal)}
                 </div>
             </div>
@@ -297,47 +295,46 @@ const InvoicePreviewPage: React.FC = () => {
                 </div>
             </div>
             
-            <div className="mt-8 border-t border-black pt-2">
+            <div className="mt-2 border-t border-black pt-2">
                  <div className="flex">
-                 <div className="w-1/2 pr-4 text-[9px]">
-                        <div className="flex items-start mb-1">
-                            <p className='w-20 shrink-0'>Payment:</p>
+                    <div className="w-1/2 pr-4 text-[9px] space-y-1">
+                        <div className="flex">
+                            <p className='w-32 shrink-0'>Payment:</p>
                             <p className='flex-1'>{paymentTerms || '90 Hari setelah invoice diterima'}</p>
                         </div>
-                        <div className="flex items-start mb-2">
-                            <p className='w-20 shrink-0'>Please state with your payment:</p>
-                            <p className='flex-1'>{invoiceId || 'INV/2024/001'}</p>
+                        <div className="flex">
+                            <p className='w-32 shrink-0'>Please state with your payment:</p>
+                            <p className='flex-1'>{`:${invoiceId || 'INV/2024/001'}`}</p>
                         </div>
-                        <p className="mb-2">For payment, please transfer to our account:</p>
-                        <div className="font-normal space-y-2">
-                            <p className="mb-1 font-semibold">PT.Jembo Cable Company Tbk</p>
-                            <div className="flex">
-                               <div className="w-2/5">
-                                    <p>Bank Mandiri -</p>
-                                    <p>Jakarta Cabang</p>
-                                    <p>Sudirman</p>
-                                </div>
-                                <div className="w-3/5 text-left">
-                                    <p>A/C No. : 102-0100206827 (Rp)</p>
-                                    <p>A/C No. : 102-0005000218 (Rp)</p>
-                                    <p>A/C No. : 102-0005000226 (USD)</p>
-                                </div>
-                           </div>
-                            <div className="text-center my-1">OR</div>
-                            <div className="flex">
-                              <div className="w-2/5">
-                                    <p>Bank BCA - Jakarta</p>
-                                    <p>Cabang KEM TOWER</p>
-                                </div>
-                                <div className="w-3/5 text-left">
-                                    <p>A/C No. : 684-0198977 (Rp)</p>
-                                </div>
+                        <p>For payment, please transfer to our account:</p>
+                        <p className="font-semibold">PT.Jembo Cable Company Tbk</p>
+                        
+                        <div className="flex">
+                           <div className="w-2/5">
+                                <p>Bank Mandiri -</p>
+                                <p>Jakarta Cabang</p>
+                                <p>Sudirman</p>
                             </div>
-                         </div>
+                            <div className="w-3/5 text-left">
+                                <p>A/C No. : 102-0100206827 (Rp)</p>
+                                <p>A/C No. : 102-0005000218 (Rp)</p>
+                                <p>A/C No. : 102-0005000226 (USD)</p>
+                            </div>
+                       </div>
+                        <div className="text-center my-1">OR</div>
+                        <div className="flex">
+                          <div className="w-2/5">
+                                <p>Bank BCA - Jakarta</p>
+                                <p>Cabang KEM TOWER</p>
+                            </div>
+                            <div className="w-3/5 text-left">
+                                <p>A/C No. : 684-0198977 (Rp)</p>
+                            </div>
+                        </div>
                     </div>
 
                     <div className="w-1/2 pl-4 flex flex-col justify-between">
-                        <div className="text-center">
+                        <div className="text-left">
                             <p className="font-semibold mb-16">PT. JEMBO CABLE COMPANY Tbk</p>
                             <p className="font-semibold">Finance</p>
                         </div>
@@ -351,3 +348,5 @@ const InvoicePreviewPage: React.FC = () => {
 }
 
 export default InvoicePreviewPage;
+
+    
