@@ -63,7 +63,6 @@ const InvoicePreviewPage: React.FC = () => {
             
             const subtotal = parsedData.items.reduce((sum, item) => sum + (item.quantity * item.price), 0);
             
-            // From image, it seems Goods, DPP VAT, and VAT 12% calculation is different. Let's hardcode for now to match the image.
             const goods = 1500000.00;
             const dppVat = 1375000.00;
             const vat12 = 165000.00;
@@ -72,7 +71,7 @@ const InvoicePreviewPage: React.FC = () => {
             setInvoiceData({
                 ...parsedData,
                 subtotal: subtotal,
-                grandTotal: goods, // This represents 'Goods' in the image
+                grandTotal: goods, 
                 dppVat: dppVat,
                 vat12: vat12,
                 totalRp: totalRp,
@@ -208,7 +207,6 @@ const InvoicePreviewPage: React.FC = () => {
 
       <div id="invoice-paper" className="w-full max-w-4xl mx-auto bg-white shadow-lg p-10 text-[10px] leading-tight flex flex-col" style={{ minHeight: '29.7cm' }}>
         
-        {/* Header Section */}
         <header className="relative h-[150px]">
             <div className="absolute top-0 w-full text-center">
                 <p className="font-bold uppercase text-sm mb-1 tracking-tighter">INVOICE/OFFICIAL RECEIPT</p>
@@ -216,16 +214,16 @@ const InvoicePreviewPage: React.FC = () => {
             </div>
             
             <div className='flex justify-between mt-16'>
-                <div className='w-1/2'>
+                <div className='w-7/12'>
                     <p className="font-bold text-xs">{customer?.name || 'PT Sejahtera Abadi'}</p>
                 </div>
-                <div className='w-1/2 text-left pl-12'>
+                <div className='w-5/12 text-left pl-12'>
                      <p>Sales Order : {soNumber || 'SO-2024-001'}</p>
                      <p>Order Date : </p>
                      <p>Reference A : </p>
                 </div>
             </div>
-             <div className='flex justify-between mt-4'>
+             <div className='flex justify-between mt-8'>
                 <div className='w-1/2'>
                     <p>Customer Code :</p>
                 </div>
@@ -235,58 +233,53 @@ const InvoicePreviewPage: React.FC = () => {
             </div>
         </header>
 
-        {/* Items Table */}
         <main className='mt-4 flex-grow'>
-            <table className="w-full border-collapse border border-black text-[10px]">
-                <thead className="font-bold">
-                    <tr className="border-b border-black">
-                        <th className="p-1 text-left border-r border-black w-[8%]">No.</th>
-                        <th className="p-1 text-left border-r border-black w-[42%]">Item</th>
-                        <th className="p-1 text-center border-r border-black w-[20%]">Quantity Unit</th>
-                        <th className="p-1 text-right border-r border-black w-[15%]">Price</th>
-                        <th className="p-1 text-right w-[15%]">Amount</th>
-                    </tr>
-                </thead>
-                <tbody>
+            <div className="w-full border-collapse border border-black text-[10px]">
+                <div className="flex font-bold border-b border-black">
+                    <div className="p-1 text-left w-[8%]">No.</div>
+                    <div className="border-l border-black h-full"></div>
+                    <div className="p-1 text-left w-[34%]">Item</div>
+                    <div className="border-l border-black h-full"></div>
+                    <div className="p-1 text-center w-[20%]">Quantity Unit</div>
+                    <div className="border-l border-black h-full"></div>
+                    <div className="p-1 text-right w-[19%]">Price</div>
+                    <div className="border-l border-black h-full"></div>
+                    <div className="p-1 text-right flex-1">Amount</div>
+                </div>
+                <div>
                   {/* Data Row */}
                   {items.map((item, itemIdx) => (
-                    <tr key={item.id}>
-                        <td className="p-1 align-top border-r border-black">{itemIdx + 1}</td>
-                        <td className="p-1 align-top border-r border-black">{item.name}</td>
-                        <td className="p-1 text-center align-top border-r border-black">{item.quantity.toLocaleString('id-ID')} {item.unit}</td>
-                        <td className="p-1 text-right align-top border-r border-black">{formatCurrency(item.price)}</td>
-                        <td className="p-1 text-right align-top">{formatCurrency(item.total)}</td>
-                    </tr>
+                    <div key={item.id} className="flex">
+                        <div className="p-1 align-top w-[8%]">{itemIdx + 1}</div>
+                        <div className="p-1 align-top w-[34%]">{item.name}</div>
+                        <div className="p-1 text-center align-top w-[20%]">{item.quantity.toLocaleString('id-ID')} {item.unit}</div>
+                        <div className="p-1 text-right align-top w-[19%]">{formatCurrency(item.price)}</div>
+                        <div className="p-1 text-right flex-1">{formatCurrency(item.total)}</div>
+                    </div>
                   ))}
                   {/* Empty Rows for spacing */}
                   {Array.from({ length: Math.max(0, 25 - items.length) }).map((_, index) => (
-                      <tr key={`empty-${index}`} className="h-[18px]">
-                          <td className='p-1 border-r border-black'>&nbsp;</td>
-                          <td className='p-1 border-r border-black'>&nbsp;</td>
-                          <td className='p-1 border-r border-black'>&nbsp;</td>
-                          <td className='p-1 border-r border-black'>&nbsp;</td>
-                          <td className='p-1'>&nbsp;</td>
-                      </tr>
+                      <div key={`empty-${index}`} className="h-[18px] flex">
+                          <div className="w-full">&nbsp;</div>
+                      </div>
                   ))}
-                </tbody>
-            </table>
+                </div>
+            </div>
         </main>
         
-        {/* Footer Section */}
         <footer className="pt-2 text-black mt-auto text-[10px]">
-            <div className="flex justify-between items-center">
+            <div className="flex justify-between items-center border-t border-black pt-1">
                 <div className="w-1/2">
                     <p>No PO : {poNumber || ''}</p>
                 </div>
                 <div className="w-1/2 flex items-center justify-end">
-                    <div className='relative w-[120px] text-right pr-1'>
-                        <span className="font-bold ">{formatCurrency(subtotal)}</span>
+                    <div className='font-bold text-right pr-1'>
+                        {formatCurrency(subtotal)}
                     </div>
                 </div>
             </div>
-            <div className='w-full border-t border-black my-1'></div>
 
-            <div className="flex justify-end">
+            <div className="flex justify-end mt-1">
                 <div className="w-1/2">
                     <div className="grid grid-cols-2">
                         <span>Goods:</span><span className="text-right">{formatCurrency(grandTotal)}</span>
@@ -301,7 +294,7 @@ const InvoicePreviewPage: React.FC = () => {
                 </div>
             </div>
 
-            <div className="flex mt-8">
+            <div className="flex mt-8 border-t border-black pt-2">
                 <div className="w-1/2 pr-4 text-[9px]">
                     <div className="flex items-start mb-1">
                         <p className='w-20 shrink-0'>Payment:</p>
