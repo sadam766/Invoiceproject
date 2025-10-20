@@ -57,28 +57,6 @@ const formatDate = (dateString: string): string => {
 };
 
 
-// --- DUMMY DATA ---
-
-const dummyInvoiceData: InvoiceData = {
-    id: 'INV/2024/05/001',
-    items: [
-        { id: '1', name: 'Kabel Tembaga 2.5mm', quantity: 100, unit: 'meter', price: 15000.00, total: 1500000.00 },
-    ],
-    customer: {
-        name: 'PT Sejahtera Abadi',
-        address: 'Jl. Merdeka No. 10, Jakarta',
-    },
-    date: '2024-05-11',
-    soNumber: 'SO-2024-001',
-    poNumber: '',
-    grandTotal: 1500000.00, // Goods
-    dppVat: 1339285.71, // (1500000 / 1.12)
-    vat12: 160714.29, // (1500000 / 1.12) * 0.12
-    totalRp: 1500000.00 + 160714.29,
-    paymentTerms: '90 Hari setelah invoice diterima',
-};
-
-
 // --- KOMPONEN UTAMA ---
 
 const InvoicePreviewPage = () => {
@@ -117,11 +95,11 @@ const InvoicePreviewPage = () => {
                     paymentTerms: parsedData.paymentTerms || '90 Hari setelah invoice diterima',
                 });
             } else {
-                setInvoiceData(dummyInvoiceData);
+                setInvoiceData(null);
             }
         } catch (error) {
             console.error("Failed to load or parse invoice data:", error);
-            setInvoiceData(dummyInvoiceData);
+            setInvoiceData(null);
         }
     }, []);
 
@@ -188,7 +166,7 @@ const InvoicePreviewPage = () => {
     };
 
     if (!invoiceData) {
-        return <div className="p-8">Loading invoice preview...</div>
+        return <div className="p-8">Loading invoice preview or no data available. Please create an invoice first.</div>
     }
 
     const {
@@ -256,23 +234,34 @@ const InvoicePreviewPage = () => {
                 </button>
             </div>
 
+            {/* AREA FAKTUR (Kertas) */}
+            {/* Ukuran global default menjadi 10px */}
             <div 
                 id="invoice-paper-container" 
                 className="w-full max-w-4xl mx-auto bg-white shadow-lg p-10 my-8 text-[10px] leading-tight flex flex-col" 
                 ref={invoiceRef}
-                style={{ minHeight: '29.7cm' }}
+                style={{ minHeight: '23cm' }} // Dikembalikan ke tinggi A4
             >
                 
-                 <header className="relative pt-0 pb-2 text-[10px] leading-snug">
+                {/* === BAGIAN HEADER === */}
+                <header className="relative pt-0 pb-2 text-[10px] leading-snug">
+                    
+                    {/* Judul dan Nomor Faktur (Tengah Atas) - Tetap text-sm karena itu judul */}
                     <div className="w-full text-center mb-1">
                         <p className="font-bold uppercase text-sm tracking-tighter">INVOICE/OFFICIAL RECEIPT</p>
                         <p className="font-bold uppercase text-sm">{invoiceId}</p>
                     </div>
 
+                    {/* PT Sejahtera Abadi (Kiri Atas) dan Detail Order (Kanan Atas) */}
                     <div className='flex justify-between items-start mt-4'>
+                        {/* Kolom Customer: w-[45%] */}
                         <div className='w-[45%]'> 
+                            {/* Font PT Sejahtera Abadi dijadikan text-[10px] tapi font-bold tetap */}
                             <p className="font-bold text-[10px]">{customer.name}</p>
                         </div>
+
+                        {/* Detail Order (Kanan Atas) - text-[10px] */}
+                        {/* PERBAIKAN: Menggunakan w-[55%] untuk memperbaiki issue lebar agar layout header 100% (45% + 55%) */}
                         <div className="w-[30%] text-[10px] text-left space-y-0">
                             <p>Sales Order: {soNumber}</p>
                             <p>Order Date: </p>
@@ -280,57 +269,67 @@ const InvoicePreviewPage = () => {
                         </div>
                     </div>
 
-                    <div className='flex justify-between text-[10px] mb-1 mt-2'>
-                        <p>Customer Code :</p>
-                        <p>Date: {formatDate(date)}</p>
+                    {/* Customer Code (Kiri Bawah Header) dan Tanggal (Kanan Bawah Header) - text-[10px] */}
+                    <div className='flex justify-between text-[10px] mb-1'>
+                            <p>Customer Code :</p>
+                            <p>Date: {formatDate(date)}</p>
                     </div>
                 </header>
                 
+                {/* === MAIN - TABEL ITEM === */}
                 <main className='mt-0 flex-grow'> 
-                    <table className="w-full border-collapse text-[10px] border border-black">
+                    {/* Tabel sudah text-[10px] */}
+                    <table className="w-full border-collapse text-[10px]">
                         <thead>
-                            <tr className='bg-white border-b border-black'>
-                                <th className="p-1 text-left w-[8%] font-normal border-r border-black">No.</th>
-                                <th className="p-1 text-left w-[40%] font-normal border-r border-black">Item</th>
-                                <th className="p-1 text-center w-[15%] font-normal border-r border-black">Quantity Unit</th>
-                                <th className="p-1 text-right w-[17%] font-normal border-r border-black">Price</th>
-                                <th className="p-1 text-right flex-1 font-normal">Amount</th>
+                            <tr className='bg-white border border-black'> 
+                                <th className="p-1 text-left w-[8%] border-r border-black border-b border-black font-normal">No.</th>
+                                <th className="p-1 text-left w-[40%] border-r border-black border-b border-black font-normal">Item</th>
+                                <th className="p-1 text-center w-[15%] border-r border-black border-b border-black font-normal">Quantity Unit</th>
+                                <th className="p-1 text-right w-[17%] border-r border-black border-b border-black font-normal">Price</th>
+                                <th className="p-1 text-right flex-1 border-b border-black font-normal">Amount</th>
                             </tr>
                         </thead>
                         <tbody>
                             {items.map((item, itemIdx) => (
-                                <tr key={item.id} className='align-top'>
-                                    <td className="p-1 h-[18px] border-r border-black">{itemIdx + 1}</td>
-                                    <td className="p-1 border-r border-black">{item.name}</td>
-                                    <td className="p-1 text-center border-r border-black">{item.quantity.toLocaleString('id-ID')} {item.unit}</td>
-                                    <td className="p-1 text-right border-r border-black">{formatCurrency(item.price)}</td>
+                                <tr 
+                                    key={item.id} 
+                                    className='align-top'
+                                >
+                                    <td className="p-1 h-[18px]">{itemIdx + 1}</td>
+                                    <td className="p-1">{item.name}</td>
+                                    <td className="p-1 text-center">{item.quantity.toLocaleString('id-ID')} {item.unit}</td>
+                                    <td className="p-1 text-right">{formatCurrency(item.price)}</td>
                                     <td className="p-1 text-right">{formatCurrency(item.total)}</td>
-                                </tr>
-                            ))}
-                            {[...Array(20 - items.length)].map((_, i) => (
-                                <tr key={`empty-${i}`} className='align-top'>
-                                    <td className="p-1 h-[18px] border-r border-black">&nbsp;</td>
-                                    <td className="p-1 border-r border-black"></td>
-                                    <td className="p-1 text-center border-r border-black"></td>
-                                    <td className="p-1 text-right border-r border-black"></td>
-                                    <td className="p-1 text-right"></td>
                                 </tr>
                             ))}
                         </tbody>
                     </table>
                 </main>
 
+                
+                {/* === BAGIAN FOOTER === */}
                 <footer className="pt-0 text-black mt-auto text-[10px]">
-                    <div className="border-t border-black w-full my-1"></div>
-                    <div className="w-full flex justify-between items-end leading-normal">
-                       <p>No PO : {poNumber}</p>
-                       <div className="text-right w-1/2">
-                          <p className="text-[10px] font-normal">{formatCurrency(grandTotal)}</p>
-                       </div>
+                    
+                    {/* Baris Angka Total Atas */}
+                    <div className="w-full flex justify-end items-end leading-normal">
+                        <div className="text-right w-1/2">
+                            <div className="h-0.5 border-b border-black w-1/4 ml-auto -mt-24"></div>
+                            {/* Angka total dijadikan text-[10px] */}
+                            <p className="text-[10px] font-normal">{formatCurrency(grandTotal)}</p>
+                        </div>
                     </div>
                     
+                    {/* Baris No PO */}
+                    <div className="w-full flex justify-start items-end leading-normal mt-0">
+                        <p>No PO : {poNumber}</p>
+                    </div>
+
+                    
+                    {/* Garis Pemisah (Garis Penuh) */}
                     <div className="border-t border-black w-full my-1"></div>
 
+                    {/* Blok Ringkasan Total (Goods, DPP, VAT, Total Rp) */}
+                    {/* Semua teks di sini sudah text-[10px] */}
                     <div className="flex justify-end mt-1">
                         <div className="w-1/2 text-[10px] leading-snug">
                             <div className="grid grid-cols-[1fr_auto] gap-x-3">
@@ -341,29 +340,35 @@ const InvoicePreviewPage = () => {
                                 <span className="text-right">VAT 12%:</span>
                                 <span className="text-right">{formatCurrency(vat12)}</span> 
                             </div>
-                            <div className="border-t border-black w-full my-1"></div>
-                            <div className="grid grid-cols-[1fr_auto] gap-x-3 font-normal mt-1">
-                                <span className="text-right font-bold">Total Rp:</span>
-                                <span className="text-right font-bold">{formatCurrency(totalRp)}</span>
+                            <div className="grid grid-cols-[1fr_auto] gap-x-3 font-normal">
+                                <span className="text-right">Total Rp:</span>
+                                <span className="text-right">{formatCurrency(totalRp)}</span>
                             </div>
                         </div>
                     </div>
-                    
+                    {/* Garis Pemisah (Garis Penuh) */}
                     <div className="border-t border-black w-full my-1"></div>
 
+                    {/* Blok Ketentuan Pembayaran, Bank, dan Tanda Tangan */}
                     <div className="mt-0 pt-1"> 
                         <div className="flex">
+                            {/* Kolom Kiri: Detail Pembayaran & Bank. Semua di sini sudah text-[10px] */}
                             <div className="w-[55%] pr-4 text-[10px] space-y-1">
-                                <div className="flex items-start gap-x-1">
-                                    <p className='shrink-0 basis-28'>Payment:</p>
+                                
+                                <div className="flex gap-x-1">
+                                    <p className='shrink-0'>Payment:</p>
                                     <p className='w-full'>{paymentTerms}</p>
                                 </div>
-                                <div className="flex items-start gap-x-1">
-                                    <p className='shrink-0 basis-28'>Please state with your payment:</p>
-                                    <p className='w-full font-semibold'>{invoiceId}</p>
+                                
+                                <div className="flex gap-x-1">
+                                    <p className='shrink-0'>Please state with your payment:</p>
+                                    <p className='w-full'>{invoiceId}</p>
                                 </div>
+                                
                                 <p className='mt-2'>For payment, please transfer to our account:</p>
+                                {/* Nama PT dijadikan text-[10px] tapi font-semibold tetap */}
                                 <p className="font-semibold text-[10px]">PT. Jembo Cable Company Tbk</p>
+                                
                                 <div className="flex items-start">
                                     <div className="w-1/3 pr-2"> 
                                         <p>Bank Mandiri -</p>
@@ -383,18 +388,17 @@ const InvoicePreviewPage = () => {
                                         <p>Cabang KEM TOWER</p>
                                     </div>
                                     <div className="w-2/3 text-left"> 
-                                        <p>A_C No. : 684-0198977 (Rp)</p>
+                                        <p>A/C No. : 684-0198977 (Rp)</p>
                                     </div>
                                 </div>
                             </div>
-                            <div className="w-[45%] pl-0 flex flex-col justify-between text-[10px] text-center">
-                                <div className='mb-16'>
-                                    <p className="font-semibold text-[10px]">PT. JEMBO CABLE COMPANY Tbk</p> 
-                                </div>
-                                <div className='mb-1'>
-                                    <div className='border-b border-black w-24 mx-auto mb-1'></div>
-                                    <p className="font-semibold">Finance</p>
-                                </div>
+
+                            {/* Kolom Kanan: Tanda Tangan */}
+                            <div className="w-[45%] pl-0 flex flex-col justify-end text-[10px] text-center">
+                                {/* Nama PT dijadikan text-[10px] tapi font-semibold tetap */}
+                                <p className="font-semibold text-[10px] mb-28">PT. JEMBO CABLE COMPANY Tbk</p> 
+                                <div className='border-b border-black w-24 mx-auto mb-1'></div>
+                                <p className="font-semibold">Finance</p>
                             </div>
                         </div>
                     </div>
