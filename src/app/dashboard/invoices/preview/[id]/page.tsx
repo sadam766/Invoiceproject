@@ -1,10 +1,11 @@
-
 'use client';
 
 import React, { useRef, useEffect, useState } from 'react';
 import { Download, Printer } from 'lucide-react';
 import { exportToExcel } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
+import html2pdf from 'html2pdf.js';
+
 
 // --- DEFINISI TIPE DATA ---
 
@@ -73,7 +74,7 @@ const dummyInvoiceData: InvoiceData = {
     grandTotal: 1500000.00, // Goods
     dppVat: 1339285.71, // (1500000 / 1.12)
     vat12: 160714.29, // (1500000 / 1.12) * 0.12
-    totalRp: 1660714.29, // (1500000 + 160714.29)
+    totalRp: 1500000.00 + 160714.29,
     paymentTerms: '90 Hari setelah invoice diterima',
 };
 
@@ -124,8 +125,26 @@ const InvoicePreviewPage = () => {
         }
     }, []);
 
-    const handlePrint = () => {
-        window.print();
+    const handleDownloadPdf = () => {
+        const element = invoiceRef.current;
+        if (!element || !invoiceData) {
+            toast({
+                variant: "destructive",
+                title: "Error",
+                description: "Cannot find invoice element to download.",
+            });
+            return;
+        }
+
+        const opt = {
+          margin:       [10, 10, 10, 10], // top, left, bottom, right
+          filename:     `Invoice-${invoiceData.id.replace(/\//g, '_')}.pdf`,
+          image:        { type: 'jpeg', quality: 0.98 },
+          html2canvas:  { scale: 2, useCORS: true },
+          jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' }
+        };
+
+        html2pdf().from(element).set(opt).save();
     };
 
     const handleExportExcel = () => {
@@ -189,8 +208,7 @@ const InvoicePreviewPage = () => {
     return (
         <div className="bg-gray-100 dark:bg-slate-900 min-h-screen p-4 font-sans text-black">
             
-            <style>
-                {`
+            <style>{`
                 @media print {
                     body > *:not(#invoice-paper-container) {
                         display: none;
@@ -203,8 +221,9 @@ const InvoicePreviewPage = () => {
                         left: 0;
                         top: 0;
                         width: 100%;
+                        height: 100%;
                         margin: 0 !important;
-                        padding: 2.5cm !important;
+                        padding: 0 !important;
                         box-shadow: none !important;
                         border: none !important;
                     }
@@ -215,19 +234,18 @@ const InvoicePreviewPage = () => {
                     }
                     @page {
                         size: A4;
-                        margin: 0;
+                        margin: 10mm;
                     }
                 }
-                `}
-            </style>
+            `}</style>
 
             <div className="flex justify-center space-x-4 mb-4 print:hidden">
                 <button
-                    onClick={handlePrint}
+                    onClick={handleDownloadPdf}
                     className="flex items-center space-x-2 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
                 >
-                    <Printer size={16} />
-                    <span>Print/Export PDF</span>
+                    <Download size={16} />
+                    <span>Download PDF</span>
                 </button>
                 <button
                     onClick={handleExportExcel}
@@ -245,7 +263,7 @@ const InvoicePreviewPage = () => {
                 style={{ minHeight: '29.7cm' }}
             >
                 
-                <header className="relative pt-0 pb-2 text-[10px] leading-snug">
+                 <header className="relative pt-0 pb-2 text-[10px] leading-snug">
                     <div className="w-full text-center mb-1">
                         <p className="font-bold uppercase text-sm tracking-tighter">INVOICE/OFFICIAL RECEIPT</p>
                         <p className="font-bold uppercase text-sm">{invoiceId}</p>
@@ -303,10 +321,10 @@ const InvoicePreviewPage = () => {
                 </main>
 
                 <footer className="pt-0 text-black mt-auto text-[10px]">
+                    <div className="border-t border-black w-full my-1"></div>
                     <div className="w-full flex justify-between items-end leading-normal">
                        <p>No PO : {poNumber}</p>
                        <div className="text-right w-1/2">
-                          <div className="h-0.5 border-b border-black w-1/4 ml-auto mb-1"></div>
                           <p className="text-[10px] font-normal">{formatCurrency(grandTotal)}</p>
                        </div>
                     </div>
@@ -323,6 +341,7 @@ const InvoicePreviewPage = () => {
                                 <span className="text-right">VAT 12%:</span>
                                 <span className="text-right">{formatCurrency(vat12)}</span> 
                             </div>
+                            <div className="border-t border-black w-full my-1"></div>
                             <div className="grid grid-cols-[1fr_auto] gap-x-3 font-normal mt-1">
                                 <span className="text-right font-bold">Total Rp:</span>
                                 <span className="text-right font-bold">{formatCurrency(totalRp)}</span>
@@ -335,12 +354,12 @@ const InvoicePreviewPage = () => {
                     <div className="mt-0 pt-1"> 
                         <div className="flex">
                             <div className="w-[55%] pr-4 text-[10px] space-y-1">
-                                <div className="flex gap-x-1">
-                                    <p className='shrink-0'>Payment:</p>
+                                <div className="flex items-start gap-x-1">
+                                    <p className='shrink-0 basis-28'>Payment:</p>
                                     <p className='w-full'>{paymentTerms}</p>
                                 </div>
-                                <div className="flex gap-x-1">
-                                    <p className='shrink-0'>Please state with your payment:</p>
+                                <div className="flex items-start gap-x-1">
+                                    <p className='shrink-0 basis-28'>Please state with your payment:</p>
                                     <p className='w-full font-semibold'>{invoiceId}</p>
                                 </div>
                                 <p className='mt-2'>For payment, please transfer to our account:</p>
@@ -364,12 +383,12 @@ const InvoicePreviewPage = () => {
                                         <p>Cabang KEM TOWER</p>
                                     </div>
                                     <div className="w-2/3 text-left"> 
-                                        <p>A/C No. : 684-0198977 (Rp)</p>
+                                        <p>A_C No. : 684-0198977 (Rp)</p>
                                     </div>
                                 </div>
                             </div>
                             <div className="w-[45%] pl-0 flex flex-col justify-between text-[10px] text-center">
-                                <div>
+                                <div className='mb-16'>
                                     <p className="font-semibold text-[10px]">PT. JEMBO CABLE COMPANY Tbk</p> 
                                 </div>
                                 <div className='mb-1'>
