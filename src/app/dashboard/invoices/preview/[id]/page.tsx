@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { useRef, useEffect, useState } from 'react';
@@ -311,18 +312,11 @@ const InvoicePreviewPage = () => {
                 
                 {/* === BAGIAN FOOTER === */}
                 <footer className="pt-0 text-black mt-auto text-[10px]">
-                    
-                    <div className='flex justify-between items-end'>
-                      <div className="w-1/2">
+                      
+                      <div className="flex justify-between items-end border-b border-black pb-1 leading-normal">
                           <p>No PO : {poNumber}</p>
-                      </div>
-                      <div className="text-right w-1/2">
-                          <div className="h-0.5 border-b border-black w-1/4 ml-auto mb-1"></div>
                           <p className="text-[10px] font-normal">{formatCurrency(grandTotal)}</p>
                       </div>
-                    </div>
-                    
-                    <div className="border-t border-black w-full my-1"></div>
 
                     <div className="flex justify-end mt-1">
                         <div className="w-1/2 text-[10px] leading-snug">
@@ -334,15 +328,14 @@ const InvoicePreviewPage = () => {
                                 <span className="text-right">VAT 12%:</span>
                                 <span className="text-right">{formatCurrency(vat12)}</span> 
                             </div>
-                            <div className="grid grid-cols-[1fr_auto] gap-x-3 font-normal">
-                                <span className="text-right">Total Rp:</span>
-                                <span className="text-right">{formatCurrency(totalRp)}</span>
+                            <div className="grid grid-cols-[1fr_auto] gap-x-3 font-normal mt-1 border-t border-black pt-1">
+                                <span className="text-right font-bold">Total Rp:</span>
+                                <span className="text-right font-bold">{formatCurrency(totalRp)}</span>
                             </div>
                         </div>
                     </div>
-                    <div className="border-t border-black w-full my-1"></div>
 
-                    <div className="mt-0 pt-1"> 
+                    <div className="mt-2 pt-2 border-t border-black"> 
                         <div className="flex">
                             <div className="w-[55%] pr-4 text-[10px] space-y-1">
                                 
@@ -359,7 +352,7 @@ const InvoicePreviewPage = () => {
                                 <p className='mt-2'>For payment, please transfer to our account:</p>
                                 <p className="font-semibold text-[10px]">PT. Jembo Cable Company Tbk</p>
                                 
-                                <div className="flex items-start">
+                                <div className="flex">
                                     <div className="w-1/3 pr-2"> 
                                         <p>Bank Mandiri -</p>
                                         <p>Jakarta Cabang</p>
@@ -372,7 +365,7 @@ const InvoicePreviewPage = () => {
                                     </div>
                                 </div>
                                 <div className="text-center my-1">OR</div>
-                                <div className="flex items-start">
+                                <div className="flex">
                                     <div className="w-1/3 pr-2"> 
                                         <p>Bank BCA - Jakarta</p>
                                         <p>Cabang KEM TOWER</p>
@@ -397,3 +390,5 @@ const InvoicePreviewPage = () => {
 }
 
 export default InvoicePreviewPage;
+
+    
