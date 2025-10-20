@@ -194,30 +194,22 @@ const InvoicePreviewPage = () => {
         <div className="bg-gray-100 dark:bg-slate-900 min-h-screen p-4 font-sans text-black">
             
             {/* INJEKSI STYLE UNTUK PRINT KHUSUS */}
-            {/* MENGHAPUS 'jsx global' untuk memperbaiki warning React */}
             <style>{`
                 @media print {
-                    /* Sembunyikan semua kecuali elemen cetak */
                     body > *:not(#invoice-paper-container) {
                         display: none;
                     }
-
-                    /* Tampilkan elemen cetak */
                     #invoice-paper-container {
                         display: block;
                         margin: 0 !important;
                         padding: 0 !important;
                         box-shadow: none !important;
                     }
-
-                    /* Menghilangkan margin dan padding pada elemen utama saat dicetak */
                     body, html {
                         margin: 0;
                         padding: 0;
                         background: none;
                     }
-
-                    /* Pengaturan kertas A4 (asumsi) */
                     @page {
                         size: A4;
                         margin: 0;
@@ -244,33 +236,26 @@ const InvoicePreviewPage = () => {
             </div>
 
             {/* AREA FAKTUR (Kertas) */}
-            {/* Ukuran global default menjadi 10px */}
             <div 
                 id="invoice-paper-container" 
                 className="w-full max-w-4xl mx-auto bg-white shadow-lg p-10 my-8 text-[10px] leading-tight flex flex-col" 
                 ref={invoiceRef}
-                style={{ minHeight: '23cm' }} // Dikembalikan ke tinggi A4
+                style={{ minHeight: '23cm' }}
             >
                 
                 {/* === BAGIAN HEADER === */}
                 <header className="relative pt-0 pb-2 text-[10px] leading-snug">
                     
-                    {/* Judul dan Nomor Faktur (Tengah Atas) - Tetap text-sm karena itu judul */}
                     <div className="w-full text-center mb-1">
                         <p className="font-bold uppercase text-sm tracking-tighter">INVOICE/OFFICIAL RECEIPT</p>
                         <p className="font-bold uppercase text-sm">{invoiceId}</p>
                     </div>
 
-                    {/* PT Sejahtera Abadi (Kiri Atas) dan Detail Order (Kanan Atas) */}
                     <div className='flex justify-between items-start mt-4'>
-                        {/* Kolom Customer: w-[45%] */}
                         <div className='w-[45%]'> 
-                            {/* Font PT Sejahtera Abadi dijadikan text-[10px] tapi font-bold tetap */}
                             <p className="font-bold text-[10px]">{customer.name}</p>
                         </div>
 
-                        {/* Detail Order (Kanan Atas) - text-[10px] */}
-                        {/* PERBAIKAN: Menggunakan w-[55%] untuk memperbaiki issue lebar agar layout header 100% (45% + 55%) */}
                         <div className="w-[30%] text-[10px] text-left space-y-0">
                             <p>Sales Order: {soNumber}</p>
                             <p>Order Date: </p>
@@ -278,7 +263,6 @@ const InvoicePreviewPage = () => {
                         </div>
                     </div>
 
-                    {/* Customer Code (Kiri Bawah Header) dan Tanggal (Kanan Bawah Header) - text-[10px] */}
                     <div className='flex justify-between text-[10px] mb-1'>
                             <p>Customer Code :</p>
                             <p>Date: {formatDate(date)}</p>
@@ -287,7 +271,6 @@ const InvoicePreviewPage = () => {
                 
                 {/* === MAIN - TABEL ITEM === */}
                 <main className='mt-0 flex-grow'> 
-                    {/* Tabel sudah text-[10px] */}
                     <table className="w-full border-collapse text-[10px]">
                         <thead>
                             <tr className='bg-white border border-black'> 
@@ -311,6 +294,16 @@ const InvoicePreviewPage = () => {
                                     <td className="p-1 text-right">{formatCurrency(item.total)}</td>
                                 </tr>
                             ))}
+                            {/* Fill empty rows */}
+                            {Array.from({ length: 15 - items.length }).map((_, i) => (
+                                <tr key={`empty-${i}`} className='h-[18px]'>
+                                    <td className='p-1'>&nbsp;</td>
+                                    <td className='p-1'>&nbsp;</td>
+                                    <td className='p-1'>&nbsp;</td>
+                                    <td className='p-1'>&nbsp;</td>
+                                    <td className='p-1'>&nbsp;</td>
+                                </tr>
+                            ))}
                         </tbody>
                     </table>
                 </main>
@@ -329,11 +322,8 @@ const InvoicePreviewPage = () => {
                       </div>
                     </div>
                     
-                    {/* Garis Pemisah (Garis Penuh) */}
                     <div className="border-t border-black w-full my-1"></div>
 
-                    {/* Blok Ringkasan Total (Goods, DPP, VAT, Total Rp) */}
-                    {/* Semua teks di sini sudah text-[10px] */}
                     <div className="flex justify-end mt-1">
                         <div className="w-1/2 text-[10px] leading-snug">
                             <div className="grid grid-cols-[1fr_auto] gap-x-3">
@@ -350,13 +340,10 @@ const InvoicePreviewPage = () => {
                             </div>
                         </div>
                     </div>
-                    {/* Garis Pemisah (Gris Penuh) */}
                     <div className="border-t border-black w-full my-1"></div>
 
-                    {/* Blok Ketentuan Pembayaran, Bank, dan Tanda Tangan */}
                     <div className="mt-0 pt-1"> 
                         <div className="flex">
-                            {/* Kolom Kiri: Detail Pembayaran & Bank. Semua di sini sudah text-[10px] */}
                             <div className="w-[55%] pr-4 text-[10px] space-y-1">
                                 
                                 <div className="flex gap-x-1">
@@ -370,7 +357,6 @@ const InvoicePreviewPage = () => {
                                 </div>
                                 
                                 <p className='mt-2'>For payment, please transfer to our account:</p>
-                                {/* Nama PT dijadikan text-[10px] tapi font-semibold tetap */}
                                 <p className="font-semibold text-[10px]">PT. Jembo Cable Company Tbk</p>
                                 
                                 <div className="flex items-start">
@@ -397,9 +383,7 @@ const InvoicePreviewPage = () => {
                                 </div>
                             </div>
 
-                            {/* Kolom Kanan: Tanda Tangan */}
                             <div className="w-[45%] pl-0 flex flex-col justify-end text-[10px] text-center">
-                                {/* Nama PT dijadikan text-[10px] tapi font-semibold tetap */}
                                 <p className="font-semibold text-[10px] mb-16">PT. JEMBO CABLE COMPANY Tbk</p> 
                                 <div className='border-b border-black w-24 mx-auto mb-1'></div>
                                 <p className="font-semibold">Finance</p>
