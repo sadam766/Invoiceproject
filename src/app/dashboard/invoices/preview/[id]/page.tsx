@@ -234,17 +234,13 @@ const InvoicePreviewPage = () => {
                 </button>
             </div>
 
-            {/* AREA FAKTUR (Kertas) */}
             <div 
                 id="invoice-paper-container" 
                 className="w-full max-w-4xl mx-auto bg-white shadow-lg p-10 my-8 text-[10px] leading-tight flex flex-col" 
                 ref={invoiceRef}
                 style={{ minHeight: '23cm' }}
             >
-                
-                {/* === BAGIAN HEADER === */}
                 <header className="relative pt-0 pb-2 text-[10px] leading-snug">
-                    
                     <div className="w-full text-center mb-1">
                         <p className="font-bold uppercase text-sm tracking-tighter">INVOICE/OFFICIAL RECEIPT</p>
                         <p className="font-bold uppercase text-sm">{invoiceId}</p>
@@ -254,7 +250,6 @@ const InvoicePreviewPage = () => {
                         <div className='w-[45%]'> 
                             <p className="font-bold text-[10px]">{customer.name}</p>
                         </div>
-
                         <div className="w-[30%] text-[10px] text-left space-y-0">
                             <p>Sales Order: {soNumber}</p>
                             <p>Order Date: </p>
@@ -268,7 +263,6 @@ const InvoicePreviewPage = () => {
                     </div>
                 </header>
                 
-                {/* === MAIN - TABEL ITEM === */}
                 <main className='mt-0 flex-grow'> 
                     <table className="w-full border-collapse text-[10px]">
                         <thead>
@@ -293,62 +287,52 @@ const InvoicePreviewPage = () => {
                                     <td className="p-1 text-right">{formatCurrency(item.total)}</td>
                                 </tr>
                             ))}
-                            {/* Fill empty rows */}
-                            {Array.from({ length: Math.max(0, 15 - items.length) }).map((_, i) => (
-                                <tr key={`empty-${i}`} style={{ height: '18px' }}>
-                                    <td>&nbsp;</td>
-                                    <td>&nbsp;</td>
-                                    <td>&nbsp;</td>
-                                    <td>&nbsp;</td>
-                                    <td>&nbsp;</td>
-                                </tr>
-                            ))}
                         </tbody>
                     </table>
                 </main>
 
-                
-                {/* === BAGIAN FOOTER === */}
                 <footer className="pt-0 text-black mt-auto text-[10px]">
-                    <div className="flex justify-end">
-                        <div className="w-[45%] text-right pr-1">
-                            <div className="inline-block border-t border-black pt-1">{formatCurrency(grandTotal)}</div>
+                    
+                    <div className="w-full flex justify-end items-end leading-normal">
+                        <div className="text-right w-1/2">
+                            <div className="h-0.5 border-b border-black w-1/4 ml-auto -mt-24"></div> 
+                            <p className="text-[10px] font-normal">{formatCurrency(grandTotal)}</p>
                         </div>
                     </div>
-
-                    <div className="border-t border-black w-full my-1 pt-1 flex justify-between">
-                         <p>No PO : {poNumber}</p>
-                         <div className="w-1/2 text-[10px] leading-snug">
-                            <div className="grid grid-cols-[1fr_auto] gap-x-3">
-                                <span className="text-right">Goods:</span>
-                                <span className="text-right">{formatCurrency(grandTotal)}</span>
-                            </div>
-                         </div>
+                    
+                    <div className="w-full flex justify-start items-end leading-normal mt-0">
+                        <p>No PO : {poNumber}</p>
                     </div>
+                    <div className="border-t border-black w-full my-1"></div>
+
                     <div className="flex justify-end mt-1">
                         <div className="w-1/2 text-[10px] leading-snug">
                             <div className="grid grid-cols-[1fr_auto] gap-x-3">
+                                <span className="text-right">Goods:</span>
+                                <span className="text-right">{formatCurrency(grandTotal)}</span>
                                 <span className="text-right">DPP VAT (11/12):</span>
                                 <span className="text-right">{formatCurrency(dppVat)}</span>
                                 <span className="text-right">VAT 12%:</span>
                                 <span className="text-right">{formatCurrency(vat12)}</span> 
                             </div>
-                            <div className="grid grid-cols-[1fr_auto] gap-x-3 font-normal mt-1 border-t border-black pt-1">
+                            <div className="grid grid-cols-[1fr_auto] gap-x-3 font-normal">
                                 <span className="text-right">Total Rp:</span>
                                 <span className="text-right">{formatCurrency(totalRp)}</span>
                             </div>
                         </div>
                     </div>
+                    <div className="border-t border-black w-full my-1"></div>
 
-                    <div className="mt-4 pt-1 border-t border-black"> 
+                    <div className="mt-0 pt-1"> 
                         <div className="flex">
                             <div className="w-[55%] pr-4 text-[10px] space-y-1">
-                                <div className="flex gap-x-2">
+                                
+                                <div className="flex gap-x-1">
                                     <p className='shrink-0'>Payment:</p>
                                     <p className='w-full'>{paymentTerms}</p>
                                 </div>
                                 
-                                <div className="flex gap-x-2">
+                                <div className="flex gap-x-1">
                                     <p className='shrink-0'>Please state with your payment:</p>
                                     <p className='w-full'>{invoiceId}</p>
                                 </div>
@@ -356,36 +340,43 @@ const InvoicePreviewPage = () => {
                                 <p className='mt-2'>For payment, please transfer to our account:</p>
                                 <p className="font-semibold text-[10px]">PT. Jembo Cable Company Tbk</p>
                                 
-                                <div className="flex items-start">
-                                    <div className="w-1/3 pr-2"> 
-                                        <p>Bank Mandiri -</p>
-                                        <p>Jakarta Cabang</p>
-                                        <p>Sudirman</p>
+                                <div className="space-y-0">
+                                    <div className="flex justify-between items-start">
+                                        <span className="w-1/3 pr-2">Bank Mandiri -</span>
+                                        <span className="flex-1">A/C No. : 102-0100206827 (Rp)</span>
                                     </div>
-                                    <div className="w-2/3 text-left"> 
-                                        <p>A/C No. : 102-0100206827 (Rp)</p>
-                                        <p>A/C No. : 102-0005000218 (Rp)</p>
-                                        <p>A/C No. : 102-0005000226 (USD)</p>
+                                    <div className="flex justify-between items-start">
+                                        <span className="w-1/3 pr-2">Jakarta Cabang</span>
+                                        <span className="flex-1">A/C No. : 102-0005000218 (Rp)</span>
+                                    </div>
+                                    <div className="flex justify-between items-start">
+                                        <span className="w-1/3 pr-2">Sudirman</span>
+                                        <span className="flex-1">A/C No. : 102-0005000226 (USD)</span>
                                     </div>
                                 </div>
+                                
                                 <div className="text-center my-1">OR</div>
-                                <div className="flex items-start">
-                                    <div className="w-1/3 pr-2"> 
-                                        <p>Bank BCA - Jakarta</p>
-                                        <p>Cabang KEM TOWER</p>
-                                    </div>
-                                    <div className="w-2/3 text-left"> 
-                                        <p>A/C No. : 684-0198977 (Rp)</p>
+                                
+                                <div className="space-y-0">
+                                    <div className="flex justify-between items-start">
+                                        <div className="w-1/3 pr-2 space-y-0"> 
+                                            <p>Bank BCA - Jakarta</p>
+                                            <p>Cabang KEM TOWER</p>
+                                        </div>
+                                        <div className="flex-1 text-left">
+                                            <p>A/C No. : 684-0198977 (Rp)</p>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
 
-                            <div className="w-[45%] pl-0 flex flex-col justify-between text-[10px] text-center">
-                                <p className="font-semibold text-[10px]">PT. JEMBO CABLE COMPANY Tbk</p> 
-                                <div className="mt-24">
-                                    <div className='border-b border-black w-24 mx-auto mb-1'></div>
-                                    <p className="font-semibold">Finance</p>
-                                </div>
+                            <div className="w-[45%] pl-0 flex flex-col justify-between text-[10px] text-center" style={{ minHeight: '130px' }}>
+                                <p className="font-semibold text-[10px]">PT. JEMBO CABLE COMPANY Tbk</p>
+                                
+                                <div className="flex-grow"></div> 
+                                
+                                <div className='border-b border-black w-24 mx-auto mb-1'></div>
+                                <p className="font-semibold">Finance</p>
                             </div>
                         </div>
                     </div>
