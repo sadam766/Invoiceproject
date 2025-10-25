@@ -530,7 +530,7 @@ export default function AddInvoicePage() {
                         type="text" 
                         value={formatNumberWithCommas(item.quantity)}
                         onChange={(e) => handleNumericItemChange(item.id, 'quantity', e.target.value)}
-                        className="w-16" 
+                        className="w-24" 
                       />
                     </TableCell>
                     <TableCell>
@@ -691,4 +691,5 @@ export default function AddInvoicePage() {
   );
 }
 
+    
     
