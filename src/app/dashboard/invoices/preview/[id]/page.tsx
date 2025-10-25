@@ -6,10 +6,6 @@ import { exportToExcel } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
 import html2pdf from 'html2pdf.js';
 
-
-
-
-
 // --- DEFINISI TIPE DATA ---
 interface Item {
     id: string;
@@ -19,8 +15,6 @@ interface Item {
     price: number;
     total: number;
 }
-
-
 
 interface InvoiceData {
     id: string;
@@ -39,18 +33,13 @@ interface InvoiceData {
     paymentTerms: string;
 }
 
-
-
 // --- FUNGSI UTILITY ---
-
 const formatCurrency = (amount: number): string => {
     return amount.toLocaleString('id-ID', {
         minimumFractionDigits: 2,
         maximumFractionDigits: 2,
     });
 };
-
-
 
 const formatDate = (dateString: string): string => {
     if (!dateString || isNaN(new Date(dateString).getTime())) {
@@ -63,10 +52,6 @@ const formatDate = (dateString: string): string => {
         year: 'numeric',
     }).replace(/\//g, '-');
 };
-
-
-
-
 
 // --- KOMPONEN UTAMA ---
 const InvoicePreviewPage = () => {
@@ -104,7 +89,6 @@ const InvoicePreviewPage = () => {
                     totalRp: parsedData.grandTotal + parsedData.vat12,
                     paymentTerms: parsedData.paymentTerms || '90 Hari setelah invoice diterima',
                 });
-
             } else {
                 setInvoiceData(null);
             }
@@ -170,10 +154,8 @@ const InvoicePreviewPage = () => {
         });
     };
 
-
-
     if (!invoiceData) {
-        return <div className="p-8">Loading invoice preview or no data available. Please create an invoice first.</div>
+        return <div className="p-8">Loading invoice preview or no data available. Please create an invoice first.</div>;
     }
     const {
         id: invoiceId,
@@ -221,9 +203,6 @@ const InvoicePreviewPage = () => {
                     }
                 }
             `}</style>
-
-
-
             <div className="flex justify-center space-x-4 mb-4 print:hidden">
                 <button
                     onClick={handleDownloadPdf}
@@ -232,7 +211,6 @@ const InvoicePreviewPage = () => {
                     <Download size={16} />
                     <span>Download PDF</span>
                 </button>
-
                 <button
                     onClick={handleExportExcel}
                     className="flex items-center space-x-2 px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors"
@@ -241,42 +219,37 @@ const InvoicePreviewPage = () => {
                     <span>Export Excel</span>
                 </button>
             </div>
-
-
-
+            
             <div 
                 id="invoice-paper-container" 
                 className="w-full max-w-4xl mx-auto bg-white shadow-lg p-10 my-8 text-[10px] leading-tight flex flex-col" 
                 ref={invoiceRef}
                 style={{ minHeight: '23cm' }}
             >
-                <header className="relative pt-0 pb-2 text-[10px] leading-snug">
+                <header className="relative pt-0 pb-0 text-[10px] leading-snug">
                     <div className="w-full text-center mb-1 leading-none">
                         <p className="font-bold uppercase text-xs tracking-tighter mb-0.5">INVOICE/OFFICIAL RECEIPT</p>
                         <p className="font-bold uppercase text-xs">{invoiceId}</p>
                     </div>
-
                     <div className='flex justify-between items-start mt-4'>
-                        <div className='w-[45%]'> 
-                            <p className="font-bold text-[10px]">{customer.name}</p>
+                        <div className='w-[45%]'>
+                            <p className="font-bold text-[10px] mb-0">{customer.name}</p>
                         </div>
-                        <div className="w-[30%] text-[10px] text-left leading-normal">
+                        <div className="w-[30%] text-[10px] text-left leading-normal space-y-0">
                             <p className="mb-0">Sales Order: {soNumber}</p>
                             <p className="mb-0">Order Date: </p>
                             <p className="mb-0">Reference A: </p>
                         </div>
                     </div>
-
-                    <div className='flex justify-between text-[10px] mb-1'>
-                            <p>Customer Code :</p>
-                            <p>Date: {formatDate(date)}</p>
-                    </div>
                 </header>
-                
-                <main className='mt-0 flex-grow'> 
-                    <table className="w-full border-collapse text-[10px]">
+                <div className='flex justify-between text-[10px] mt-0'>
+                    <p className='mb-0'>Customer Code :</p>
+                    <p className='mb-0'>Date: {formatDate(date)}</p>
+                </div>
+                <main className='mt-0 flex-grow'>
+                    <table className="w-full border-collapse text-[10px] mt-0">
                         <thead>
-                            <tr className='bg-white border border-black'> 
+                            <tr className='bg-white border border-black'>
                                 <th className="p-1 text-left w-[8%] border-r border-black border-b border-black font-normal">No.</th>
                                 <th className="p-1 text-left w-[40%] border-r border-black border-b border-black font-normal">Item</th>
                                 <th className="p-1 text-center w-[15%] border-r border-black border-b border-black font-normal">Quantity Unit</th>
@@ -286,8 +259,8 @@ const InvoicePreviewPage = () => {
                         </thead>
                         <tbody>
                             {items.map((item, itemIdx) => (
-                                <tr 
-                                    key={item.id} 
+                                <tr
+                                    key={item.id}
                                     className='align-top'
                                 >
                                     <td className="p-1 h-[18px]">{itemIdx + 1}</td>
@@ -300,21 +273,17 @@ const InvoicePreviewPage = () => {
                         </tbody>
                     </table>
                 </main>
-
                 <footer className="pt-0 text-black mt-auto text-[10px]">
-                    
                     <div className="w-full flex justify-end items-end leading-normal">
                         <div className="text-right w-1/2">
-                            <div className="h-0.5 border-b border-black w-1/4 ml-auto -mt-24"></div> 
+                            <div className="h-0.5 border-b border-black w-1/4 ml-auto -mt-24"></div>
                             <p className="text-[10px] font-normal">{formatCurrency(grandTotal)}</p>
                         </div>
                     </div>
-                    
                     <div className="w-full flex justify-start items-end leading-normal mt-0">
                         <p>No PO : {poNumber}</p>
                     </div>
                     <div className="border-t border-black w-full my-1"></div>
-
                     <div className="flex justify-end mt-1">
                         <div className="w-1/2 text-[10px] leading-snug">
                             <div className="grid grid-cols-[1fr_auto] gap-x-3">
@@ -323,7 +292,7 @@ const InvoicePreviewPage = () => {
                                 <span className="text-right">DPP VAT (11/12):</span>
                                 <span className="text-right">{formatCurrency(dppVat)}</span>
                                 <span className="text-right">VAT 12%:</span>
-                                <span className="text-right">{formatCurrency(vat12)}</span> 
+                                <span className="text-right">{formatCurrency(vat12)}</span>
                             </div>
                             <div className="grid grid-cols-[1fr_auto] gap-x-3 font-normal">
                                 <span className="text-right">Total Rp:</span>
@@ -332,59 +301,49 @@ const InvoicePreviewPage = () => {
                         </div>
                     </div>
                     <div className="border-t border-black w-full my-1"></div>
-
-                    <div className="mt-0 pt-1"> 
+                    <div className="mt-0 pt-1">
                         <div className="flex">
-                            <div className="w-[55%] pr-4 text-[10px] space-y-1">
-                                
-                            <div className="flex leading-none mb-0.5"> 
-                                <p className='shrink-0 w-[15%]'>Payment:</p>
-                                <p className='flex-1'>{paymentTerms}</p>
-                            </div>
-                                
-                            <div className="flex leading-none mb-0.5"> 
-                                <p className='shrink-0 w-[45%]'>Please state with your payment:</p>
-                                <p className='flex-1 font-bold'>{invoiceId}</p>
-                            </div>
-                                
-                                <p className='mt-2'>For payment, please transfer to our account:</p>
-                                <p className="font-semibold text-[10px]">PT. Jembo Cable Company Tbk</p>
-                                
-                                <div className="space-y-0">
-                                    <div className="flex justify-between items-start">
-                                        <span className="w-1/3 pr-2">Bank Mandiri -</span>
-                                        <span className="flex-1">A/C No. : 102-0100206827 (Rp)</span>
+                            <div className="w-[55%] pr-4 text-[10px] space-y-0.5 leading-normal"> 
+                                <div className="flex">
+                                    <p className='shrink-0 w-[50px] mb-0'>Payment:</p> 
+                                    <p className='w-full ml-1 font-normal mb-0'>{paymentTerms}</p>
+                                </div>
+                                <div className="flex">
+                                    <p className='shrink-0 w-[150px] mb-0'>Please state with your payment:</p>
+                                    <p className='w-full ml-1 font-bold mb-0'>{invoiceId}</p>
+                                </div>
+                                <p className='mt-2 mb-1'>For payment, please transfer to our account:</p>
+                                <p className="font-semibold text-[10px] mb-1">PT. Jembo Cable Company Tbk</p>
+                                <div className="space-y-0 leading-tight">
+                                    <div className="flex">
+                                        <span className="w-1/3 pr-2 mb-0">Bank Mandiri -</span>
+                                        <span className="flex-1 mb-0">A/C No. : 102-0100206827 (Rp)</span>
                                     </div>
-                                    <div className="flex justify-between items-start">
-                                        <span className="w-1/3 pr-2">Jakarta Cabang</span>
-                                        <span className="flex-1">A/C No. : 102-0005000218 (Rp)</span>
+                                    <div className="flex">
+                                        <span className="w-1/3 pr-2 mb-0">Jakarta Cabang</span>
+                                        <span className="flex-1 mb-0">A/C No. : 102-0005000218 (Rp)</span>
                                     </div>
-                                    <div className="flex justify-between items-start">
-                                        <span className="w-1/3 pr-2">Sudirman</span>
-                                        <span className="flex-1">A/C No. : 102-0005000226 (USD)</span>
+                                    <div className="flex">
+                                        <span className="w-1/3 pr-2 mb-0">Sudirman</span>
+                                        <span className="flex-1 mb-0">A/C No. : 102-0005000226 (USD)</span>
                                     </div>
                                 </div>
-                                
                                 <div className="text-center my-1">OR</div>
-                                
-                                <div className="space-y-0">
-                                    <div className="flex justify-between items-start">
+                                <div className="space-y-0 leading-tight">
+                                    <div className="flex">
                                         <div className="w-1/3 pr-2 leading-tight space-y-0">
                                             <p className='mb-0'>Bank BCA - Jakarta</p>
                                             <p className='mt-0'>Cabang KEM TOWER</p>
                                         </div>
                                         <div className="flex-1 text-left">
-                                            <p>A/C No. : 684-0198977 (Rp)</p>
+                                            <p className='mb-0'>A/C No. : 684-0198977 (Rp)</p>
                                         </div>
                                     </div>
                                 </div>
                             </div>
-
                             <div className="w-[45%] pl-0 flex flex-col justify-between text-[10px] text-center" style={{ minHeight: '130px' }}>
                                 <p className="font-semibold text-[10px]">PT. JEMBO CABLE COMPANY Tbk</p>
-                                
-                                <div className="flex-grow"></div> 
-                                
+                                <div className="flex-grow"></div>
                                 <div className='border-b border-black w-24 mx-auto mb-1 mt-20'></div>
                                 <p className="font-semibold">Finance</p>
                             </div>
@@ -394,9 +353,6 @@ const InvoicePreviewPage = () => {
             </div>
         </div>
     );
-}
-
+};
 
 export default InvoicePreviewPage;
-
-
