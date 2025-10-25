@@ -545,7 +545,7 @@ export default function AddInvoicePage() {
                         placeholder="Rp 0,00"
                         value={formatNumberWithCommas(item.price)}
                         onChange={(e) => handleNumericItemChange(item.id, 'price', e.target.value)}
-                        className="text-right"
+                        className="text-right w-32"
                       />
                     </TableCell>
                     <TableCell className="text-right">Rp {formatNumberWithCommas(item.total)}</TableCell>
@@ -692,4 +692,6 @@ export default function AddInvoicePage() {
 }
 
     
+    
+
     
