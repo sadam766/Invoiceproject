@@ -508,10 +508,10 @@ export default function AddInvoicePage() {
                 <TableHeader>
                   <TableRow>
                     <TableHead className="w-2/5">Item</TableHead>
-                    <TableHead>Qty</TableHead>
-                    <TableHead>Unit</TableHead>
-                    <TableHead>Price</TableHead>
-                    <TableHead className="text-right">Total</TableHead>
+                    <TableHead className="w-[100px]">Qty</TableHead>
+                    <TableHead className="w-[100px]">Unit</TableHead>
+                    <TableHead className="w-[150px]">Price</TableHead>
+                    <TableHead className="w-[150px] text-right">Total</TableHead>
                     <TableHead className="w-[40px]"></TableHead>
                   </TableRow>
                 </TableHeader>
@@ -530,14 +530,13 @@ export default function AddInvoicePage() {
                         type="text" 
                         value={formatNumberWithCommas(item.quantity)}
                         onChange={(e) => handleNumericItemChange(item.id, 'quantity', e.target.value)}
-                        className="w-24" 
+                        className="text-right" 
                       />
                     </TableCell>
                     <TableCell>
                         <Input 
                             value={item.unit}
                             onChange={(e) => handleItemChange(item.id, 'unit', e.target.value)}
-                            className="w-20"
                         />
                     </TableCell>
                     <TableCell>
@@ -545,7 +544,7 @@ export default function AddInvoicePage() {
                         placeholder="Rp 0,00"
                         value={formatNumberWithCommas(item.price)}
                         onChange={(e) => handleNumericItemChange(item.id, 'price', e.target.value)}
-                        className="text-right w-32"
+                        className="text-right"
                       />
                     </TableCell>
                     <TableCell className="text-right">Rp {formatNumberWithCommas(item.total)}</TableCell>
@@ -695,3 +694,4 @@ export default function AddInvoicePage() {
     
 
     
+
