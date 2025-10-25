@@ -1,5 +1,5 @@
-'use client';
 
+'use client';
 import React, { useRef, useEffect, useState } from 'react';
 import { Download } from 'lucide-react';
 import { exportToExcel } from '@/lib/utils';
@@ -7,8 +7,10 @@ import { useToast } from '@/hooks/use-toast';
 import html2pdf from 'html2pdf.js';
 
 
-// --- DEFINISI TIPE DATA ---
 
+
+
+// --- DEFINISI TIPE DATA ---
 interface Item {
     id: string;
     name: string;
@@ -17,6 +19,8 @@ interface Item {
     price: number;
     total: number;
 }
+
+
 
 interface InvoiceData {
     id: string;
@@ -35,6 +39,8 @@ interface InvoiceData {
     paymentTerms: string;
 }
 
+
+
 // --- FUNGSI UTILITY ---
 
 const formatCurrency = (amount: number): string => {
@@ -43,6 +49,8 @@ const formatCurrency = (amount: number): string => {
         maximumFractionDigits: 2,
     });
 };
+
+
 
 const formatDate = (dateString: string): string => {
     if (!dateString || isNaN(new Date(dateString).getTime())) {
@@ -57,8 +65,10 @@ const formatDate = (dateString: string): string => {
 };
 
 
-// --- KOMPONEN UTAMA ---
 
+
+
+// --- KOMPONEN UTAMA ---
 const InvoicePreviewPage = () => {
     const invoiceRef = useRef<HTMLDivElement>(null);
     const [invoiceData, setInvoiceData] = useState<InvoiceData | null>(null);
@@ -94,6 +104,7 @@ const InvoicePreviewPage = () => {
                     totalRp: parsedData.grandTotal + parsedData.vat12,
                     paymentTerms: parsedData.paymentTerms || '90 Hari setelah invoice diterima',
                 });
+
             } else {
                 setInvoiceData(null);
             }
@@ -113,7 +124,6 @@ const InvoicePreviewPage = () => {
             });
             return;
         }
-
         const opt = {
           margin:       [10, 10, 10, 10], // top, left, bottom, right
           filename:     `Invoice-${invoiceData.id.replace(/\//g, '_')}.pdf`,
@@ -121,7 +131,6 @@ const InvoicePreviewPage = () => {
           html2canvas:  { scale: 2, useCORS: true },
           jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' }
         };
-
         html2pdf().from(element).set(opt).save();
     };
 
@@ -134,7 +143,6 @@ const InvoicePreviewPage = () => {
             });
             return;
         }
-        
         const dataToExport = invoiceData.items.map(item => ({
             'Invoice ID': invoiceData.id,
             'Customer': invoiceData.customer.name,
@@ -151,24 +159,22 @@ const InvoicePreviewPage = () => {
             'Invoice ID': '---', 'Customer': '', 'SO Number': '', 'Date': '', 'Item Name': '---',
             'Quantity': '', 'Unit': '', 'Price': '', 'Total': ''
         });
-
         dataToExport.push({ 'Invoice ID': 'Subtotal (Goods)', 'Total': invoiceData.grandTotal } as any);
         dataToExport.push({ 'Invoice ID': 'DPP VAT', 'Total': invoiceData.dppVat } as any);
         dataToExport.push({ 'Invoice ID': 'VAT 12%', 'Total': invoiceData.vat12 } as any);
         dataToExport.push({ 'Invoice ID': 'Total', 'Total': invoiceData.totalRp } as any);
-
         exportToExcel(dataToExport, `Invoice-${invoiceData.id.replace(/\//g, '_')}`);
-        
         toast({
             title: "Export Successful",
             description: `Invoice ${invoiceData.id} has been exported to Excel.`,
         });
     };
 
+
+
     if (!invoiceData) {
         return <div className="p-8">Loading invoice preview or no data available. Please create an invoice first.</div>
     }
-
     const {
         id: invoiceId,
         items,
@@ -185,7 +191,6 @@ const InvoicePreviewPage = () => {
 
     return (
         <div className="bg-gray-100 dark:bg-slate-900 min-h-screen p-4 font-sans text-black">
-            
             <style>{`
                 @media print {
                     body > *:not(#invoice-paper-container) {
@@ -217,6 +222,8 @@ const InvoicePreviewPage = () => {
                 }
             `}</style>
 
+
+
             <div className="flex justify-center space-x-4 mb-4 print:hidden">
                 <button
                     onClick={handleDownloadPdf}
@@ -225,6 +232,7 @@ const InvoicePreviewPage = () => {
                     <Download size={16} />
                     <span>Download PDF</span>
                 </button>
+
                 <button
                     onClick={handleExportExcel}
                     className="flex items-center space-x-2 px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors"
@@ -234,6 +242,8 @@ const InvoicePreviewPage = () => {
                 </button>
             </div>
 
+
+
             <div 
                 id="invoice-paper-container" 
                 className="w-full max-w-4xl mx-auto bg-white shadow-lg p-10 my-8 text-[10px] leading-tight flex flex-col" 
@@ -241,19 +251,19 @@ const InvoicePreviewPage = () => {
                 style={{ minHeight: '23cm' }}
             >
                 <header className="relative pt-0 pb-2 text-[10px] leading-snug">
-                    <div className="w-full text-center mb-1">
-                        <p className="font-bold uppercase text-sm tracking-tighter">INVOICE/OFFICIAL RECEIPT</p>
-                        <p className="font-bold uppercase text-sm">{invoiceId}</p>
+                    <div className="w-full text-center mb-1 leading-none">
+                        <p className="font-bold uppercase text-xs tracking-tighter mb-0.5">INVOICE/OFFICIAL RECEIPT</p>
+                        <p className="font-bold uppercase text-xs">{invoiceId}</p>
                     </div>
 
                     <div className='flex justify-between items-start mt-4'>
                         <div className='w-[45%]'> 
                             <p className="font-bold text-[10px]">{customer.name}</p>
                         </div>
-                        <div className="w-[30%] text-[10px] text-left space-y-0">
-                            <p>Sales Order: {soNumber}</p>
-                            <p>Order Date: </p>
-                            <p>Reference A: </p>
+                        <div className="w-[30%] text-[10px] text-left leading-normal">
+                            <p className="mb-0">Sales Order: {soNumber}</p>
+                            <p className="mb-0">Order Date: </p>
+                            <p className="mb-0">Reference A: </p>
                         </div>
                     </div>
 
@@ -327,15 +337,15 @@ const InvoicePreviewPage = () => {
                         <div className="flex">
                             <div className="w-[55%] pr-4 text-[10px] space-y-1">
                                 
-                                <div className="flex gap-x-1">
-                                    <p className='shrink-0'>Payment:</p>
-                                    <p className='w-full'>{paymentTerms}</p>
-                                </div>
+                            <div className="flex leading-none mb-0.5"> 
+                                <p className='shrink-0 w-[15%]'>Payment:</p>
+                                <p className='flex-1'>{paymentTerms}</p>
+                            </div>
                                 
-                                <div className="flex gap-x-1">
-                                    <p className='shrink-0'>Please state with your payment:</p>
-                                    <p className='w-full'>{invoiceId}</p>
-                                </div>
+                            <div className="flex leading-none mb-0.5"> 
+                                <p className='shrink-0 w-[45%]'>Please state with your payment:</p>
+                                <p className='flex-1 font-bold'>{invoiceId}</p>
+                            </div>
                                 
                                 <p className='mt-2'>For payment, please transfer to our account:</p>
                                 <p className="font-semibold text-[10px]">PT. Jembo Cable Company Tbk</p>
@@ -359,9 +369,9 @@ const InvoicePreviewPage = () => {
                                 
                                 <div className="space-y-0">
                                     <div className="flex justify-between items-start">
-                                        <div className="w-1/3 pr-2 space-y-0"> 
-                                            <p>Bank BCA - Jakarta</p>
-                                            <p>Cabang KEM TOWER</p>
+                                        <div className="w-1/3 pr-2 leading-tight space-y-0">
+                                            <p className='mb-0'>Bank BCA - Jakarta</p>
+                                            <p className='mt-0'>Cabang KEM TOWER</p>
                                         </div>
                                         <div className="flex-1 text-left">
                                             <p>A/C No. : 684-0198977 (Rp)</p>
@@ -375,7 +385,7 @@ const InvoicePreviewPage = () => {
                                 
                                 <div className="flex-grow"></div> 
                                 
-                                <div className='border-b border-black w-24 mx-auto mb-1'></div>
+                                <div className='border-b border-black w-24 mx-auto mb-1 mt-20'></div>
                                 <p className="font-semibold">Finance</p>
                             </div>
                         </div>
@@ -386,4 +396,7 @@ const InvoicePreviewPage = () => {
     );
 }
 
+
 export default InvoicePreviewPage;
+
+
