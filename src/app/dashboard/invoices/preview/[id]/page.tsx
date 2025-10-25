@@ -1,3 +1,4 @@
+
 'use client';
 import React, { useRef, useEffect, useState } from 'react';
 import { Download, Upload } from 'lucide-react';
@@ -262,7 +263,6 @@ const InvoicePreviewPage = () => {
                                                 <td className="p-1 text-right">{formatCurrency(item.total)}</td>
                                             </tr>
                                         ))}
-                                        {/* Fill empty rows if not the last page and items are less than max */}
                                         {!isLastPage && Array.from({ length: ITEMS_PER_PAGE - chunk.length }).map((_, i) => (
                                             <tr key={`empty-${i}`}><td className="p-1 h-[18px]" colSpan={5}>&nbsp;</td></tr>
                                         ))}
@@ -274,7 +274,6 @@ const InvoicePreviewPage = () => {
                                 <footer className="pt-0 text-black mt-auto text-[10px]">
                                     <div className="w-full flex justify-end items-end leading-normal">
                                         <div className="text-right w-1/2">
-                                            {/* This line is tricky, adjust as needed */}
                                             {chunk.length < 5 && <div className="h-0.5 border-b border-black w-1/4 ml-auto" style={{marginTop: `-${(10 - chunk.length) * 18}px`}}></div>}
                                             <p className="text-[10px] font-normal">{formatCurrency(grandTotal)}</p>
                                         </div>
@@ -362,3 +361,5 @@ const InvoicePreviewPage = () => {
 };
 
 export default InvoicePreviewPage;
+
+    
