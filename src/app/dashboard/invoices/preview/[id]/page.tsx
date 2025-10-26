@@ -32,6 +32,7 @@ interface InvoiceData {
     vat12: number;
     totalRp: number;
     paymentTerms: string;
+    printType: 'original' | 'copy';
 }
 
 // --- FUNGSI UTILITY ---
@@ -92,6 +93,7 @@ const InvoicePreviewPage = () => {
                     vat12: parsedData.vat12,
                     totalRp: parsedData.grandTotal + parsedData.vat12,
                     paymentTerms: parsedData.paymentTerms || '90 Hari setelah invoice diterima',
+                    printType: parsedData.printType || 'original',
                 });
             } else {
                 setInvoiceData(null);
@@ -172,7 +174,8 @@ const InvoicePreviewPage = () => {
         dppVat,
         vat12,
         paymentTerms,
-        totalRp
+        totalRp,
+        printType
     } = invoiceData;
 
     const itemChunks = Array.from({ length: Math.ceil(items.length / ITEMS_PER_PAGE) }, (_, i) =>
@@ -231,6 +234,8 @@ const InvoicePreviewPage = () => {
                     return (
                         <div key={pageIndex} className={`w-full max-w-4xl mx-auto bg-white shadow-lg p-4 my-8 text-[10px] leading-tight flex flex-col ${pageIndex > 0 ? 'page-break' : ''}`} style={{ height: '220mm' }}>
                             <header className="relative pt-0 pb-0 text-[10px] leading-snug">
+                                {/* Penempatan "Original" di pojok kanan atas */}
+                                <p className="absolute right-0 top-0 font-normal text-sm capitalize">{printType}</p>
                                 <div className="w-full text-center mb-1 leading-none">
                                     <p className="font-bold uppercase text-xs tracking-tighter mb-0.5">INVOICE/OFFICIAL RECEIPT</p>
                                     <p className="font-bold uppercase text-xs">{invoiceId}</p>
@@ -370,5 +375,3 @@ const InvoicePreviewPage = () => {
 };
 
 export default InvoicePreviewPage;
-
-    

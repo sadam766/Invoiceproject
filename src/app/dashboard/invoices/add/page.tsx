@@ -86,6 +86,7 @@ export default function AddInvoicePage() {
   const [issueDate, setIssueDate] = useState<Date | undefined>(new Date());
   const [dueDate, setDueDate] = useState<Date | undefined>();
   const [status, setStatus] = useState<'paid' | 'unpaid' | 'sent' | 'draft'>('draft');
+  const [printType, setPrintType] = useState<'original' | 'copy'>('original');
 
   const [items, setItems] = useState<InvoiceItem[]>([]);
   const [subtotal, setSubtotal] = useState(0);
@@ -371,6 +372,7 @@ export default function AddInvoicePage() {
       date: issueDate ? format(issueDate, 'yyyy-MM-dd') : '',
       amount: grandTotal + vat12,
       status,
+      printType,
       items: items.map((item, index) => ({
         no: index + 1,
         item: item.name,
@@ -792,7 +794,7 @@ export default function AddInvoicePage() {
 
               <div className="space-y-2">
                 <label className="text-sm font-medium">Print Type</label>
-                <Select defaultValue="original">
+                <Select value={printType} onValueChange={(value) => setPrintType(value as 'original' | 'copy')}>
                   <SelectTrigger>
                     <SelectValue />
                   </SelectTrigger>
@@ -814,5 +816,3 @@ export default function AddInvoicePage() {
     </main>
   );
 }
-
-    
