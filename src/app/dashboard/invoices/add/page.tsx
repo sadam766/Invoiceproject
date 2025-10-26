@@ -71,9 +71,10 @@ export default function AddInvoicePage() {
   const { toast } = useToast();
 
   const invoiceNumberId = searchParams.get('invoiceNumberId');
+  const editInvoiceId = searchParams.get('editInvoiceId');
 
   const [invoiceNumberDataState, setInvoiceNumberDataState] = useState<InvoiceNumber | undefined>(undefined);
-  const [isInvoiceNumberLoading, setIsInvoiceNumberLoading] = useState(!!invoiceNumberId);
+  const [isInvoiceNumberLoading, setIsInvoiceNumberLoading] = useState(!!invoiceNumberId || !!editInvoiceId);
   
   const isLoading = isInvoiceNumberLoading;
 
@@ -113,8 +114,43 @@ export default function AddInvoicePage() {
         setInvoiceNumberDataState(foundInvoice);
         setIsInvoiceNumberLoading(false);
       }, 500);
+    } else if (editInvoiceId) {
+      setIsInvoiceNumberLoading(true);
+      setTimeout(() => {
+        const decodedId = editInvoiceId.replace(/_/g, '/');
+        const foundInvoice = invoiceListData.find(inv => inv.id === decodedId);
+        if (foundInvoice) {
+            setInvoiceId(foundInvoice.id);
+            setSoNumber(foundInvoice.soNumber);
+            setPoNumber(foundInvoice.poNumber);
+            setStatus(foundInvoice.status);
+            
+            const foundCustomer = customerListData.find(c => c.name === foundInvoice.customer);
+            setCustomer(foundCustomer);
+
+            if (foundInvoice.date) {
+                setIssueDate(new Date(foundInvoice.date));
+            }
+
+            if(foundInvoice.soNumber) {
+                const soItems = salesOrderListData.filter(so => so.soNumber === foundInvoice.soNumber);
+                 if (soItems.length > 0) {
+                    const newItems: InvoiceItem[] = soItems.map((item, index) => ({
+                        id: Date.now() + index,
+                        name: item.productName,
+                        quantity: item.quantity,
+                        unit: item.unit,
+                        price: item.price,
+                        total: item.quantity * item.price,
+                    }));
+                    setItems(newItems);
+                }
+            }
+        }
+        setIsInvoiceNumberLoading(false);
+      }, 500);
     }
-  }, [invoiceNumberId]);
+  }, [invoiceNumberId, editInvoiceId]);
 
 
   useEffect(() => {
@@ -376,6 +412,8 @@ export default function AddInvoicePage() {
         </main>
     )
   }
+  
+  const pageTitle = editInvoiceId ? "Edit Invoice" : "Create Invoice";
 
   return (
     <main className="flex flex-1 flex-col gap-4 p-4 md:gap-8 md:p-8">
@@ -387,7 +425,7 @@ export default function AddInvoicePage() {
           </Button>
         </Link>
         <h1 className="flex-1 shrink-0 whitespace-nowrap text-xl font-semibold tracking-tight sm:grow-0">
-          Create Invoice
+          {pageTitle}
         </h1>
       </div>
       <div className="grid gap-4 md:grid-cols-3 lg:grid-cols-7">
@@ -396,7 +434,7 @@ export default function AddInvoicePage() {
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
               <div>
                 <label className="text-sm font-medium">Invoice No.</label>
-                <Input value={invoiceId} onChange={e => setInvoiceId(e.target.value)} />
+                <Input value={invoiceId} onChange={e => setInvoiceId(e.target.value)} disabled={!!editInvoiceId || !!invoiceNumberId} />
               </div>
               <div>
                 <label className="text-sm font-medium">SO/Sales Order</label>

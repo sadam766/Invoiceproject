@@ -75,8 +75,8 @@ import {
     };
 
     const handleEdit = (invoice: Invoice) => {
-      // Logic to handle editing, for now we can just log it
-      console.log('Editing invoice:', invoice.id);
+      const safeId = invoice.id.replace(/\//g, '_');
+      router.push(`/dashboard/invoices/add?editInvoiceId=${safeId}`);
     }
 
     const handlePreview = (invoice: Invoice) => {
@@ -107,6 +107,7 @@ import {
         const previewData = {
             id: invoice.id,
             soNumber: invoice.soNumber,
+            poNumber: invoice.poNumber,
             customer: foundCustomer,
             date: invoice.date,
             amount: invoice.amount,
@@ -402,7 +403,5 @@ import {
       </main>
     );
   }
-
-    
 
     
