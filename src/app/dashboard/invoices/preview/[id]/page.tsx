@@ -1,7 +1,8 @@
 
 'use client';
 import React, { useRef, useEffect, useState } from 'react';
-import { Download, Upload } from 'lucide-react';
+import { useRouter } from 'next/navigation';
+import { Download, Upload, ArrowLeft } from 'lucide-react';
 import { exportToExcel } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
 import html2pdf from 'html2pdf.js';
@@ -60,6 +61,7 @@ const InvoicePreviewPage = () => {
     const invoiceContainerRef = useRef<HTMLDivElement>(null);
     const [invoiceData, setInvoiceData] = useState<InvoiceData | null>(null);
     const { toast } = useToast();
+    const router = useRouter();
 
     useEffect(() => {
         try {
@@ -200,6 +202,13 @@ const InvoicePreviewPage = () => {
                 }
             `}</style>
             <div className="flex justify-center space-x-4 mb-4 print-hidden">
+                <button
+                    onClick={() => router.back()}
+                    className="flex items-center space-x-2 px-4 py-2 bg-gray-500 text-white rounded-md hover:bg-gray-600 transition-colors"
+                >
+                    <ArrowLeft size={16} />
+                    <span>Back to Edit</span>
+                </button>
                 <button
                     onClick={handleDownloadPdf}
                     className="flex items-center space-x-2 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
@@ -361,5 +370,7 @@ const InvoicePreviewPage = () => {
 };
 
 export default InvoicePreviewPage;
+
+    
 
     
