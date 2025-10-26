@@ -111,10 +111,10 @@ export default function TaxInvoicePage() {
                       <TableHead className="w-[40px]"><Checkbox /></TableHead>
                       <TableHead>NPWP PEMBELI / IDENTITAS LAINNYA <ArrowUpDown className="inline-block ml-2 h-4 w-4" /></TableHead>
                       <TableHead>NAMA PEMBELI <ArrowUpDown className="inline-block ml-2 h-4 w-4" /></TableHead>
-                      <TableHead>KODE TRANSAKSI <ArrowUpDown className="inline-block ml-2 h-4 w-4" /></TableHead>
+                      <TableHead>STATUS <ArrowUpDown className="inline-block ml-2 h-4 w-4" /></TableHead>
                       <TableHead>NOMOR FAKTUR PAJAK <ArrowUpDown className="inline-block ml-2 h-4 w-4" /></TableHead>
                       <TableHead>TANGGAL FAKTUR PAJAK <ArrowUpDown className="inline-block ml-2 h-4 w-4" /></TableHead>
-                      <TableHead>MASA PAJAK <ArrowUpDown className="inline-block ml-2 h-4 w-4" /></TableHead>
+                      <TableHead>NOMOR INVOICE <ArrowUpDown className="inline-block ml-2 h-4 w-4" /></TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -123,10 +123,12 @@ export default function TaxInvoicePage() {
                         <TableCell><Checkbox /></TableCell>
                         <TableCell className="font-medium">{invoice.buyerNpwp}</TableCell>
                         <TableCell>{invoice.buyerName}</TableCell>
-                        <TableCell>{invoice.transactionCode}</TableCell>
+                        <TableCell>
+                            <Badge className="bg-cyan-100 text-cyan-800 border-cyan-200">{invoice.status}</Badge>
+                        </TableCell>
                         <TableCell>{invoice.taxInvoiceNumber}</TableCell>
                         <TableCell>{invoice.taxInvoiceDate}</TableCell>
-                        <TableCell>{invoice.taxPeriod}</TableCell>
+                        <TableCell>{invoice.invoiceNumber}</TableCell>
                       </TableRow>
                     ))}
                   </TableBody>

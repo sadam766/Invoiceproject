@@ -136,7 +136,7 @@ export function getSalesMonitoringData(): SalesMonitoringData[] {
 
     return Object.values(soData).map(so => {
         const invoice = invoiceListData.find(inv => inv.soNumber === so.soNumber);
-        const taxInvoice = taxInvoiceData.find(ti => ti.taxInvoiceNumber.includes(so.soNumber.slice(-4))); // Simplified logic
+        const taxInvoice = taxInvoiceData.find(ti => ti.invoiceNumber === invoice?.id);
         const spd = spdData.find(s => s.noInvoice.includes(invoice?.id || ''));
 
         const paymentStatus = (invoice?.status === 'paid') ? 'Paid' : 'Unpaid';
@@ -220,20 +220,20 @@ export let invoiceNumberData: InvoiceNumber[] = [
 export type TaxInvoice = {
     buyerNpwp: string;
     buyerName: string;
-    transactionCode: string;
+    status: string;
     taxInvoiceNumber: string;
     taxInvoiceDate: string;
-    taxPeriod: number;
+    invoiceNumber: string;
 };
 
 export const taxInvoiceData: TaxInvoice[] = [
     {
         buyerNpwp: '01.234.567.8-901.234',
         buyerName: 'PT. Sejahtera Abadi',
-        transactionCode: '01',
+        status: 'APPROVED',
         taxInvoiceNumber: '010.000-24.00000001',
         taxInvoiceDate: '2024-05-11',
-        taxPeriod: 5,
+        invoiceNumber: 'INV/2024/001',
     }
 ];
 
