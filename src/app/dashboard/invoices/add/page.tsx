@@ -387,7 +387,9 @@ export default function AddInvoicePage() {
       dppVat,
       vat12,
       negotiation: typeof negotiation === 'string' ? parseFormattedNumber(negotiation) : negotiation,
+      dpPercent,
       dpValue: typeof dpValue === 'string' ? parseFormattedNumber(dpValue) : dpValue,
+      dpPelunasanPercent,
       pelunasan: typeof pelunasan === 'string' ? parseFormattedNumber(pelunasan) : pelunasan,
       grandTotal,
     };

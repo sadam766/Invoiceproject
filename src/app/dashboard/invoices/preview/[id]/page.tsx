@@ -33,6 +33,11 @@ interface InvoiceData {
     totalRp: number;
     paymentTerms: string;
     printType: 'original' | 'copy';
+    negotiation: number;
+    dpPercent: number | string;
+    dpValue: number;
+    dpPelunasanPercent: number | string;
+    pelunasan: number;
 }
 
 // --- FUNGSI UTILITY ---
@@ -94,6 +99,11 @@ const InvoicePreviewPage = () => {
                     totalRp: parsedData.grandTotal + parsedData.vat12,
                     paymentTerms: parsedData.paymentTerms || '90 Hari setelah invoice diterima',
                     printType: parsedData.printType || 'original',
+                    negotiation: parsedData.negotiation || 0,
+                    dpPercent: parsedData.dpPercent || 0,
+                    dpValue: parsedData.dpValue || 0,
+                    dpPelunasanPercent: parsedData.dpPelunasanPercent || 0,
+                    pelunasan: parsedData.pelunasan || 0,
                 });
             } else {
                 setInvoiceData(null);
@@ -175,13 +185,19 @@ const InvoicePreviewPage = () => {
         vat12,
         paymentTerms,
         totalRp,
-        printType
+        printType,
+        negotiation,
+        dpPercent,
+        dpValue,
+        pelunasan
     } = invoiceData;
 
     const itemChunks = Array.from({ length: Math.ceil(items.length / ITEMS_PER_PAGE) }, (_, i) =>
         items.slice(i * ITEMS_PER_PAGE, i * ITEMS_PER_PAGE + ITEMS_PER_PAGE)
     );
     const totalPages = itemChunks.length;
+    const subTotalItems = items.reduce((acc, item) => acc + item.total, 0);
+
 
     return (
         <div className="bg-gray-100 dark:bg-slate-900 min-h-screen p-4 sm:p-6 font-sans text-black">
@@ -234,7 +250,6 @@ const InvoicePreviewPage = () => {
                     return (
                         <div key={pageIndex} className={`w-full max-w-4xl mx-auto bg-white shadow-lg p-4 my-8 text-[10px] leading-tight flex flex-col ${pageIndex > 0 ? 'page-break' : ''}`} style={{ height: '220mm' }}>
                             <header className="relative pt-0 pb-0 text-[10px] leading-snug">
-                                {/* Penempatan "Original" di pojok kanan atas */}
                                 <p className="absolute right-0 top-0 font-normal text-sm capitalize">{printType}</p>
                                 <div className="w-full text-center mb-1 leading-none">
                                     <p className="font-bold uppercase text-xs tracking-tighter mb-0.5">INVOICE/OFFICIAL RECEIPT</p>
@@ -289,9 +304,33 @@ const InvoicePreviewPage = () => {
                                     <div className="w-full flex justify-end items-end leading-normal">
                                         <div className="text-right w-1/2">
                                             {chunk.length < 5 && <div className="h-0.5 border-b border-black w-1/4 ml-auto" style={{marginTop: `-${(10 - chunk.length) * 18}px`}}></div>}
-                                            <p className="text-[10px] font-normal">{formatCurrency(grandTotal)}</p>
+                                            <p className="text-[10px] font-normal">{formatCurrency(subTotalItems)}</p>
                                         </div>
                                     </div>
+                            
+                                    <div className="w-full flex justify-between items-start leading-normal mt-1">
+                                        <div className='w-1/2 text-[10px] space-y-0.5 leading-tight pl-2'>
+                                            {negotiation > 0 && (
+                                                <div className='flex justify-start space-x-2'>
+                                                    <p className='mb-0'>A/Negotiation :</p>
+                                                    <p className='mb-0'>({formatCurrency(negotiation)})</p> 
+                                                </div>
+                                            )}
+                                            {dpValue > 0 && (
+                                                <div className='flex justify-start space-x-2'>
+                                                    <p className='mb-0'>DP {dpPercent ? `${dpPercent}%` : 'Value'} :</p>
+                                                    <p className='mb-0'>{formatCurrency(dpValue)}</p>
+                                                </div>
+                                            )}
+                                        </div>
+                            
+                                        <div className="w-1/2 text-right text-xs pr-1">
+                                            {pelunasan > 0 && (
+                                                <p className='mb-0 mt-3 font-semibold'>Pelunasan: {formatCurrency(pelunasan)}</p> 
+                                            )}
+                                        </div>
+                                    </div>
+
                                     <div className="w-full flex justify-start items-end leading-normal mt-0">
                                         <p>No PO : {poNumber}</p>
                                     </div>
