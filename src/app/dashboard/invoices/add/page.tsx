@@ -52,7 +52,7 @@ import {
   Check
 } from 'lucide-react';
 import Link from 'next/link';
-import { type InvoiceNumber, invoiceNumberData, salesOrderListData, customerListData, type Customer, productListData, ProductListItem } from '@/app/lib/data';
+import { type InvoiceNumber, invoiceNumberData, salesOrderListData, customerListData, type Customer, productListData, type ProductListItem, invoiceListData, type Invoice } from '@/app/lib/data';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
 
@@ -83,7 +83,7 @@ export default function AddInvoicePage() {
 
   const [issueDate, setIssueDate] = useState<Date | undefined>(new Date());
   const [dueDate, setDueDate] = useState<Date | undefined>();
-  const [status, setStatus] = useState('draft');
+  const [status, setStatus] = useState<'paid' | 'unpaid' | 'sent' | 'draft'>('draft');
 
   const [items, setItems] = useState<InvoiceItem[]>([]);
   const [subtotal, setSubtotal] = useState(0);
@@ -209,7 +209,37 @@ export default function AddInvoicePage() {
   }, [items, negotiation, dpPercent, dpValue, dpPelunasanPercent, pelunasan]);
 
   
-  const handleSaveInvoice = async (invoiceStatus: 'draft' | 'sent' = 'draft') => {
+  const handleSaveInvoice = async (invoiceStatus: 'draft' | 'sent' | 'paid' | 'unpaid' = 'draft') => {
+    if (!invoiceId || !customer || !issueDate) {
+        toast({
+            variant: "destructive",
+            title: "Validation Error",
+            description: "Please fill in Invoice No, Customer, and Issue Date.",
+        });
+        return;
+    }
+
+    const newInvoice: Invoice = {
+        id: invoiceId,
+        soNumber: soNumber,
+        customer: customer.name,
+        date: format(issueDate, 'yyyy-MM-dd'),
+        amount: grandTotal + vat12,
+        status: invoiceStatus,
+        spdNumber: '-', // Default value
+    };
+    
+    // Check if invoice with the same ID already exists
+    const existingInvoiceIndex = invoiceListData.findIndex(inv => inv.id === newInvoice.id);
+
+    if (existingInvoiceIndex !== -1) {
+        // Update existing invoice
+        invoiceListData[existingInvoiceIndex] = newInvoice;
+    } else {
+        // Add new invoice to the beginning of the list
+        invoiceListData.unshift(newInvoice);
+    }
+
     toast({
       title: "Invoice Saved",
       description: `Invoice ${invoiceId} has been successfully saved as ${invoiceStatus}.`,
@@ -305,10 +335,12 @@ export default function AddInvoicePage() {
       items: items.map((item, index) => ({
         no: index + 1,
         item: item.name,
+        name: item.name,
         quantity: item.quantity,
         unit: item.unit,
         price: item.price,
-        amount: item.total
+        amount: item.total,
+        total: item.total
       })),
       subtotal,
       dppVat,
@@ -580,13 +612,14 @@ export default function AddInvoicePage() {
                         type="text" 
                         value={formatNumberWithCommas(item.quantity)}
                         onChange={(e) => handleNumericItemChange(item.id, 'quantity', e.target.value)}
-                        className="text-right" 
+                        className="text-right w-24" 
                       />
                     </TableCell>
                     <TableCell>
                         <Input 
                             value={item.unit}
                             onChange={(e) => handleItemChange(item.id, 'unit', e.target.value)}
+                            className="w-24"
                         />
                     </TableCell>
                     <TableCell>
@@ -594,7 +627,7 @@ export default function AddInvoicePage() {
                         placeholder="Rp 0,00"
                         value={formatNumberWithCommas(item.price)}
                         onChange={(e) => handleNumericItemChange(item.id, 'price', e.target.value)}
-                        className="text-right"
+                        className="text-right w-36"
                       />
                     </TableCell>
                     <TableCell className="text-right">Rp {formatNumberWithCommas(item.total)}</TableCell>
@@ -703,7 +736,7 @@ export default function AddInvoicePage() {
 
               <div className="space-y-2">
                 <label className="text-sm font-medium">Status</label>
-                <Select value={status} onValueChange={setStatus}>
+                <Select value={status} onValueChange={(value) => setStatus(value as 'paid' | 'unpaid' | 'sent' | 'draft')}>
                   <SelectTrigger>
                     <SelectValue />
                   </SelectTrigger>
@@ -711,6 +744,7 @@ export default function AddInvoicePage() {
                     <SelectItem value="draft">Draft</SelectItem>
                     <SelectItem value="sent">Sent</SelectItem>
                     <SelectItem value="paid">Paid</SelectItem>
+                    <SelectItem value="unpaid">Unpaid</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
