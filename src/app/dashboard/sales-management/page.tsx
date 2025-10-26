@@ -50,7 +50,7 @@ import {
             setSelectedSale(sale);
 
             const relatedInvoices = invoiceListData.filter(
-                inv => inv.soNumber === sale.soNumber
+                inv => inv.soNumber === sale.soNumber || (sale.poNumber && inv.poNumber === sale.poNumber)
             );
             
             const totalEstimates = relatedInvoices.reduce((sum, inv) => sum + inv.amount, 0);
@@ -189,7 +189,7 @@ import {
                                 <div className="font-medium text-muted-foreground">NO. SO</div>
                                 <div className="font-medium">{invoice.soNumber}</div>
                                 <div className="font-medium text-muted-foreground">NO. PO</div>
-                                <div>{selectedSale.poNumber}</div>
+                                <div>{invoice.poNumber || selectedSale.poNumber}</div>
                             </div>
                             <Button variant="ghost" size="icon">
                                 <MoreVertical className="h-4 w-4" />
@@ -252,4 +252,5 @@ import {
       </main>
     );
   }
-  
+
+    

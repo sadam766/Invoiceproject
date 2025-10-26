@@ -79,6 +79,7 @@ export default function AddInvoicePage() {
 
   const [invoiceId, setInvoiceId] = useState('');
   const [soNumber, setSoNumber] = useState('');
+  const [poNumber, setPoNumber] = useState('');
   const [customer, setCustomer] = useState<Customer | undefined>(undefined);
 
   const [issueDate, setIssueDate] = useState<Date | undefined>(new Date());
@@ -222,6 +223,7 @@ export default function AddInvoicePage() {
     const newInvoice: Invoice = {
         id: invoiceId,
         soNumber: soNumber,
+        poNumber: poNumber,
         customer: customer.name,
         date: format(issueDate, 'yyyy-MM-dd'),
         amount: grandTotal + vat12,
@@ -328,6 +330,7 @@ export default function AddInvoicePage() {
     const previewData = {
       id: invoiceId,
       soNumber,
+      poNumber,
       customer,
       date: issueDate ? format(issueDate, 'yyyy-MM-dd') : '',
       amount: grandTotal + vat12,
@@ -440,7 +443,7 @@ export default function AddInvoicePage() {
               </div>
               <div>
                 <label className="text-sm font-medium">No. PO</label>
-                <Input />
+                <Input value={poNumber} onChange={e => setPoNumber(e.target.value)} />
               </div>
               <div>
                 <label className="text-sm font-medium">Payment</label>
@@ -773,3 +776,5 @@ export default function AddInvoicePage() {
     </main>
   );
 }
+
+    

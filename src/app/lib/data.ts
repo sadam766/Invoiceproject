@@ -161,6 +161,7 @@ export function getSalesMonitoringData(): SalesMonitoringData[] {
 export type Invoice = {
   id: string;
   soNumber: string;
+  poNumber: string;
   customer: string;
   date: string;
   amount: number;
@@ -172,6 +173,7 @@ export let invoiceListData: Invoice[] = [
   {
     id: 'INV/2024/001',
     soNumber: 'SO-2024-001',
+    poNumber: 'PO-ABC-001',
     customer: 'PT. Sejahtera Abadi',
     date: '2024-05-11',
     amount: 1000000,
@@ -181,6 +183,7 @@ export let invoiceListData: Invoice[] = [
   {
     id: 'INV/2024/002',
     soNumber: 'SO-2024-002',
+    poNumber: 'PO-DEF-002',
     customer: 'CV. Maju Jaya',
     date: '2024-05-13',
     amount: 1500000,
@@ -408,3 +411,4 @@ export let spdData: SpdData[] = [
     }
 ];
 
+    
