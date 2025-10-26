@@ -1,5 +1,7 @@
 
 'use client';
+import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import {
     Card,
     CardContent,
@@ -24,15 +26,67 @@ import {
   import { Badge } from '@/components/ui/badge';
   import { Calendar, ChevronRight, Edit, Search, ArrowUpDown, List, LayoutGrid, Plus, MoreVertical } from 'lucide-react';
   import { AddDocumentDialog } from './_components/add-document-dialog';
-  
+  import { salesListData, invoiceListData, type SalesListItem, type Invoice } from '@/app/lib/data';
+
+  type SaleDetails = {
+    totalEstimates: number;
+    totalEstimatesCount: number;
+    totalPaid: number;
+    totalPaidCount: number;
+    totalInvoiced: number;
+    totalInvoicedCount: number;
+    relatedInvoices: Invoice[];
+  }
+
   export default function SalesManagementPage() {
+    const router = useRouter();
+    const [selectedSale, setSelectedSale] = useState<SalesListItem | null>(null);
+    const [details, setDetails] = useState<SaleDetails | null>(null);
+
+    useEffect(() => {
+        const dataFromSession = sessionStorage.getItem('salesPreviewData');
+        if (dataFromSession) {
+            const sale = JSON.parse(dataFromSession);
+            setSelectedSale(sale);
+
+            const relatedInvoices = invoiceListData.filter(
+                inv => inv.soNumber === sale.soNumber
+            );
+            
+            const totalEstimates = relatedInvoices.reduce((sum, inv) => sum + inv.amount, 0);
+            const totalPaid = relatedInvoices
+                .filter(inv => inv.status === 'paid')
+                .reduce((sum, inv) => sum + inv.amount, 0);
+            
+            setDetails({
+                totalEstimates: totalEstimates,
+                totalEstimatesCount: relatedInvoices.length,
+                totalPaid: totalPaid,
+                totalPaidCount: relatedInvoices.filter(inv => inv.status === 'paid').length,
+                totalInvoiced: totalEstimates,
+                totalInvoicedCount: relatedInvoices.length,
+                relatedInvoices: relatedInvoices,
+            });
+        }
+    }, []);
+
+    if (!selectedSale || !details) {
+        return (
+            <main className="flex flex-1 flex-col gap-4 p-4 md:gap-8 md:p-8">
+                <div className="text-center text-muted-foreground">
+                    Loading sale details or no sale selected. Please go back to the <a href="/dashboard/sales" className="underline">Sales page</a> and preview a sale.
+                </div>
+            </main>
+        );
+    }
+    
     return (
       <main className="flex flex-1 flex-col gap-4 p-4 md:gap-8 md:p-8">
         <div className="flex items-center justify-between">
             <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                <span>Customers</span>
+                <a href="/dashboard/customers" className="hover:underline">Customers</a>
                 <ChevronRight className="h-4 w-4" />
-                <span className="font-medium text-foreground">PT. Sejahtera Abadi</span>
+                <span className="font-medium text-foreground">{selectedSale.customer}</span>
             </div>
           <div className="flex items-center gap-2">
             <DropdownMenu>
@@ -60,39 +114,39 @@ import {
           <Card>
             <CardHeader className="flex flex-row items-center justify-between pb-2">
               <CardTitle className="text-sm font-medium">Total Estimates</CardTitle>
-              <Badge variant="secondary">1</Badge>
+              <Badge variant="secondary">{details.totalEstimatesCount}</Badge>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">Rp1.0jt</div>
+              <div className="text-2xl font-bold">Rp {details.totalEstimates.toLocaleString('id-ID')}</div>
               <p className="text-xs text-muted-foreground flex items-center">
                 <span className="w-2 h-2 rounded-full bg-orange-500 mr-2"></span>
-                OUTSTANDING (1)
+                OUTSTANDING ({details.totalInvoicedCount - details.totalPaidCount})
               </p>
             </CardContent>
           </Card>
           <Card>
             <CardHeader className="flex flex-row items-center justify-between pb-2">
               <CardTitle className="text-sm font-medium">Change Orders</CardTitle>
-              <Badge variant="secondary">0</Badge>
+              <Badge variant="secondary">{details.totalPaidCount}</Badge>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">Rp0.0jt</div>
+              <div className="text-2xl font-bold">Rp {details.totalPaid.toLocaleString('id-ID')}</div>
               <p className="text-xs text-muted-foreground flex items-center">
               <span className="w-2 h-2 rounded-full bg-green-500 mr-2"></span>
-                TOTAL PAID (0)
+                TOTAL PAID ({details.totalPaidCount})
               </p>
             </CardContent>
           </Card>
           <Card>
             <CardHeader className="flex flex-row items-center justify-between pb-2">
               <CardTitle className="text-sm font-medium">Invoices</CardTitle>
-              <Badge variant="secondary">1</Badge>
+              <Badge variant="secondary">{details.totalInvoicedCount}</Badge>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">Rp1.0jt</div>
+              <div className="text-2xl font-bold">Rp {details.totalInvoiced.toLocaleString('id-ID')}</div>
               <p className="text-xs text-muted-foreground flex items-center">
               <span className="w-2 h-2 rounded-full bg-blue-500 mr-2"></span>
-                INVOICED (1)
+                INVOICED ({details.totalInvoicedCount})
               </p>
             </CardContent>
           </Card>
@@ -128,68 +182,70 @@ import {
                     </div>
                 </div>
 
-                <div className="rounded-lg border p-4">
-                    <div className="flex justify-between items-start">
-                        <div className="grid grid-cols-2 gap-x-8 gap-y-1 text-sm">
-                            <div className="font-medium text-muted-foreground">NO. SO</div>
-                            <div className="font-medium">SO-2024-001</div>
-                            <div className="font-medium text-muted-foreground">NO. PO</div>
-                            <div>-</div>
+                {details.relatedInvoices.map(invoice => (
+                    <div className="rounded-lg border p-4 mb-4" key={invoice.id}>
+                        <div className="flex justify-between items-start">
+                            <div className="grid grid-cols-2 gap-x-8 gap-y-1 text-sm">
+                                <div className="font-medium text-muted-foreground">NO. SO</div>
+                                <div className="font-medium">{invoice.soNumber}</div>
+                                <div className="font-medium text-muted-foreground">NO. PO</div>
+                                <div>{selectedSale.poNumber}</div>
+                            </div>
+                            <Button variant="ghost" size="icon">
+                                <MoreVertical className="h-4 w-4" />
+                            </Button>
                         </div>
-                         <Button variant="ghost" size="icon">
-                            <MoreVertical className="h-4 w-4" />
-                        </Button>
+                        <div className="flex justify-between items-center mt-2">
+                            <div>
+                                <div className="text-xs text-muted-foreground">Customer</div>
+                                <div className="font-medium">{invoice.customer}</div>
+                            </div>
+                            <div>
+                                <div className="text-xs text-muted-foreground">Sales</div>
+                                <div className="font-medium">{selectedSale.sales}</div>
+                            </div>
+                        </div>
+                        <Badge variant={invoice.status === 'paid' ? 'default' : 'destructive'} className="mt-2 capitalize">{invoice.status}</Badge>
+                        <div className="flex justify-between items-end mt-4">
+                            <div>
+                                <div className="text-xs text-muted-foreground">Nilai Pembayaran</div>
+                                <div className="font-medium">Rp {invoice.status === 'paid' ? invoice.amount.toLocaleString('id-ID') : 0}</div>
+                            </div>
+                            <div>
+                                <div className="text-xs text-muted-foreground">Nilai Invoice</div>
+                                <div className="font-medium">Rp {invoice.amount.toLocaleString('id-ID')}</div>
+                            </div>
+                        </div>
+                        <div className="border-t my-4"></div>
+                        <div className="grid grid-cols-2 gap-x-8 gap-y-2 text-sm">
+                            <div>
+                                <div className="text-muted-foreground">No. Invoice</div>
+                                <div className="font-medium">{invoice.id}</div>
+                            </div>
+                            <div>
+                                <div className="text-muted-foreground">No. Faktur Pajak</div>
+                                <div>-</div>
+                            </div>
+                            <div>
+                                <div className="text-muted-foreground">Tgl. Faktur Pajak</div>
+                                <div>-</div>
+                            </div>
+                            <div>
+                                <Badge className="bg-cyan-100 text-cyan-800 border-cyan-200">APPROVED</Badge>
+                            </div>
+                            <div>
+                                <div className="text-muted-foreground">Tanggal Invoice</div>
+                                <div className="font-medium">{invoice.date}</div>
+                            </div>
+                            <div>
+                                <div className="text-muted-foreground">Jatuh Tempo</div>
+                                <div className="font-medium">N/A</div>
+                            </div>
+                        </div>
                     </div>
-                    <div className="flex justify-between items-center mt-2">
-                        <div>
-                            <div className="text-xs text-muted-foreground">Customer</div>
-                            <div className="font-medium">PT. Sejahtera Abadi</div>
-                        </div>
-                         <div>
-                            <div className="text-xs text-muted-foreground">Sales</div>
-                            <div className="font-medium">Budi</div>
-                        </div>
-                    </div>
-                    <Badge variant="destructive" className="mt-2">UNPAID</Badge>
-                    <div className="flex justify-between items-end mt-4">
-                        <div>
-                            <div className="text-xs text-muted-foreground">Nilai Pembayaran</div>
-                            <div className="font-medium">Rp 0</div>
-                        </div>
-                        <div>
-                            <div className="text-xs text-muted-foreground">Nilai Invoice</div>
-                            <div className="font-medium">Rp 1.000.000</div>
-                        </div>
-                    </div>
-                    <div className="border-t my-4"></div>
-                     <div className="grid grid-cols-2 gap-x-8 gap-y-2 text-sm">
-                        <div>
-                            <div className="text-muted-foreground">No. Invoice</div>
-                            <div className="font-medium">INV/2024/001</div>
-                        </div>
-                        <div>
-                            <div className="text-muted-foreground">No. Faktur Pajak</div>
-                            <div>-</div>
-                        </div>
-                        <div>
-                            <div className="text-muted-foreground">Tgl. Faktur Pajak</div>
-                            <div>-</div>
-                        </div>
-                        <div>
-                            <Badge className="bg-cyan-100 text-cyan-800 border-cyan-200">APPROVED</Badge>
-                        </div>
-                         <div>
-                            <div className="text-muted-foreground">Tanggal Invoice</div>
-                            <div className="font-medium">11/05/2024</div>
-                        </div>
-                        <div>
-                            <div className="text-muted-foreground">Jatuh Tempo</div>
-                            <div className="font-medium">10/06/2024</div>
-                        </div>
-                    </div>
-                </div>
+                ))}
                 <div className="text-sm text-muted-foreground mt-4">
-                    Showing 1 to 1 of 1 entries
+                    Showing 1 to {details.relatedInvoices.length} of {details.relatedInvoices.length} entries
                 </div>
             </CardContent>
         </Card>

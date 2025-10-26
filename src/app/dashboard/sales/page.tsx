@@ -1,5 +1,7 @@
 
 'use client';
+import { useState, useMemo } from 'react';
+import { useRouter } from 'next/navigation';
 import {
     Card,
     CardContent,
@@ -14,46 +16,113 @@ import {
     TableHeader,
     TableRow,
   } from '@/components/ui/table';
+  import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuTrigger,
+  } from '@/components/ui/dropdown-menu';
   import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
   import { Input } from '@/components/ui/input';
   import { Button } from '@/components/ui/button';
   import { Badge } from '@/components/ui/badge';
   import { Checkbox } from '@/components/ui/checkbox';
-  import { salesListData } from '@/app/lib/data';
-  import { Search, Filter, MoreHorizontal, ArrowUpDown, Plus, Upload, Download } from 'lucide-react';
+  import { salesListData, type SalesListItem } from '@/app/lib/data';
+  import { Search, Filter, MoreHorizontal, ArrowUpDown, Plus, Upload, Download, Eye, Edit, Trash2 } from 'lucide-react';
   import { AddSaleDialog } from './_components/add-sale-dialog';
+  import { useToast } from '@/hooks/use-toast';
+  import { DeleteConfirmationDialog } from '@/app/components/delete-confirmation-dialog';
   
   export default function SalesListPage() {
-    const totalFiltered = salesListData.reduce((sum, item) => sum + item.amount, 0);
-    const totalPaid = salesListData.filter(item => item.status === 'Paid').reduce((sum, item) => sum + item.amount, 0);
-    const totalUnpaid = salesListData.filter(item => item.status === 'Unpaid').reduce((sum, item) => sum + item.amount, 0);
+    const router = useRouter();
+    const { toast } = useToast();
+    const [sales, setSales] = useState<SalesListItem[]>(salesListData);
+    const [editingSale, setEditingSale] = useState<SalesListItem | undefined>(undefined);
+    const [isDialogOpen, setIsDialogOpen] = useState(false);
+    
+    const [searchQuery, setSearchQuery] = useState('');
+    const [activeTab, setActiveTab] = useState('all');
+
+    const totalFiltered = sales.reduce((sum, item) => sum + item.amount, 0);
+    const totalPaid = sales.filter(item => item.status === 'Paid').reduce((sum, item) => sum + item.amount, 0);
+    const totalUnpaid = sales.filter(item => item.status === 'Unpaid').reduce((sum, item) => sum + item.amount, 0);
   
+    const filteredSales = useMemo(() => {
+        let filtered = sales;
+        if (activeTab !== 'all') {
+            filtered = sales.filter(s => s.status.toLowerCase() === activeTab);
+        }
+        if (searchQuery) {
+            filtered = filtered.filter(s => 
+                s.soNumber.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                s.customer.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                s.sales.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                s.poNumber.toLowerCase().includes(searchQuery.toLowerCase())
+            );
+        }
+        return filtered;
+    }, [sales, activeTab, searchQuery]);
+
+    const handleAddClick = () => {
+        setEditingSale(undefined);
+        setIsDialogOpen(true);
+    };
+
+    const handleEdit = (sale: SalesListItem) => {
+        setEditingSale(sale);
+        setIsDialogOpen(true);
+    };
+
+    const handleDelete = (soNumber: string) => {
+        setSales(sales.filter(s => s.soNumber !== soNumber));
+        toast({ title: "Sale Deleted", description: `Sale ${soNumber} has been removed.` });
+    };
+
+    const handlePreview = (sale: SalesListItem) => {
+        sessionStorage.setItem('salesPreviewData', JSON.stringify(sale));
+        router.push('/dashboard/sales-management');
+    };
+
+    const handleSave = (sale: SalesListItem) => {
+        if (editingSale) {
+            setSales(sales.map(s => (s.soNumber === editingSale.soNumber ? sale : s)));
+            toast({ title: "Sale Updated", description: `Sale ${sale.soNumber} has been updated.` });
+        } else {
+            setSales([...sales, sale]);
+            toast({ title: "Sale Added", description: `New sale ${sale.soNumber} has been added.` });
+        }
+        setIsDialogOpen(false);
+        setEditingSale(undefined);
+    };
+
+    const handleDialogStateChange = (open: boolean) => {
+        setIsDialogOpen(open);
+        if (!open) {
+            setEditingSale(undefined);
+        }
+    };
+
     return (
       <main className="flex flex-1 flex-col gap-4 p-4 md:gap-8 md:p-8">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Payment Overview</h1>
         </div>
         <div className="grid gap-4 md:grid-cols-3 lg:grid-cols-5">
-            <Card className="lg:col-span-2 bg-blue-50/50 border-blue-200 shadow-sm relative overflow-hidden">
+            <Card className="lg:col-span-2 bg-blue-50/50 border-blue-200 shadow-sm relative overflow-hidden dark:bg-blue-950/20 dark:border-blue-800/50">
                 <CardHeader>
-                    <CardTitle className="text-sm font-medium text-blue-900/80">Total (Filtered)</CardTitle>
+                    <CardTitle className="text-sm font-medium text-blue-900/80 dark:text-blue-200">Total (Filtered)</CardTitle>
                 </CardHeader>
                 <CardContent>
-                    <div className="text-3xl font-bold text-blue-950">Rp {totalFiltered.toLocaleString('id-ID')},00</div>
+                    <div className="text-3xl font-bold text-blue-950 dark:text-blue-100">Rp {totalFiltered.toLocaleString('id-ID')},00</div>
                 </CardContent>
-                <div className="absolute bottom-0 left-0 w-full h-12 bg-gradient-to-t from-blue-100 to-transparent">
+                <div className="absolute bottom-0 left-0 w-full h-12 bg-gradient-to-t from-blue-100 to-transparent dark:from-blue-950/30">
                    <div className="w-full h-full" style={{
                        background: 'linear-gradient(180deg, rgba(255,255,255,0) 0%, rgba(167,207,255,0.2) 50%, rgba(132,189,255,0.4) 100%)',
                        clipPath: 'polygon(0 80%, 30% 60%, 70% 85%, 100% 70%, 100% 100%, 0% 100%)'
                    }}>
-                       <div className="w-full h-px bg-primary/50" style={{
-                           position: 'absolute',
-                           bottom: 'calc(20% + (85% - 70%) / 2)',
-                           clipPath: 'polygon(0 80%, 30% 60%, 70% 85%, 100% 70%)'
-                       }}></div>
                    </div>
                    <div className="absolute bottom-0 left-0 right-0 h-10 w-full" style={{
-                        backgroundImage: 'linear-gradient(to top, #DBEAFE, transparent)'
+                        backgroundImage: 'linear-gradient(to top, hsl(220 90% 96% / 1), transparent)'
                    }}></div>
                    <svg width="100%" height="30" viewBox="0 0 200 20" preserveAspectRatio="none" className="absolute bottom-0 left-0">
                        <path d="M 0 16 L 60 12 L 140 17 L 200 14" stroke="hsl(var(--primary))" strokeWidth="1.5" fill="none"></path>
@@ -99,7 +168,7 @@ import {
   
         <Card>
             <CardContent className="pt-6">
-                <Tabs defaultValue="all">
+                <Tabs value={activeTab} onValueChange={setActiveTab}>
                     <div className="flex justify-between items-center mb-4">
                         <div>
                             <h2 className="text-xl font-bold">Sales</h2>
@@ -107,75 +176,110 @@ import {
                         <div className="flex items-center gap-2">
                            <Button variant="outline"><Upload className="mr-2 h-4 w-4"/> Import</Button>
                            <Button variant="outline"><Download className="mr-2 h-4 w-4"/> Export</Button>
-                           <AddSaleDialog />
+                           <AddSaleDialog 
+                                isOpen={isDialogOpen}
+                                onOpenChange={handleDialogStateChange}
+                                onSave={handleSave}
+                                saleData={editingSale}
+                                onAddClick={handleAddClick}
+                           />
                         </div>
                     </div>
                     <div className="flex justify-between items-center">
                     <TabsList>
-                        <TabsTrigger value="all">All Sales <Badge variant="secondary" className="ml-2">96</Badge></TabsTrigger>
-                        <TabsTrigger value="draft">Draft <Badge variant="secondary" className="ml-2">12</Badge></TabsTrigger>
-                        <TabsTrigger value="paid">Paid <Badge variant="secondary" className="ml-2">62</Badge></TabsTrigger>
-                        <TabsTrigger value="unpaid">Unpaid <Badge variant="secondary" className="ml-2">17</Badge></TabsTrigger>
-                        <TabsTrigger value="pending">Pending <Badge variant="secondary" className="ml-2">5</Badge></TabsTrigger>
-                        <TabsTrigger value="overdue">Overdue <Badge variant="secondary" className="ml-2">0</Badge></TabsTrigger>
+                        <TabsTrigger value="all">All Sales <Badge variant="secondary" className="ml-2">{sales.length}</Badge></TabsTrigger>
+                        <TabsTrigger value="paid">Paid <Badge variant="secondary" className="ml-2">{sales.filter(s=>s.status === 'Paid').length}</Badge></TabsTrigger>
+                        <TabsTrigger value="unpaid">Unpaid <Badge variant="secondary" className="ml-2">{sales.filter(s=>s.status === 'Unpaid').length}</Badge></TabsTrigger>
                     </TabsList>
                     <div className="flex items-center gap-2">
                         <div className="relative w-64">
                             <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-                            <Input type="search" placeholder="Search" className="pl-8" />
+                            <Input 
+                                type="search" 
+                                placeholder="Search" 
+                                className="pl-8"
+                                value={searchQuery}
+                                onChange={(e) => setSearchQuery(e.target.value)}
+                            />
                         </div>
                         <Button variant="outline"><Filter className="mr-2 h-4 w-4" /> Filters</Button>
                     </div>
                     </div>
-                    <TabsContent value="all">
-                        <div className="mt-4 w-full overflow-auto">
-                            <Table>
-                            <TableHeader>
-                                <TableRow>
-                                    <TableHead className="w-[40px]">
-                                        <Checkbox />
-                                    </TableHead>
-                                    <TableHead>NUMBER SO <ArrowUpDown className="inline-block ml-2 h-4 w-4" /></TableHead>
-                                    <TableHead>CUSTOMER <ArrowUpDown className="inline-block ml-2 h-4 w-4" /></TableHead>
-                                    <TableHead>SALES <ArrowUpDown className="inline-block ml-2 h-4 w-4" /></TableHead>
-                                    <TableHead>NO. PO <ArrowUpDown className="inline-block ml-2 h-4 w-4" /></TableHead>
-                                    <TableHead>AMOUNT <ArrowUpDown className="inline-block ml-2 h-4 w-4" /></TableHead>
-                                    <TableHead>STATUS <ArrowUpDown className="inline-block ml-2 h-4 w-4" /></TableHead>
-                                    <TableHead></TableHead>
-                                </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                                {salesListData.map((sale) => (
-                                <TableRow key={sale.soNumber}>
-                                    <TableCell>
-                                        <Checkbox />
-                                    </TableCell>
-                                    <TableCell className="font-medium">{sale.soNumber}</TableCell>
-                                    <TableCell>{sale.customer}</TableCell>
-                                    <TableCell>{sale.sales}</TableCell>
-                                    <TableCell>{sale.poNumber}</TableCell>
-                                    <TableCell>Rp {sale.amount.toLocaleString('id-ID')},00</TableCell>
-                                    <TableCell>
-                                        <Badge variant={sale.status === 'Paid' ? 'outline' : 'destructive'} 
-                                        className={sale.status === 'Paid' ? 'bg-green-100 text-green-800 border-green-200' : 'bg-red-100 text-red-800 border-red-200'}>
-                                            {sale.status}
-                                        </Badge>
-                                        {sale.paidDate && <div className="text-xs text-muted-foreground">on: {sale.paidDate}</div>}
-                                    </TableCell>
-                                    <TableCell>
-                                        <Button variant="ghost" size="icon">
-                                            <MoreHorizontal className="h-4 w-4" />
-                                        </Button>
-                                    </TableCell>
-                                </TableRow>
-                                ))}
-                            </TableBody>
-                            </Table>
-                        </div>
-                        <div className="text-sm text-muted-foreground mt-4">
-                            Showing 1 to 2 of 2 entries
-                        </div>
+                    <TabsContent value="all" className="mt-4">
+                        {/* This content is now handled by filteredSales */}
                     </TabsContent>
+                    <TabsContent value="paid" className="mt-4">
+                        {/* This content is now handled by filteredSales */}
+                    </TabsContent>
+                    <TabsContent value="unpaid" className="mt-4">
+                        {/* This content is now handled by filteredSales */}
+                    </TabsContent>
+                    
+                    <div className="mt-4 w-full overflow-auto">
+                        <Table>
+                        <TableHeader>
+                            <TableRow>
+                                <TableHead className="w-[40px]">
+                                    <Checkbox />
+                                </TableHead>
+                                <TableHead>NUMBER SO <ArrowUpDown className="inline-block ml-2 h-4 w-4" /></TableHead>
+                                <TableHead>CUSTOMER <ArrowUpDown className="inline-block ml-2 h-4 w-4" /></TableHead>
+                                <TableHead>SALES <ArrowUpDown className="inline-block ml-2 h-4 w-4" /></TableHead>
+                                <TableHead>NO. PO <ArrowUpDown className="inline-block ml-2 h-4 w-4" /></TableHead>
+                                <TableHead>AMOUNT <ArrowUpDown className="inline-block ml-2 h-4 w-4" /></TableHead>
+                                <TableHead>STATUS <ArrowUpDown className="inline-block ml-2 h-4 w-4" /></TableHead>
+                                <TableHead></TableHead>
+                            </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                            {filteredSales.map((sale) => (
+                            <TableRow key={sale.soNumber}>
+                                <TableCell>
+                                    <Checkbox />
+                                </TableCell>
+                                <TableCell className="font-medium">{sale.soNumber}</TableCell>
+                                <TableCell>{sale.customer}</TableCell>
+                                <TableCell>{sale.sales}</TableCell>
+                                <TableCell>{sale.poNumber}</TableCell>
+                                <TableCell>Rp {sale.amount.toLocaleString('id-ID')},00</TableCell>
+                                <TableCell>
+                                    <Badge variant={sale.status === 'Paid' ? 'outline' : 'destructive'} 
+                                    className={sale.status === 'Paid' ? 'bg-green-100 text-green-800 border-green-200' : 'bg-red-100 text-red-800 border-red-200'}>
+                                        {sale.status}
+                                    </Badge>
+                                    {sale.paidDate && <div className="text-xs text-muted-foreground">on: {sale.paidDate}</div>}
+                                </TableCell>
+                                <TableCell>
+                                    <DropdownMenu>
+                                        <DropdownMenuTrigger asChild>
+                                            <Button variant="ghost" size="icon">
+                                                <MoreHorizontal className="h-4 w-4" />
+                                            </Button>
+                                        </DropdownMenuTrigger>
+                                        <DropdownMenuContent align="end">
+                                            <DropdownMenuItem onClick={() => handlePreview(sale)}>
+                                                <Eye className="mr-2 h-4 w-4" />
+                                                Preview
+                                            </DropdownMenuItem>
+                                            <DropdownMenuItem onClick={() => handleEdit(sale)}>
+                                                <Edit className="mr-2 h-4 w-4" />
+                                                Edit
+                                            </DropdownMenuItem>
+                                            <DropdownMenuItem className="text-destructive focus:text-destructive focus:bg-destructive/10" asChild>
+                                                <DeleteConfirmationDialog onConfirm={() => handleDelete(sale.soNumber)} />
+                                            </DropdownMenuItem>
+                                        </DropdownMenuContent>
+                                    </DropdownMenu>
+                                </TableCell>
+                            </TableRow>
+                            ))}
+                        </TableBody>
+                        </Table>
+                    </div>
+                    <div className="text-sm text-muted-foreground mt-4">
+                        Showing 1 to {filteredSales.length} of {sales.length} entries
+                    </div>
+
                 </Tabs>
             </CardContent>
         </Card>
