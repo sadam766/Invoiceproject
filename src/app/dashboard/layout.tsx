@@ -198,9 +198,11 @@ export default function DashboardLayout({
                 </SidebarMenuButton>
             </SidebarMenuItem>
              <SidebarMenuItem>
-              <SidebarMenuButton>
-                <Calendar />
-                Calendar
+              <SidebarMenuButton asChild isActive={pathname === '/dashboard/calendar'}>
+                <Link href="/dashboard/calendar">
+                  <Calendar />
+                  Calendar
+                </Link>
               </SidebarMenuButton>
             </SidebarMenuItem>
              <SidebarMenuItem>
