@@ -84,7 +84,7 @@ export default function SpdPreviewPage() {
                         <p>KEPADA YTH:</p>
                         <div className="pl-12">
                             <p className="font-bold">{spdItem.customer}</p>
-                            <p>{customerDetails?.address}</p>
+                            <p>{customerDetails?.spdAddress}</p>
                             <p>UP: BPK EDI FEBRIANTO (0877-7126-1408)</p>
                         </div>
                     </div>
