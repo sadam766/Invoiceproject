@@ -407,3 +407,4 @@ export let spdData: SpdData[] = [
         suratJalan: '-',
     }
 ];
+

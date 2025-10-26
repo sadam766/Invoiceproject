@@ -220,7 +220,7 @@ const InvoicePreviewPage = () => {
                 {itemChunks.map((chunk, pageIndex) => {
                     const isLastPage = pageIndex === totalPages - 1;
                     return (
-                        <div key={pageIndex} className={`w-full max-w-4xl mx-auto bg-white shadow-lg p-10 my-8 text-[10px] leading-tight flex flex-col ${pageIndex > 0 ? 'page-break' : ''}`} style={{ height: '297mm' }}>
+                        <div key={pageIndex} className={`w-full max-w-4xl mx-auto bg-white shadow-lg p-4 my-8 text-[10px] leading-tight flex flex-col ${pageIndex > 0 ? 'page-break' : ''}`} style={{ height: '220mm' }}>
                             <header className="relative pt-0 pb-0 text-[10px] leading-snug">
                                 <div className="w-full text-center mb-1 leading-none">
                                     <p className="font-bold uppercase text-xs tracking-tighter mb-0.5">INVOICE/OFFICIAL RECEIPT</p>

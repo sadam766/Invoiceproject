@@ -52,7 +52,7 @@ import {
   Check
 } from 'lucide-react';
 import Link from 'next/link';
-import { type InvoiceNumber, invoiceNumberData, salesOrderListData, customerListData, type Customer } from '@/app/lib/data';
+import { type InvoiceNumber, invoiceNumberData, salesOrderListData, customerListData, type Customer, productListData, ProductListItem } from '@/app/lib/data';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
 
@@ -101,6 +101,7 @@ export default function AddInvoicePage() {
 
   const [soPopoverOpen, setSoPopoverOpen] = useState(false);
   const [customerPopoverOpen, setCustomerPopoverOpen] = useState(false);
+  const [productPopoverOpen, setProductPopoverOpen] = useState<number | null>(null);
   const uniqueSalesOrders = Array.from(new Set(salesOrderListData.map(item => item.soNumber)));
 
   useEffect(() => {
@@ -234,6 +235,23 @@ export default function AddInvoicePage() {
       return item;
     });
     setItems(newItems);
+  };
+  
+  const handleProductSelect = (itemId: number, product: ProductListItem) => {
+    const newItems = items.map(item => {
+        if (item.id === itemId) {
+            return {
+                ...item,
+                name: product.name,
+                unit: product.unit,
+                price: product.price,
+                total: item.quantity * product.price,
+            };
+        }
+        return item;
+    });
+    setItems(newItems);
+    setProductPopoverOpen(null);
   };
   
   const handleNumericInputChange = (setter: React.Dispatch<React.SetStateAction<string | number>>) => (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -519,11 +537,43 @@ export default function AddInvoicePage() {
                   {items.map(item => (
                   <TableRow key={item.id}>
                     <TableCell>
-                      <Input 
-                        placeholder="Search for a product..." 
-                        value={item.name} 
-                        onChange={(e) => handleItemChange(item.id, 'name', e.target.value)} 
-                       />
+                        <Popover open={productPopoverOpen === item.id} onOpenChange={(isOpen) => setProductPopoverOpen(isOpen ? item.id : null)}>
+                            <PopoverTrigger asChild>
+                                <Button
+                                    variant="outline"
+                                    role="combobox"
+                                    className="w-full justify-between font-normal"
+                                >
+                                    {item.name || "Search for a product..."}
+                                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                                </Button>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-[--radix-popover-trigger-width] p-0">
+                                <Command>
+                                    <CommandInput placeholder="Search product..." />
+                                    <CommandList>
+                                        <CommandEmpty>No product found.</CommandEmpty>
+                                        <CommandGroup>
+                                            {productListData.map((product) => (
+                                                <CommandItem
+                                                    key={product.name}
+                                                    value={product.name}
+                                                    onSelect={() => handleProductSelect(item.id, product)}
+                                                >
+                                                    <Check
+                                                        className={cn(
+                                                            "mr-2 h-4 w-4",
+                                                            item.name.toLowerCase() === product.name.toLowerCase() ? "opacity-100" : "opacity-0"
+                                                        )}
+                                                    />
+                                                    {product.name}
+                                                </CommandItem>
+                                            ))}
+                                        </CommandGroup>
+                                    </CommandList>
+                                </Command>
+                            </PopoverContent>
+                        </Popover>
                     </TableCell>
                     <TableCell>
                       <Input 
@@ -689,9 +739,3 @@ export default function AddInvoicePage() {
     </main>
   );
 }
-
-    
-    
-
-    
-
