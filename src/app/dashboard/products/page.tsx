@@ -1,6 +1,6 @@
 
 'use client';
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useRef } from 'react';
 import {
     Card,
     CardContent,
@@ -23,9 +23,11 @@ import {
   import { Input } from '@/components/ui/input';
   import { Button } from '@/components/ui/button';
   import { productListData, type ProductListItem } from '@/app/lib/data';
-  import { Search, Upload, Download, Plus } from 'lucide-react';
+  import { Search, Upload, Download } from 'lucide-react';
   import { AddProductDialog } from './_components/add-product-dialog';
   import { DeleteConfirmationDialog } from '@/app/components/delete-confirmation-dialog';
+  import { useToast } from '@/hooks/use-toast';
+  import { exportToExcel, importFromExcel } from '@/lib/utils';
   
   export default function ProductListPage() {
     const [products, setProducts] = useState(productListData);
@@ -33,6 +35,8 @@ import {
     const [isDialogOpen, setIsDialogOpen] = useState(false);
     const [searchQuery, setSearchQuery] = useState('');
     const [categoryFilter, setCategoryFilter] = useState('all');
+    const fileInputRef = useRef<HTMLInputElement>(null);
+    const { toast } = useToast();
 
     const filteredProducts = useMemo(() => {
         let filtered = products;
@@ -86,6 +90,37 @@ import {
       }
     }
 
+    const handleExport = () => {
+        exportToExcel(products, 'products');
+        toast({ title: "Export Successful", description: "Product data has been exported to Excel." });
+    };
+
+    const handleImportClick = () => {
+        fileInputRef.current?.click();
+    };
+
+    const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
+        const file = event.target.files?.[0];
+        if (file) {
+            try {
+                const data = await importFromExcel(file) as ProductListItem[];
+                setProducts(prev => [...prev, ...data]);
+                toast({
+                    title: "Import Successful",
+                    description: `${data.length} products imported successfully.`,
+                });
+            } catch (error) {
+                console.error("Error importing file:", error);
+                toast({
+                    variant: "destructive",
+                    title: "Import Error",
+                    description: "Failed to import the Excel file. Please check the file format.",
+                });
+            }
+        }
+    };
+
+
     return (
       <main className="flex flex-1 flex-col gap-4 p-4 md:gap-8 md:p-8">
         <div>
@@ -119,8 +154,9 @@ import {
                             <SelectItem value="aksesoris">Aksesoris</SelectItem>
                           </SelectContent>
                         </Select>
-                       <Button variant="outline"><Upload className="mr-2 h-4 w-4"/> Import</Button>
-                       <Button variant="outline"><Download className="mr-2 h-4 w-4"/> Export</Button>
+                       <input type="file" ref={fileInputRef} onChange={handleFileChange} className="hidden" accept=".xlsx, .xls" />
+                       <Button variant="outline" onClick={handleImportClick}><Upload className="mr-2 h-4 w-4"/> Import</Button>
+                       <Button variant="outline" onClick={handleExport}><Download className="mr-2 h-4 w-4"/> Export</Button>
                        <AddProductDialog
                           isOpen={isDialogOpen}
                           onOpenChange={handleDialogStateChange}

@@ -1,6 +1,6 @@
 
 'use client';
-
+import { useState, useMemo, useRef } from 'react';
 import {
   Card,
   CardContent,
@@ -20,11 +20,63 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
-import { taxInvoiceData } from '@/app/lib/data';
-import { Search, Upload, Download, Filter, Plus, ArrowUpDown } from 'lucide-react';
+import { taxInvoiceData, type TaxInvoice } from '@/app/lib/data';
+import { Search, Upload, Download, Filter, ArrowUpDown } from 'lucide-react';
 import { AddTaxInvoiceDialog } from './_components/add-tax-invoice-dialog';
+import { useToast } from '@/hooks/use-toast';
+import { exportToExcel, importFromExcel } from '@/lib/utils';
 
 export default function TaxInvoicePage() {
+    const [data, setData] = useState(taxInvoiceData);
+    const [searchQuery, setSearchQuery] = useState('');
+    const [activeTab, setActiveTab] = useState('all');
+    const fileInputRef = useRef<HTMLInputElement>(null);
+    const { toast } = useToast();
+
+    const filteredData = useMemo(() => {
+        let filtered = data;
+        if (activeTab !== 'all') {
+            filtered = data.filter(i => i.status.toLowerCase() === activeTab);
+        }
+        if (searchQuery) {
+            filtered = filtered.filter(i =>
+                Object.values(i).some(val => String(val).toLowerCase().includes(searchQuery.toLowerCase()))
+            );
+        }
+        return filtered;
+    }, [data, searchQuery, activeTab]);
+    
+    const handleExport = () => {
+        exportToExcel(data, 'tax-invoices');
+        toast({ title: "Export Successful", description: "Tax invoice data has been exported to Excel." });
+    };
+
+    const handleImportClick = () => {
+        fileInputRef.current?.click();
+    };
+
+    const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
+        const file = event.target.files?.[0];
+        if (file) {
+            try {
+                const imported = await importFromExcel(file) as TaxInvoice[];
+                setData(prev => [...prev, ...imported]);
+                toast({
+                    title: "Import Successful",
+                    description: `${imported.length} tax invoices imported successfully.`,
+                });
+            } catch (error) {
+                console.error("Error importing file:", error);
+                toast({
+                    variant: "destructive",
+                    title: "Import Error",
+                    description: "Failed to import the Excel file. Please check the file format.",
+                });
+            }
+        }
+    };
+
+
   return (
     <main className="flex flex-1 flex-col gap-4 p-4 md:gap-8 md:p-8">
       <div>
@@ -77,33 +129,34 @@ export default function TaxInvoicePage() {
 
       <Card>
         <CardContent className="pt-6">
-          <Tabs defaultValue="all">
+          <Tabs defaultValue="all" value={activeTab} onValueChange={setActiveTab}>
             <div className="flex justify-between items-center mb-4">
               <div>
                 <h2 className="text-xl font-bold">Tax Invoices</h2>
               </div>
               <div className="flex items-center gap-2">
-                 <Button variant="outline"><Upload className="mr-2 h-4 w-4"/> Import</Button>
-                 <Button variant="outline"><Download className="mr-2 h-4 w-4"/> Export</Button>
+                 <input type="file" ref={fileInputRef} onChange={handleFileChange} className="hidden" accept=".xlsx, .xls" />
+                 <Button variant="outline" onClick={handleImportClick}><Upload className="mr-2 h-4 w-4"/> Import</Button>
+                 <Button variant="outline" onClick={handleExport}><Download className="mr-2 h-4 w-4"/> Export</Button>
                  <Button variant="outline"><Filter className="mr-2 h-4 w-4"/> Filter Duplikat</Button>
                  <AddTaxInvoiceDialog />
               </div>
             </div>
             <div className="flex justify-between items-center">
               <TabsList>
-                <TabsTrigger value="all">All <Badge variant="secondary" className="ml-2">4</Badge></TabsTrigger>
-                <TabsTrigger value="approved">APPROVED <Badge variant="secondary" className="ml-2">3</Badge></TabsTrigger>
-                <TabsTrigger value="cancelled">Dibatalkan <Badge variant="secondary" className="ml-2">1</Badge></TabsTrigger>
+                <TabsTrigger value="all">All <Badge variant="secondary" className="ml-2">{data.length}</Badge></TabsTrigger>
+                <TabsTrigger value="approved">APPROVED <Badge variant="secondary" className="ml-2">{data.filter(i=>i.status === 'APPROVED').length}</Badge></TabsTrigger>
+                <TabsTrigger value="cancelled">Dibatalkan <Badge variant="secondary" className="ml-2">{data.filter(i=>i.status === 'Dibatalkan').length}</Badge></TabsTrigger>
               </TabsList>
               <div className="flex items-center gap-2">
                 <div className="relative w-64">
                   <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-                  <Input type="search" placeholder="Search" className="pl-8" />
+                  <Input type="search" placeholder="Search" className="pl-8" value={searchQuery} onChange={e => setSearchQuery(e.target.value)} />
                 </div>
                 <Button variant="outline"><Filter className="mr-2 h-4 w-4" /> Filters</Button>
               </div>
             </div>
-            <TabsContent value="all">
+            <TabsContent value={activeTab}>
               <div className="mt-4 w-full overflow-auto">
                 <Table>
                   <TableHeader>
@@ -118,7 +171,7 @@ export default function TaxInvoicePage() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {taxInvoiceData.map((invoice) => (
+                    {filteredData.map((invoice) => (
                       <TableRow key={invoice.taxInvoiceNumber}>
                         <TableCell><Checkbox /></TableCell>
                         <TableCell className="font-medium">{invoice.buyerNpwp}</TableCell>
@@ -135,7 +188,7 @@ export default function TaxInvoicePage() {
                 </Table>
               </div>
               <div className="text-sm text-muted-foreground mt-4">
-                Showing 1 to 1 of 1 entries
+                Showing 1 to {filteredData.length} of {data.length} entries
               </div>
             </TabsContent>
           </Tabs>

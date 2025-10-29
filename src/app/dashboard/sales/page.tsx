@@ -1,6 +1,6 @@
 
 'use client';
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import {
     Card,
@@ -28,10 +28,11 @@ import {
   import { Badge } from '@/components/ui/badge';
   import { Checkbox } from '@/components/ui/checkbox';
   import { salesListData, type SalesListItem } from '@/app/lib/data';
-  import { Search, Filter, MoreHorizontal, ArrowUpDown, Plus, Upload, Download, Eye, Edit, Trash2 } from 'lucide-react';
+  import { Search, Filter, MoreHorizontal, ArrowUpDown, Plus, Upload, Download, Eye, Edit } from 'lucide-react';
   import { AddSaleDialog } from './_components/add-sale-dialog';
   import { useToast } from '@/hooks/use-toast';
   import { DeleteConfirmationDialog } from '@/app/components/delete-confirmation-dialog';
+  import { exportToExcel, importFromExcel } from '@/lib/utils';
   
   export default function SalesListPage() {
     const router = useRouter();
@@ -39,6 +40,7 @@ import {
     const [sales, setSales] = useState<SalesListItem[]>(salesListData);
     const [editingSale, setEditingSale] = useState<SalesListItem | undefined>(undefined);
     const [isDialogOpen, setIsDialogOpen] = useState(false);
+    const fileInputRef = useRef<HTMLInputElement>(null);
     
     const [searchQuery, setSearchQuery] = useState('');
     const [activeTab, setActiveTab] = useState('all');
@@ -101,6 +103,37 @@ import {
             setEditingSale(undefined);
         }
     };
+    
+    const handleExport = () => {
+        exportToExcel(sales, 'sales');
+        toast({ title: "Export Successful", description: "Sales data has been exported to Excel." });
+    };
+
+    const handleImportClick = () => {
+        fileInputRef.current?.click();
+    };
+
+    const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
+        const file = event.target.files?.[0];
+        if (file) {
+            try {
+                const data = await importFromExcel(file) as SalesListItem[];
+                setSales(prev => [...prev, ...data]);
+                toast({
+                    title: "Import Successful",
+                    description: `${data.length} sales records imported successfully.`,
+                });
+            } catch (error) {
+                console.error("Error importing file:", error);
+                toast({
+                    variant: "destructive",
+                    title: "Import Error",
+                    description: "Failed to import the Excel file. Please check the file format.",
+                });
+            }
+        }
+    };
+
 
     return (
       <main className="flex flex-1 flex-col gap-4 p-4 md:gap-8 md:p-8">
@@ -174,8 +207,9 @@ import {
                             <h2 className="text-xl font-bold">Sales</h2>
                         </div>
                         <div className="flex items-center gap-2">
-                           <Button variant="outline"><Upload className="mr-2 h-4 w-4"/> Import</Button>
-                           <Button variant="outline"><Download className="mr-2 h-4 w-4"/> Export</Button>
+                           <input type="file" ref={fileInputRef} onChange={handleFileChange} className="hidden" accept=".xlsx, .xls" />
+                           <Button variant="outline" onClick={handleImportClick}><Upload className="mr-2 h-4 w-4"/> Import</Button>
+                           <Button variant="outline" onClick={handleExport}><Download className="mr-2 h-4 w-4"/> Export</Button>
                            <AddSaleDialog 
                                 isOpen={isDialogOpen}
                                 onOpenChange={handleDialogStateChange}
@@ -286,4 +320,3 @@ import {
       </main>
     );
   }
-  

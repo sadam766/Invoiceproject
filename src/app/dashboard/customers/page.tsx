@@ -1,6 +1,6 @@
 
 'use client';
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useRef } from 'react';
 import {
     Card,
     CardContent,
@@ -16,15 +16,19 @@ import {
   import { Input } from '@/components/ui/input';
   import { Button } from '@/components/ui/button';
   import { customerListData, type Customer } from '@/app/lib/data';
-  import { Search, Upload, Download, Plus } from 'lucide-react';
+  import { Search, Upload, Download } from 'lucide-react';
   import { AddCustomerDialog } from './_components/add-customer-dialog';
   import { DeleteConfirmationDialog } from '@/app/components/delete-confirmation-dialog';
+  import { useToast } from '@/hooks/use-toast';
+  import { exportToExcel, importFromExcel } from '@/lib/utils';
   
   export default function CustomerListPage() {
     const [customers, setCustomers] = useState(customerListData);
     const [editingCustomer, setEditingCustomer] = useState<Customer | undefined>(undefined);
     const [isDialogOpen, setIsDialogOpen] = useState(false);
     const [searchQuery, setSearchQuery] = useState('');
+    const fileInputRef = useRef<HTMLInputElement>(null);
+    const { toast } = useToast();
 
     const filteredCustomers = useMemo(() => {
         if (!searchQuery) {
@@ -70,6 +74,37 @@ import {
         setEditingCustomer(undefined);
       }
     }
+
+    const handleExport = () => {
+        exportToExcel(customers, 'customers');
+        toast({ title: "Export Successful", description: "Customer data has been exported to Excel." });
+    };
+
+    const handleImportClick = () => {
+        fileInputRef.current?.click();
+    };
+
+    const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
+        const file = event.target.files?.[0];
+        if (file) {
+            try {
+                const data = await importFromExcel(file) as Omit<Customer, 'id'>[];
+                const newCustomers: Customer[] = data.map(c => ({...c, id: (Math.random() + 1).toString(36).substring(7) }));
+                setCustomers(prev => [...prev, ...newCustomers]);
+                toast({
+                    title: "Import Successful",
+                    description: `${data.length} customers imported successfully.`,
+                });
+            } catch (error) {
+                console.error("Error importing file:", error);
+                toast({
+                    variant: "destructive",
+                    title: "Import Error",
+                    description: "Failed to import the Excel file. Please check the file format.",
+                });
+            }
+        }
+    };
     
     return (
       <main className="flex flex-1 flex-col gap-4 p-4 md:gap-8 md:p-8">
@@ -94,8 +129,9 @@ import {
                         />
                     </div>
                     <div className="flex items-center gap-2">
-                       <Button variant="outline"><Upload className="mr-2 h-4 w-4"/> Import</Button>
-                       <Button variant="outline"><Download className="mr-2 h-4 w-4"/> Export</Button>
+                       <input type="file" ref={fileInputRef} onChange={handleFileChange} className="hidden" accept=".xlsx, .xls" />
+                       <Button variant="outline" onClick={handleImportClick}><Upload className="mr-2 h-4 w-4"/> Import</Button>
+                       <Button variant="outline" onClick={handleExport}><Download className="mr-2 h-4 w-4"/> Export</Button>
                        <AddCustomerDialog
                          isOpen={isDialogOpen}
                          onOpenChange={handleDialogStateChange}
