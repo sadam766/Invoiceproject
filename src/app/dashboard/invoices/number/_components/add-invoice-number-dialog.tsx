@@ -30,7 +30,8 @@ import { Calendar } from '@/components/ui/calendar';
 import { cn, formatNumberWithCommas, parseFormattedNumber } from '@/lib/utils';
 import { format } from 'date-fns';
 import type { InvoiceNumber } from '@/app/lib/data';
-import { customerListData, salesOrderListData } from '@/app/lib/data';
+import { customerListData, salesOrderListData, invoiceNumberData } from '@/app/lib/data';
+import { useToast } from '@/hooks/use-toast';
 
 
 type AddInvoiceNumberDialogProps = {
@@ -59,6 +60,7 @@ export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceDa
 
   const [customerPopoverOpen, setCustomerPopoverOpen] = useState(false);
   const [soPopoverOpen, setSoPopoverOpen] = useState(false);
+  const { toast } = useToast();
 
   const uniqueSalesOrders = Array.from(new Set(salesOrderListData.map(item => item.soNumber)));
 
@@ -155,6 +157,16 @@ export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceDa
   };
 
   const handleSave = () => {
+    // Check for duplicates before saving
+    if (!invoiceData && invoiceNumberData.some(inv => inv.id === fullInvoiceNumber)) {
+      toast({
+        variant: "destructive",
+        title: "Duplicate Invoice Number",
+        description: `Invoice number "${fullInvoiceNumber}" already exists. Please use a different number.`,
+      });
+      return; // Stop the save process
+    }
+
     const formattedDate = date ? format(date, 'dd/MM/yyyy') : '';
     const numericAmount = typeof amount === 'string' ? parseFormattedNumber(amount) : amount;
     onSave({
@@ -329,9 +341,11 @@ export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceDa
         </div>
         <div className="pt-6 border-t flex justify-end gap-2">
           <Button variant="ghost" onClick={() => onOpenChange(false)}>Cancel</Button>
-          <Button type="button" onClick={handleSave}>Save &amp; Create Invoice</Button>
+          <Button type="button" onClick={handleSave}>Save & Create Invoice</Button>
         </div>
       </DialogContent>
     </Dialog>
   );
 }
+
+    
