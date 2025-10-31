@@ -1,4 +1,3 @@
-
 'use client';
 import { useState, useMemo, useRef } from 'react';
 import {
@@ -15,22 +14,33 @@ import {
   } from '@/components/ui/table';
   import { Input } from '@/components/ui/input';
   import { Button } from '@/components/ui/button';
-  import { customerListData, type Customer } from '@/app/lib/data';
+  import type { Customer } from '@/app/lib/data';
   import { Search, Upload, Download } from 'lucide-react';
   import { AddCustomerDialog } from './_components/add-customer-dialog';
   import { DeleteConfirmationDialog } from '@/app/components/delete-confirmation-dialog';
   import { useToast } from '@/hooks/use-toast';
   import { exportToExcel, importFromExcel } from '@/lib/utils';
-  
+  import { useFirestore, useUser, useCollection, useMemoFirebase } from '@/firebase';
+  import { collection, doc, setDoc, deleteDoc, writeBatch } from 'firebase/firestore';
+
   export default function CustomerListPage() {
-    const [customers, setCustomers] = useState(customerListData);
+    const firestore = useFirestore();
+    const { user } = useUser();
     const [editingCustomer, setEditingCustomer] = useState<Customer | undefined>(undefined);
     const [isDialogOpen, setIsDialogOpen] = useState(false);
     const [searchQuery, setSearchQuery] = useState('');
     const fileInputRef = useRef<HTMLInputElement>(null);
     const { toast } = useToast();
 
+    const customersCollection = useMemoFirebase(() => {
+        if (!firestore) return null;
+        return collection(firestore, 'customers');
+    }, [firestore]);
+
+    const { data: customers, isLoading } = useCollection<Customer>(customersCollection);
+
     const filteredCustomers = useMemo(() => {
+        if (!customers) return [];
         if (!searchQuery) {
           return customers;
         }
@@ -51,21 +61,40 @@ import {
         setIsDialogOpen(true);
     };
 
-    const handleDelete = (customerId: string) => {
-        setCustomers(customers.filter((c) => c.id !== customerId));
+    const handleDelete = async (customerId: string) => {
+        if (!firestore) return;
+        const docRef = doc(firestore, 'customers', customerId);
+        await deleteDoc(docRef);
+        toast({ title: 'Customer deleted' });
     };
 
-    const handleSave = (customer: Omit<Customer, 'id'>) => {
-        if (editingCustomer) {
-          // Editing existing customer
-          setCustomers(customers.map((c) => c.id === editingCustomer.id ? { ...customer, id: c.id } : c));
-        } else {
-          // Adding new customer
-          const newCustomer = { ...customer, id: (Math.random() + 1).toString(36).substring(7) };
-          setCustomers([...customers, newCustomer]);
+    const handleSave = async (customer: Omit<Customer, 'id'> & { id?: string }) => {
+        if (!firestore) return;
+        
+        let customerId = customer.id || editingCustomer?.id;
+        if (!customerId) {
+            // Create a new ID for a new customer
+            customerId = doc(collection(firestore, 'customers')).id;
         }
-        setIsDialogOpen(false);
-        setEditingCustomer(undefined);
+
+        const docRef = doc(firestore, 'customers', customerId);
+        
+        try {
+            await setDoc(docRef, { ...customer, id: customerId }, { merge: true });
+            toast({
+                title: editingCustomer ? 'Customer Updated' : 'Customer Added',
+                description: `Customer ${customer.name} has been saved.`,
+            });
+            setIsDialogOpen(false);
+            setEditingCustomer(undefined);
+        } catch (error) {
+            console.error("Error saving customer: ", error);
+            toast({
+                variant: 'destructive',
+                title: 'Error',
+                description: 'Could not save customer. See console for details.',
+            });
+        }
       };
 
     const handleDialogStateChange = (open: boolean) => {
@@ -76,8 +105,10 @@ import {
     }
 
     const handleExport = () => {
-        exportToExcel(customers, 'customers');
-        toast({ title: "Export Successful", description: "Customer data has been exported to Excel." });
+        if (customers) {
+            exportToExcel(customers, 'customers');
+            toast({ title: "Export Successful", description: "Customer data has been exported to Excel." });
+        }
     };
 
     const handleImportClick = () => {
@@ -86,11 +117,18 @@ import {
 
     const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
         const file = event.target.files?.[0];
-        if (file) {
+        if (file && firestore) {
             try {
                 const data = await importFromExcel(file) as Omit<Customer, 'id'>[];
-                const newCustomers: Customer[] = data.map(c => ({...c, id: (Math.random() + 1).toString(36).substring(7) }));
-                setCustomers(prev => [...prev, ...newCustomers]);
+                const batch = writeBatch(firestore);
+
+                data.forEach(customerData => {
+                    const newDocRef = doc(collection(firestore, 'customers'));
+                    batch.set(newDocRef, { ...customerData, id: newDocRef.id });
+                });
+
+                await batch.commit();
+                
                 toast({
                     title: "Import Successful",
                     description: `${data.length} customers imported successfully.`,
@@ -153,7 +191,12 @@ import {
                             </TableRow>
                         </TableHeader>
                         <TableBody>
-                            {filteredCustomers?.map((customer) => (
+                            {isLoading && (
+                                <TableRow>
+                                    <TableCell colSpan={4} className="text-center">Loading customers...</TableCell>
+                                </TableRow>
+                            )}
+                            {!isLoading && filteredCustomers?.map((customer) => (
                                 <TableRow key={customer.id}>
                                     <TableCell className="font-medium">{customer.name}</TableCell>
                                     <TableCell>{customer.address}</TableCell>

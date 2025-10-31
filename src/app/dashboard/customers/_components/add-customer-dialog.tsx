@@ -1,4 +1,3 @@
-
 'use client';
 import { Button } from '@/components/ui/button';
 import {
@@ -19,7 +18,7 @@ import { useEffect, useState } from 'react';
 type AddCustomerDialogProps = {
   isOpen: boolean;
   onOpenChange: (isOpen: boolean) => void;
-  onSave: (customer: Omit<Customer, 'id'>) => void;
+  onSave: (customer: Omit<Customer, 'id'> & { id?: string }) => void;
   customerData?: Customer;
   onAddClick: () => void;
 };
@@ -43,7 +42,7 @@ export function AddCustomerDialog({ isOpen, onOpenChange, onSave, customerData, 
   }, [customerData, isOpen]);
 
   const handleSave = () => {
-    onSave({ name, address, spdAddress });
+    onSave({ id: customerData?.id, name, address, spdAddress });
     onOpenChange(false);
   };
   
