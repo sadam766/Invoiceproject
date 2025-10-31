@@ -1,0 +1,176 @@
+{
+  "entities": {
+    "Product": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Product",
+      "type": "object",
+      "description": "Represents a product in the sales dashboard.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the product."
+        },
+        "name": {
+          "type": "string",
+          "description": "Name of the product."
+        },
+        "description": {
+          "type": "string",
+          "description": "Description of the product."
+        },
+        "price": {
+          "type": "number",
+          "description": "Price of the product."
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "description",
+        "price"
+      ]
+    },
+    "Customer": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Customer",
+      "type": "object",
+      "description": "Represents a customer in the sales dashboard.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the customer."
+        },
+        "name": {
+          "type": "string",
+          "description": "Name of the customer."
+        },
+        "email": {
+          "type": "string",
+          "description": "Email address of the customer.",
+          "format": "email"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "email"
+      ]
+    },
+    "Sale": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Sale",
+      "type": "object",
+      "description": "Represents a sale transaction in the sales dashboard.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the sale transaction."
+        },
+        "customerId": {
+          "type": "string",
+          "description": "Reference to Customer. (Relationship: Customer 1:N Sale)"
+        },
+        "productId": {
+          "type": "string",
+          "description": "Reference to Product. (Relationship: Product 1:N Sale)"
+        },
+        "date": {
+          "type": "string",
+          "description": "Date of the sale transaction.",
+          "format": "date-time"
+        },
+        "amount": {
+          "type": "number",
+          "description": "Total amount of the sale transaction."
+        },
+        "status": {
+          "type": "string",
+          "description": "Status of the sale transaction (e.g., 'completed', 'pending', 'cancelled')."
+        }
+      },
+      "required": [
+        "id",
+        "customerId",
+        "productId",
+        "date",
+        "amount",
+        "status"
+      ]
+    }
+  },
+  "auth": {
+    "providers": [
+      "password",
+      "anonymous"
+    ]
+  },
+  "firestore": {
+    "structure": [
+      {
+        "path": "/products/{productId}",
+        "definition": {
+          "entityName": "Product",
+          "schema": {
+            "$ref": "#/backend/entities/Product"
+          },
+          "description": "Stores product information.  Write access is restricted to users with admin privileges (checked via `/roles_admin/{uid}`).",
+          "params": [
+            {
+              "name": "productId",
+              "description": "The unique identifier for the product."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/customers/{customerId}",
+        "definition": {
+          "entityName": "Customer",
+          "schema": {
+            "$ref": "#/backend/entities/Customer"
+          },
+          "description": "Stores customer data. Only the customer (identified by their UID) can read/write their own data.",
+          "params": [
+            {
+              "name": "customerId",
+              "description": "The unique identifier for the customer, which matches their Firebase Auth UID."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/sales/{saleId}",
+        "definition": {
+          "entityName": "Sale",
+          "schema": {
+            "$ref": "#/backend/entities/Sale"
+          },
+          "description": "Stores sale transaction data. Includes denormalized `customerId` for authorization independence.  Only the customer associated with the sale can read/write the sale data.",
+          "params": [
+            {
+              "name": "saleId",
+              "description": "The unique identifier for the sale transaction."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/roles_admin/{uid}",
+        "definition": {
+          "entityName": "roles_admin",
+          "schema": {
+            "$ref": "#/backend/entities/user"
+          },
+          "description": "Collection to store UIDs of users with admin privileges. Existence of a document grants admin rights.",
+          "params": [
+            {
+              "name": "uid",
+              "description": "The Firebase Auth UID of the admin user."
+            }
+          ]
+        }
+      }
+    ],
+    "reasoning": "The Firestore structure is designed to securely manage product, customer, and sales data for the sales dashboard application. It prioritizes Authorization Independence, clarity, and ease of querying.\n\n**Authorization Independence:**\n\n*   Sales are stored directly under a `sales` collection. To enforce security without relying on hierarchical `get()` calls, `customerId` is denormalized inside the Sale document. This allows rules to validate that the `customerId` matches the `request.auth.uid` when creating or modifying sales, without needing to read the customer document.\n\n**Structural Segregation:**\n\n*   Each entity type (products, customers, sales) is stored in its own top-level collection. This segregation simplifies security rules because each collection has a distinct access pattern.\n\n**Access Modeling:**\n\n*   **Customers:** Customers are stored in the `/customers/{customerId}` collection. This path-based ownership allows simple rules enforcing that only the authenticated user (with `uid` equal to `customerId`) can read/write their customer data.\n*   **Sales:** Sales are stored in the `/sales/{saleId}` collection. Security is enforced using denormalized `customerId` to restrict access to sales associated with the authenticated user.\n*   **Products:** Products are stored in the `/products/{productId}` collection. Assuming all products are publicly readable but only admins can create/update them, a separate `/roles_admin/{uid}` collection controls administrative privileges.  Rules on the `/products` collection check for the existence of a document in `/roles_admin/{request.auth.uid}` to grant write access.\n\n**QAPs (Rules are not Filters):**\n\n*   The structure supports secure listing of sales associated with a specific customer because the `customerId` is available in each `Sale` document. This allows rules to filter sales based on the `request.auth.uid` (which represents the `customerId`). Products are secured based on admin roles.\n\n**Invariants:**\n\n*   Timestamps could be added to documents (e.g., `createdAt`, `updatedAt`) to track changes. Security rules can enforce that `createdAt` is only set on creation and `updatedAt` is always updated on modifications.\n"
+  }
+}
