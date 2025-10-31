@@ -52,7 +52,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import React from 'react';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { ThemeToggle } from '../components/theme-toggle';
 import { cn } from '@/lib/utils';
@@ -63,10 +63,16 @@ export default function DashboardLayout({
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
+  const router = useRouter();
 
   if (pathname === '/login') {
     return <>{children}</>;
   }
+  
+  const handleLogout = () => {
+    router.push('/login');
+  };
+
 
   return (
     <SidebarProvider>
@@ -271,7 +277,7 @@ export default function DashboardLayout({
                     <DropdownMenuItem>Profile</DropdownMenuItem>
                     <DropdownMenuItem>Settings</DropdownMenuItem>
                     <DropdownMenuSeparator />
-                    <DropdownMenuItem>Log out</DropdownMenuItem>
+                    <DropdownMenuItem onClick={handleLogout}>Log out</DropdownMenuItem>
                     </DropdownMenuContent>
                 </DropdownMenu>
             </div>
