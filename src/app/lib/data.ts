@@ -248,6 +248,7 @@ export type ProductListItem = {
 
 export let productListData: ProductListItem[] = [
     {
+        id: '1',
         name: 'Kabel Fiber Optik',
         category: 'Kabel',
         quantity: 100,
@@ -255,6 +256,7 @@ export let productListData: ProductListItem[] = [
         price: 15000,
     },
     {
+        id: '2',
         name: 'Konektor RJ45',
         category: 'Aksesoris',
         quantity: 500,
@@ -262,6 +264,7 @@ export let productListData: ProductListItem[] = [
         price: 2500,
     },
     {
+        id: '3',
         name: 'Kabel Tembaga 2.5mm',
         category: 'Kabel',
         quantity: 15,
@@ -325,27 +328,6 @@ export type Customer = {
   address: string;
   spdAddress: string;
 };
-
-export let customerListData: Customer[] = [
-  {
-    id: '1',
-    name: 'PT. Sejahtera Abadi',
-    address: 'Jl. Jendral Sudirman No. 123, Jakarta',
-    spdAddress: 'Jl. Gatot Subroto No. 45, Jakarta',
-  },
-  { 
-    id: '2',
-    name: 'CV. Maju Jaya',
-    address: 'Jl. Gajah Mada No. 10, Surabaya',
-    spdAddress: 'Jl. Gajah Mada No. 10, Surabaya',
-  },
-  { 
-    id: '3',
-    name: 'Toko Listrik Sinar Jaya',
-    address: 'Jl. Hayam Wuruk No. 5, Jakarta',
-    spdAddress: 'Jl. Hayam Wuruk No. 5, Jakarta',
-  },
-];
 
 export type SalesListItem = {
   soNumber: string;

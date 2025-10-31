@@ -22,15 +22,17 @@ import {
   } from '@/components/ui/select';
   import { Input } from '@/components/ui/input';
   import { Button } from '@/components/ui/button';
-  import { productListData, type ProductListItem } from '@/app/lib/data';
+  import type { ProductListItem } from '@/app/lib/data';
   import { Search, Upload, Download } from 'lucide-react';
   import { AddProductDialog } from './_components/add-product-dialog';
   import { DeleteConfirmationDialog } from '@/app/components/delete-confirmation-dialog';
   import { useToast } from '@/hooks/use-toast';
   import { exportToExcel, importFromExcel } from '@/lib/utils';
+  import { useFirestore, useCollection, useMemoFirebase } from '@/firebase';
+  import { collection, doc, setDoc, deleteDoc, writeBatch } from 'firebase/firestore';
   
   export default function ProductListPage() {
-    const [products, setProducts] = useState(productListData);
+    const firestore = useFirestore();
     const [editingProduct, setEditingProduct] = useState<ProductListItem | undefined>(undefined);
     const [isDialogOpen, setIsDialogOpen] = useState(false);
     const [searchQuery, setSearchQuery] = useState('');
@@ -38,7 +40,15 @@ import {
     const fileInputRef = useRef<HTMLInputElement>(null);
     const { toast } = useToast();
 
+    const productsCollection = useMemoFirebase(() => {
+        if (!firestore) return null;
+        return collection(firestore, 'products');
+    }, [firestore]);
+
+    const { data: products, isLoading } = useCollection<ProductListItem>(productsCollection);
+
     const filteredProducts = useMemo(() => {
+        if (!products) return [];
         let filtered = products;
         if (categoryFilter !== 'all') {
             filtered = filtered.filter(p => p.category === categoryFilter);
@@ -63,24 +73,40 @@ import {
         setIsDialogOpen(true);
     };
 
-    const handleDelete = (productName: string) => {
-        setProducts(products.filter((p) => p.name !== productName));
+    const handleDelete = async (productId: string) => {
+        if (!firestore) return;
+        const docRef = doc(firestore, 'products', productId);
+        await deleteDoc(docRef);
+        toast({ title: 'Product deleted' });
     };
 
-    const handleSave = (product: ProductListItem) => {
-      if (editingProduct && editingProduct.name === product.name) {
-        // Editing existing product
-        setProducts(products.map((p) => p.name === product.name ? product : p));
-      } else if (editingProduct) {
-        // Editing existing product but with new name
-        const filteredProducts = products.filter(p => p.name !== editingProduct.name);
-        setProducts([...filteredProducts, product]);
-      } else {
-        // Adding new product
-        setProducts([...products, product]);
-      }
-      setIsDialogOpen(false);
-      setEditingProduct(undefined);
+    const handleSave = async (product: Omit<ProductListItem, 'id'> & { id?: string }) => {
+        if (!firestore) return;
+
+        let productId = product.id;
+        if (!productId) {
+            // Create a new ID for a new product if it's not being edited
+            productId = doc(collection(firestore, 'products')).id;
+        }
+
+        const docRef = doc(firestore, 'products', productId);
+
+        try {
+            await setDoc(docRef, { ...product, id: productId }, { merge: true });
+            toast({
+                title: editingProduct ? 'Product Updated' : 'Product Added',
+                description: `Product ${product.name} has been saved.`,
+            });
+            setIsDialogOpen(false);
+            setEditingProduct(undefined);
+        } catch (error) {
+            console.error("Error saving product: ", error);
+            toast({
+                variant: 'destructive',
+                title: 'Error',
+                description: 'Could not save product. See console for details.',
+            });
+        }
     };
 
     const handleDialogStateChange = (open: boolean) => {
@@ -91,8 +117,10 @@ import {
     }
 
     const handleExport = () => {
-        exportToExcel(products, 'products');
-        toast({ title: "Export Successful", description: "Product data has been exported to Excel." });
+        if (products) {
+            exportToExcel(products, 'products');
+            toast({ title: "Export Successful", description: "Product data has been exported to Excel." });
+        }
     };
 
     const handleImportClick = () => {
@@ -101,10 +129,18 @@ import {
 
     const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
         const file = event.target.files?.[0];
-        if (file) {
+        if (file && firestore) {
             try {
-                const data = await importFromExcel(file) as ProductListItem[];
-                setProducts(prev => [...prev, ...data]);
+                const data = await importFromExcel(file) as Omit<ProductListItem, 'id'>[];
+                const batch = writeBatch(firestore);
+
+                data.forEach(productData => {
+                    const newDocRef = doc(collection(firestore, 'products'));
+                    batch.set(newDocRef, { ...productData, id: newDocRef.id });
+                });
+
+                await batch.commit();
+
                 toast({
                     title: "Import Successful",
                     description: `${data.length} products imported successfully.`,
@@ -180,8 +216,13 @@ import {
                             </TableRow>
                         </TableHeader>
                         <TableBody>
-                            {filteredProducts.map((product) => (
-                                <TableRow key={product.name}>
+                            {isLoading && (
+                                <TableRow>
+                                    <TableCell colSpan={6} className="text-center">Loading products...</TableCell>
+                                </TableRow>
+                            )}
+                            {!isLoading && filteredProducts?.map((product) => (
+                                <TableRow key={product.id}>
                                     <TableCell className="font-medium">{product.name}</TableCell>
                                     <TableCell>{product.category}</TableCell>
                                     <TableCell>{product.quantity} units</TableCell>
@@ -190,7 +231,7 @@ import {
                                     <TableCell>
                                         <div className="flex gap-2">
                                             <Button variant="link" className="p-0 h-auto" onClick={() => handleEdit(product)}>Edit</Button>
-                                            <DeleteConfirmationDialog onConfirm={() => handleDelete(product.name)} />
+                                            <DeleteConfirmationDialog onConfirm={() => handleDelete(product.id!)} />
                                         </div>
                                     </TableCell>
                                 </TableRow>
@@ -199,7 +240,7 @@ import {
                     </Table>
                 </div>
                 <div className="text-sm text-muted-foreground mt-4">
-                    Showing 1 to {filteredProducts.length} of {products.length} entries
+                    Showing 1 to {filteredProducts?.length || 0} of {products?.length || 0} entries
                 </div>
             </CardContent>
         </Card>

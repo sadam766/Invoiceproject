@@ -27,7 +27,7 @@ import { formatNumberWithCommas, parseFormattedNumber } from '@/lib/utils';
 type AddProductDialogProps = {
   isOpen: boolean;
   onOpenChange: (isOpen: boolean) => void;
-  onSave: (product: ProductListItem) => void;
+  onSave: (product: Omit<ProductListItem, 'id'> & { id?: string }) => void;
   productData?: ProductListItem;
   onAddClick: () => void;
 };
@@ -65,6 +65,7 @@ export function AddProductDialog({ isOpen, onOpenChange, onSave, productData, on
 
   const handleSave = () => {
     onSave({ 
+        id: productData?.id,
         name, 
         category, 
         quantity: typeof quantity === 'string' ? parseFormattedNumber(quantity) : quantity, 
