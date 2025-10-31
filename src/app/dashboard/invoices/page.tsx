@@ -22,7 +22,7 @@ import {
   import { Button } from '@/components/ui/button';
   import { Badge } from '@/components/ui/badge';
   import { Checkbox } from '@/components/ui/checkbox';
-  import { invoiceListData, type Invoice, spdData, type SpdData, salesOrderListData, customerListData } from '@/app/lib/data';
+  import { invoiceListData, type Invoice, spdData, type SpdData, salesOrderListData, type Customer } from '@/app/lib/data';
   import { Search, Filter, MoreHorizontal, ArrowUpDown, Plus, Eye, Pencil } from 'lucide-react';
   import { Skeleton } from '@/components/ui/skeleton';
   import {
@@ -33,6 +33,8 @@ import {
   } from '@/components/ui/dropdown-menu';
   import { DeleteConfirmationDialog } from '@/app/components/delete-confirmation-dialog';
   import { useToast } from '@/hooks/use-toast';
+  import { useFirestore, useCollection, useMemoFirebase } from '@/firebase';
+  import { collection } from 'firebase/firestore';
 
 
   export default function InvoiceListPage() {
@@ -44,7 +46,14 @@ import {
     const [searchQuery, setSearchQuery] = useState('');
     const [selectedInvoices, setSelectedInvoices] = useState<Set<string>>(new Set());
     const { toast } = useToast();
+    const firestore = useFirestore();
     
+    const customersCollection = useMemoFirebase(() => {
+        if (!firestore) return null;
+        return collection(firestore, 'customers');
+    }, [firestore]);
+    const { data: customerListData } = useCollection<Customer>(customersCollection);
+
     const filteredInvoices = useMemo(() => {
         let filtered = invoices;
         if (activeTab !== 'all') {
@@ -102,7 +111,7 @@ import {
         const dppVat = grandTotal / 1.12;
         const vat12 = dppVat * 0.12;
 
-        const foundCustomer = customerListData.find(c => c.name === invoice.customer);
+        const foundCustomer = customerListData?.find(c => c.name === invoice.customer);
 
         const previewData = {
             id: invoice.id,

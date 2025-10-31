@@ -5,16 +5,25 @@ import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { ArrowLeft, Printer, Upload } from 'lucide-react';
-import { type SpdData, spdData as initialSpdData, customerListData, invoiceListData } from '@/app/lib/data';
+import { type SpdData, spdData as initialSpdData, type Customer, invoiceListData } from '@/app/lib/data';
 import { format } from 'date-fns';
 import { id as indonesiaLocale } from 'date-fns/locale';
+import { useFirestore, useCollection, useMemoFirebase } from '@/firebase';
+import { collection } from 'firebase/firestore';
 
 export default function SpdPreviewPage() {
     const router = useRouter();
     const params = useParams();
     const { id } = params;
+    const firestore = useFirestore();
 
     const [spdItem, setSpdItem] = useState<SpdData | null>(null);
+    
+    const customersCollection = useMemoFirebase(() => {
+        if (!firestore) return null;
+        return collection(firestore, 'customers');
+    }, [firestore]);
+    const { data: customerListData } = useCollection<Customer>(customersCollection);
 
     useEffect(() => {
         const dataFromSession = sessionStorage.getItem('spdPreviewData');
@@ -45,7 +54,7 @@ export default function SpdPreviewPage() {
         );
     }
     
-    const customerDetails = customerListData.find(c => c.name === spdItem.customer);
+    const customerDetails = customerListData?.find(c => c.name === spdItem.customer);
     const relatedInvoice = invoiceListData.find(i => i.id === spdItem.noInvoice);
     const suratJalanParts = spdItem.suratJalan.split(',').map(s => s.trim());
 
@@ -164,3 +173,4 @@ export default function SpdPreviewPage() {
         </main>
     );
 }
+

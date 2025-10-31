@@ -52,9 +52,11 @@ import {
   Check
 } from 'lucide-react';
 import Link from 'next/link';
-import { type InvoiceNumber, invoiceNumberData, salesOrderListData, customerListData, type Customer, productListData, type ProductListItem, invoiceListData, type Invoice } from '@/app/lib/data';
+import { type InvoiceNumber, invoiceNumberData, salesOrderListData, type Customer, type ProductListItem, invoiceListData, type Invoice } from '@/app/lib/data';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
+import { useFirestore, useCollection, useMemoFirebase } from '@/firebase';
+import { collection } from 'firebase/firestore';
 
 type InvoiceItem = {
     id: number;
@@ -69,6 +71,7 @@ export default function AddInvoicePage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { toast } = useToast();
+  const firestore = useFirestore();
 
   const invoiceNumberId = searchParams.get('invoiceNumberId');
   const editInvoiceId = searchParams.get('editInvoiceId');
@@ -107,6 +110,18 @@ export default function AddInvoicePage() {
   const [productPopoverOpen, setProductPopoverOpen] = useState<number | null>(null);
   const uniqueSalesOrders = Array.from(new Set(salesOrderListData.map(item => item.soNumber)));
 
+  const customersCollection = useMemoFirebase(() => {
+    if (!firestore) return null;
+    return collection(firestore, 'customers');
+  }, [firestore]);
+  const { data: customerListData } = useCollection<Customer>(customersCollection);
+
+  const productsCollection = useMemoFirebase(() => {
+    if (!firestore) return null;
+    return collection(firestore, 'products');
+  }, [firestore]);
+  const { data: productListData } = useCollection<ProductListItem>(productsCollection);
+
   useEffect(() => {
     if (invoiceNumberId) {
       setIsInvoiceNumberLoading(true);
@@ -126,7 +141,7 @@ export default function AddInvoicePage() {
             setPoNumber(foundInvoice.poNumber);
             setStatus(foundInvoice.status);
             
-            const foundCustomer = customerListData.find(c => c.name === foundInvoice.customer);
+            const foundCustomer = customerListData?.find(c => c.name === foundInvoice.customer);
             setCustomer(foundCustomer);
 
             if (foundInvoice.date) {
@@ -151,7 +166,7 @@ export default function AddInvoicePage() {
         setIsInvoiceNumberLoading(false);
       }, 500);
     }
-  }, [invoiceNumberId, editInvoiceId]);
+  }, [invoiceNumberId, editInvoiceId, customerListData]);
 
 
   useEffect(() => {
@@ -162,7 +177,7 @@ export default function AddInvoicePage() {
       if (invoiceNumberDataState.salesOrder) {
         handleSoSelect(invoiceNumberDataState.salesOrder);
       } else {
-        const foundCustomer = customerListData.find(c => c.name === invoiceNumberDataState.customer);
+        const foundCustomer = customerListData?.find(c => c.name === invoiceNumberDataState.customer);
         setCustomer(foundCustomer);
       }
 
@@ -174,7 +189,7 @@ export default function AddInvoicePage() {
         }
       }
     }
-  }, [invoiceNumberDataState]);
+  }, [invoiceNumberDataState, customerListData]);
   
   const handleSoSelect = (selectedSo: string) => {
     setSoNumber(selectedSo);
@@ -192,7 +207,7 @@ export default function AddInvoicePage() {
         setItems(newItems);
 
         const soCustomerName = soItems[0].customer;
-        const foundCustomer = customerListData.find(c => c.name === soCustomerName);
+        const foundCustomer = customerListData?.find(c => c.name === soCustomerName);
         setCustomer(foundCustomer);
     } else {
         setItems([]);
@@ -202,7 +217,7 @@ export default function AddInvoicePage() {
   }
 
   const handleCustomerSelect = (customerName: string) => {
-    const foundCustomer = customerListData.find(c => c.name.toLowerCase() === customerName.toLowerCase());
+    const foundCustomer = customerListData?.find(c => c.name.toLowerCase() === customerName.toLowerCase());
     setCustomer(foundCustomer);
     setCustomerPopoverOpen(false);
   }
@@ -511,7 +526,7 @@ export default function AddInvoicePage() {
                             <CommandList>
                                 <CommandEmpty>No customer found.</CommandEmpty>
                                 <CommandGroup>
-                                    {customerListData.map((c) => (
+                                    {customerListData?.map((c) => (
                                     <CommandItem
                                         key={c.id}
                                         value={c.name}
@@ -631,7 +646,7 @@ export default function AddInvoicePage() {
                                     <CommandList>
                                         <CommandEmpty>No product found.</CommandEmpty>
                                         <CommandGroup>
-                                            {productListData.map((product) => (
+                                            {productListData?.map((product) => (
                                                 <CommandItem
                                                     key={product.name}
                                                     value={product.name}
@@ -818,3 +833,4 @@ export default function AddInvoicePage() {
     </main>
   );
 }
+

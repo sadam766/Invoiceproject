@@ -29,9 +29,11 @@ import {
 import { Calendar } from '@/components/ui/calendar';
 import { cn, formatNumberWithCommas, parseFormattedNumber } from '@/lib/utils';
 import { format } from 'date-fns';
-import type { InvoiceNumber } from '@/app/lib/data';
-import { customerListData, salesOrderListData, invoiceNumberData } from '@/app/lib/data';
+import type { InvoiceNumber, Customer } from '@/app/lib/data';
+import { salesOrderListData, invoiceNumberData } from '@/app/lib/data';
 import { useToast } from '@/hooks/use-toast';
+import { useFirestore, useCollection, useMemoFirebase } from '@/firebase';
+import { collection } from 'firebase/firestore';
 
 
 type AddInvoiceNumberDialogProps = {
@@ -44,6 +46,7 @@ type AddInvoiceNumberDialogProps = {
 
 
 export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceData, onAddClick }: AddInvoiceNumberDialogProps) {
+  const firestore = useFirestore();
   const [date, setDate] = useState<Date | undefined>(new Date());
   const [invoiceType, setInvoiceType] = useState<'sar' | 'kw'>('kw');
   const [isAutoNumber, setIsAutoNumber] = useState(true);
@@ -63,20 +66,24 @@ export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceDa
   const { toast } = useToast();
 
   const uniqueSalesOrders = Array.from(new Set(salesOrderListData.map(item => item.soNumber)));
+  
+  const customersCollection = useMemoFirebase(() => {
+    if (!firestore) return null;
+    return collection(firestore, 'customers');
+  }, [firestore]);
+
+  const { data: customerListData, isLoading: isCustomersLoading } = useCollection<Customer>(customersCollection);
 
   const handleSalesOrderSelect = (currentValue: string) => {
     const newSalesOrder = currentValue === salesOrder ? '' : currentValue;
     setSalesOrder(newSalesOrder);
 
     if (newSalesOrder) {
-      // Find customer and total amount for the selected SO
       const soDetails = salesOrderListData.filter(item => item.soNumber === newSalesOrder);
-      const associatedCustomer = customerListData.find(c => c.name.includes(soDetails[0].productName.split(' ')[0])); // Simplified logic
-      
       const soCustomer = salesOrderListData.find(item => item.soNumber === newSalesOrder)?.customer;
       
       if (soCustomer) {
-        const customerDetails = customerListData.find(c => c.name === soCustomer);
+        const customerDetails = customerListData?.find(c => c.name === soCustomer);
         if (customerDetails) {
             setCustomer(customerDetails.name);
         }
@@ -86,7 +93,6 @@ export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceDa
       setAmount(formatNumberWithCommas(totalAmount));
 
     } else {
-        // Reset if SO is deselected
         setCustomer('');
         setAmount(0);
     }
@@ -268,7 +274,7 @@ export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceDa
                     className="w-full justify-between"
                     >
                     {customer
-                        ? customerListData.find((c) => c.name === customer)?.name
+                        ? customerListData?.find((c) => c.name === customer)?.name
                         : "e.g., PT. XYZ Corp"}
                     <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                     </Button>
@@ -279,7 +285,7 @@ export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceDa
                      <CommandList>
                         <CommandEmpty>No customer found.</CommandEmpty>
                         <CommandGroup>
-                            {customerListData.map((c) => (
+                            {customerListData?.map((c) => (
                             <CommandItem
                                 key={c.id}
                                 value={c.name}

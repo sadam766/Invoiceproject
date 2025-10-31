@@ -5,12 +5,21 @@ import { useState, useMemo } from 'react';
 import { addDays, format, startOfToday, isSameDay, isWithinInterval } from 'date-fns';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Calendar } from '@/components/ui/calendar';
-import { invoiceListData, type Invoice } from '@/app/lib/data';
+import { invoiceListData, type Invoice, type Customer } from '@/app/lib/data';
 import { Badge } from '@/components/ui/badge';
 import { Bell } from 'lucide-react';
+import { useFirestore, useCollection, useMemoFirebase } from '@/firebase';
+import { collection } from 'firebase/firestore';
 
 export default function CalendarPage() {
   const [date, setDate] = useState<Date | undefined>(new Date());
+  const firestore = useFirestore();
+
+  const customersCollection = useMemoFirebase(() => {
+    if (!firestore) return null;
+    return collection(firestore, 'customers');
+  }, [firestore]);
+  const { data: customerListData } = useCollection<Customer>(customersCollection);
   
   const unpaidInvoices = useMemo(() => {
     return invoiceListData.filter(invoice => invoice.status === 'unpaid' || invoice.status === 'sent');
@@ -120,3 +129,4 @@ export default function CalendarPage() {
     </main>
   );
 }
+

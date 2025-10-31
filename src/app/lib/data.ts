@@ -246,33 +246,6 @@ export type ProductListItem = {
     price: number;
 };
 
-export let productListData: ProductListItem[] = [
-    {
-        id: '1',
-        name: 'Kabel Fiber Optik',
-        category: 'Kabel',
-        quantity: 100,
-        unit: 'meter',
-        price: 15000,
-    },
-    {
-        id: '2',
-        name: 'Konektor RJ45',
-        category: 'Aksesoris',
-        quantity: 500,
-        unit: 'pcs',
-        price: 2500,
-    },
-    {
-        id: '3',
-        name: 'Kabel Tembaga 2.5mm',
-        category: 'Kabel',
-        quantity: 15,
-        unit: 'meter',
-        price: 7500,
-    }
-];
-
 export type SalesOrder = {
     soNumber: string;
     customer: string;

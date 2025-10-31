@@ -6,6 +6,7 @@ import { Download, Upload, ArrowLeft } from 'lucide-react';
 import { exportToExcel } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
 import html2pdf from 'html2pdf.js';
+import type { Customer } from '@/app/lib/data';
 
 // --- DEFINISI TIPE DATA ---
 interface Item {
@@ -414,3 +415,4 @@ const InvoicePreviewPage = () => {
 };
 
 export default InvoicePreviewPage;
+
