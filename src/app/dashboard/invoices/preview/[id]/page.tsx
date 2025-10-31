@@ -199,6 +199,8 @@ const InvoicePreviewPage = () => {
     const totalPages = itemChunks.length;
     const subTotalItems = items.reduce((acc, item) => acc + item.total, 0);
 
+    const invoiceTitle = invoiceId.startsWith('KW') ? 'PROFORMA INVOICE' : 'INVOICE/OFFICIAL RECEIPT';
+
 
     return (
         <div className="bg-gray-100 dark:bg-slate-900 min-h-screen p-4 sm:p-6 font-sans text-black">
@@ -253,7 +255,7 @@ const InvoicePreviewPage = () => {
                             <header className="relative pt-0 pb-0 text-[10px] leading-snug">
                                 <p className="absolute right-0 top-0 font-normal text-sm capitalize">{printType}</p>
                                 <div className="w-full text-center mb-1 leading-none">
-                                    <p className="font-bold uppercase text-xs tracking-tighter mb-0.5">INVOICE/OFFICIAL RECEIPT</p>
+                                    <p className="font-bold uppercase text-xs tracking-tighter mb-0.5">{invoiceTitle}</p>
                                     <p className="font-bold uppercase text-xs">{invoiceId}</p>
                                 </div>
                                 <div className='flex justify-between items-start mt-4'>
@@ -415,4 +417,5 @@ const InvoicePreviewPage = () => {
 };
 
 export default InvoicePreviewPage;
+
 
