@@ -49,7 +49,8 @@ service cloud.firestore {
      * @principle Enforces document ownership for customer data.
      */
     match /customers/{customerId} {
-      allow get, list: if isOwner(customerId);
+      allow get: if isOwner(customerId);
+      allow list: if isSignedIn();
       allow create: if isOwner(customerId) && request.resource.data.id == customerId;
       allow update: if isOwner(customerId) && resource != null && request.resource.data.id == resource.data.id;
       allow delete: if isExistingOwner(customerId);
