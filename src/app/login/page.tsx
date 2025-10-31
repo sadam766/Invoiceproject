@@ -1,0 +1,128 @@
+
+'use client';
+
+import { useState } from 'react';
+import Image from 'next/image';
+import Link from 'next/link';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Eye, EyeOff, Mountain } from 'lucide-react';
+
+function GoogleIcon(props: React.SVGProps<SVGSVGElement>) {
+    return (
+      <svg
+        {...props}
+        xmlns="http://www.w3.org/2000/svg"
+        width="24"
+        height="24"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      >
+        <path d="M15.545 6.558a9.42 9.42 0 0 1 .139 1.626c0 2.434-.87 4.492-2.384 5.885l.027.027A7.21 7.21 0 1 0 10.5 15.292a7.21 7.21 0 0 0 5.045-2.03.62.62 0 0 1 .832.868 8.42 8.42 0 0 1-6.19 2.535 8.42 8.42 0 0 1-8.23-7.443A8.42 8.42 0 0 1 10.5 4.5c2.59 0 4.922 1.12 6.55 2.94l-.027-.027z" />
+        <path d="M20 10h-5V5" />
+      </svg>
+    );
+}
+
+export default function LoginPage() {
+  const [showPassword, setShowPassword] = useState(false);
+
+  return (
+    <div className="w-full lg:grid lg:min-h-screen lg:grid-cols-2 xl:min-h-screen">
+      <div className="flex items-center justify-center py-12">
+        <div className="mx-auto grid w-[350px] gap-6">
+          <div className="grid gap-2">
+            <div className="flex items-center gap-2 mb-4">
+                <Mountain className="h-6 w-6 text-primary" />
+                <span className="text-xl font-semibold">Acme Inc</span>
+            </div>
+            <h1 className="text-3xl font-bold">Welcome back !</h1>
+            <p className="text-balance text-muted-foreground">
+              Enter to get unlimited access to data & information.
+            </p>
+          </div>
+          <div className="grid gap-4">
+            <div className="grid gap-2">
+              <Label htmlFor="email">Email</Label>
+              <Input
+                id="email"
+                type="email"
+                placeholder="Enter your mail address"
+                required
+              />
+            </div>
+            <div className="grid gap-2 relative">
+                <div className="flex items-center">
+                    <Label htmlFor="password">Password</Label>
+                </div>
+                <Input 
+                    id="password" 
+                    type={showPassword ? "text" : "password"}
+                    placeholder="Enter password"
+                    required 
+                />
+                <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-3 top-9 text-muted-foreground"
+                >
+                    {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+                </button>
+            </div>
+            <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-2">
+                    <Checkbox id="remember-me" />
+                    <Label htmlFor="remember-me" className="text-sm font-medium">Remember me</Label>
+                </div>
+                <Link
+                    href="#"
+                    className="text-sm text-primary hover:underline"
+                >
+                    Forgot your password?
+                </Link>
+            </div>
+            <Button type="submit" className="w-full">
+              Log In
+            </Button>
+            <div className="relative my-4">
+              <div className="absolute inset-0 flex items-center">
+                <span className="w-full border-t" />
+              </div>
+              <div className="relative flex justify-center text-xs uppercase">
+                <span className="bg-background px-2 text-muted-foreground">
+                  Or, Login with
+                </span>
+              </div>
+            </div>
+            <Button variant="outline" className="w-full">
+              <GoogleIcon className="mr-2 h-4 w-4" />
+              Sign up with google
+            </Button>
+          </div>
+          <div className="mt-4 text-center text-sm">
+            Don&apos;t have an account?{' '}
+            <Link href="#" className="underline text-primary">
+              Register here
+            </Link>
+          </div>
+        </div>
+      </div>
+      <div className="hidden bg-muted lg:block">
+        <Image
+          src="https://picsum.photos/seed/login/1200/1800"
+          alt="Image"
+          width="1920"
+          height="1080"
+          className="h-full w-full object-cover dark:brightness-[0.2] dark:grayscale"
+          data-ai-hint="geometric abstract"
+        />
+      </div>
+    </div>
+  );
+}

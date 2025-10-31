@@ -64,6 +64,10 @@ export default function DashboardLayout({
 }) {
   const pathname = usePathname();
 
+  if (pathname === '/login') {
+    return <>{children}</>;
+  }
+
   return (
     <SidebarProvider>
       <Sidebar>
@@ -125,7 +129,7 @@ export default function DashboardLayout({
                       </SidebarMenuSubButton>
                     </SidebarMenuSubItem>
                     <SidebarMenuSubItem>
-                      <SidebarMenuSubButton asChild isActive={pathname === '/dashboard/invoices/add'}>
+                      <SidebarMenuSubButton asChild isActive={pathname.startsWith('/dashboard/invoices/add')}>
                         <Link href="/dashboard/invoices/add">
                          Add Invoice
                         </Link>
