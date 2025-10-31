@@ -28,7 +28,7 @@ import {
   import { DeleteConfirmationDialog } from '@/app/components/delete-confirmation-dialog';
   import { useToast } from '@/hooks/use-toast';
   import { exportToExcel, importFromExcel } from '@/lib/utils';
-  import { useFirestore, useCollection, useMemoFirebase } from '@/firebase';
+  import { useFirestore, useCollection, useMemoFirebase, errorEmitter, FirestorePermissionError } from '@/firebase';
   import { collection, doc, setDoc, deleteDoc, writeBatch } from 'firebase/firestore';
   
   export default function ProductListPage() {
@@ -73,40 +73,52 @@ import {
         setIsDialogOpen(true);
     };
 
-    const handleDelete = async (productId: string) => {
+    const handleDelete = (productId: string) => {
         if (!firestore) return;
         const docRef = doc(firestore, 'products', productId);
-        await deleteDoc(docRef);
-        toast({ title: 'Product deleted' });
+        deleteDoc(docRef)
+          .then(() => {
+            toast({ title: 'Product deleted' });
+          })
+          .catch(async (serverError) => {
+            const permissionError = new FirestorePermissionError({
+              path: docRef.path,
+              operation: 'delete',
+            });
+            errorEmitter.emit('permission-error', permissionError);
+          });
     };
 
-    const handleSave = async (product: Omit<ProductListItem, 'id'> & { id?: string }) => {
+    const handleSave = (product: Omit<ProductListItem, 'id'> & { id?: string }) => {
         if (!firestore) return;
 
         let productId = product.id;
-        if (!productId) {
+        const isNewProduct = !productId;
+        if (isNewProduct) {
             // Create a new ID for a new product if it's not being edited
             productId = doc(collection(firestore, 'products')).id;
         }
 
-        const docRef = doc(firestore, 'products', productId);
+        const docRef = doc(firestore, 'products', productId!);
+        const dataToSave = { ...product, id: productId };
 
-        try {
-            await setDoc(docRef, { ...product, id: productId }, { merge: true });
-            toast({
-                title: editingProduct ? 'Product Updated' : 'Product Added',
-                description: `Product ${product.name} has been saved.`,
+        setDoc(docRef, dataToSave, { merge: !isNewProduct })
+            .then(() => {
+                toast({
+                    title: editingProduct ? 'Product Updated' : 'Product Added',
+                    description: `Product ${product.name} has been saved.`,
+                });
+                setIsDialogOpen(false);
+                setEditingProduct(undefined);
+            })
+            .catch(async (serverError) => {
+                const permissionError = new FirestorePermissionError({
+                  path: docRef.path,
+                  operation: isNewProduct ? 'create' : 'update',
+                  requestResourceData: dataToSave,
+                });
+                errorEmitter.emit('permission-error', permissionError);
             });
-            setIsDialogOpen(false);
-            setEditingProduct(undefined);
-        } catch (error) {
-            console.error("Error saving product: ", error);
-            toast({
-                variant: 'destructive',
-                title: 'Error',
-                description: 'Could not save product. See console for details.',
-            });
-        }
     };
 
     const handleDialogStateChange = (open: boolean) => {
