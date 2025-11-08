@@ -8,20 +8,6 @@
  * - /customers/{customerId}: Stores customer data, accessible only by the customer themselves.
  * - /sales/{saleId}: Stores sale data, accessible only by the customer associated with the sale.
  * - /roles_admin/{uid}: Indicates admin privileges; presence of a document grants admin rights.
- *
- * Key Security Decisions:
- * - User listing is generally disallowed for privacy.
- * - Admin privileges are determined by the existence of a document in `/roles_admin/{uid}`.
- * - Data schema is not strictly enforced, focusing on authorization.
- *
- * Denormalization for Authorization:
- * - The `sales` documents contain a denormalized `customerId` field to allow for authorization
- *   without needing to perform additional reads on the `customers` collection. This
- *   improves performance and simplifies the security rules.
- *
- * Structural Segregation:
- * - Data is segregated into top-level collections based on entity type (products, customers, sales).
- *   This simplifies access control patterns and enhances security.
  */
 rules_version = '2';
 service cloud.firestore {
@@ -35,10 +21,7 @@ service cloud.firestore {
      * @principle Enforces role-based access control for product management.
      */
     match /products/{productId} {
-      allow get, list: if true;
-      allow create: if isSignedIn();
-      allow update: if isSignedIn() && resource != null;
-      allow delete: if isSignedIn() && resource != null;
+      allow read, write: if isSignedIn();
     }
 
     /**
@@ -54,6 +37,16 @@ service cloud.firestore {
       allow create: if isOwner(customerId) && request.resource.data.id == customerId;
       allow update: if isOwner(customerId) && resource != null && request.resource.data.id == resource.data.id;
       allow delete: if isExistingOwner(customerId);
+    }
+
+    /**
+     * @description Allows authenticated users to manage sales order information.
+     * @path /salesOrders/{orderId}
+     * @allow read, write: Any signed-in user can perform these operations.
+     * @principle Allows broad access for development purposes.
+     */
+    match /salesOrders/{orderId} {
+        allow read, write: if isSignedIn();
     }
 
     /**
