@@ -50,6 +50,16 @@ service cloud.firestore {
     }
 
     /**
+     * @description Allows authenticated users to manage invoice number information.
+     * @path /invoiceNumbers/{invoiceNumberId}
+     * @allow read, write: Any signed-in user can perform these operations.
+     * @principle Allows broad access for development purposes.
+     */
+    match /invoiceNumbers/{invoiceNumberId} {
+        allow read, write: if isSignedIn();
+    }
+
+    /**
      * @description Allows a customer to read and write their own sale data, verified by customerId in the document.
      * @path /sales/{saleId}
      * @allow (get, create, update, delete, list): Only the customer associated with the sale can perform these operations.
