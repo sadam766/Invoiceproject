@@ -1,6 +1,6 @@
 
 'use client';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -29,8 +29,7 @@ import {
 import { Calendar } from '@/components/ui/calendar';
 import { cn, formatNumberWithCommas, parseFormattedNumber } from '@/lib/utils';
 import { format } from 'date-fns';
-import type { InvoiceNumber, Customer } from '@/app/lib/data';
-import { salesOrderListData, invoiceNumberData } from '@/app/lib/data';
+import type { InvoiceNumber, Customer, SalesOrder } from '@/app/lib/data';
 import { useToast } from '@/hooks/use-toast';
 import { useFirestore, useCollection, useMemoFirebase } from '@/firebase';
 import { collection } from 'firebase/firestore';
@@ -65,20 +64,34 @@ export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceDa
   const [soPopoverOpen, setSoPopoverOpen] = useState(false);
   const { toast } = useToast();
 
-  const uniqueSalesOrders = Array.from(new Set(salesOrderListData.map(item => item.soNumber)));
-  
   const customersCollection = useMemoFirebase(() => {
     if (!firestore) return null;
     return collection(firestore, 'customers');
   }, [firestore]);
+  const { data: customerListData } = useCollection<Customer>(customersCollection);
 
-  const { data: customerListData, isLoading: isCustomersLoading } = useCollection<Customer>(customersCollection);
+  const salesOrdersCollection = useMemoFirebase(() => {
+    if (!firestore) return null;
+    return collection(firestore, 'salesOrders');
+  }, [firestore]);
+  const { data: salesOrderListData } = useCollection<SalesOrder>(salesOrdersCollection);
 
+  const invoiceNumbersCollection = useMemoFirebase(() => {
+    if (!firestore) return null;
+    return collection(firestore, 'invoiceNumbers');
+  }, [firestore]);
+  const { data: invoiceNumberData } = useCollection<InvoiceNumber>(invoiceNumbersCollection);
+
+  const uniqueSalesOrders = useMemo(() => {
+    if (!salesOrderListData) return [];
+    return Array.from(new Set(salesOrderListData.map(item => item.soNumber)))
+  },[salesOrderListData]);
+  
   const handleSalesOrderSelect = (currentValue: string) => {
     const newSalesOrder = currentValue === salesOrder ? '' : currentValue;
     setSalesOrder(newSalesOrder);
 
-    if (newSalesOrder) {
+    if (newSalesOrder && salesOrderListData) {
       const soDetails = salesOrderListData.filter(item => item.soNumber === newSalesOrder);
       const soCustomer = salesOrderListData.find(item => item.soNumber === newSalesOrder)?.customer;
       
@@ -164,7 +177,7 @@ export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceDa
 
   const handleSave = () => {
     // Check for duplicates before saving
-    if (!invoiceData && invoiceNumberData.some(inv => inv.id === fullInvoiceNumber)) {
+    if (!invoiceData && invoiceNumberData?.some(inv => inv.id === fullInvoiceNumber)) {
       toast({
         variant: "destructive",
         title: "Duplicate Invoice Number",
@@ -353,5 +366,3 @@ export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceDa
     </Dialog>
   );
 }
-
-    

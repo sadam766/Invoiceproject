@@ -119,8 +119,8 @@ export type SalesMonitoringData = {
   needsSpd: boolean;
 };
 
-export function getSalesMonitoringData(): SalesMonitoringData[] {
-    const soData = salesOrderListData.reduce((acc, order) => {
+export function getSalesMonitoringData(salesOrders: SalesOrder[]): SalesMonitoringData[] {
+    const soData = salesOrders.reduce((acc, order) => {
         if (!acc[order.soNumber]) {
             acc[order.soNumber] = {
                 soNumber: order.soNumber,
@@ -247,6 +247,7 @@ export type ProductListItem = {
 };
 
 export type SalesOrder = {
+    id?: string;
     soNumber: string;
     customer: string;
     productName: string;
@@ -255,45 +256,6 @@ export type SalesOrder = {
     unit: string;
     price: number;
 };
-
-export let salesOrderListData: SalesOrder[] = [
-    {
-        soNumber: 'SO-2024-001',
-        customer: 'PT. Sejahtera Abadi',
-        productName: 'Kabel Fiber Optik',
-        category: 'Kabel',
-        quantity: 50,
-        unit: 'meter',
-        price: 15000,
-    },
-    {
-        soNumber: 'SO-2024-001',
-        customer: 'PT. Sejahtera Abadi',
-        productName: 'Konektor RJ45',
-        category: 'Aksesoris',
-        quantity: 100,
-        unit: 'pcs',
-        price: 2500,
-    },
-    {
-        soNumber: 'SO-2024-002',
-        customer: 'CV. Maju Jaya',
-        productName: 'Kabel Tembaga 2.5mm',
-        category: 'Kabel',
-        quantity: 200,
-        unit: 'meter',
-        price: 7500,
-    },
-     {
-        soNumber: 'SO-2024-003',
-        customer: 'Toko Listrik Sinar Jaya',
-        productName: 'Kabel Tembaga 1.5mm',
-        category: 'Kabel',
-        quantity: 500,
-        unit: 'meter',
-        price: 5500,
-    }
-];
 
 export type Customer = {
   id?: string;

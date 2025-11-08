@@ -22,15 +22,17 @@ import {
   } from '@/components/ui/select';
   import { Input } from '@/components/ui/input';
   import { Button } from '@/components/ui/button';
-  import { salesOrderListData, type SalesOrder } from '@/app/lib/data';
+  import { type SalesOrder } from '@/app/lib/data';
   import { Search, Upload, Download } from 'lucide-react';
   import { DeleteConfirmationDialog } from '@/app/components/delete-confirmation-dialog';
   import { AddSalesOrderDialog } from './_components/add-sales-order-dialog';
   import { useToast } from '@/hooks/use-toast';
   import { exportToExcel, importFromExcel } from '@/lib/utils';
+  import { useFirestore, useCollection, useMemoFirebase } from '@/firebase';
+  import { collection, doc, setDoc, deleteDoc, writeBatch } from 'firebase/firestore';
   
   export default function SalesOrderListPage() {
-    const [orders, setOrders] = useState(salesOrderListData);
+    const firestore = useFirestore();
     const [editingOrder, setEditingOrder] = useState<SalesOrder | undefined>(undefined);
     const [isDialogOpen, setIsDialogOpen] = useState(false);
     const [searchQuery, setSearchQuery] = useState('');
@@ -38,7 +40,15 @@ import {
     const fileInputRef = useRef<HTMLInputElement>(null);
     const { toast } = useToast();
 
+    const salesOrdersCollection = useMemoFirebase(() => {
+        if (!firestore) return null;
+        return collection(firestore, 'salesOrders');
+    }, [firestore]);
+
+    const { data: orders, isLoading } = useCollection<SalesOrder>(salesOrdersCollection);
+
     const filteredOrders = useMemo(() => {
+        if (!orders) return [];
         let filtered = orders;
         if (categoryFilter !== 'all') {
             filtered = filtered.filter(o => o.category === categoryFilter);
@@ -63,26 +73,27 @@ import {
         setIsDialogOpen(true);
     };
 
-    const handleDelete = (soNumber: string, productName: string) => {
-        setOrders(orders.filter(o => !(o.soNumber === soNumber && o.productName === productName)));
+    const handleDelete = (orderId: string) => {
+        if (!firestore) return;
+        const docRef = doc(firestore, 'salesOrders', orderId);
+        deleteDoc(docRef);
+        toast({ title: 'Sales Order deleted' });
     };
 
     const handleSave = (order: SalesOrder) => {
-        const orderKey = `${order.soNumber}-${order.productName}`;
-        if (editingOrder) {
-            const editingKey = `${editingOrder.soNumber}-${editingOrder.productName}`;
-            if (editingKey === orderKey) {
-                // Editing existing order, key hasn't changed
-                setOrders(orders.map(o => (`${o.soNumber}-${o.productName}` === orderKey ? order : o)));
-            } else {
-                // Editing existing order, but key (soNumber or productName) has changed
-                const filteredOrders = orders.filter(o => `${o.soNumber}-${o.productName}` !== editingKey);
-                setOrders([...filteredOrders, order]);
-            }
-        } else {
-            // Adding new order
-            setOrders([...orders, order]);
+        if (!firestore) return;
+        let orderId = order.id || editingOrder?.id;
+        if (!orderId) {
+            orderId = doc(collection(firestore, 'salesOrders')).id;
         }
+
+        const docRef = doc(firestore, 'salesOrders', orderId);
+        setDoc(docRef, { ...order, id: orderId }, { merge: true });
+        
+        toast({
+            title: editingOrder ? 'Sales Order Updated' : 'Sales Order Added',
+            description: `Sales Order ${order.soNumber} has been saved.`,
+        });
         setIsDialogOpen(false);
         setEditingOrder(undefined);
     };
@@ -95,8 +106,10 @@ import {
     }
 
     const handleExport = () => {
-        exportToExcel(orders, 'sales-orders');
-        toast({ title: "Export Successful", description: "Sales order data has been exported to Excel." });
+        if(orders) {
+            exportToExcel(orders, 'sales-orders');
+            toast({ title: "Export Successful", description: "Sales order data has been exported to Excel." });
+        }
     };
 
     const handleImportClick = () => {
@@ -105,10 +118,18 @@ import {
 
     const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
         const file = event.target.files?.[0];
-        if (file) {
+        if (file && firestore) {
             try {
-                const data = await importFromExcel(file) as SalesOrder[];
-                setOrders(prev => [...prev, ...data]);
+                const data = await importFromExcel(file) as Omit<SalesOrder, 'id'>[];
+                const batch = writeBatch(firestore);
+
+                data.forEach(orderData => {
+                    const newDocRef = doc(collection(firestore, 'salesOrders'));
+                    batch.set(newDocRef, { ...orderData, id: newDocRef.id });
+                });
+
+                await batch.commit();
+
                 toast({
                     title: "Import Successful",
                     description: `${data.length} sales orders imported successfully.`,
@@ -176,6 +197,7 @@ import {
                         <TableHeader>
                             <TableRow>
                                 <TableHead>SO NUMBER</TableHead>
+                                <TableHead>CUSTOMER</TableHead>
                                 <TableHead>PRODUCT NAME</TableHead>
                                 <TableHead>CATEGORY</TableHead>
                                 <TableHead>QUANTITY</TableHead>
@@ -185,9 +207,11 @@ import {
                             </TableRow>
                         </TableHeader>
                         <TableBody>
-                            {filteredOrders.map((order, index) => (
-                                <TableRow key={`${order.soNumber}-${order.productName}-${index}`}>
+                            {isLoading && <TableRow><TableCell colSpan={8} className='text-center'>Loading...</TableCell></TableRow>}
+                            {filteredOrders?.map((order) => (
+                                <TableRow key={order.id}>
                                     <TableCell className="font-medium">{order.soNumber}</TableCell>
+                                    <TableCell>{order.customer}</TableCell>
                                     <TableCell>{order.productName}</TableCell>
                                     <TableCell>{order.category}</TableCell>
                                     <TableCell>{order.quantity}</TableCell>
@@ -196,7 +220,7 @@ import {
                                     <TableCell>
                                         <div className="flex gap-2">
                                             <Button variant="link" className="p-0 h-auto" onClick={() => handleEdit(order)}>Edit</Button>
-                                            <DeleteConfirmationDialog onConfirm={() => handleDelete(order.soNumber, order.productName)} />
+                                            <DeleteConfirmationDialog onConfirm={() => handleDelete(order.id!)} />
                                         </div>
                                     </TableCell>
                                 </TableRow>
@@ -205,7 +229,7 @@ import {
                     </Table>
                 </div>
                 <div className="text-sm text-muted-foreground mt-4">
-                    Showing 1 to {filteredOrders.length} of {orders.length} entries
+                    Showing 1 to {filteredOrders?.length || 0} of {orders?.length || 0} entries
                 </div>
             </CardContent>
         </Card>

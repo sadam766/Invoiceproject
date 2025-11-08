@@ -17,9 +17,12 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { getSalesMonitoringData, SalesMonitoringData } from '@/app/lib/data';
+import { getSalesMonitoringData, SalesMonitoringData, SalesOrder } from '@/app/lib/data';
 import { Search, Eye } from 'lucide-react';
 import Link from 'next/link';
+import { useFirestore, useCollection, useMemoFirebase } from '@/firebase';
+import { collection } from 'firebase/firestore';
+
 
 const statusVariant: { [key: string]: 'outline' | 'destructive' | 'secondary' } = {
     'Paid': 'outline',
@@ -40,10 +43,21 @@ function cn(...inputs: (string | undefined | null | false)[]): string {
 }
 
 export default function SalesMonitoringPage() {
-  const [salesMonitoringData, setSalesMonitoringData] = useState(getSalesMonitoringData());
+  const firestore = useFirestore();
   const [activeTab, setActiveTab] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
+
+  const salesOrdersCollection = useMemoFirebase(() => {
+    if (!firestore) return null;
+    return collection(firestore, 'salesOrders');
+  }, [firestore]);
+  const { data: salesOrderListData, isLoading } = useCollection<SalesOrder>(salesOrdersCollection);
   
+  const salesMonitoringData = useMemo(() => {
+    if (!salesOrderListData) return [];
+    return getSalesMonitoringData(salesOrderListData);
+  }, [salesOrderListData]);
+
   const needsInvoiceData = salesMonitoringData.filter(d => d.needsInvoice);
   const needsSpdData = salesMonitoringData.filter(d => d.needsSpd);
   const unpaidData = salesMonitoringData.filter(d => d.paymentStatus === 'Unpaid');
@@ -95,7 +109,8 @@ export default function SalesMonitoringPage() {
           </TableRow>
         </TableHeader>
         <TableBody>
-          {data.map((sale) => (
+          {isLoading && <TableRow><TableCell colSpan={9} className="text-center">Loading data...</TableCell></TableRow>}
+          {!isLoading && data.map((sale) => (
             <TableRow key={sale.soNumber}>
               <TableCell className="font-medium">
                 {sale.soNumber}
@@ -197,4 +212,3 @@ export default function SalesMonitoringPage() {
     </main>
   );
 }
-

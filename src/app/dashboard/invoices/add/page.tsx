@@ -52,7 +52,7 @@ import {
   Check
 } from 'lucide-react';
 import Link from 'next/link';
-import { type InvoiceNumber, invoiceNumberData, salesOrderListData, type Customer, type ProductListItem, invoiceListData, type Invoice } from '@/app/lib/data';
+import { type InvoiceNumber, type Customer, type ProductListItem, invoiceListData, type Invoice, type SalesOrder } from '@/app/lib/data';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useFirestore, useCollection, useMemoFirebase } from '@/firebase';
@@ -108,7 +108,6 @@ export default function AddInvoicePage() {
   const [soPopoverOpen, setSoPopoverOpen] = useState(false);
   const [customerPopoverOpen, setCustomerPopoverOpen] = useState(false);
   const [productPopoverOpen, setProductPopoverOpen] = useState<number | null>(null);
-  const uniqueSalesOrders = Array.from(new Set(salesOrderListData.map(item => item.soNumber)));
 
   const customersCollection = useMemoFirebase(() => {
     if (!firestore) return null;
@@ -122,11 +121,29 @@ export default function AddInvoicePage() {
   }, [firestore]);
   const { data: productListData } = useCollection<ProductListItem>(productsCollection);
 
+  const salesOrdersCollection = useMemoFirebase(() => {
+    if (!firestore) return null;
+    return collection(firestore, 'salesOrders');
+  }, [firestore]);
+  const { data: salesOrderListData } = useCollection<SalesOrder>(salesOrdersCollection);
+
+  const uniqueSalesOrders = useMemo(() => {
+      if (!salesOrderListData) return [];
+      return Array.from(new Set(salesOrderListData.map(item => item.soNumber)))
+  }, [salesOrderListData]);
+
+
+  const invoiceNumberCollection = useMemoFirebase(() => {
+    if (!firestore) return null;
+    return collection(firestore, 'invoiceNumbers');
+  }, [firestore]);
+  const { data: invoiceNumberData } = useCollection<InvoiceNumber>(invoiceNumberCollection);
+
   useEffect(() => {
     if (invoiceNumberId) {
       setIsInvoiceNumberLoading(true);
       setTimeout(() => {
-        const foundInvoice = invoiceNumberData.find(inv => inv.id.replace(/\//g, '_') === invoiceNumberId);
+        const foundInvoice = invoiceNumberData?.find(inv => inv.id.replace(/\//g, '_') === invoiceNumberId);
         setInvoiceNumberDataState(foundInvoice);
         setIsInvoiceNumberLoading(false);
       }, 500);
@@ -148,7 +165,7 @@ export default function AddInvoicePage() {
                 setIssueDate(new Date(foundInvoice.date));
             }
 
-            if(foundInvoice.soNumber) {
+            if(foundInvoice.soNumber && salesOrderListData) {
                 const soItems = salesOrderListData.filter(so => so.soNumber === foundInvoice.soNumber);
                  if (soItems.length > 0) {
                     const newItems: InvoiceItem[] = soItems.map((item, index) => ({
@@ -166,7 +183,7 @@ export default function AddInvoicePage() {
         setIsInvoiceNumberLoading(false);
       }, 500);
     }
-  }, [invoiceNumberId, editInvoiceId, customerListData]);
+  }, [invoiceNumberId, editInvoiceId, customerListData, invoiceNumberData, salesOrderListData]);
 
 
   useEffect(() => {
@@ -194,24 +211,26 @@ export default function AddInvoicePage() {
   const handleSoSelect = (selectedSo: string) => {
     setSoNumber(selectedSo);
 
-    const soItems = salesOrderListData.filter(so => so.soNumber === selectedSo);
-    if (soItems.length > 0) {
-        const newItems: InvoiceItem[] = soItems.map((item, index) => ({
-            id: Date.now() + index,
-            name: item.productName,
-            quantity: item.quantity,
-            unit: item.unit,
-            price: item.price,
-            total: item.quantity * item.price,
-        }));
-        setItems(newItems);
+    if (salesOrderListData) {
+        const soItems = salesOrderListData.filter(so => so.soNumber === selectedSo);
+        if (soItems.length > 0) {
+            const newItems: InvoiceItem[] = soItems.map((item, index) => ({
+                id: Date.now() + index,
+                name: item.productName,
+                quantity: item.quantity,
+                unit: item.unit,
+                price: item.price,
+                total: item.quantity * item.price,
+            }));
+            setItems(newItems);
 
-        const soCustomerName = soItems[0].customer;
-        const foundCustomer = customerListData?.find(c => c.name === soCustomerName);
-        setCustomer(foundCustomer);
-    } else {
-        setItems([]);
-        setCustomer(undefined);
+            const soCustomerName = soItems[0].customer;
+            const foundCustomer = customerListData?.find(c => c.name === soCustomerName);
+            setCustomer(foundCustomer);
+        } else {
+            setItems([]);
+            setCustomer(undefined);
+        }
     }
     setSoPopoverOpen(false);
   }
@@ -833,4 +852,3 @@ export default function AddInvoicePage() {
     </main>
   );
 }
-
