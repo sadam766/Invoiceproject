@@ -78,12 +78,13 @@ import {
     };
 
     const handleSave = (customer: Omit<Customer, 'id'> & { id?: string }) => {
-        if (!firestore) return;
+        if (!firestore || !user) return;
         
         const isNewCustomer = !customer.id && !editingCustomer?.id;
         let customerId = customer.id || editingCustomer?.id;
         if (!customerId) {
-            customerId = doc(collection(firestore, 'customers')).id;
+            // For new customers, their ID should be the user's UID.
+            customerId = user.uid;
         }
 
         const docRef = doc(firestore, 'customers', customerId);

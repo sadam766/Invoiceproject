@@ -34,7 +34,7 @@ service cloud.firestore {
     match /customers/{customerId} {
       allow get: if isOwner(customerId);
       allow list: if isSignedIn();
-      allow create: if isOwner(customerId) && request.resource.data.id == customerId;
+      allow create: if isSignedIn() && request.resource.data.id == request.auth.uid;
       allow update: if isOwner(customerId) && resource != null && request.resource.data.id == resource.data.id;
       allow delete: if isExistingOwner(customerId);
     }
