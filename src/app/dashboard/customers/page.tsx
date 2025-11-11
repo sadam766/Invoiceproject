@@ -20,7 +20,7 @@ import {
   import { DeleteConfirmationDialog } from '@/app/components/delete-confirmation-dialog';
   import { useToast } from '@/hooks/use-toast';
   import { exportToExcel, importFromExcel } from '@/lib/utils';
-  import { useFirestore, useUser, useCollection, useMemoFirebase } from '@/firebase';
+  import { useFirestore, useUser, useCollection, useMemoFirebase, errorEmitter, FirestorePermissionError } from '@/firebase';
   import { collection, doc, setDoc, deleteDoc, writeBatch } from 'firebase/firestore';
 
   export default function CustomerListPage() {
@@ -61,40 +61,51 @@ import {
         setIsDialogOpen(true);
     };
 
-    const handleDelete = async (customerId: string) => {
+    const handleDelete = (customerId: string) => {
         if (!firestore) return;
         const docRef = doc(firestore, 'customers', customerId);
-        await deleteDoc(docRef);
-        toast({ title: 'Customer deleted' });
+        deleteDoc(docRef)
+            .then(() => {
+                toast({ title: 'Customer deleted' });
+            })
+            .catch(async (serverError) => {
+                const permissionError = new FirestorePermissionError({
+                    path: docRef.path,
+                    operation: 'delete',
+                });
+                errorEmitter.emit('permission-error', permissionError);
+            });
     };
 
-    const handleSave = async (customer: Omit<Customer, 'id'> & { id?: string }) => {
+    const handleSave = (customer: Omit<Customer, 'id'> & { id?: string }) => {
         if (!firestore) return;
         
+        const isNewCustomer = !customer.id && !editingCustomer?.id;
         let customerId = customer.id || editingCustomer?.id;
         if (!customerId) {
-            // Create a new ID for a new customer
             customerId = doc(collection(firestore, 'customers')).id;
         }
 
         const docRef = doc(firestore, 'customers', customerId);
+        const dataToSave = { ...customer, id: customerId };
         
-        try {
-            await setDoc(docRef, { ...customer, id: customerId }, { merge: true });
-            toast({
-                title: editingCustomer ? 'Customer Updated' : 'Customer Added',
-                description: `Customer ${customer.name} has been saved.`,
+        setDoc(docRef, dataToSave, { merge: !isNewCustomer })
+            .then(() => {
+                toast({
+                    title: editingCustomer ? 'Customer Updated' : 'Customer Added',
+                    description: `Customer ${customer.name} has been saved.`,
+                });
+                setIsDialogOpen(false);
+                setEditingCustomer(undefined);
+            })
+            .catch(async (serverError) => {
+                 const permissionError = new FirestorePermissionError({
+                    path: docRef.path,
+                    operation: isNewCustomer ? 'create' : 'update',
+                    requestResourceData: dataToSave,
+                });
+                errorEmitter.emit('permission-error', permissionError);
             });
-            setIsDialogOpen(false);
-            setEditingCustomer(undefined);
-        } catch (error) {
-            console.error("Error saving customer: ", error);
-            toast({
-                variant: 'destructive',
-                title: 'Error',
-                description: 'Could not save customer. See console for details.',
-            });
-        }
       };
 
     const handleDialogStateChange = (open: boolean) => {
@@ -118,29 +129,32 @@ import {
     const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
         const file = event.target.files?.[0];
         if (file && firestore) {
-            try {
-                const data = await importFromExcel(file) as Omit<Customer, 'id'>[];
-                const batch = writeBatch(firestore);
+            const data = await importFromExcel(file) as Omit<Customer, 'id'>[];
+            const batch = writeBatch(firestore);
+            const importedDataForError: any[] = [];
 
-                data.forEach(customerData => {
-                    const newDocRef = doc(collection(firestore, 'customers'));
-                    batch.set(newDocRef, { ...customerData, id: newDocRef.id });
-                });
+            data.forEach(customerData => {
+                const newDocRef = doc(collection(firestore, 'customers'));
+                const fullData = { ...customerData, id: newDocRef.id };
+                batch.set(newDocRef, fullData);
+                importedDataForError.push(fullData);
+            });
 
-                await batch.commit();
-                
-                toast({
-                    title: "Import Successful",
-                    description: `${data.length} customers imported successfully.`,
+            batch.commit()
+                .then(() => {
+                    toast({
+                        title: "Import Successful",
+                        description: `${data.length} customers imported successfully.`,
+                    });
+                })
+                .catch(async (serverError) => {
+                    const permissionError = new FirestorePermissionError({
+                        path: 'customers', // Path for batch write can be generalized
+                        operation: 'create', // Assuming import is a create operation
+                        requestResourceData: importedDataForError, // This is an approximation for batch
+                    });
+                    errorEmitter.emit('permission-error', permissionError);
                 });
-            } catch (error) {
-                console.error("Error importing file:", error);
-                toast({
-                    variant: "destructive",
-                    title: "Import Error",
-                    description: "Failed to import the Excel file. Please check the file format.",
-                });
-            }
         }
     };
     
