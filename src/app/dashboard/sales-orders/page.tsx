@@ -197,7 +197,6 @@ import {
                         <TableHeader>
                             <TableRow>
                                 <TableHead>SO NUMBER</TableHead>
-                                <TableHead>CUSTOMER</TableHead>
                                 <TableHead>PRODUCT NAME</TableHead>
                                 <TableHead>CATEGORY</TableHead>
                                 <TableHead>QUANTITY</TableHead>
@@ -207,11 +206,10 @@ import {
                             </TableRow>
                         </TableHeader>
                         <TableBody>
-                            {isLoading && <TableRow><TableCell colSpan={8} className='text-center'>Loading...</TableCell></TableRow>}
+                            {isLoading && <TableRow><TableCell colSpan={7} className='text-center'>Loading...</TableCell></TableRow>}
                             {filteredOrders?.map((order) => (
                                 <TableRow key={order.id}>
                                     <TableCell className="font-medium">{order.soNumber}</TableCell>
-                                    <TableCell>{order.customer}</TableCell>
                                     <TableCell>{order.productName}</TableCell>
                                     <TableCell>{order.category}</TableCell>
                                     <TableCell>{order.quantity}</TableCell>

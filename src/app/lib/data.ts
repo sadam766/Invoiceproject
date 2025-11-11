@@ -124,7 +124,7 @@ export function getSalesMonitoringData(salesOrders: SalesOrder[]): SalesMonitori
         if (!acc[order.soNumber]) {
             acc[order.soNumber] = {
                 soNumber: order.soNumber,
-                customer: order.customer,
+                customer: 'N/A', // Customer data is removed from sales order
                 date: new Date().toLocaleDateString('en-CA'), // Placeholder date
                 amount: 0,
             };
@@ -249,7 +249,6 @@ export type ProductListItem = {
 export type SalesOrder = {
     id?: string;
     soNumber: string;
-    customer: string;
     productName: string;
     category: string;
     quantity: number;

@@ -34,7 +34,6 @@ type AddSalesOrderDialogProps = {
 
 export function AddSalesOrderDialog({ isOpen, onOpenChange, onSave, orderData, onAddClick }: AddSalesOrderDialogProps) {
   const [soNumber, setSoNumber] = useState('');
-  const [customer, setCustomer] = useState('');
   const [productName, setProductName] = useState('');
   const [category, setCategory] = useState('');
   const [quantity, setQuantity] = useState<number|string>(0);
@@ -44,7 +43,6 @@ export function AddSalesOrderDialog({ isOpen, onOpenChange, onSave, orderData, o
   useEffect(() => {
     if (orderData && isOpen) {
       setSoNumber(orderData.soNumber);
-      setCustomer(orderData.customer);
       setProductName(orderData.productName);
       setCategory(orderData.category);
       setQuantity(formatNumberWithCommas(orderData.quantity));
@@ -52,7 +50,6 @@ export function AddSalesOrderDialog({ isOpen, onOpenChange, onSave, orderData, o
       setPrice(formatNumberWithCommas(orderData.price));
     } else if (!isOpen) {
       setSoNumber('');
-      setCustomer('');
       setProductName('');
       setCategory('');
       setQuantity(0);
@@ -73,7 +70,6 @@ export function AddSalesOrderDialog({ isOpen, onOpenChange, onSave, orderData, o
     onSave({ 
         id: orderData?.id,
         soNumber, 
-        customer,
         productName, 
         category, 
         quantity: typeof quantity === 'string' ? parseFormattedNumber(quantity) : quantity, 
@@ -106,12 +102,6 @@ export function AddSalesOrderDialog({ isOpen, onOpenChange, onSave, orderData, o
               SO Number
             </Label>
             <Input id="so-number" value={soNumber} onChange={(e) => setSoNumber(e.target.value)} className="col-span-3" />
-          </div>
-           <div className="grid grid-cols-4 items-center gap-4">
-            <Label htmlFor="customer" className="text-right">
-              Customer
-            </Label>
-            <Input id="customer" value={customer} onChange={(e) => setCustomer(e.target.value)} className="col-span-3" />
           </div>
           <div className="grid grid-cols-4 items-center gap-4">
             <Label htmlFor="product-name" className="text-right">
