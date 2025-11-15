@@ -199,8 +199,7 @@ const InvoicePreviewPage = () => {
     const totalPages = itemChunks.length;
     const subTotalItems = items.reduce((acc, item) => acc + item.total, 0);
 
-    const invoiceTitle = invoiceId.startsWith('KW') ? 'PROFORMA INVOICE' : 'INVOICE/OFFICIAL RECEIPT';
-
+    const invoiceTitle = invoiceId.startsWith('KW') ? 'PROFORMA INVOICE' : 'INVOICE/OFFICIAL RECEIPT'
 
     return (
         <div className="bg-gray-100 dark:bg-slate-900 min-h-screen p-4 sm:p-6 font-sans text-black">
@@ -302,38 +301,49 @@ const InvoicePreviewPage = () => {
                                 </table>
                             </main>
                             
-                            {isLastPage ? (
+                            {isLastPage && (
                                 <footer className="pt-0 text-black mt-auto text-[10px]">
-                                    <div className="w-full flex justify-end items-end leading-normal">
-                                        <div className="text-right w-1/2">
-                                            {chunk.length < 5 && <div className="h-0.5 border-b border-black w-1/4 ml-auto" style={{marginTop: `-${(10 - chunk.length) * 18}px`}}></div>}
-                                            <p className="text-[10px] font-normal">{formatCurrency(subTotalItems)}</p>
-                                        </div>
-                                    </div>
-                            
-                                    <div className="w-full flex justify-between items-start leading-normal mt-1">
-                                        <div className='w-1/2 text-[10px] space-y-0.5 leading-tight pl-2'>
-                                            {negotiation > 0 && (
-                                                <div className='flex justify-start space-x-2'>
-                                                    <p className='mb-0'>A/Negotiation :</p>
-                                                    <p className='mb-0'>({formatCurrency(negotiation)})</p> 
+                                    
+                                    {/* CONTAINER UTAMA UNTUK SUBTOTAL, NEGOSIASI, DP, PELUNASAN, dan Rincian Total */}
+                                    <div className="flex w-full justify-end items-start leading-normal">
+                                        
+                                        {/* Kolom Kanan: SUB-TOTAL ITEMS, NEGOSIASI, DP, PELUNASAN, dan Rincian Total */}
+                                        <div className="w-full text-right text-[10px] pr-1">
+                                            
+                                            {/* CONTAINER GABUNGAN: Subtotal Items + DP + Negosiasi + Pelunasan */}
+                                            <div className="w-full">
+                                                {/* Subtotal Items */}
+                                                <div className="text-right w-full">
+                                                    {/* Penyesuaian Garis (Opsional, sesuaikan nilai 18px jika tinggi baris Anda berbeda) */}
+                                                    {chunk.length < 5 && <div className="h-0.5 border-b border-black w-1/4 ml-auto" style={{marginTop: `-${(10 - chunk.length) * 18}px`}}></div>}
+                                                    <p className="font-normal mb-0">Subtotal Item: {formatCurrency(subTotalItems)}</p>
                                                 </div>
-                                            )}
-                                            {dpValue > 0 && (
-                                                <div className='flex justify-start space-x-2'>
-                                                    <p className='mb-0'>DP {dpPercent ? `${dpPercent}%` : 'Value'} :</p>
-                                                    <p className='mb-0'>{formatCurrency(dpValue)}</p>
-                                                </div>
-                                            )}
-                                        </div>
-                            
-                                        <div className="w-1/2 text-right text-xs pr-1">
-                                            {pelunasan > 0 && (
-                                                <p className='mb-0 mt-3 font-semibold'>Pelunasan: {formatCurrency(pelunasan)}</p> 
-                                            )}
-                                        </div>
-                                    </div>
 
+                                                {/* Negosiasi */}
+                                                {negotiation > 0 && (
+                                                    <div className='flex justify-end space-x-2'>
+                                                        <p className='mb-0'>A/Negotiation :</p>
+                                                        <p className='mb-0'>({formatCurrency(negotiation)})</p> 
+                                                    </div>
+                                                )}
+
+                                                {/* DP */}
+                                                {dpValue > 0 && (
+                                                    <div className='flex justify-end space-x-2'>
+                                                        <p className='mb-0'>DP {dpPercent ? `${dpPercent}%` : 'Value'} :</p>
+                                                        <p className='mb-0'>{formatCurrency(dpValue)}</p>
+                                                    </div>
+                                                )}
+
+                                                 {/* Pelunasan */}
+                                                 {pelunasan > 0 && (
+                                                    <div className='flex justify-end space-x-2 font-semibold'>
+                                                        <p className='mb-0'>Pelunasan:</p>
+                                                        <p className='mb-0'>{formatCurrency(pelunasan)}</p> 
+                                                    </div>
+                                                )}
+                                            </div>
+                                    
                                     <div className="w-full flex justify-start items-end leading-normal mt-0">
                                         <p>No PO : {poNumber}</p>
                                     </div>
@@ -403,8 +413,10 @@ const InvoicePreviewPage = () => {
                                             </div>
                                         </div>
                                     </div>
+                                    </div>
+                                    </div>
                                 </footer>
-                            ) : null}
+                            )}
                             <div className="text-center text-gray-500 text-[8px] mt-auto pt-2">
                                 Halaman {pageIndex + 1} dari {totalPages}
                             </div>
@@ -418,4 +430,4 @@ const InvoicePreviewPage = () => {
 
 export default InvoicePreviewPage;
 
-
+    
