@@ -33,7 +33,6 @@ import type { InvoiceNumber, Customer, SalesOrder } from '@/app/lib/data';
 import { useToast } from '@/hooks/use-toast';
 import { useFirestore, useCollection, useMemoFirebase } from '@/firebase';
 import { collection } from 'firebase/firestore';
-import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 
 
 type AddInvoiceNumberDialogProps = {
@@ -43,11 +42,11 @@ type AddInvoiceNumberDialogProps = {
   invoiceData?: InvoiceNumber;
   onAddClick: () => void;
   allInvoiceNumbers: InvoiceNumber[] | null;
-  generateNextNumber: (type: 'sar' | 'kw') => string;
+  initialNumberData?: { prefix: string, mainNumber: string, suffix: string, type: 'sar' | 'kw' };
 };
 
 
-export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceData, onAddClick, allInvoiceNumbers, generateNextNumber }: AddInvoiceNumberDialogProps) {
+export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceData, onAddClick, allInvoiceNumbers, initialNumberData }: AddInvoiceNumberDialogProps) {
   const firestore = useFirestore();
   const [date, setDate] = useState<Date | undefined>(new Date());
   const [invoiceType, setInvoiceType] = useState<'sar' | 'kw'>('kw');
@@ -84,20 +83,56 @@ export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceDa
     return Array.from(new Set(salesOrderListData.map(item => item.soNumber)))
   },[salesOrderListData]);
 
-  const setupNumberParts = (type: 'sar' | 'kw', mainNum?: string) => {
-    const currentYear = new Date().getFullYear();
-    if (type === 'sar') {
-      setPrefix('SAR/');
-      setSuffix('');
-      if (mainNum) setMainNumber(mainNum);
-      else if (isAutoNumber) setMainNumber(generateNextNumber('sar'));
-    } else { // kw
-      setPrefix('KW/');
-      setSuffix(`/KEU/${currentYear}`);
-      if (mainNum) setMainNumber(mainNum);
-      else if (isAutoNumber) setMainNumber(generateNextNumber('kw'));
+  useEffect(() => {
+    if (!isOpen) return;
+  
+    if (invoiceData) {
+      // ===== EDIT MODE =====
+      const type = invoiceData.id.startsWith('SAR/') ? 'sar' : 'kw';
+      
+      let extractedMainNumber = '';
+      const parts = invoiceData.id.split('/');
+      
+      if (type === 'sar' && parts.length >= 2) {
+          extractedMainNumber = parts[1];
+      } else if (type === 'kw' && parts.length >= 3) {
+          extractedMainNumber = parts[1];
+      }
+      
+      setInvoiceType(type);
+      setPrefix(type === 'sar' ? 'SAR/' : `KW/`);
+      setSuffix(type === 'sar' ? '' : `/KEU/${new Date().getFullYear()}`);
+      setMainNumber(extractedMainNumber);
+      setIsAutoNumber(false); // Always start in manual for editing
+      
+      setCustomer(invoiceData.customer);
+      setSalesOrder(invoiceData.salesOrder);
+      if (invoiceData.date) {
+        const dateParts = invoiceData.date.split('/');
+        if (dateParts.length === 3) {
+          const [day, month, year] = dateParts;
+          setDate(new Date(parseInt(year), parseInt(month) - 1, parseInt(day)));
+        } else {
+          setDate(new Date());
+        }
+      } else {
+        setDate(new Date());
+      }
+      setAmount(formatNumberWithCommas(invoiceData.amount));
+    } else if (initialNumberData) {
+      // ===== ADD NEW MODE (with pre-filled data from parent) =====
+      setIsAutoNumber(true);
+      setInvoiceType(initialNumberData.type);
+      setPrefix(initialNumberData.prefix);
+      setMainNumber(initialNumberData.mainNumber);
+      setSuffix(initialNumberData.suffix);
+      // Reset other fields for a new entry
+      setCustomer('');
+      setSalesOrder('');
+      setDate(new Date());
+      setAmount(0);
     }
-  };
+  }, [invoiceData, initialNumberData, isOpen]);
   
   const handleSalesOrderSelect = (currentValue: string) => {
     const newSalesOrder = currentValue === salesOrder ? '' : currentValue;
@@ -126,57 +161,6 @@ export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceDa
     setSoPopoverOpen(false);
   };
   
-  // Effect to handle initialization and reset
-  useEffect(() => {
-    if (!isOpen) return;
-
-    if (invoiceData) {
-      // ===== EDIT MODE =====
-      const type = invoiceData.id.startsWith('SAR/') ? 'sar' : 'kw';
-      
-      let extractedMainNumber = '';
-      const parts = invoiceData.id.split('/');
-      if (parts.length >= 2) extractedMainNumber = parts[1];
-      
-      setInvoiceType(type);
-      setupNumberParts(type, extractedMainNumber);
-      setIsAutoNumber(false); // Always start in manual for editing
-      
-      setCustomer(invoiceData.customer);
-      setSalesOrder(invoiceData.salesOrder);
-      if (invoiceData.date) {
-        const dateParts = invoiceData.date.split('/');
-        if (dateParts.length === 3) {
-          const [day, month, year] = dateParts;
-          setDate(new Date(parseInt(year), parseInt(month) - 1, parseInt(day)));
-        } else {
-          setDate(new Date());
-        }
-      } else {
-        setDate(new Date());
-      }
-      setAmount(formatNumberWithCommas(invoiceData.amount));
-    } else {
-      // ===== ADD NEW MODE (runs once on open) =====
-      const initialType = 'kw';
-      setInvoiceType(initialType);
-      setIsAutoNumber(true);
-      setupNumberParts(initialType);
-      setCustomer('');
-      setSalesOrder('');
-      setDate(new Date());
-      setAmount(0);
-    }
-  }, [invoiceData, isOpen]);
-
-
-  useEffect(() => {
-    // This effect runs when type or isAutoNumber changes
-    if (!invoiceData) { // Only for "add new" mode
-      setupNumberParts(invoiceType);
-    }
-  }, [invoiceType, isAutoNumber]);
-
 
   useEffect(() => {
     setFullInvoiceNumber(`${prefix}${mainNumber}${suffix}`);
@@ -205,7 +189,6 @@ export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceDa
         });
         return;
     }
-    // Check for duplicates only when creating a new invoice, not when editing
     if (!invoiceData && allInvoiceNumbers?.some(inv => inv.id === fullInvoiceNumber)) {
       toast({
         variant: "destructive",
@@ -244,22 +227,23 @@ export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceDa
         <div className="grid gap-6 py-4 max-h-[70vh] overflow-y-auto pr-4">
           {!invoiceData && (
               <div className="space-y-2">
-                <Label>Jenis Faktur</Label>
-                <RadioGroup
-                  defaultValue="kw"
-                  value={invoiceType}
-                  onValueChange={(value) => setInvoiceType(value as 'sar' | 'kw')}
-                  className="flex space-x-4"
-                >
-                  <div className="flex items-center space-x-2">
-                    <RadioGroupItem value="kw" id="kw" />
-                    <Label htmlFor="kw" className="font-normal">KW</Label>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <RadioGroupItem value="sar" id="sar" />
-                    <Label htmlFor="sar" className="font-normal">SAR</Label>
-                  </div>
-                </RadioGroup>
+                <Label>Tipe Faktur</Label>
+                 <div className="flex w-full rounded-md border border-input">
+                    <Button
+                        variant={invoiceType === 'sar' ? 'default' : 'ghost'}
+                        onClick={() => onAddClick('sar')}
+                        className="flex-1 rounded-r-none"
+                    >
+                        SAR
+                    </Button>
+                    <Button
+                        variant={invoiceType === 'kw' ? 'default' : 'ghost'}
+                        onClick={() => onAddClick('kw')}
+                        className="flex-1 rounded-l-none"
+                    >
+                        KW / Proforma
+                    </Button>
+                </div>
               </div>
             )}
 

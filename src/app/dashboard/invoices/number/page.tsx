@@ -36,7 +36,7 @@ import {
 
     const [editingInvoice, setEditingInvoice] = useState<InvoiceNumber | undefined>(undefined);
     const [isDialogOpen, setIsDialogOpen] = useState(false);
-    const [initialNumber, setInitialNumber] = useState<{ prefix: string, mainNumber: string, suffix: string } | undefined>(undefined);
+    const [initialNumberData, setInitialNumberData] = useState<{ prefix: string, mainNumber: string, suffix: string, type: 'sar' | 'kw' } | undefined>(undefined);
     
     const invoiceNumbersCollection = useMemoFirebase(() => {
         if (!firestore) return null;
@@ -62,42 +62,48 @@ import {
         );
     }, [invoices, searchQuery]);
 
-    const generateNextNumber = (type: 'sar' | 'kw') => {
-        if (!invoices) {
-            return type === 'kw' ? '0001' : '1';
-        }
+    const generateNextNumber = (type: 'sar' | 'kw'): { prefix: string, mainNumber: string, suffix: string, type: 'sar' | 'kw'} => {
+        const currentYear = new Date().getFullYear();
+        let prefix = '';
+        let suffix = '';
         let nextNum = 1;
 
-        const relevantNumbers = invoices.filter(inv => {
-            const id = inv.id || '';
-            if (type === 'sar') return id.startsWith('SAR/');
-            return id.startsWith('KW/');
-        }).map(inv => {
-            const parts = (inv.id || '').split('/');
-            if (parts.length >= 2) return parseInt(parts[1], 10);
-            return 0;
-        }).filter(num => !isNaN(num) && num > 0);
-
-        if (relevantNumbers.length > 0) {
-            nextNum = Math.max(...relevantNumbers) + 1;
+        if (invoices) {
+            const relevantNumbers = invoices.filter(inv => {
+                const id = inv.id || '';
+                if (type === 'sar') return id.startsWith('SAR/');
+                return id.startsWith('KW/');
+            }).map(inv => {
+                const parts = (inv.id || '').split('/');
+                if (parts.length >= 2) return parseInt(parts[1], 10);
+                return 0;
+            }).filter(num => !isNaN(num) && num > 0);
+    
+            if (relevantNumbers.length > 0) {
+                nextNum = Math.max(...relevantNumbers) + 1;
+            }
         }
 
         if (type === 'sar') {
-            return nextNum.toString();
+            prefix = 'SAR/';
+            suffix = '';
+            return { prefix, mainNumber: nextNum.toString(), suffix, type };
         } else { // kw
-            return nextNum.toString().padStart(4, '0');
+            prefix = 'KW/';
+            suffix = `/KEU/${currentYear}`;
+            return { prefix, mainNumber: nextNum.toString().padStart(4, '0'), suffix, type };
         }
     };
 
 
-    const handleAddClick = () => {
-      setInitialNumber(undefined);
+    const handleAddClick = (type: 'sar' | 'kw' = 'kw') => {
+      setInitialNumberData(generateNextNumber(type));
       setEditingInvoice(undefined);
       setIsDialogOpen(true);
     };
 
     const handleEdit = (invoice: InvoiceNumber) => {
-        setInitialNumber(undefined); // Clear initial number for edit mode
+        setInitialNumberData(undefined);
         setEditingInvoice(invoice);
         setIsDialogOpen(true);
     };
@@ -129,7 +135,7 @@ import {
 
       setDoc(docRef, dataToSave, { merge: true })
         .then(() => {
-            if (!editingInvoice) { // Only redirect for new invoices
+            if (!editingInvoice) { 
                 router.push(`/dashboard/invoices/add?invoiceNumberId=${safeId}`);
             }
              toast({
@@ -241,7 +247,7 @@ import {
                         invoiceData={editingInvoice}
                         onAddClick={handleAddClick}
                         allInvoiceNumbers={invoices}
-                        generateNextNumber={generateNextNumber}
+                        initialNumberData={initialNumberData}
                        />
                     </div>
                 </div>
