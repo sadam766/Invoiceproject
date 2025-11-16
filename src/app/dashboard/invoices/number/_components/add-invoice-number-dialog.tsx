@@ -120,13 +120,23 @@ export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceDa
         if (invoiceType === 'sar') {
             setPrefix('SAR/');
             setSuffix('');
-            if (isAutoNumber) setMainNumber('25000003');
-            else setMainNumber('');
+            if (isAutoNumber && !invoiceData) { // Only auto-generate for new invoices
+                const sarNumbers = invoiceNumberData?.filter(inv => inv.id.startsWith('SAR/')).map(inv => parseInt(inv.id.replace('SAR/', ''), 10)).filter(num => !isNaN(num)) || [];
+                const nextNumber = sarNumbers.length > 0 ? Math.max(...sarNumbers) + 1 : 1;
+                setMainNumber(nextNumber.toString());
+            } else if (!invoiceData) {
+                setMainNumber('');
+            }
         } else { // kw
             setPrefix('KW/');
             setSuffix(`/KEU/${currentYear}`);
-            if (isAutoNumber) setMainNumber('0001');
-            else setMainNumber('');
+            if (isAutoNumber && !invoiceData) { // Only auto-generate for new invoices
+                const kwNumbers = invoiceNumberData?.filter(inv => inv.id.startsWith('KW/')).map(inv => parseInt(inv.id.split('/')[1], 10)).filter(num => !isNaN(num)) || [];
+                const nextNumber = kwNumbers.length > 0 ? Math.max(...kwNumbers) + 1 : 1;
+                setMainNumber(nextNumber.toString().padStart(4, '0'));
+            } else if (!invoiceData) {
+                setMainNumber('');
+            }
         }
     }
     
@@ -159,7 +169,7 @@ export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceDa
             setAmount(0);
         }
     }
-  }, [invoiceData, isOpen, invoiceType, isAutoNumber]);
+  }, [invoiceData, isOpen, invoiceType, isAutoNumber, invoiceNumberData]);
 
   useEffect(() => {
     setFullInvoiceNumber(`${prefix}${mainNumber}${suffix}`);
@@ -168,6 +178,9 @@ export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceDa
 
   const handleMainNumberChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setMainNumber(e.target.value);
+    if(isAutoNumber) {
+        setIsAutoNumber(false);
+    }
   }
   
   const handleAmountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -226,12 +239,12 @@ export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceDa
           <div className="space-y-2">
             <Label>Nomor Faktur</Label>
             <div className="flex items-center space-x-2">
-              <Checkbox id="auto-number" checked={isAutoNumber} onCheckedChange={(checked) => setIsAutoNumber(Boolean(checked))} />
+              <Checkbox id="auto-number" checked={isAutoNumber} onCheckedChange={(checked) => setIsAutoNumber(Boolean(checked))} disabled={!!invoiceData}/>
               <Label htmlFor="auto-number" className="font-normal">Nomor Otomatis</Label>
             </div>
             <div className="grid grid-cols-[auto_1fr_auto] items-center gap-2">
               <Input value={prefix} className="bg-muted text-right" readOnly />
-              <Input value={mainNumber} onChange={handleMainNumberChange} disabled={isAutoNumber && !invoiceData} />
+              <Input value={mainNumber} onChange={handleMainNumberChange} />
               {suffix && <Input value={suffix} className="bg-muted" readOnly />}
             </div>
             <Input id="full-invoice-number" value={fullInvoiceNumber} disabled className="bg-muted font-semibold text-center" />
