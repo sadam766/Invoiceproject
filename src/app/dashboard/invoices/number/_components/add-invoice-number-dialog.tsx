@@ -120,21 +120,21 @@ export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceDa
         if (invoiceType === 'sar') {
             setPrefix('SAR/');
             setSuffix('');
-            if (isAutoNumber && !invoiceData) { // Only auto-generate for new invoices
+            if (isAutoNumber && !invoiceData) {
                 const sarNumbers = invoiceNumberData?.filter(inv => inv.id.startsWith('SAR/')).map(inv => parseInt(inv.id.replace('SAR/', ''), 10)).filter(num => !isNaN(num)) || [];
                 const nextNumber = sarNumbers.length > 0 ? Math.max(...sarNumbers) + 1 : 1;
                 setMainNumber(nextNumber.toString());
-            } else if (!invoiceData) {
+            } else if (!isAutoNumber) {
                 setMainNumber('');
             }
         } else { // kw
             setPrefix('KW/');
             setSuffix(`/KEU/${currentYear}`);
-            if (isAutoNumber && !invoiceData) { // Only auto-generate for new invoices
+            if (isAutoNumber && !invoiceData) {
                 const kwNumbers = invoiceNumberData?.filter(inv => inv.id.startsWith('KW/')).map(inv => parseInt(inv.id.split('/')[1], 10)).filter(num => !isNaN(num)) || [];
                 const nextNumber = kwNumbers.length > 0 ? Math.max(...kwNumbers) + 1 : 1;
                 setMainNumber(nextNumber.toString().padStart(4, '0'));
-            } else if (!invoiceData) {
+            } else if (!isAutoNumber) {
                 setMainNumber('');
             }
         }
@@ -159,7 +159,7 @@ export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceDa
             setSalesOrder(invoiceData.salesOrder);
             setDate(new Date(invoiceData.date.split('/').reverse().join('-')));
             setAmount(formatNumberWithCommas(invoiceData.amount));
-            setIsAutoNumber(false); // Disable auto number on edit
+            setIsAutoNumber(false); // Always allow edit in edit mode
         } else {
             // Add new mode
             generateNumber();
@@ -178,9 +178,6 @@ export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceDa
 
   const handleMainNumberChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setMainNumber(e.target.value);
-    if(isAutoNumber) {
-        setIsAutoNumber(false);
-    }
   }
   
   const handleAmountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -192,7 +189,7 @@ export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceDa
   };
 
   const handleSave = () => {
-    // Check for duplicates before saving
+    // Check for duplicates before saving, but only for new invoices
     if (!invoiceData && invoiceNumberData?.some(inv => inv.id === fullInvoiceNumber)) {
       toast({
         variant: "destructive",
