@@ -86,6 +86,17 @@ export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceDa
     if (!salesOrderListData) return [];
     return Array.from(new Set(salesOrderListData.map(item => item.soNumber)))
   },[salesOrderListData]);
+
+  const generatePrefixAndSuffix = (type: 'sar' | 'kw') => {
+    const currentYear = new Date().getFullYear();
+    if (type === 'sar') {
+        setPrefix('SAR/');
+        setSuffix('');
+    } else { // kw
+        setPrefix('KW/');
+        setSuffix(`/KEU/${currentYear}`);
+    }
+  };
   
   const handleSalesOrderSelect = (currentValue: string) => {
     const newSalesOrder = currentValue === salesOrder ? '' : currentValue;
@@ -105,27 +116,28 @@ export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceDa
     setSoPopoverOpen(false);
   };
 
-  const generateNumber = (type: 'sar' | 'kw') => {
-    const currentYear = new Date().getFullYear();
+  const generateNextNumber = (type: 'sar' | 'kw') => {
     let nextNum = 1;
     let newMainNumber = '';
 
+    const relevantNumbers = invoiceNumberData?.filter(inv => {
+        if (type === 'sar') return inv.id.startsWith('SAR/');
+        return inv.id.startsWith('KW/');
+    }).map(inv => {
+        const parts = inv.id.split('/');
+        if (type === 'sar' && parts.length >= 2) return parseInt(parts[1], 10);
+        if (type === 'kw' && parts.length >= 2) return parseInt(parts[1], 10);
+        return 0;
+    }).filter(num => !isNaN(num));
+
+    if (relevantNumbers && relevantNumbers.length > 0) {
+        nextNum = Math.max(...relevantNumbers) + 1;
+    }
+
     if (type === 'sar') {
-      setPrefix('SAR/');
-      setSuffix('');
-      const sarNumbers = invoiceNumberData?.filter(inv => inv.id.startsWith('SAR/')).map(inv => parseInt(inv.id.replace('SAR/', ''), 10)).filter(num => !isNaN(num)) || [];
-      if (sarNumbers.length > 0) {
-        nextNum = Math.max(...sarNumbers) + 1;
-      }
-      newMainNumber = nextNum.toString();
+        newMainNumber = nextNum.toString();
     } else { // kw
-      setPrefix('KW/');
-      setSuffix(`/KEU/${currentYear}`);
-      const kwNumbers = invoiceNumberData?.filter(inv => inv.id.startsWith('KW/')).map(inv => parseInt(inv.id.split('/')[1], 10)).filter(num => !isNaN(num)) || [];
-      if (kwNumbers.length > 0) {
-        nextNum = Math.max(...kwNumbers) + 1;
-      }
-      newMainNumber = nextNum.toString().padStart(4, '0');
+        newMainNumber = nextNum.toString().padStart(4, '0');
     }
     setMainNumber(newMainNumber);
   };
@@ -136,22 +148,19 @@ export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceDa
     if (invoiceData) {
       // Edit mode
       const type = invoiceData.id.startsWith('SAR/') ? 'sar' : 'kw';
-      const parts = invoiceData.id.split('/');
       setInvoiceType(type);
+      generatePrefixAndSuffix(type);
 
+      const parts = invoiceData.id.split('/');
+      let extractedMainNumber = '';
       if (type === 'sar' && parts.length >= 2) {
-        setPrefix(`${parts[0]}/`);
-        setMainNumber(parts[1]);
-        setSuffix(parts.length > 2 ? `/${parts.slice(2).join('/')}` : '');
-      } else if (type === 'kw' && parts.length >= 4) {
-        setPrefix(`${parts[0]}/`);
-        setMainNumber(parts[1]);
-        setSuffix(`/${parts.slice(2).join('/')}`);
+        extractedMainNumber = parts[1];
+      } else if (type === 'kw' && parts.length >= 2) {
+        extractedMainNumber = parts[1];
       } else {
-        setPrefix('');
-        setMainNumber(invoiceData.id);
-        setSuffix('');
+        extractedMainNumber = invoiceData.id;
       }
+      setMainNumber(extractedMainNumber);
       
       setCustomer(invoiceData.customer);
       setSalesOrder(invoiceData.salesOrder);
@@ -167,14 +176,15 @@ export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceDa
         setDate(new Date());
       }
       setAmount(formatNumberWithCommas(invoiceData.amount));
+      // In edit mode, user might want to switch to manual, so we don't force isAutoNumber
+      // setIsAutoNumber(true); 
     } else {
       // Add new mode
+      generatePrefixAndSuffix(invoiceType);
       if (isAutoNumber) {
-        generateNumber(invoiceType);
+        generateNextNumber(invoiceType);
       } else {
-        setPrefix('');
         setMainNumber('');
-        setSuffix('');
       }
       setCustomer('');
       setSalesOrder('');
@@ -202,6 +212,14 @@ export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceDa
   };
 
   const handleSave = () => {
+    if (!mainNumber) {
+        toast({
+            variant: "destructive",
+            title: "Validation Error",
+            description: "Nomor Faktur tidak boleh kosong.",
+        });
+        return;
+    }
     if (!invoiceData && invoiceNumberData?.some(inv => inv.id === fullInvoiceNumber)) {
       toast({
         variant: "destructive",
@@ -252,9 +270,9 @@ export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceDa
               <Label htmlFor="auto-number" className="font-normal">Nomor Otomatis</Label>
             </div>
             <div className="grid grid-cols-[auto_1fr_auto] items-center gap-2">
-              <Input value={prefix} className="bg-muted text-right" readOnly />
+              <Input value={prefix} className="bg-muted text-right" readOnly tabIndex={-1} />
               <Input value={mainNumber} onChange={handleMainNumberChange} />
-              {suffix && <Input value={suffix} className="bg-muted" readOnly />}
+              {suffix && <Input value={suffix} className="bg-muted" readOnly tabIndex={-1} />}
             </div>
             <Input id="full-invoice-number" value={fullInvoiceNumber} disabled className="bg-muted font-semibold text-center" />
           </div>
@@ -391,3 +409,5 @@ export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceDa
     </Dialog>
   );
 }
+
+    
