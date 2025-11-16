@@ -67,7 +67,8 @@ import {
 
     const handleDelete = (invoiceId: string) => {
         if (!firestore || !invoiceId) return;
-        const docRef = doc(firestore, 'invoiceNumbers', invoiceId);
+        const safeId = invoiceId.replace(/\//g, '_');
+        const docRef = doc(firestore, 'invoiceNumbers', safeId);
         deleteDoc(docRef)
             .then(() => {
                 toast({ title: 'Invoice Number Deleted' });
@@ -84,12 +85,14 @@ import {
     const handleSave = (invoice: Omit<InvoiceNumber, 'id'> & {id: string}) => {
       if (!firestore) return;
       const { id, ...invoiceData } = invoice;
+      const safeId = id.replace(/\//g, '_');
       
-      const docRef = doc(firestore, 'invoiceNumbers', id);
-      setDoc(docRef, invoiceData, { merge: true })
+      const docRef = doc(firestore, 'invoiceNumbers', safeId);
+      const dataToSave = { ...invoiceData, id: id };
+
+      setDoc(docRef, dataToSave, { merge: true })
         .then(() => {
             if (!editingInvoice) { // Only redirect for new invoices
-                const safeId = id.replace(/\//g, '_');
                 router.push(`/dashboard/invoices/add?invoiceNumberId=${safeId}`);
             }
              toast({
@@ -100,7 +103,7 @@ import {
             const permissionError = new FirestorePermissionError({
                 path: docRef.path,
                 operation: editingInvoice ? 'update' : 'create',
-                requestResourceData: invoiceData,
+                requestResourceData: dataToSave,
             });
             errorEmitter.emit('permission-error', permissionError);
         });
@@ -136,9 +139,11 @@ import {
           
           data.forEach(item => {
               if (item.id) {
-                const docRef = doc(firestore, 'invoiceNumbers', item.id);
-                batch.set(docRef, item);
-                importedDataForError.push(item);
+                const safeId = item.id.replace(/\//g, '_');
+                const docRef = doc(firestore, 'invoiceNumbers', safeId);
+                const dataToSave = { ...item, id: item.id };
+                batch.set(docRef, dataToSave);
+                importedDataForError.push(dataToSave);
               }
           });
 
@@ -229,7 +234,7 @@ import {
                             ) : (
                                 filteredInvoices?.map((invoice) => (
                                     <TableRow key={invoice.id}>
-                                        <TableCell className="font-medium">{invoice.id.replace(/_/g, '/')}</TableCell>
+                                        <TableCell className="font-medium">{invoice.id}</TableCell>
                                         <TableCell>{invoice.customer}</TableCell>
                                         <TableCell>{invoice.salesOrder}</TableCell>
                                         <TableCell>{invoice.date}</TableCell>
