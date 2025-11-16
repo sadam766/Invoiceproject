@@ -33,6 +33,7 @@ import type { InvoiceNumber, Customer, SalesOrder } from '@/app/lib/data';
 import { useToast } from '@/hooks/use-toast';
 import { useFirestore, useCollection, useMemoFirebase } from '@/firebase';
 import { collection } from 'firebase/firestore';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 
 
 type AddInvoiceNumberDialogProps = {
@@ -40,13 +41,13 @@ type AddInvoiceNumberDialogProps = {
   onOpenChange: (isOpen: boolean) => void;
   onSave: (invoice: Omit<InvoiceNumber, 'id'> & {id: string}) => void;
   invoiceData?: InvoiceNumber;
-  initialNumberData?: { prefix: string, mainNumber: string, suffix: string };
   onAddClick: () => void;
   allInvoiceNumbers: InvoiceNumber[] | null;
+  generateNextNumber: (type: 'sar' | 'kw') => string;
 };
 
 
-export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceData, initialNumberData, onAddClick, allInvoiceNumbers }: AddInvoiceNumberDialogProps) {
+export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceData, onAddClick, allInvoiceNumbers, generateNextNumber }: AddInvoiceNumberDialogProps) {
   const firestore = useFirestore();
   const [date, setDate] = useState<Date | undefined>(new Date());
   const [invoiceType, setInvoiceType] = useState<'sar' | 'kw'>('kw');
@@ -83,6 +84,20 @@ export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceDa
     return Array.from(new Set(salesOrderListData.map(item => item.soNumber)))
   },[salesOrderListData]);
 
+  const setupNumberParts = (type: 'sar' | 'kw', mainNum?: string) => {
+    const currentYear = new Date().getFullYear();
+    if (type === 'sar') {
+      setPrefix('SAR/');
+      setSuffix('');
+      if (mainNum) setMainNumber(mainNum);
+      else if (isAutoNumber) setMainNumber(generateNextNumber('sar'));
+    } else { // kw
+      setPrefix('KW/');
+      setSuffix(`/KEU/${currentYear}`);
+      if (mainNum) setMainNumber(mainNum);
+      else if (isAutoNumber) setMainNumber(generateNextNumber('kw'));
+    }
+  };
   
   const handleSalesOrderSelect = (currentValue: string) => {
     const newSalesOrder = currentValue === salesOrder ? '' : currentValue;
@@ -113,39 +128,18 @@ export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceDa
   
   // Effect to handle initialization and reset
   useEffect(() => {
-    if (!isOpen) {
-        return; // Do nothing if the dialog is closed
-    }
+    if (!isOpen) return;
 
     if (invoiceData) {
       // ===== EDIT MODE =====
       const type = invoiceData.id.startsWith('SAR/') ? 'sar' : 'kw';
-      const currentYear = new Date().getFullYear();
-
-      let extractedPrefix = '';
-      let extractedMainNumber = '';
-      let extractedSuffix = '';
       
-      if (type === 'sar') {
-          extractedPrefix = 'SAR/';
-          const parts = invoiceData.id.split('/');
-          if (parts.length >= 2) extractedMainNumber = parts[1];
-          extractedSuffix = '';
-      } else { // kw
-          const parts = invoiceData.id.split('/');
-          extractedPrefix = 'KW/';
-          if (parts.length >= 4) {
-            extractedMainNumber = parts[1];
-            extractedSuffix = `/${parts[2]}/${parts[3]}`;
-          } else {
-            extractedSuffix = `/KEU/${currentYear}`;
-          }
-      }
+      let extractedMainNumber = '';
+      const parts = invoiceData.id.split('/');
+      if (parts.length >= 2) extractedMainNumber = parts[1];
       
       setInvoiceType(type);
-      setPrefix(extractedPrefix);
-      setMainNumber(extractedMainNumber);
-      setSuffix(extractedSuffix);
+      setupNumberParts(type, extractedMainNumber);
       setIsAutoNumber(false); // Always start in manual for editing
       
       setCustomer(invoiceData.customer);
@@ -163,18 +157,25 @@ export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceDa
       }
       setAmount(formatNumberWithCommas(invoiceData.amount));
     } else {
-      // ===== ADD NEW MODE =====
-      setInvoiceType(initialNumberData?.prefix.startsWith('SAR') ? 'sar' : 'kw');
-      setPrefix(initialNumberData?.prefix || 'KW/');
-      setMainNumber(initialNumberData?.mainNumber || '0001');
-      setSuffix(initialNumberData?.suffix || `/KEU/${new Date().getFullYear()}`);
-      setIsAutoNumber(true); // Default to auto
+      // ===== ADD NEW MODE (runs once on open) =====
+      const initialType = 'kw';
+      setInvoiceType(initialType);
+      setIsAutoNumber(true);
+      setupNumberParts(initialType);
       setCustomer('');
       setSalesOrder('');
       setDate(new Date());
       setAmount(0);
     }
-  }, [invoiceData, isOpen, initialNumberData]);
+  }, [invoiceData, isOpen]);
+
+
+  useEffect(() => {
+    // This effect runs when type or isAutoNumber changes
+    if (!invoiceData) { // Only for "add new" mode
+      setupNumberParts(invoiceType);
+    }
+  }, [invoiceType, isAutoNumber]);
 
 
   useEffect(() => {
@@ -241,12 +242,31 @@ export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceDa
           <DialogTitle>{dialogTitle}</DialogTitle>
         </DialogHeader>
         <div className="grid gap-6 py-4 max-h-[70vh] overflow-y-auto pr-4">
-           {/* Invoice Type selection is disabled as it's now determined by onAddClick */}
+          {!invoiceData && (
+              <div className="space-y-2">
+                <Label>Jenis Faktur</Label>
+                <RadioGroup
+                  defaultValue="kw"
+                  value={invoiceType}
+                  onValueChange={(value) => setInvoiceType(value as 'sar' | 'kw')}
+                  className="flex space-x-4"
+                >
+                  <div className="flex items-center space-x-2">
+                    <RadioGroupItem value="kw" id="kw" />
+                    <Label htmlFor="kw" className="font-normal">KW</Label>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <RadioGroupItem value="sar" id="sar" />
+                    <Label htmlFor="sar" className="font-normal">SAR</Label>
+                  </div>
+                </RadioGroup>
+              </div>
+            )}
+
            <div className="space-y-2">
             <Label>Nomor Faktur</Label>
-            {/* Checkbox is disabled because its logic is now external */}
             <div className="flex items-center space-x-2">
-              <Checkbox id="auto-number" checked={isAutoNumber} disabled />
+              <Checkbox id="auto-number" checked={isAutoNumber} onCheckedChange={(checked) => setIsAutoNumber(!!checked)} />
               <Label htmlFor="auto-number" className="font-normal">Nomor Otomatis</Label>
             </div>
             <div className="grid grid-cols-[auto_1fr_auto] items-center gap-2">

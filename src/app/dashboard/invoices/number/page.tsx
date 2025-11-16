@@ -91,13 +91,7 @@ import {
 
 
     const handleAddClick = () => {
-        const nextKwNumber = generateNextNumber('kw');
-        const currentYear = new Date().getFullYear();
-        setInitialNumber({
-            prefix: 'KW/',
-            mainNumber: nextKwNumber,
-            suffix: `/KEU/${currentYear}`
-        });
+      setInitialNumber(undefined);
       setEditingInvoice(undefined);
       setIsDialogOpen(true);
     };
@@ -247,7 +241,7 @@ import {
                         invoiceData={editingInvoice}
                         onAddClick={handleAddClick}
                         allInvoiceNumbers={invoices}
-                        initialNumberData={initialNumber}
+                        generateNextNumber={generateNextNumber}
                        />
                     </div>
                 </div>
