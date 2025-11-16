@@ -150,17 +150,40 @@ export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceDa
     setMainNumber(newMainNumber);
   };
 
+  const handleInvoiceTypeChange = (newType: 'sar' | 'kw') => {
+    setInvoiceType(newType);
+    generatePrefixAndSuffix(newType);
+    if (isAutoNumber) {
+        generateNextNumber(newType);
+    } else {
+        setMainNumber('');
+    }
+  }
+
+  // Effect to handle initialization and reset
   useEffect(() => {
-    if (!isOpen) return;
+    if (!isOpen) {
+        // Reset state when dialog is closed
+        setInvoiceType('kw');
+        setIsAutoNumber(true);
+        setMainNumber('');
+        setCustomer('');
+        setSalesOrder('');
+        setDate(new Date());
+        setAmount(0);
+        return;
+    };
+
+    const type = invoiceData?.id.startsWith('SAR/') ? 'sar' : 'kw';
+    setInvoiceType(type);
+    generatePrefixAndSuffix(type);
 
     if (invoiceData) {
-      // Edit mode
-      const type = invoiceData.id.startsWith('SAR/') ? 'sar' : 'kw';
-      setInvoiceType(type);
-      
+      // ===== EDIT MODE =====
+      setIsAutoNumber(false); // Manual mode for editing
       const parts = invoiceData.id.split('/');
       let extractedMainNumber = '';
-       if (type === 'sar' && parts.length >= 2) {
+      if (type === 'sar' && parts.length >= 2) {
         extractedMainNumber = parts[1];
       } else if (type === 'kw' && parts.length >= 2) {
         extractedMainNumber = parts[1];
@@ -181,32 +204,16 @@ export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceDa
         setDate(new Date());
       }
       setAmount(formatNumberWithCommas(invoiceData.amount));
-      setIsAutoNumber(false); 
     } else {
-      // Add new mode
-      setIsAutoNumber(true);
-      if (isAutoNumber) {
-        generateNextNumber(invoiceType);
-      } else {
-        setMainNumber('');
-      }
+      // ===== ADD NEW MODE =====
+      setIsAutoNumber(true); // Default to auto
+      generateNextNumber(type);
       setCustomer('');
       setSalesOrder('');
       setDate(new Date());
       setAmount(0);
     }
-  }, [invoiceData, isOpen]);
-
-  useEffect(() => {
-    generatePrefixAndSuffix(invoiceType);
-    if (!invoiceData) { // Only for "Add New" mode
-        if (isAutoNumber) {
-          generateNextNumber(invoiceType);
-        } else {
-          setMainNumber('');
-        }
-    }
-  }, [invoiceType, isAutoNumber, invoiceData, allInvoiceNumbers, isOpen]);
+  }, [invoiceData, isOpen, allInvoiceNumbers]); // Rerun when data or open state changes
 
 
   useEffect(() => {
@@ -275,14 +282,20 @@ export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceDa
           <div>
             <Label htmlFor="invoice-type">Tipe Faktur</Label>
             <div className="mt-2 grid grid-cols-2 gap-2 rounded-md bg-muted p-1">
-                <Button variant={invoiceType === 'sar' ? 'default' : 'ghost'} onClick={() => setInvoiceType('sar')} className="h-8">SAR</Button>
-                <Button variant={invoiceType === 'kw' ? 'default' : 'ghost'} onClick={() => setInvoiceType('kw')} className="h-8">KW / Proforma</Button>
+                <Button variant={invoiceType === 'sar' ? 'default' : 'ghost'} onClick={() => handleInvoiceTypeChange('sar')} className="h-8">SAR</Button>
+                <Button variant={invoiceType === 'kw' ? 'default' : 'ghost'} onClick={() => handleInvoiceTypeChange('kw')} className="h-8">KW / Proforma</Button>
             </div>
           </div>
           <div className="space-y-2">
             <Label>Nomor Faktur</Label>
             <div className="flex items-center space-x-2">
-              <Checkbox id="auto-number" checked={isAutoNumber} onCheckedChange={(checked) => setIsAutoNumber(Boolean(checked))}/>
+              <Checkbox id="auto-number" checked={isAutoNumber} onCheckedChange={(checked) => {
+                  const newIsAuto = Boolean(checked);
+                  setIsAutoNumber(newIsAuto);
+                  if (newIsAuto) {
+                    generateNextNumber(invoiceType);
+                  }
+              }}/>
               <Label htmlFor="auto-number" className="font-normal">Nomor Otomatis</Label>
             </div>
             <div className="grid grid-cols-[auto_1fr_auto] items-center gap-2">
