@@ -113,7 +113,6 @@ export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceDa
     setSoPopoverOpen(false);
   };
 
-
   useEffect(() => {
     const generateNumber = () => {
         const currentYear = new Date().getFullYear();
@@ -160,8 +159,8 @@ export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceDa
             setIsAutoNumber(true); // Allow editing
         } else {
             // Add new mode
-            const newNumber = generateNumber();
             if (isAutoNumber) {
+                const newNumber = generateNumber();
                 setMainNumber(newNumber);
             } else {
                 setMainNumber('');
@@ -173,6 +172,7 @@ export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceDa
         }
     }
   }, [invoiceData, isOpen, invoiceType, isAutoNumber, invoiceNumberData]);
+
 
   useEffect(() => {
     setFullInvoiceNumber(`${prefix}${mainNumber}${suffix}`);
@@ -243,7 +243,7 @@ export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceDa
             </div>
             <div className="grid grid-cols-[auto_1fr_auto] items-center gap-2">
               <Input value={prefix} className="bg-muted text-right" readOnly />
-              <Input value={mainNumber} onChange={handleMainNumberChange} />
+              <Input value={mainNumber} onChange={handleMainNumberChange} disabled={!isAutoNumber && !invoiceData}/>
               {suffix && <Input value={suffix} className="bg-muted" readOnly />}
             </div>
             <Input id="full-invoice-number" value={fullInvoiceNumber} disabled className="bg-muted font-semibold text-center" />
@@ -381,3 +381,5 @@ export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceDa
     </Dialog>
   );
 }
+
+    
