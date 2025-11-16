@@ -157,8 +157,7 @@ export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceDa
       // Edit mode
       const type = invoiceData.id.startsWith('SAR/') ? 'sar' : 'kw';
       setInvoiceType(type);
-      generatePrefixAndSuffix(type);
-
+      
       const parts = invoiceData.id.split('/');
       let extractedMainNumber = '';
        if (type === 'sar' && parts.length >= 2) {
@@ -185,7 +184,7 @@ export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceDa
       setIsAutoNumber(false); 
     } else {
       // Add new mode
-      generatePrefixAndSuffix(invoiceType);
+      setIsAutoNumber(true);
       if (isAutoNumber) {
         generateNextNumber(invoiceType);
       } else {
@@ -196,17 +195,18 @@ export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceDa
       setDate(new Date());
       setAmount(0);
     }
-  }, [invoiceData, isOpen, allInvoiceNumbers]);
+  }, [invoiceData, isOpen]);
 
   useEffect(() => {
     generatePrefixAndSuffix(invoiceType);
-    if (!invoiceData && isAutoNumber) { // Only generate new number for "Add New"
-        generateNextNumber(invoiceType);
-    } else if (!invoiceData && !isAutoNumber) {
-        setMainNumber('');
+    if (!invoiceData) { // Only for "Add New" mode
+        if (isAutoNumber) {
+          generateNextNumber(invoiceType);
+        } else {
+          setMainNumber('');
+        }
     }
-    // For edit mode, the number is set in the main useEffect
-  }, [invoiceType, isAutoNumber, invoiceData, isOpen, allInvoiceNumbers]);
+  }, [invoiceType, isAutoNumber, invoiceData, allInvoiceNumbers, isOpen]);
 
 
   useEffect(() => {
