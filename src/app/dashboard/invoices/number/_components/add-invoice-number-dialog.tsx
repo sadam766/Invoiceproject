@@ -80,7 +80,7 @@ export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceDa
     if (!firestore) return null;
     return collection(firestore, 'invoiceNumbers');
   }, [firestore]);
-  const { data: invoiceNumberData } = useCollection<InvoiceNumber>(invoiceNumberData);
+  const { data: invoiceNumberData } = useCollection<InvoiceNumber>(invoiceNumbersCollection);
 
   const uniqueSalesOrders = useMemo(() => {
     if (!salesOrderListData) return [];
@@ -94,16 +94,6 @@ export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceDa
     if (newSalesOrder && salesOrderListData) {
       const soDetails = salesOrderListData.filter(item => item.soNumber === newSalesOrder);
       
-      // Since customer is removed from salesOrder, we can't auto-fill it.
-      // We keep the logic in case it's added back later.
-      // const soCustomer = salesOrderListData.find(item => item.soNumber === newSalesOrder)?.customer;
-      // if (soCustomer && customerListData) {
-      //   const customerDetails = customerListData.find(c => c.name === soCustomer);
-      //   if (customerDetails) {
-      //       setCustomer(customerDetails.name);
-      //   }
-      // }
-
       const totalAmount = soDetails.reduce((sum, item) => sum + (item.quantity * item.price), 0);
       setAmount(formatNumberWithCommas(totalAmount));
 
@@ -115,43 +105,45 @@ export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceDa
     setSoPopoverOpen(false);
   };
 
+  const generateNumber = (type: 'sar' | 'kw') => {
+    const currentYear = new Date().getFullYear();
+    let nextNum = 1;
+    let newMainNumber = '';
+
+    if (type === 'sar') {
+      setPrefix('SAR/');
+      setSuffix('');
+      const sarNumbers = invoiceNumberData?.filter(inv => inv.id.startsWith('SAR/')).map(inv => parseInt(inv.id.replace('SAR/', ''), 10)).filter(num => !isNaN(num)) || [];
+      if (sarNumbers.length > 0) {
+        nextNum = Math.max(...sarNumbers) + 1;
+      }
+      newMainNumber = nextNum.toString();
+    } else { // kw
+      setPrefix('KW/');
+      setSuffix(`/KEU/${currentYear}`);
+      const kwNumbers = invoiceNumberData?.filter(inv => inv.id.startsWith('KW/')).map(inv => parseInt(inv.id.split('/')[1], 10)).filter(num => !isNaN(num)) || [];
+      if (kwNumbers.length > 0) {
+        nextNum = Math.max(...kwNumbers) + 1;
+      }
+      newMainNumber = nextNum.toString().padStart(4, '0');
+    }
+    setMainNumber(newMainNumber);
+  };
+
   useEffect(() => {
     if (!isOpen) return;
 
-    const generateNumber = (type: 'sar' | 'kw') => {
-      const currentYear = new Date().getFullYear();
-      let nextNum = 1;
-
-      if (type === 'sar') {
-        setPrefix('SAR/');
-        setSuffix('');
-        const sarNumbers = invoiceNumberData?.filter(inv => inv.id.startsWith('SAR/')).map(inv => parseInt(inv.id.replace('SAR/', ''), 10)).filter(num => !isNaN(num)) || [];
-        if (sarNumbers.length > 0) {
-          nextNum = Math.max(...sarNumbers) + 1;
-        }
-        return nextNum.toString();
-      } else { // kw
-        setPrefix('KW/');
-        setSuffix(`/KEU/${currentYear}`);
-        const kwNumbers = invoiceNumberData?.filter(inv => inv.id.startsWith('KW/')).map(inv => parseInt(inv.id.split('/')[1], 10)).filter(num => !isNaN(num)) || [];
-        if (kwNumbers.length > 0) {
-          nextNum = Math.max(...kwNumbers) + 1;
-        }
-        return nextNum.toString().padStart(4, '0');
-      }
-    };
-  
     if (invoiceData) {
       // Edit mode
       const type = invoiceData.id.startsWith('SAR/') ? 'sar' : 'kw';
       const parts = invoiceData.id.split('/');
       setInvoiceType(type);
-  
+
       if (type === 'sar' && parts.length >= 2) {
         setPrefix(`${parts[0]}/`);
         setMainNumber(parts[1]);
         setSuffix(parts.length > 2 ? `/${parts.slice(2).join('/')}` : '');
-      } else if (type === 'kw' && parts.length >= 3) {
+      } else if (type === 'kw' && parts.length >= 4) {
         setPrefix(`${parts[0]}/`);
         setMainNumber(parts[1]);
         setSuffix(`/${parts.slice(2).join('/')}`);
@@ -160,7 +152,7 @@ export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceDa
         setMainNumber(invoiceData.id);
         setSuffix('');
       }
-  
+      
       setCustomer(invoiceData.customer);
       setSalesOrder(invoiceData.salesOrder);
       if (invoiceData.date) {
@@ -178,9 +170,11 @@ export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceDa
     } else {
       // Add new mode
       if (isAutoNumber) {
-        setMainNumber(generateNumber(invoiceType));
+        generateNumber(invoiceType);
       } else {
+        setPrefix('');
         setMainNumber('');
+        setSuffix('');
       }
       setCustomer('');
       setSalesOrder('');
@@ -397,9 +391,3 @@ export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceDa
     </Dialog>
   );
 }
-
-    
-
-    
-
-    
