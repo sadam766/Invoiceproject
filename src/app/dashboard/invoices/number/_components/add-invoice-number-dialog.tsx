@@ -115,11 +115,11 @@ export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceDa
 
   useEffect(() => {
     if (!isOpen) return;
-  
-    const generateNumber = () => {
+
+    const generateInitialNumber = () => {
       const currentYear = new Date().getFullYear();
       let nextNum = 1;
-      
+
       if (invoiceType === 'sar') {
         setPrefix('SAR/');
         setSuffix('');
@@ -154,7 +154,6 @@ export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceDa
         setMainNumber(parts[1]);
         setSuffix(`/${parts.slice(2).join('/')}`);
       } else {
-        // Fallback for unexpected format
         setPrefix('');
         setMainNumber(invoiceData.id);
         setSuffix('');
@@ -174,15 +173,13 @@ export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceDa
         setDate(new Date());
       }
       setAmount(formatNumberWithCommas(invoiceData.amount));
-      setIsAutoNumber(true); // Always allow editing in edit mode
     } else {
       // Add new mode
       if (isAutoNumber) {
-        setMainNumber(generateNumber());
+        setMainNumber(generateInitialNumber());
       } else {
         setMainNumber('');
       }
-      // Reset other fields
       setCustomer('');
       setSalesOrder('');
       setDate(new Date());
@@ -240,7 +237,7 @@ export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceDa
           <Plus className="mr-2 h-4 w-4" /> Add Number
         </Button>
       </DialogTrigger>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="sm:max-w-lg">
         <DialogHeader>
           <DialogTitle>{dialogTitle}</DialogTitle>
         </DialogHeader>
@@ -398,5 +395,7 @@ export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceDa
     </Dialog>
   );
 }
+
+    
 
     
