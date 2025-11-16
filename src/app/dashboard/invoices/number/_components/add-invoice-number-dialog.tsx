@@ -95,8 +95,8 @@ export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceDa
       const soDetails = salesOrderListData.filter(item => item.soNumber === newSalesOrder);
       const soCustomer = salesOrderListData.find(item => item.soNumber === newSalesOrder)?.customer;
       
-      if (soCustomer) {
-        const customerDetails = customerListData?.find(c => c.name === soCustomer);
+      if (soCustomer && customerListData) {
+        const customerDetails = customerListData.find(c => c.name === soCustomer);
         if (customerDetails) {
             setCustomer(customerDetails.name);
         }
@@ -117,32 +117,31 @@ export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceDa
   useEffect(() => {
     const generateNumber = () => {
         const currentYear = new Date().getFullYear();
+        let nextNum = 1;
+
         if (invoiceType === 'sar') {
             setPrefix('SAR/');
             setSuffix('');
-            if (isAutoNumber && !invoiceData) {
-                const sarNumbers = invoiceNumberData?.filter(inv => inv.id.startsWith('SAR/')).map(inv => parseInt(inv.id.replace('SAR/', ''), 10)).filter(num => !isNaN(num)) || [];
-                const nextNumber = sarNumbers.length > 0 ? Math.max(...sarNumbers) + 1 : 1;
-                setMainNumber(nextNumber.toString());
-            } else if (!isAutoNumber) {
-                setMainNumber('');
+            const sarNumbers = invoiceNumberData?.filter(inv => inv.id.startsWith('SAR/')).map(inv => parseInt(inv.id.replace('SAR/', ''), 10)).filter(num => !isNaN(num)) || [];
+            if (sarNumbers.length > 0) {
+                nextNum = Math.max(...sarNumbers) + 1;
             }
+            return nextNum.toString();
         } else { // kw
             setPrefix('KW/');
             setSuffix(`/KEU/${currentYear}`);
-            if (isAutoNumber && !invoiceData) {
-                const kwNumbers = invoiceNumberData?.filter(inv => inv.id.startsWith('KW/')).map(inv => parseInt(inv.id.split('/')[1], 10)).filter(num => !isNaN(num)) || [];
-                const nextNumber = kwNumbers.length > 0 ? Math.max(...kwNumbers) + 1 : 1;
-                setMainNumber(nextNumber.toString().padStart(4, '0'));
-            } else if (!isAutoNumber) {
-                setMainNumber('');
+            const kwNumbers = invoiceNumberData?.filter(inv => inv.id.startsWith('KW/')).map(inv => parseInt(inv.id.split('/')[1], 10)).filter(num => !isNaN(num)) || [];
+            if (kwNumbers.length > 0) {
+                nextNum = Math.max(...kwNumbers) + 1;
             }
+            return nextNum.toString().padStart(4, '0');
         }
     }
     
     if (isOpen) {
         if (invoiceData) {
             // Edit mode
+            const parts = invoiceData.id.split('/');
             if (invoiceData.id.startsWith('SAR/')) {
                 setInvoiceType('sar');
                 setPrefix('SAR/');
@@ -150,19 +149,23 @@ export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceDa
                 setMainNumber(invoiceData.id.replace('SAR/', ''));
             } else {
                 setInvoiceType('kw');
-                const parts = invoiceData.id.split('/');
                 setPrefix('KW/');
-                setSuffix(`/${parts[2]}/${parts[3]}`);
+                setSuffix(`/${parts.slice(2).join('/')}`);
                 setMainNumber(parts[1]);
             }
             setCustomer(invoiceData.customer);
             setSalesOrder(invoiceData.salesOrder);
             setDate(new Date(invoiceData.date.split('/').reverse().join('-')));
             setAmount(formatNumberWithCommas(invoiceData.amount));
-            setIsAutoNumber(false); // Always allow edit in edit mode
+            setIsAutoNumber(true); // Allow editing
         } else {
             // Add new mode
-            generateNumber();
+            const newNumber = generateNumber();
+            if (isAutoNumber) {
+                setMainNumber(newNumber);
+            } else {
+                setMainNumber('');
+            }
             setCustomer('');
             setSalesOrder('');
             setDate(new Date());
@@ -189,14 +192,13 @@ export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceDa
   };
 
   const handleSave = () => {
-    // Check for duplicates before saving, but only for new invoices
     if (!invoiceData && invoiceNumberData?.some(inv => inv.id === fullInvoiceNumber)) {
       toast({
         variant: "destructive",
         title: "Duplicate Invoice Number",
         description: `Invoice number "${fullInvoiceNumber}" already exists. Please use a different number.`,
       });
-      return; // Stop the save process
+      return; 
     }
 
     const formattedDate = date ? format(date, 'dd/MM/yyyy') : '';
@@ -236,7 +238,7 @@ export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceDa
           <div className="space-y-2">
             <Label>Nomor Faktur</Label>
             <div className="flex items-center space-x-2">
-              <Checkbox id="auto-number" checked={isAutoNumber} onCheckedChange={(checked) => setIsAutoNumber(Boolean(checked))} disabled={!!invoiceData}/>
+              <Checkbox id="auto-number" checked={isAutoNumber} onCheckedChange={(checked) => setIsAutoNumber(Boolean(checked))}/>
               <Label htmlFor="auto-number" className="font-normal">Nomor Otomatis</Label>
             </div>
             <div className="grid grid-cols-[auto_1fr_auto] items-center gap-2">
@@ -299,8 +301,8 @@ export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceDa
                     aria-expanded={customerPopoverOpen}
                     className="w-full justify-between"
                     >
-                    {customer
-                        ? customerListData?.find((c) => c.name === customer)?.name
+                    {customer && customerListData
+                        ? customerListData.find((c) => c.name.toLowerCase() === customer.toLowerCase())?.name
                         : "e.g., PT. XYZ Corp"}
                     <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                     </Button>
@@ -316,14 +318,14 @@ export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceDa
                                 key={c.id}
                                 value={c.name}
                                 onSelect={(currentValue) => {
-                                    setCustomer(currentValue === customer ? "" : currentValue);
+                                    setCustomer(currentValue.toLowerCase() === customer.toLowerCase() ? "" : c.name);
                                     setCustomerPopoverOpen(false);
                                 }}
                             >
                                 <Check
                                 className={cn(
                                     "mr-2 h-4 w-4",
-                                    customer === c.name ? "opacity-100" : "opacity-0"
+                                    customer.toLowerCase() === c.name.toLowerCase() ? "opacity-100" : "opacity-0"
                                 )}
                                 />
                                 {c.name}
