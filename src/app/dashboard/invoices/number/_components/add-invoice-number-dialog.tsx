@@ -80,7 +80,7 @@ export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceDa
     if (!firestore) return null;
     return collection(firestore, 'invoiceNumbers');
   }, [firestore]);
-  const { data: invoiceNumberData } = useCollection<InvoiceNumber>(invoiceNumbersCollection);
+  const { data: invoiceNumberData } = useCollection<InvoiceNumber>(invoiceNumberData);
 
   const uniqueSalesOrders = useMemo(() => {
     if (!salesOrderListData) return [];
@@ -93,14 +93,16 @@ export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceDa
 
     if (newSalesOrder && salesOrderListData) {
       const soDetails = salesOrderListData.filter(item => item.soNumber === newSalesOrder);
-      const soCustomer = salesOrderListData.find(item => item.soNumber === newSalesOrder)?.customer;
       
-      if (soCustomer && customerListData) {
-        const customerDetails = customerListData.find(c => c.name === soCustomer);
-        if (customerDetails) {
-            setCustomer(customerDetails.name);
-        }
-      }
+      // Since customer is removed from salesOrder, we can't auto-fill it.
+      // We keep the logic in case it's added back later.
+      // const soCustomer = salesOrderListData.find(item => item.soNumber === newSalesOrder)?.customer;
+      // if (soCustomer && customerListData) {
+      //   const customerDetails = customerListData.find(c => c.name === soCustomer);
+      //   if (customerDetails) {
+      //       setCustomer(customerDetails.name);
+      //   }
+      // }
 
       const totalAmount = soDetails.reduce((sum, item) => sum + (item.quantity * item.price), 0);
       setAmount(formatNumberWithCommas(totalAmount));
@@ -116,11 +118,11 @@ export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceDa
   useEffect(() => {
     if (!isOpen) return;
 
-    const generateInitialNumber = () => {
+    const generateNumber = (type: 'sar' | 'kw') => {
       const currentYear = new Date().getFullYear();
       let nextNum = 1;
 
-      if (invoiceType === 'sar') {
+      if (type === 'sar') {
         setPrefix('SAR/');
         setSuffix('');
         const sarNumbers = invoiceNumberData?.filter(inv => inv.id.startsWith('SAR/')).map(inv => parseInt(inv.id.replace('SAR/', ''), 10)).filter(num => !isNaN(num)) || [];
@@ -176,7 +178,7 @@ export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceDa
     } else {
       // Add new mode
       if (isAutoNumber) {
-        setMainNumber(generateInitialNumber());
+        setMainNumber(generateNumber(invoiceType));
       } else {
         setMainNumber('');
       }
@@ -185,7 +187,7 @@ export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceDa
       setDate(new Date());
       setAmount(0);
     }
-  }, [invoiceData, isOpen, invoiceType, isAutoNumber, invoiceNumberData]);
+  }, [invoiceData, isOpen, isAutoNumber, invoiceType, invoiceNumberData]);
 
 
   useEffect(() => {
@@ -237,7 +239,7 @@ export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceDa
           <Plus className="mr-2 h-4 w-4" /> Add Number
         </Button>
       </DialogTrigger>
-      <DialogContent className="sm:max-w-lg">
+      <DialogContent className="sm:max-w-2xl">
         <DialogHeader>
           <DialogTitle>{dialogTitle}</DialogTitle>
         </DialogHeader>
@@ -257,7 +259,7 @@ export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceDa
             </div>
             <div className="grid grid-cols-[auto_1fr_auto] items-center gap-2">
               <Input value={prefix} className="bg-muted text-right" readOnly />
-              <Input value={mainNumber} onChange={handleMainNumberChange} disabled={!isAutoNumber && !invoiceData} />
+              <Input value={mainNumber} onChange={handleMainNumberChange} />
               {suffix && <Input value={suffix} className="bg-muted" readOnly />}
             </div>
             <Input id="full-invoice-number" value={fullInvoiceNumber} disabled className="bg-muted font-semibold text-center" />
@@ -395,6 +397,8 @@ export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceDa
     </Dialog>
   );
 }
+
+    
 
     
 
