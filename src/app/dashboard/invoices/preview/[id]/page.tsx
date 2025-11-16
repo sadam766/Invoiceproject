@@ -199,7 +199,7 @@ const InvoicePreviewPage = () => {
     const totalPages = itemChunks.length;
     const subTotalItems = items.reduce((acc, item) => acc + item.total, 0);
 
-    const invoiceTitle = invoiceId.startsWith('KW') ? 'PROFORMA INVOICE' : 'INVOICE/OFFICIAL RECEIPT'
+    const invoiceTitle = invoiceId.startsWith('KW') ? 'PROFORMA INVOICE' : 'INVOICE/OFFICIAL RECEIPT';
 
     return (
         <div className="bg-gray-100 dark:bg-slate-900 min-h-screen p-4 sm:p-6 font-sans text-black">
@@ -429,5 +429,3 @@ const InvoicePreviewPage = () => {
 };
 
 export default InvoicePreviewPage;
-
-    
