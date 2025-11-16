@@ -114,73 +114,73 @@ export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceDa
   };
 
   useEffect(() => {
+    if (!isOpen) return;
+
     const generateNumber = () => {
-        const currentYear = new Date().getFullYear();
-        let nextNum = 1;
-
-        if (invoiceType === 'sar') {
-            setPrefix('SAR/');
-            setSuffix('');
-            const sarNumbers = invoiceNumberData?.filter(inv => inv.id.startsWith('SAR/')).map(inv => parseInt(inv.id.replace('SAR/', ''), 10)).filter(num => !isNaN(num)) || [];
-            if (sarNumbers.length > 0) {
-                nextNum = Math.max(...sarNumbers) + 1;
-            }
-            return nextNum.toString();
-        } else { // kw
-            setPrefix('KW/');
-            setSuffix(`/KEU/${currentYear}`);
-            const kwNumbers = invoiceNumberData?.filter(inv => inv.id.startsWith('KW/')).map(inv => parseInt(inv.id.split('/')[1], 10)).filter(num => !isNaN(num)) || [];
-            if (kwNumbers.length > 0) {
-                nextNum = Math.max(...kwNumbers) + 1;
-            }
-            return nextNum.toString().padStart(4, '0');
+      const currentYear = new Date().getFullYear();
+      let nextNum = 1;
+      
+      if (invoiceType === 'sar') {
+        setPrefix('SAR/');
+        setSuffix('');
+        const sarNumbers = invoiceNumberData?.filter(inv => inv.id.startsWith('SAR/')).map(inv => parseInt(inv.id.replace('SAR/', ''), 10)).filter(num => !isNaN(num)) || [];
+        if (sarNumbers.length > 0) {
+          nextNum = Math.max(...sarNumbers) + 1;
         }
-    }
-    
-    if (isOpen) {
-        if (invoiceData) {
-            // Edit mode
-            const parts = invoiceData.id.split('/');
-            const type = invoiceData.id.startsWith('SAR/') ? 'sar' : 'kw';
-            setInvoiceType(type);
+        return nextNum.toString();
+      } else { // kw
+        setPrefix('KW/');
+        setSuffix(`/KEU/${currentYear}`);
+        const kwNumbers = invoiceNumberData?.filter(inv => inv.id.startsWith('KW/')).map(inv => parseInt(inv.id.split('/')[1], 10)).filter(num => !isNaN(num)) || [];
+        if (kwNumbers.length > 0) {
+          nextNum = Math.max(...kwNumbers) + 1;
+        }
+        return nextNum.toString().padStart(4, '0');
+      }
+    };
 
-            if (type === 'sar') {
-                setPrefix('SAR/');
-                setSuffix('');
-                setMainNumber(invoiceData.id.replace('SAR/', ''));
-            } else { // kw
-                setPrefix('KW/');
-                setSuffix(`/${parts.slice(2).join('/')}`);
-                setMainNumber(parts[1] || '');
-            }
+    if (invoiceData) {
+      // Edit mode
+      const parts = invoiceData.id.split('/');
+      const type = invoiceData.id.startsWith('SAR/') ? 'sar' : 'kw';
+      setInvoiceType(type);
 
-            setCustomer(invoiceData.customer);
-            setSalesOrder(invoiceData.salesOrder);
-             if (invoiceData.date) {
-                const dateParts = invoiceData.date.split('/');
-                if (dateParts.length === 3) {
-                    const [day, month, year] = dateParts;
-                    // Note: JavaScript months are 0-indexed, so subtract 1
-                    setDate(new Date(parseInt(year), parseInt(month) - 1, parseInt(day)));
-                } else {
-                    setDate(new Date());
-                }
-            } else {
-                setDate(new Date());
-            }
-            setAmount(formatNumberWithCommas(invoiceData.amount));
-            setIsAutoNumber(true); // Default to auto-number logic which allows editing
+      if (type === 'sar') {
+        setPrefix('SAR/');
+        setSuffix('');
+        setMainNumber(parts[1] || '');
+      } else { // kw
+        setPrefix(`${parts[0]}/`);
+        setSuffix(`/${parts.slice(2).join('/')}`);
+        setMainNumber(parts[1] || '');
+      }
+
+      setCustomer(invoiceData.customer);
+      setSalesOrder(invoiceData.salesOrder);
+      if (invoiceData.date) {
+        const dateParts = invoiceData.date.split('/');
+        if (dateParts.length === 3) {
+          const [day, month, year] = dateParts;
+          setDate(new Date(parseInt(year), parseInt(month) - 1, parseInt(day)));
         } else {
-            // Add new mode
-            setMainNumber(isAutoNumber ? generateNumber() : '');
-            setCustomer('');
-            setSalesOrder('');
-            setDate(new Date());
-            setAmount(0);
+          setDate(new Date());
         }
+      } else {
+        setDate(new Date());
+      }
+      setAmount(formatNumberWithCommas(invoiceData.amount));
+      setIsAutoNumber(true); // Default to auto-number logic which allows editing
     } else {
-        // Reset form when closing
+      // Add new mode
+      if (isAutoNumber) {
+        setMainNumber(generateNumber());
+      } else {
         setMainNumber('');
+      }
+      setCustomer('');
+      setSalesOrder('');
+      setDate(new Date());
+      setAmount(0);
     }
   }, [invoiceData, isOpen, invoiceType, isAutoNumber, invoiceNumberData]);
 
@@ -254,7 +254,7 @@ export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceDa
             </div>
             <div className="grid grid-cols-[auto_1fr_auto] items-center gap-2">
               <Input value={prefix} className="bg-muted text-right" readOnly />
-              <Input value={mainNumber} onChange={handleMainNumberChange} disabled={!isAutoNumber}/>
+              <Input value={mainNumber} onChange={handleMainNumberChange} disabled={!isAutoNumber && !!invoiceData} />
               {suffix && <Input value={suffix} className="bg-muted" readOnly />}
             </div>
             <Input id="full-invoice-number" value={fullInvoiceNumber} disabled className="bg-muted font-semibold text-center" />
@@ -392,7 +392,3 @@ export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceDa
     </Dialog>
   );
 }
-
-    
-
-    
