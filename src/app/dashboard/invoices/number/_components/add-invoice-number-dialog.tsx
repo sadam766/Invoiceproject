@@ -153,12 +153,20 @@ export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceDa
 
       const parts = invoiceData.id.split('/');
       let extractedMainNumber = '';
-      if (type === 'sar' && parts.length >= 2) {
+       if (type === 'sar' && parts.length >= 2) {
         extractedMainNumber = parts[1];
-      } else if (type === 'kw' && parts.length >= 2) {
+      } else if (type === 'kw' && parts.length > 2) {
         extractedMainNumber = parts[1];
       } else {
-        extractedMainNumber = invoiceData.id;
+        // Fallback for unexpected formats
+        if (invoiceData.id.startsWith(prefix)) {
+            extractedMainNumber = invoiceData.id.substring(prefix.length);
+            if (suffix && extractedMainNumber.endsWith(suffix)) {
+                extractedMainNumber = extractedMainNumber.slice(0, -suffix.length);
+            }
+        } else {
+            extractedMainNumber = invoiceData.id;
+        }
       }
       setMainNumber(extractedMainNumber);
       
@@ -176,8 +184,7 @@ export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceDa
         setDate(new Date());
       }
       setAmount(formatNumberWithCommas(invoiceData.amount));
-      // In edit mode, user might want to switch to manual, so we don't force isAutoNumber
-      // setIsAutoNumber(true); 
+      setIsAutoNumber(false); 
     } else {
       // Add new mode
       generatePrefixAndSuffix(invoiceType);
@@ -191,7 +198,17 @@ export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceDa
       setDate(new Date());
       setAmount(0);
     }
-  }, [invoiceData, isOpen, isAutoNumber, invoiceType, invoiceNumberData]);
+  }, [invoiceData, isOpen, invoiceNumberData]);
+
+  useEffect(() => {
+    generatePrefixAndSuffix(invoiceType);
+    if (!invoiceData && isAutoNumber) { // Only generate new number for "Add New"
+        generateNextNumber(invoiceType);
+    } else if (!invoiceData && !isAutoNumber) {
+        setMainNumber('');
+    }
+    // For edit mode, the number is set in the main useEffect
+  }, [invoiceType, isAutoNumber, invoiceData, isOpen]);
 
 
   useEffect(() => {
@@ -409,5 +426,7 @@ export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceDa
     </Dialog>
   );
 }
+
+    
 
     
