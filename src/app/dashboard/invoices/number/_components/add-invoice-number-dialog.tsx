@@ -115,7 +115,7 @@ export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceDa
 
   useEffect(() => {
     if (!isOpen) return;
-
+  
     const generateNumber = () => {
       const currentYear = new Date().getFullYear();
       let nextNum = 1;
@@ -138,23 +138,28 @@ export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceDa
         return nextNum.toString().padStart(4, '0');
       }
     };
-
+  
     if (invoiceData) {
       // Edit mode
-      const parts = invoiceData.id.split('/');
       const type = invoiceData.id.startsWith('SAR/') ? 'sar' : 'kw';
+      const parts = invoiceData.id.split('/');
       setInvoiceType(type);
-
-      if (type === 'sar') {
-        setPrefix('SAR/');
-        setSuffix('');
-        setMainNumber(parts[1] || '');
-      } else { // kw
+  
+      if (type === 'sar' && parts.length >= 2) {
         setPrefix(`${parts[0]}/`);
+        setMainNumber(parts[1]);
+        setSuffix(parts.length > 2 ? `/${parts.slice(2).join('/')}` : '');
+      } else if (type === 'kw' && parts.length >= 3) {
+        setPrefix(`${parts[0]}/`);
+        setMainNumber(parts[1]);
         setSuffix(`/${parts.slice(2).join('/')}`);
-        setMainNumber(parts[1] || '');
+      } else {
+        // Fallback for unexpected format
+        setPrefix('');
+        setMainNumber(invoiceData.id);
+        setSuffix('');
       }
-
+  
       setCustomer(invoiceData.customer);
       setSalesOrder(invoiceData.salesOrder);
       if (invoiceData.date) {
@@ -169,7 +174,7 @@ export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceDa
         setDate(new Date());
       }
       setAmount(formatNumberWithCommas(invoiceData.amount));
-      setIsAutoNumber(true); // Default to auto-number logic which allows editing
+      setIsAutoNumber(true); // Always allow editing in edit mode
     } else {
       // Add new mode
       if (isAutoNumber) {
@@ -177,6 +182,7 @@ export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceDa
       } else {
         setMainNumber('');
       }
+      // Reset other fields
       setCustomer('');
       setSalesOrder('');
       setDate(new Date());
@@ -254,7 +260,7 @@ export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceDa
             </div>
             <div className="grid grid-cols-[auto_1fr_auto] items-center gap-2">
               <Input value={prefix} className="bg-muted text-right" readOnly />
-              <Input value={mainNumber} onChange={handleMainNumberChange} disabled={!isAutoNumber && !!invoiceData} />
+              <Input value={mainNumber} onChange={handleMainNumberChange} disabled={!isAutoNumber && !invoiceData} />
               {suffix && <Input value={suffix} className="bg-muted" readOnly />}
             </div>
             <Input id="full-invoice-number" value={fullInvoiceNumber} disabled className="bg-muted font-semibold text-center" />
@@ -392,3 +398,5 @@ export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceDa
     </Dialog>
   );
 }
+
+    
