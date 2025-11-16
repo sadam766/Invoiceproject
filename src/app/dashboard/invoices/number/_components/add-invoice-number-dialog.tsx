@@ -115,46 +115,49 @@ export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceDa
 
 
   useEffect(() => {
-    const resetForm = () => {
+    const generateNumber = () => {
         const currentYear = new Date().getFullYear();
         if (invoiceType === 'sar') {
-          setPrefix('SAR/');
-          setSuffix('');
-          if (isAutoNumber) setMainNumber('25000003');
-          else setMainNumber('');
+            setPrefix('SAR/');
+            setSuffix('');
+            if (isAutoNumber) setMainNumber('25000003');
+            else setMainNumber('');
         } else { // kw
-          setPrefix('KW/');
-          setSuffix(`/KEU/${currentYear}`);
-          if (isAutoNumber) setMainNumber('0001');
-          else setMainNumber('');
+            setPrefix('KW/');
+            setSuffix(`/KEU/${currentYear}`);
+            if (isAutoNumber) setMainNumber('0001');
+            else setMainNumber('');
         }
-        setCustomer('');
-        setSalesOrder('');
-        setDate(new Date());
-        setAmount(0);
     }
-
+    
     if (isOpen) {
-      if (invoiceData) {
-        if (invoiceData.id.startsWith('SAR/')) {
-          setInvoiceType('sar');
-          setPrefix('SAR/');
-          setSuffix('');
-          setMainNumber(invoiceData.id.replace('SAR/', ''));
+        if (invoiceData) {
+            // Edit mode
+            if (invoiceData.id.startsWith('SAR/')) {
+                setInvoiceType('sar');
+                setPrefix('SAR/');
+                setSuffix('');
+                setMainNumber(invoiceData.id.replace('SAR/', ''));
+            } else {
+                setInvoiceType('kw');
+                const parts = invoiceData.id.split('/');
+                setPrefix('KW/');
+                setSuffix(`/${parts[2]}/${parts[3]}`);
+                setMainNumber(parts[1]);
+            }
+            setCustomer(invoiceData.customer);
+            setSalesOrder(invoiceData.salesOrder);
+            setDate(new Date(invoiceData.date.split('/').reverse().join('-')));
+            setAmount(formatNumberWithCommas(invoiceData.amount));
+            setIsAutoNumber(false); // Disable auto number on edit
         } else {
-          setInvoiceType('kw');
-          const parts = invoiceData.id.split('/');
-          setPrefix('KW/');
-          setSuffix(`/${parts[2]}/${parts[3]}`);
-          setMainNumber(parts[1]);
+            // Add new mode
+            generateNumber();
+            setCustomer('');
+            setSalesOrder('');
+            setDate(new Date());
+            setAmount(0);
         }
-        setCustomer(invoiceData.customer);
-        setSalesOrder(invoiceData.salesOrder);
-        setDate(new Date(invoiceData.date.split('/').reverse().join('-')));
-        setAmount(formatNumberWithCommas(invoiceData.amount));
-      } else {
-        resetForm();
-      }
     }
   }, [invoiceData, isOpen, invoiceType, isAutoNumber]);
 
@@ -228,7 +231,7 @@ export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceDa
             </div>
             <div className="grid grid-cols-[auto_1fr_auto] items-center gap-2">
               <Input value={prefix} className="bg-muted text-right" readOnly />
-              <Input value={mainNumber} onChange={handleMainNumberChange} />
+              <Input value={mainNumber} onChange={handleMainNumberChange} disabled={isAutoNumber && !invoiceData} />
               {suffix && <Input value={suffix} className="bg-muted" readOnly />}
             </div>
             <Input id="full-invoice-number" value={fullInvoiceNumber} disabled className="bg-muted font-semibold text-center" />
