@@ -203,6 +203,7 @@ import {
                         onSave={handleSave}
                         invoiceData={editingInvoice}
                         onAddClick={handleAddClick}
+                        allInvoiceNumbers={invoices}
                        />
                     </div>
                 </div>

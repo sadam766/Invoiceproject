@@ -41,10 +41,11 @@ type AddInvoiceNumberDialogProps = {
   onSave: (invoice: Omit<InvoiceNumber, 'id'> & {id: string}) => void;
   invoiceData?: InvoiceNumber;
   onAddClick: () => void;
+  allInvoiceNumbers: InvoiceNumber[] | null;
 };
 
 
-export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceData, onAddClick }: AddInvoiceNumberDialogProps) {
+export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceData, onAddClick, allInvoiceNumbers }: AddInvoiceNumberDialogProps) {
   const firestore = useFirestore();
   const [date, setDate] = useState<Date | undefined>(new Date());
   const [invoiceType, setInvoiceType] = useState<'sar' | 'kw'>('kw');
@@ -75,12 +76,6 @@ export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceDa
     return collection(firestore, 'salesOrders');
   }, [firestore]);
   const { data: salesOrderListData } = useCollection<SalesOrder>(salesOrdersCollection);
-
-  const invoiceNumbersCollection = useMemoFirebase(() => {
-    if (!firestore) return null;
-    return collection(firestore, 'invoiceNumbers');
-  }, [firestore]);
-  const { data: allInvoiceNumbers } = useCollection<InvoiceNumber>(invoiceNumbersCollection);
 
   const uniqueSalesOrders = useMemo(() => {
     if (!salesOrderListData) return [];
@@ -126,7 +121,10 @@ export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceDa
   };
 
   const generateNextNumber = (type: 'sar' | 'kw') => {
-    if (!allInvoiceNumbers) return;
+    if (!allInvoiceNumbers) {
+      setMainNumber(type === 'kw' ? '0001' : '1');
+      return;
+    }
     let nextNum = 1;
 
     const relevantNumbers = allInvoiceNumbers.filter(inv => {
@@ -209,7 +207,7 @@ export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceDa
         setMainNumber('');
     }
     // For edit mode, the number is set in the main useEffect
-  }, [invoiceType, isAutoNumber, invoiceData, isOpen]);
+  }, [invoiceType, isAutoNumber, invoiceData, isOpen, allInvoiceNumbers]);
 
 
   useEffect(() => {
@@ -218,6 +216,7 @@ export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceDa
 
 
   const handleMainNumberChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setIsAutoNumber(false);
     setMainNumber(e.target.value);
   }
   
