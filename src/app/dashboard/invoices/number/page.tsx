@@ -16,26 +16,35 @@ import {
   } from '@/components/ui/table';
   import { Input } from '@/components/ui/input';
   import { Button } from '@/components/ui/button';
-  import { invoiceNumberData, type InvoiceNumber } from '@/app/lib/data';
+  import { type InvoiceNumber } from '@/app/lib/data';
   import { Search, Upload, Download, Filter } from 'lucide-react';
   import { AddInvoiceNumberDialog } from './_components/add-invoice-number-dialog';
   import { DeleteConfirmationDialog } from '@/app/components/delete-confirmation-dialog';
   import { Skeleton } from '@/components/ui/skeleton';
   import { exportToExcel, importFromExcel } from '@/lib/utils';
   import { useToast } from '@/hooks/use-toast';
+  import { useFirestore, useCollection, useMemoFirebase, errorEmitter, FirestorePermissionError } from '@/firebase';
+  import { collection, doc, setDoc, deleteDoc, writeBatch } from 'firebase/firestore';
 
   export default function InvoiceNumberPage() {
     const router = useRouter();
     const { toast } = useToast();
-    const [invoices, setInvoices] = useState(invoiceNumberData);
-    const [isLoading, setIsLoading] = useState(false);
+    const firestore = useFirestore();
+
     const fileInputRef = useRef<HTMLInputElement>(null);
     const [searchQuery, setSearchQuery] = useState('');
 
     const [editingInvoice, setEditingInvoice] = useState<InvoiceNumber | undefined>(undefined);
     const [isDialogOpen, setIsDialogOpen] = useState(false);
+    
+    const invoiceNumbersCollection = useMemoFirebase(() => {
+        if (!firestore) return null;
+        return collection(firestore, 'invoiceNumbers');
+    }, [firestore]);
+    const { data: invoices, isLoading } = useCollection<InvoiceNumber>(invoiceNumbersCollection);
 
     const filteredInvoices = useMemo(() => {
+        if (!invoices) return [];
         if (!searchQuery) {
             return invoices;
         }
@@ -57,33 +66,44 @@ import {
     };
 
     const handleDelete = (invoiceId: string) => {
-        const updatedInvoices = invoices.filter((inv) => inv.id !== invoiceId);
-        setInvoices(updatedInvoices);
-        // Also update the source data
-        const index = invoiceNumberData.findIndex(inv => inv.id === invoiceId);
-        if (index > -1) {
-            invoiceNumberData.splice(index, 1);
-        }
+        if (!firestore || !invoiceId) return;
+        const docRef = doc(firestore, 'invoiceNumbers', invoiceId);
+        deleteDoc(docRef)
+            .then(() => {
+                toast({ title: 'Invoice Number Deleted' });
+            })
+            .catch(async (serverError) => {
+                const permissionError = new FirestorePermissionError({
+                    path: docRef.path,
+                    operation: 'delete',
+                });
+                errorEmitter.emit('permission-error', permissionError);
+            });
     };
 
     const handleSave = (invoice: Omit<InvoiceNumber, 'id'> & {id: string}) => {
-      if (editingInvoice) {
-        const updatedInvoices = invoices.map(i => i.id === editingInvoice.id ? invoice : i);
-        setInvoices(updatedInvoices);
-        // Also update the source data
-        const index = invoiceNumberData.findIndex(i => i.id === editingInvoice.id);
-        if (index > -1) {
-            invoiceNumberData[index] = invoice;
-        }
-      } else {
-        // Add to the source data directly
-        invoiceNumberData.push(invoice);
-        // Update the state from the source to ensure consistency
-        setInvoices([...invoiceNumberData]);
-        
-        const safeId = invoice.id.replace(/\//g, '_');
-        router.push(`/dashboard/invoices/add?invoiceNumberId=${safeId}`);
-      }
+      if (!firestore) return;
+      const { id, ...invoiceData } = invoice;
+      
+      const docRef = doc(firestore, 'invoiceNumbers', id);
+      setDoc(docRef, invoiceData, { merge: true })
+        .then(() => {
+            if (!editingInvoice) { // Only redirect for new invoices
+                const safeId = id.replace(/\//g, '_');
+                router.push(`/dashboard/invoices/add?invoiceNumberId=${safeId}`);
+            }
+             toast({
+                title: editingInvoice ? 'Invoice Number Updated' : 'Invoice Number Created',
+             });
+        })
+        .catch(async (serverError) => {
+            const permissionError = new FirestorePermissionError({
+                path: docRef.path,
+                operation: editingInvoice ? 'update' : 'create',
+                requestResourceData: invoiceData,
+            });
+            errorEmitter.emit('permission-error', permissionError);
+        });
       
       setIsDialogOpen(false);
       setEditingInvoice(undefined);
@@ -97,7 +117,9 @@ import {
     }
     
     const handleExport = () => {
-      exportToExcel(invoices, 'invoice-numbers');
+      if (invoices) {
+        exportToExcel(invoices, 'invoice-numbers');
+      }
     };
 
     const handleImportClick = () => {
@@ -106,23 +128,38 @@ import {
     
     const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
       const file = event.target.files?.[0];
-      if (file) {
+      if (file && firestore) {
         try {
           const data = await importFromExcel(file) as InvoiceNumber[];
-          // Add to the source data directly
-          invoiceNumberData.push(...data);
-          // Update the state from the source
-          setInvoices([...invoiceNumberData]);
+          const batch = writeBatch(firestore);
+          const importedDataForError: any[] = [];
+          
+          data.forEach(item => {
+              if (item.id) {
+                const docRef = doc(firestore, 'invoiceNumbers', item.id);
+                batch.set(docRef, item);
+                importedDataForError.push(item);
+              }
+          });
+
+          await batch.commit();
+
           toast({
             title: "Success",
             description: `${data.length} records imported successfully.`,
           });
-        } catch (error) {
+        } catch (error: any) {
           console.error("Error importing file:", error);
+           const permissionError = new FirestorePermissionError({
+              path: 'invoiceNumbers',
+              operation: 'create', // Batch write is treated as multiple creates
+              requestResourceData: 'Batch import data',
+          });
+          errorEmitter.emit('permission-error', permissionError);
           toast({
             variant: "destructive",
             title: "Error",
-            description: "Failed to import the Excel file.",
+            description: error.message || "Failed to import the Excel file.",
           });
         }
       }

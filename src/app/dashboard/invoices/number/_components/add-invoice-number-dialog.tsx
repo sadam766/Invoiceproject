@@ -80,7 +80,7 @@ export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceDa
     if (!firestore) return null;
     return collection(firestore, 'invoiceNumbers');
   }, [firestore]);
-  const { data: invoiceNumberData } = useCollection<InvoiceNumber>(invoiceNumbersCollection);
+  const { data: allInvoiceNumbers } = useCollection<InvoiceNumber>(invoiceNumbersCollection);
 
   const uniqueSalesOrders = useMemo(() => {
     if (!salesOrderListData) return [];
@@ -105,8 +105,17 @@ export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceDa
     if (newSalesOrder && salesOrderListData) {
       const soDetails = salesOrderListData.filter(item => item.soNumber === newSalesOrder);
       
-      const totalAmount = soDetails.reduce((sum, item) => sum + (item.quantity * item.price), 0);
-      setAmount(formatNumberWithCommas(totalAmount));
+      if (soDetails.length > 0) {
+        const totalAmount = soDetails.reduce((sum, item) => sum + (item.quantity * item.price), 0);
+        setAmount(formatNumberWithCommas(totalAmount));
+        const customerName = soDetails[0].customer;
+        if(customerName) {
+            setCustomer(customerName);
+        }
+      } else {
+        setAmount(0);
+        setCustomer('');
+      }
 
     } else {
         setCustomer('');
@@ -117,23 +126,25 @@ export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceDa
   };
 
   const generateNextNumber = (type: 'sar' | 'kw') => {
+    if (!allInvoiceNumbers) return;
     let nextNum = 1;
-    let newMainNumber = '';
 
-    const relevantNumbers = invoiceNumberData?.filter(inv => {
-        if (type === 'sar') return inv.id.startsWith('SAR/');
-        return inv.id.startsWith('KW/');
+    const relevantNumbers = allInvoiceNumbers.filter(inv => {
+        const id = inv.id || '';
+        if (type === 'sar') return id.startsWith('SAR/');
+        return id.startsWith('KW/');
     }).map(inv => {
-        const parts = inv.id.split('/');
+        const parts = (inv.id || '').split('/');
         if (type === 'sar' && parts.length >= 2) return parseInt(parts[1], 10);
         if (type === 'kw' && parts.length >= 2) return parseInt(parts[1], 10);
         return 0;
-    }).filter(num => !isNaN(num));
+    }).filter(num => !isNaN(num) && num > 0);
 
-    if (relevantNumbers && relevantNumbers.length > 0) {
+    if (relevantNumbers.length > 0) {
         nextNum = Math.max(...relevantNumbers) + 1;
     }
 
+    let newMainNumber = '';
     if (type === 'sar') {
         newMainNumber = nextNum.toString();
     } else { // kw
@@ -155,18 +166,8 @@ export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceDa
       let extractedMainNumber = '';
        if (type === 'sar' && parts.length >= 2) {
         extractedMainNumber = parts[1];
-      } else if (type === 'kw' && parts.length > 2) {
+      } else if (type === 'kw' && parts.length >= 2) {
         extractedMainNumber = parts[1];
-      } else {
-        // Fallback for unexpected formats
-        if (invoiceData.id.startsWith(prefix)) {
-            extractedMainNumber = invoiceData.id.substring(prefix.length);
-            if (suffix && extractedMainNumber.endsWith(suffix)) {
-                extractedMainNumber = extractedMainNumber.slice(0, -suffix.length);
-            }
-        } else {
-            extractedMainNumber = invoiceData.id;
-        }
       }
       setMainNumber(extractedMainNumber);
       
@@ -198,7 +199,7 @@ export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceDa
       setDate(new Date());
       setAmount(0);
     }
-  }, [invoiceData, isOpen, invoiceNumberData]);
+  }, [invoiceData, isOpen, allInvoiceNumbers]);
 
   useEffect(() => {
     generatePrefixAndSuffix(invoiceType);
@@ -237,7 +238,7 @@ export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceDa
         });
         return;
     }
-    if (!invoiceData && invoiceNumberData?.some(inv => inv.id === fullInvoiceNumber)) {
+    if (!invoiceData && allInvoiceNumbers?.some(inv => inv.id === fullInvoiceNumber)) {
       toast({
         variant: "destructive",
         title: "Duplicate Invoice Number",
@@ -345,6 +346,7 @@ export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceDa
                     role="combobox"
                     aria-expanded={customerPopoverOpen}
                     className="w-full justify-between"
+                    disabled={!!salesOrder}
                     >
                     {customer && customerListData
                         ? customerListData.find((c) => c.name.toLowerCase() === customer.toLowerCase())?.name
@@ -414,7 +416,7 @@ export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceDa
               </div>
             <div className="space-y-2">
               <Label htmlFor="amount">Jumlah</Label>
-              <Input id="amount" value={amount} onChange={handleAmountChange} placeholder="0" />
+              <Input id="amount" value={amount} onChange={handleAmountChange} placeholder="0" disabled={!!salesOrder} />
             </div>
           </div>
         </div>
@@ -426,7 +428,3 @@ export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceDa
     </Dialog>
   );
 }
-
-    
-
-    
