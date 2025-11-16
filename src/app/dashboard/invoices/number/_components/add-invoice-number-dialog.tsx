@@ -1,3 +1,4 @@
+
 'use client';
 import { useState, useEffect, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
@@ -39,12 +40,13 @@ type AddInvoiceNumberDialogProps = {
   onOpenChange: (isOpen: boolean) => void;
   onSave: (invoice: Omit<InvoiceNumber, 'id'> & {id: string}) => void;
   invoiceData?: InvoiceNumber;
+  initialNumberData?: { prefix: string, mainNumber: string, suffix: string };
   onAddClick: () => void;
   allInvoiceNumbers: InvoiceNumber[] | null;
 };
 
 
-export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceData, onAddClick, allInvoiceNumbers }: AddInvoiceNumberDialogProps) {
+export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceData, initialNumberData, onAddClick, allInvoiceNumbers }: AddInvoiceNumberDialogProps) {
   const firestore = useFirestore();
   const [date, setDate] = useState<Date | undefined>(new Date());
   const [invoiceType, setInvoiceType] = useState<'sar' | 'kw'>('kw');
@@ -81,16 +83,6 @@ export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceDa
     return Array.from(new Set(salesOrderListData.map(item => item.soNumber)))
   },[salesOrderListData]);
 
-  const generatePrefixAndSuffix = (type: 'sar' | 'kw') => {
-    const currentYear = new Date().getFullYear();
-    if (type === 'sar') {
-        setPrefix('SAR/');
-        setSuffix('');
-    } else { // kw
-        setPrefix('KW/');
-        setSuffix(`/KEU/${currentYear}`);
-    }
-  };
   
   const handleSalesOrderSelect = (currentValue: string) => {
     const newSalesOrder = currentValue === salesOrder ? '' : currentValue;
@@ -118,77 +110,43 @@ export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceDa
 
     setSoPopoverOpen(false);
   };
-
-  const generateNextNumber = (type: 'sar' | 'kw') => {
-    if (!allInvoiceNumbers) {
-      setMainNumber(type === 'kw' ? '0001' : '1');
-      return;
-    }
-    let nextNum = 1;
-
-    const relevantNumbers = allInvoiceNumbers.filter(inv => {
-        const id = inv.id || '';
-        if (type === 'sar') return id.startsWith('SAR/');
-        return id.startsWith('KW/');
-    }).map(inv => {
-        const parts = (inv.id || '').split('/');
-        if (type === 'sar' && parts.length >= 2) return parseInt(parts[1], 10);
-        if (type === 'kw' && parts.length >= 2) return parseInt(parts[1], 10);
-        return 0;
-    }).filter(num => !isNaN(num) && num > 0);
-
-    if (relevantNumbers.length > 0) {
-        nextNum = Math.max(...relevantNumbers) + 1;
-    }
-
-    let newMainNumber = '';
-    if (type === 'sar') {
-        newMainNumber = nextNum.toString();
-    } else { // kw
-        newMainNumber = nextNum.toString().padStart(4, '0');
-    }
-    setMainNumber(newMainNumber);
-  };
-
-  const handleInvoiceTypeChange = (newType: 'sar' | 'kw') => {
-    setInvoiceType(newType);
-    generatePrefixAndSuffix(newType);
-    if (isAutoNumber) {
-        generateNextNumber(newType);
-    } else {
-        setMainNumber('');
-    }
-  }
-
+  
   // Effect to handle initialization and reset
   useEffect(() => {
     if (!isOpen) {
-        // Reset state when dialog is closed
-        setInvoiceType('kw');
-        setIsAutoNumber(true);
-        setMainNumber('');
-        setCustomer('');
-        setSalesOrder('');
-        setDate(new Date());
-        setAmount(0);
-        return;
-    };
-
-    const type = invoiceData?.id.startsWith('SAR/') ? 'sar' : 'kw';
-    setInvoiceType(type);
-    generatePrefixAndSuffix(type);
+        return; // Do nothing if the dialog is closed
+    }
 
     if (invoiceData) {
       // ===== EDIT MODE =====
-      setIsAutoNumber(false); // Manual mode for editing
-      const parts = invoiceData.id.split('/');
+      const type = invoiceData.id.startsWith('SAR/') ? 'sar' : 'kw';
+      const currentYear = new Date().getFullYear();
+
+      let extractedPrefix = '';
       let extractedMainNumber = '';
-      if (type === 'sar' && parts.length >= 2) {
-        extractedMainNumber = parts[1];
-      } else if (type === 'kw' && parts.length >= 2) {
-        extractedMainNumber = parts[1];
+      let extractedSuffix = '';
+      
+      if (type === 'sar') {
+          extractedPrefix = 'SAR/';
+          const parts = invoiceData.id.split('/');
+          if (parts.length >= 2) extractedMainNumber = parts[1];
+          extractedSuffix = '';
+      } else { // kw
+          const parts = invoiceData.id.split('/');
+          extractedPrefix = 'KW/';
+          if (parts.length >= 4) {
+            extractedMainNumber = parts[1];
+            extractedSuffix = `/${parts[2]}/${parts[3]}`;
+          } else {
+            extractedSuffix = `/KEU/${currentYear}`;
+          }
       }
+      
+      setInvoiceType(type);
+      setPrefix(extractedPrefix);
       setMainNumber(extractedMainNumber);
+      setSuffix(extractedSuffix);
+      setIsAutoNumber(false); // Always start in manual for editing
       
       setCustomer(invoiceData.customer);
       setSalesOrder(invoiceData.salesOrder);
@@ -206,14 +164,17 @@ export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceDa
       setAmount(formatNumberWithCommas(invoiceData.amount));
     } else {
       // ===== ADD NEW MODE =====
+      setInvoiceType(initialNumberData?.prefix.startsWith('SAR') ? 'sar' : 'kw');
+      setPrefix(initialNumberData?.prefix || 'KW/');
+      setMainNumber(initialNumberData?.mainNumber || '0001');
+      setSuffix(initialNumberData?.suffix || `/KEU/${new Date().getFullYear()}`);
       setIsAutoNumber(true); // Default to auto
-      generateNextNumber(type);
       setCustomer('');
       setSalesOrder('');
       setDate(new Date());
       setAmount(0);
     }
-  }, [invoiceData, isOpen, allInvoiceNumbers]); // Rerun when data or open state changes
+  }, [invoiceData, isOpen, initialNumberData]);
 
 
   useEffect(() => {
@@ -243,6 +204,7 @@ export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceDa
         });
         return;
     }
+    // Check for duplicates only when creating a new invoice, not when editing
     if (!invoiceData && allInvoiceNumbers?.some(inv => inv.id === fullInvoiceNumber)) {
       toast({
         variant: "destructive",
@@ -279,23 +241,12 @@ export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceDa
           <DialogTitle>{dialogTitle}</DialogTitle>
         </DialogHeader>
         <div className="grid gap-6 py-4 max-h-[70vh] overflow-y-auto pr-4">
-          <div>
-            <Label htmlFor="invoice-type">Tipe Faktur</Label>
-            <div className="mt-2 grid grid-cols-2 gap-2 rounded-md bg-muted p-1">
-                <Button variant={invoiceType === 'sar' ? 'default' : 'ghost'} onClick={() => handleInvoiceTypeChange('sar')} className="h-8">SAR</Button>
-                <Button variant={invoiceType === 'kw' ? 'default' : 'ghost'} onClick={() => handleInvoiceTypeChange('kw')} className="h-8">KW / Proforma</Button>
-            </div>
-          </div>
-          <div className="space-y-2">
+           {/* Invoice Type selection is disabled as it's now determined by onAddClick */}
+           <div className="space-y-2">
             <Label>Nomor Faktur</Label>
+            {/* Checkbox is disabled because its logic is now external */}
             <div className="flex items-center space-x-2">
-              <Checkbox id="auto-number" checked={isAutoNumber} onCheckedChange={(checked) => {
-                  const newIsAuto = Boolean(checked);
-                  setIsAutoNumber(newIsAuto);
-                  if (newIsAuto) {
-                    generateNextNumber(invoiceType);
-                  }
-              }}/>
+              <Checkbox id="auto-number" checked={isAutoNumber} disabled />
               <Label htmlFor="auto-number" className="font-normal">Nomor Otomatis</Label>
             </div>
             <div className="grid grid-cols-[auto_1fr_auto] items-center gap-2">

@@ -36,6 +36,7 @@ import {
 
     const [editingInvoice, setEditingInvoice] = useState<InvoiceNumber | undefined>(undefined);
     const [isDialogOpen, setIsDialogOpen] = useState(false);
+    const [initialNumber, setInitialNumber] = useState<{ prefix: string, mainNumber: string, suffix: string } | undefined>(undefined);
     
     const invoiceNumbersCollection = useMemoFirebase(() => {
         if (!firestore) return null;
@@ -45,22 +46,64 @@ import {
 
     const filteredInvoices = useMemo(() => {
         if (!invoices) return [];
+        const sortedInvoices = [...invoices].sort((a, b) => {
+            const numA = parseInt(a.id.split('/')[1], 10);
+            const numB = parseInt(b.id.split('/')[1], 10);
+            return numB - numA;
+        });
+
         if (!searchQuery) {
-            return invoices;
+            return sortedInvoices;
         }
-        return invoices.filter((invoice) => 
+        return sortedInvoices.filter((invoice) => 
             invoice.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
             invoice.customer.toLowerCase().includes(searchQuery.toLowerCase()) ||
             invoice.salesOrder.toLowerCase().includes(searchQuery.toLowerCase())
         );
     }, [invoices, searchQuery]);
 
+    const generateNextNumber = (type: 'sar' | 'kw') => {
+        if (!invoices) {
+            return type === 'kw' ? '0001' : '1';
+        }
+        let nextNum = 1;
+
+        const relevantNumbers = invoices.filter(inv => {
+            const id = inv.id || '';
+            if (type === 'sar') return id.startsWith('SAR/');
+            return id.startsWith('KW/');
+        }).map(inv => {
+            const parts = (inv.id || '').split('/');
+            if (parts.length >= 2) return parseInt(parts[1], 10);
+            return 0;
+        }).filter(num => !isNaN(num) && num > 0);
+
+        if (relevantNumbers.length > 0) {
+            nextNum = Math.max(...relevantNumbers) + 1;
+        }
+
+        if (type === 'sar') {
+            return nextNum.toString();
+        } else { // kw
+            return nextNum.toString().padStart(4, '0');
+        }
+    };
+
+
     const handleAddClick = () => {
+        const nextKwNumber = generateNextNumber('kw');
+        const currentYear = new Date().getFullYear();
+        setInitialNumber({
+            prefix: 'KW/',
+            mainNumber: nextKwNumber,
+            suffix: `/KEU/${currentYear}`
+        });
       setEditingInvoice(undefined);
       setIsDialogOpen(true);
     };
 
     const handleEdit = (invoice: InvoiceNumber) => {
+        setInitialNumber(undefined); // Clear initial number for edit mode
         setEditingInvoice(invoice);
         setIsDialogOpen(true);
     };
@@ -204,6 +247,7 @@ import {
                         invoiceData={editingInvoice}
                         onAddClick={handleAddClick}
                         allInvoiceNumbers={invoices}
+                        initialNumberData={initialNumber}
                        />
                     </div>
                 </div>
