@@ -83,34 +83,43 @@ export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceDa
   },[salesOrderListData]);
 
   const generateNextNumber = (type: 'sar' | 'kw') => {
-      const currentYear = new Date().getFullYear();
-      let nextNum = 1;
-
-      if (allInvoiceNumbers) {
-          const relevantNumbers = allInvoiceNumbers.filter(inv => {
-              const id = inv.id || '';
-              if (type === 'sar') return id.startsWith('SAR/');
-              return id.startsWith('KW/');
-          }).map(inv => {
-              const parts = (inv.id || '').split('/');
-              if (parts.length >= 2) return parseInt(parts[1], 10);
-              return 0;
-          }).filter(num => !isNaN(num) && num > 0);
+    const currentYear = new Date().getFullYear();
+    let nextNum = 1;
   
-          if (relevantNumbers.length > 0) {
-              nextNum = Math.max(...relevantNumbers) + 1;
-          }
-      }
-
-      if (type === 'sar') {
-          setPrefix('SAR/');
-          setSuffix('');
-          setMainNumber(nextNum.toString());
-      } else { // kw
-          setPrefix('KW/');
-          setSuffix(`/KEU/${currentYear}`);
-          setMainNumber(nextNum.toString().padStart(4, '0'));
-      }
+    if (allInvoiceNumbers) {
+        const relevantNumbers = allInvoiceNumbers
+            .filter(inv => {
+                const id = inv.id || '';
+                if (type === 'sar') return id.startsWith('SAR/') || id.startsWith('SAR_');
+                return id.startsWith('KW/');
+            })
+            .map(inv => {
+                const id = inv.id || '';
+                // Regex to split by the first occurrence of '/' or '_'
+                const parts = id.split(/[/_](.+)/); 
+                if (parts.length > 1) {
+                    // This will capture the numeric part even if it contains other characters, parseInt will handle it
+                    const numberPart = parts[1].split('/')[0];
+                    return parseInt(numberPart, 10);
+                }
+                return 0;
+            })
+            .filter(num => !isNaN(num) && num > 0);
+  
+        if (relevantNumbers.length > 0) {
+            nextNum = Math.max(...relevantNumbers) + 1;
+        }
+    }
+  
+    if (type === 'sar') {
+        setPrefix('SAR/');
+        setSuffix('');
+        setMainNumber(nextNum.toString());
+    } else { // kw
+        setPrefix('KW/');
+        setSuffix(`/KEU/${currentYear}`);
+        setMainNumber(nextNum.toString().padStart(4, '0'));
+    }
   };
   
   useEffect(() => {
@@ -128,19 +137,22 @@ export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceDa
 
     if (invoiceData) {
       // ===== EDIT MODE =====
-      const type = invoiceData.id.startsWith('SAR/') ? 'sar' : 'kw';
+      const type = invoiceData.id.startsWith('SAR/') || invoiceData.id.startsWith('SAR_') ? 'sar' : 'kw';
       
       let extractedMainNumber = '';
-      const parts = invoiceData.id.split('/');
+      const parts = invoiceData.id.split(/[/_](.+)/);
       
-      if (type === 'sar' && parts.length >= 2) {
-          extractedMainNumber = parts[1];
+      if (type === 'sar') {
+          extractedMainNumber = parts[1] || '';
           setPrefix('SAR/');
           setSuffix('');
-      } else if (type === 'kw' && parts.length >= 3) {
-          extractedMainNumber = parts[1];
-          setPrefix(`KW/`);
-          setSuffix(`/KEU/${new Date(invoiceData.date.split('/').reverse().join('-')).getFullYear()}`);
+      } else if (type === 'kw' && invoiceData.id.includes('/')) {
+          const kwParts = invoiceData.id.split('/');
+          if (kwParts.length >= 3) {
+            extractedMainNumber = kwParts[1];
+            setPrefix(`KW/`);
+            setSuffix(`/${kwParts.slice(2).join('/')}`);
+          }
       }
       
       setInvoiceType(type);
@@ -174,12 +186,12 @@ export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceDa
     }
   }, [invoiceData, isOpen]);
   
-  // This effect runs when user toggles invoice type in ADD mode
+  // This effect runs when user toggles invoice type in ADD mode or toggles auto-number
   useEffect(() => {
     if (isOpen && !invoiceData && isAutoNumber) {
       generateNextNumber(invoiceType);
     }
-  }, [invoiceType, isAutoNumber, isOpen, invoiceData]); // Rerun on type change if in add mode & auto
+  }, [invoiceType, isAutoNumber, isOpen, invoiceData, allInvoiceNumbers]); // Rerun on dependencies change
 
 
   const handleSalesOrderSelect = (currentValue: string) => {
@@ -237,11 +249,12 @@ export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceDa
         });
         return;
     }
-    if (!invoiceData && allInvoiceNumbers?.some(inv => inv.id === fullInvoiceNumber)) {
+    const finalInvoiceNumber = `${prefix}${mainNumber}${suffix}`;
+    if (!invoiceData && allInvoiceNumbers?.some(inv => inv.id === finalInvoiceNumber)) {
       toast({
         variant: "destructive",
         title: "Duplicate Invoice Number",
-        description: `Invoice number "${fullInvoiceNumber}" already exists. Please use a different number.`,
+        description: `Invoice number "${finalInvoiceNumber}" already exists. Please use a different number.`,
       });
       return; 
     }
@@ -249,7 +262,7 @@ export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceDa
     const formattedDate = date ? format(date, 'dd/MM/yyyy') : '';
     const numericAmount = typeof amount === 'string' ? parseFormattedNumber(amount) : amount;
     onSave({
-      id: fullInvoiceNumber,
+      id: finalInvoiceNumber,
       customer,
       salesOrder,
       date: formattedDate,
