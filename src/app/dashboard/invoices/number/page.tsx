@@ -36,7 +36,6 @@ import {
 
     const [editingInvoice, setEditingInvoice] = useState<InvoiceNumber | undefined>(undefined);
     const [isDialogOpen, setIsDialogOpen] = useState(false);
-    const [initialNumberData, setInitialNumberData] = useState<{ prefix: string, mainNumber: string, suffix: string, type: 'sar' | 'kw' } | undefined>(undefined);
     
     const invoiceNumbersCollection = useMemoFirebase(() => {
         if (!firestore) return null;
@@ -62,48 +61,12 @@ import {
         );
     }, [invoices, searchQuery]);
 
-    const generateNextNumber = (type: 'sar' | 'kw'): { prefix: string, mainNumber: string, suffix: string, type: 'sar' | 'kw'} => {
-        const currentYear = new Date().getFullYear();
-        let prefix = '';
-        let suffix = '';
-        let nextNum = 1;
-
-        if (invoices) {
-            const relevantNumbers = invoices.filter(inv => {
-                const id = inv.id || '';
-                if (type === 'sar') return id.startsWith('SAR/');
-                return id.startsWith('KW/');
-            }).map(inv => {
-                const parts = (inv.id || '').split('/');
-                if (parts.length >= 2) return parseInt(parts[1], 10);
-                return 0;
-            }).filter(num => !isNaN(num) && num > 0);
-    
-            if (relevantNumbers.length > 0) {
-                nextNum = Math.max(...relevantNumbers) + 1;
-            }
-        }
-
-        if (type === 'sar') {
-            prefix = 'SAR/';
-            suffix = '';
-            return { prefix, mainNumber: nextNum.toString(), suffix, type };
-        } else { // kw
-            prefix = 'KW/';
-            suffix = `/KEU/${currentYear}`;
-            return { prefix, mainNumber: nextNum.toString().padStart(4, '0'), suffix, type };
-        }
-    };
-
-
-    const handleAddClick = (type: 'sar' | 'kw' = 'kw') => {
-      setInitialNumberData(generateNextNumber(type));
+    const handleAddClick = () => {
       setEditingInvoice(undefined);
       setIsDialogOpen(true);
     };
 
     const handleEdit = (invoice: InvoiceNumber) => {
-        setInitialNumberData(undefined);
         setEditingInvoice(invoice);
         setIsDialogOpen(true);
     };
@@ -178,7 +141,6 @@ import {
         try {
           const data = await importFromExcel(file) as InvoiceNumber[];
           const batch = writeBatch(firestore);
-          const importedDataForError: any[] = [];
           
           data.forEach(item => {
               if (item.id) {
@@ -186,7 +148,6 @@ import {
                 const docRef = doc(firestore, 'invoiceNumbers', safeId);
                 const dataToSave = { ...item, id: item.id };
                 batch.set(docRef, dataToSave);
-                importedDataForError.push(dataToSave);
               }
           });
 
@@ -247,7 +208,6 @@ import {
                         invoiceData={editingInvoice}
                         onAddClick={handleAddClick}
                         allInvoiceNumbers={invoices}
-                        initialNumberData={initialNumberData}
                        />
                     </div>
                 </div>
