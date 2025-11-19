@@ -21,7 +21,7 @@ import {
   import { AddInvoiceNumberDialog } from './_components/add-invoice-number-dialog';
   import { DeleteConfirmationDialog } from '@/app/components/delete-confirmation-dialog';
   import { Skeleton } from '@/components/ui/skeleton';
-  import { exportToExcel, importFromExcel } from '@/lib/utils';
+  import { exportToExcel, importFromExcel, generateExcelTemplate } from '@/lib/utils';
   import { useToast } from '@/hooks/use-toast';
   import { useFirestore, useCollection, useMemoFirebase, errorEmitter, FirestorePermissionError } from '@/firebase';
   import { collection, doc, setDoc, deleteDoc, writeBatch } from 'firebase/firestore';
@@ -46,8 +46,8 @@ import {
     const filteredInvoices = useMemo(() => {
         if (!invoices) return [];
         const sortedInvoices = [...invoices].sort((a, b) => {
-            const numA = parseInt(a.id.split('/')[1], 10);
-            const numB = parseInt(b.id.split('/')[1], 10);
+            const numA = parseInt(a.id.split(/[/_]/)[1], 10);
+            const numB = parseInt(b.id.split(/[/_]/)[1], 10);
             return numB - numA;
         });
 
@@ -124,6 +124,12 @@ import {
         setEditingInvoice(undefined);
       }
     }
+
+    const handleDownloadTemplate = () => {
+        const headers = ['id', 'customer', 'salesOrder', 'date', 'amount'];
+        generateExcelTemplate(headers, 'invoice_number_template');
+        toast({ title: "Template Downloaded", description: "Invoice number template has been downloaded." });
+    };
     
     const handleExport = () => {
       if (invoices) {
@@ -199,6 +205,7 @@ import {
                     <div className="flex items-center gap-2">
                        <input type="file" ref={fileInputRef} onChange={handleFileChange} className="hidden" accept=".xlsx, .xls" />
                        <Button variant="outline" onClick={handleImportClick}><Upload className="mr-2 h-4 w-4"/> Impor</Button>
+                       <Button variant="outline" onClick={handleDownloadTemplate}><Download className="mr-2 h-4 w-4"/> Download Template</Button>
                        <Button variant="outline" onClick={handleExport}><Download className="mr-2 h-4 w-4"/> Ekspor</Button>
                        <Button variant="outline"><Filter className="mr-2 h-4 w-4"/> Filter Duplikat</Button>
                        <AddInvoiceNumberDialog

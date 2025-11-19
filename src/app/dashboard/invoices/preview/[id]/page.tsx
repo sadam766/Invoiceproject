@@ -315,7 +315,7 @@ const InvoicePreviewPage = () => {
                                             <div className="w-full">
                                                 <div className="text-right w-full">
                                                     {chunk.length < 5 && <div className="h-0.5 border-b border-black w-1/4 ml-auto" style={{marginTop: `-${(10 - chunk.length) * 18}px`}}></div>}
-                                                    <p className="font-normal mb-0">Subtotal Item: {formatCurrency(subTotalItems)}</p>
+                                                    <p className="font-normal mb-0">{formatCurrency(subTotalItems)}</p>
                                                 </div>
 
                                                 {negotiation > 0 && (
@@ -359,23 +359,31 @@ const InvoicePreviewPage = () => {
                                         </div>
                                     </div>
                                     <div className="border-t border-black w-full my-1"></div>
+                                    {/* --- BAGIAN PEMBAYARAN & TANDA TANGAN YANG DIPERBARUI --- */}
                                     <div className="mt-0 pt-1">
+                                        {/* Menggunakan 'flex' untuk membagi menjadi dua kolom besar (Payment Info dan Tanda Tangan) */}
                                         <div className="flex">
                                             
+                                            {/* Kolom Kiri: Detail Pembayaran (55% Lebar) */}
                                             <div className="w-[55%] pr-4 text-[10px] space-y-0.5 leading-normal">
                                                 
-                                                <div className="grid grid-cols-[max-content_1fr] gap-x-2 items-start leading-tight">
-                                                    <p className='shrink-0 w-max mb-0'>**Payment:**</p> 
-                                                    <p className='font-normal mb-0'>{paymentTerms}</p>
-                                                    
-                                                    <p className='shrink-0 w-max mb-0'>**Please state with your payment:**</p>
-                                                    <p className='font-bold mb-0'>{invoiceId}</p>
+                                                {/* 1. Menggunakan GRID untuk merapikan 'Payment' dan 'Invoice ID' */}
+                                                <div className="flex items-start">
+                                                    {/* Hapus 'w-16' pada label agar lebarnya sesuai konten */}
+                                                    <p className='shrink-0 w-max mb-0'>Payment:</p> 
+                                                    {/* Hapus 'flex-1' pada nilai, dan atur margin/padding sesuai keinginan */}
+                                                    <p className='ml-2 font-normal mb-0'>{paymentTerms}</p> 
+                                                </div>
+                                                <div className="flex items-start">
+                                                    <p className='shrink-0 w-max mb-0'>Please state with your payment:</p>
+                                                    <p className='ml-2 font-bold mb-0'>{invoiceId}</p>
                                                 </div>
                                                 
                                                 <p className='mt-2 mb-1'>For payment, please transfer to our account:</p>
                                                 <p className="font-semibold text-[10px] mb-1">PT. Jembo Cable Company Tbk</p>
                                                 
-                                                <div className="grid grid-cols-[max-content_1fr] gap-x-2 leading-tight">
+                                                {/* Bank Mandiri Details */}
+                                                <div className="grid grid-cols-[35%_1fr] gap-x-2 leading-tight">
                                                     <div>
                                                         <p className='mb-0'>Bank Mandiri -</p>
                                                         <p className='mb-0'>Jakarta Cabang</p>
@@ -390,7 +398,8 @@ const InvoicePreviewPage = () => {
 
                                                 <div className="text-center my-1">OR</div>
 
-                                                <div className="grid grid-cols-[max-content_1fr] gap-x-2 leading-tight">
+                                                {/* Bank BCA Details */}
+                                                <div className="grid grid-cols-[35%_1fr] gap-x-2 leading-tight">
                                                     <div>
                                                         <p className='mb-0'>Bank BCA - Jakarta</p>
                                                         <p className='mb-0'>Cabang KEM TOWER</p>
@@ -401,6 +410,7 @@ const InvoicePreviewPage = () => {
                                                 </div>
                                             </div>
                                             
+                                            {/* Kolom Kanan: Tanda Tangan (45% Lebar) */}
                                             <div className="w-[45%] pl-0 flex flex-col justify-between text-[10px] text-center" style={{ minHeight: '130px' }}>
                                                 <p className="font-semibold text-[10px]">PT. JEMBO CABLE COMPANY Tbk</p>
                                                 <div className="flex-grow"></div>

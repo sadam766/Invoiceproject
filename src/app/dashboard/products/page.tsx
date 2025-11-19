@@ -27,7 +27,7 @@ import {
   import { AddProductDialog } from './_components/add-product-dialog';
   import { DeleteConfirmationDialog } from '@/app/components/delete-confirmation-dialog';
   import { useToast } from '@/hooks/use-toast';
-  import { exportToExcel, importFromExcel } from '@/lib/utils';
+  import { exportToExcel, importFromExcel, generateExcelTemplate } from '@/lib/utils';
   import { useFirestore, useCollection, useMemoFirebase, errorEmitter, FirestorePermissionError } from '@/firebase';
   import { collection, doc, setDoc, deleteDoc, writeBatch } from 'firebase/firestore';
   
@@ -127,6 +127,12 @@ import {
         setEditingProduct(undefined);
       }
     }
+    
+    const handleDownloadTemplate = () => {
+        const headers = ['id', 'name', 'category', 'quantity', 'unit', 'price'];
+        generateExcelTemplate(headers, 'product_template');
+        toast({ title: "Template Downloaded", description: "Product template has been downloaded." });
+    };
 
     const handleExport = () => {
         if (products) {
@@ -204,6 +210,7 @@ import {
                         </Select>
                        <input type="file" ref={fileInputRef} onChange={handleFileChange} className="hidden" accept=".xlsx, .xls" />
                        <Button variant="outline" onClick={handleImportClick}><Upload className="mr-2 h-4 w-4"/> Import</Button>
+                       <Button variant="outline" onClick={handleDownloadTemplate}><Download className="mr-2 h-4 w-4"/> Download Template</Button>
                        <Button variant="outline" onClick={handleExport}><Download className="mr-2 h-4 w-4"/> Export</Button>
                        <AddProductDialog
                           isOpen={isDialogOpen}
