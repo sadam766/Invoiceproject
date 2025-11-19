@@ -129,7 +129,7 @@ import {
     }
     
     const handleDownloadTemplate = () => {
-        const headers = ['id', 'name', 'category', 'quantity', 'unit', 'price'];
+        const headers = ['name', 'category', 'quantity', 'unit', 'price'];
         generateExcelTemplate(headers, 'product_template');
         toast({ title: "Template Downloaded", description: "Product template has been downloaded." });
     };

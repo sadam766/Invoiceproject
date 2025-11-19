@@ -82,10 +82,21 @@ import {
         
         const isNewCustomer = !customer.id && !editingCustomer?.id;
         let customerId = customer.id || editingCustomer?.id;
-        if (!customerId) {
-            // For new customers, their ID should be the user's UID.
-            customerId = user.uid;
+        if (isNewCustomer) {
+            // For new customers, their ID should be auto-generated.
+            customerId = doc(collection(firestore, 'customers')).id;
         }
+
+        if (!customerId) {
+            console.error("Customer ID is missing.");
+            toast({
+                variant: 'destructive',
+                title: 'Error',
+                description: 'Could not save customer due to missing ID.'
+            });
+            return;
+        }
+
 
         const docRef = doc(firestore, 'customers', customerId);
         const dataToSave = { ...customer, id: customerId };
@@ -117,7 +128,7 @@ import {
     }
 
     const handleDownloadTemplate = () => {
-        const headers = ['id', 'name', 'address', 'spdAddress'];
+        const headers = ['name', 'address', 'spdAddress'];
         generateExcelTemplate(headers, 'customer_template');
         toast({ title: "Template Downloaded", description: "Customer template has been downloaded." });
     };
@@ -136,32 +147,37 @@ import {
     const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
         const file = event.target.files?.[0];
         if (file && firestore) {
-            const data = await importFromExcel(file) as Omit<Customer, 'id'>[];
-            const batch = writeBatch(firestore);
-            const importedDataForError: any[] = [];
-
-            data.forEach(customerData => {
-                const newDocRef = doc(collection(firestore, 'customers'));
-                const fullData = { ...customerData, id: newDocRef.id };
-                batch.set(newDocRef, fullData);
-                importedDataForError.push(fullData);
-            });
-
-            batch.commit()
-                .then(() => {
-                    toast({
-                        title: "Import Successful",
-                        description: `${data.length} customers imported successfully.`,
-                    });
-                })
-                .catch(async (serverError) => {
-                    const permissionError = new FirestorePermissionError({
-                        path: 'customers', // Path for batch write can be generalized
-                        operation: 'create', // Assuming import is a create operation
-                        requestResourceData: importedDataForError, // This is an approximation for batch
-                    });
-                    errorEmitter.emit('permission-error', permissionError);
+            try {
+                const data = await importFromExcel(file) as Omit<Customer, 'id'>[];
+                const batch = writeBatch(firestore);
+                const importedDataForError: any[] = [];
+    
+                data.forEach(customerData => {
+                    const newDocRef = doc(collection(firestore, 'customers'));
+                    const fullData = { ...customerData, id: newDocRef.id };
+                    batch.set(newDocRef, fullData);
+                    importedDataForError.push(fullData);
                 });
+    
+                await batch.commit();
+                
+                toast({
+                    title: "Import Successful",
+                    description: `${data.length} customers imported successfully.`,
+                });
+            } catch (error) {
+                 const permissionError = new FirestorePermissionError({
+                    path: 'customers', // Path for batch write can be generalized
+                    operation: 'create', // Assuming import is a create operation
+                    requestResourceData: 'Batch customer import',
+                });
+                errorEmitter.emit('permission-error', permissionError);
+                toast({
+                    variant: "destructive",
+                    title: "Import Error",
+                    description: "Failed to import customers. Please check the file format and permissions.",
+                });
+            }
         }
     };
     

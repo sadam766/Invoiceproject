@@ -106,7 +106,7 @@ import {
     }
     
     const handleDownloadTemplate = () => {
-        const headers = ['id', 'soNumber', 'productName', 'category', 'quantity', 'unit', 'price'];
+        const headers = ['soNumber', 'productName', 'category', 'quantity', 'unit', 'price'];
         generateExcelTemplate(headers, 'sales_order_template');
         toast({ title: "Template Downloaded", description: "Sales Order template has been downloaded." });
     };
