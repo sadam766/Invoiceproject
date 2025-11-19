@@ -90,17 +90,19 @@ export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceDa
         const relevantNumbers = allInvoiceNumbers
             .filter(inv => {
                 const id = inv.id || '';
-                if (type === 'sar') return id.startsWith('SAR/') || id.startsWith('SAR_');
+                if (type === 'sar') {
+                    return id.startsWith('SAR/') || id.startsWith('SAR_');
+                }
                 return id.startsWith('KW/');
             })
             .map(inv => {
                 const id = inv.id || '';
-                // Regex to split by the first occurrence of '/' or '_'
-                const parts = id.split(/[/_](.+)/); 
-                if (parts.length > 1) {
-                    // This will capture the numeric part even if it contains other characters, parseInt will handle it
-                    const numberPart = parts[1].split('/')[0];
-                    return parseInt(numberPart, 10);
+                if (type === 'sar') {
+                    const parts = id.split(/[/_](.+)/);
+                    if (parts.length > 1) return parseInt(parts[1], 10);
+                } else { // type === 'kw'
+                    const match = id.match(/^KW\/(\d+)\//);
+                    if (match && match[1]) return parseInt(match[1], 10);
                 }
                 return 0;
             })
@@ -140,15 +142,15 @@ export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceDa
       const type = invoiceData.id.startsWith('SAR/') || invoiceData.id.startsWith('SAR_') ? 'sar' : 'kw';
       
       let extractedMainNumber = '';
-      const parts = invoiceData.id.split(/[/_](.+)/);
       
       if (type === 'sar') {
-          extractedMainNumber = parts[1] || '';
+          const parts = invoiceData.id.split(/[/_](.+)/);
+          extractedMainNumber = parts.length > 1 ? parts[1] : '';
           setPrefix('SAR/');
           setSuffix('');
       } else if (type === 'kw' && invoiceData.id.includes('/')) {
           const kwParts = invoiceData.id.split('/');
-          if (kwParts.length >= 3) {
+          if (kwParts.length >= 2) {
             extractedMainNumber = kwParts[1];
             setPrefix(`KW/`);
             setSuffix(`/${kwParts.slice(2).join('/')}`);
