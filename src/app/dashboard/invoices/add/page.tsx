@@ -570,7 +570,7 @@ export default function AddInvoicePage() {
                  {customer && (
                     <div className="mt-2 p-2 border rounded-md bg-muted text-sm text-muted-foreground">
                         <p>{customer.address}</p>
-                        <p>{customer.spdAddress}</p>
+                        <p className="mt-1">{customer.spdAddress}</p>
                     </div>
                  )}
               </div>

@@ -261,6 +261,7 @@ const InvoicePreviewPage = () => {
                                 <div className='flex justify-between items-start mt-4'>
                                     <div className='w-[45%]'>
                                         <p className="font-bold text-[10px] mb-0">{customer.name}</p>
+                                        <p className="text-[10px] mb-0">{customer.address}</p>
                                     </div>
                                     <div className="w-[30%] text-[10px] text-left leading-normal space-y-0">
                                         <p className="mb-0">Sales Order: {soNumber}</p> 
