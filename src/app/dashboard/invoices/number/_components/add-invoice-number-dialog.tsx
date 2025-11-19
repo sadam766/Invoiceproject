@@ -98,9 +98,11 @@ export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceDa
             .map(inv => {
                 const id = inv.id || '';
                 if (type === 'sar') {
+                     // Regex to split by the first occurrence of / or _
                     const parts = id.split(/[/_](.+)/);
                     if (parts.length > 1) return parseInt(parts[1], 10);
                 } else { // type === 'kw'
+                    // Regex to find KW/{numbers}/...
                     const match = id.match(/^KW\/(\d+)\//);
                     if (match && match[1]) return parseInt(match[1], 10);
                 }
@@ -288,27 +290,35 @@ export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceDa
           <DialogTitle>{dialogTitle}</DialogTitle>
         </DialogHeader>
         <div className="grid gap-6 py-4 max-h-[70vh] overflow-y-auto pr-4">
-          {!invoiceData && (
+          
               <div className="space-y-2">
                 <Label>Tipe Faktur</Label>
                  <div className="flex w-full rounded-md border border-input">
                     <Button
                         variant={invoiceType === 'sar' ? 'default' : 'ghost'}
-                        onClick={() => setInvoiceType('sar')}
+                        onClick={() => {
+                          if (invoiceData) return; // Don't change type in edit mode
+                          setInvoiceType('sar')
+                        }}
                         className="flex-1 rounded-r-none"
+                        disabled={!!invoiceData}
                     >
                         SAR
                     </Button>
                     <Button
                         variant={invoiceType === 'kw' ? 'default' : 'ghost'}
-                        onClick={() => setInvoiceType('kw')}
+                        onClick={() => {
+                           if (invoiceData) return; // Don't change type in edit mode
+                           setInvoiceType('kw')
+                        }}
                         className="flex-1 rounded-l-none"
+                        disabled={!!invoiceData}
                     >
                         KW / Proforma
                     </Button>
                 </div>
               </div>
-            )}
+            
 
            <div className="space-y-2">
             <Label>Nomor Faktur</Label>
