@@ -306,22 +306,18 @@ const InvoicePreviewPage = () => {
                             {isLastPage && (
                                 <footer className="pt-0 text-black mt-auto text-[10px]">
                                     
-                                    {/* CONTAINER UTAMA UNTUK SUBTOTAL, NEGOSIASI, DP, PELUNASAN, dan Rincian Total */}
-                                    <div className="flex w-full justify-end items-start leading-normal">
-                                        
-                                        {/* Kolom Kanan: SUB-TOTAL ITEMS, NEGOSIASI, DP, PELUNASAN, dan Rincian Total */}
-                                        <div className="w-full text-right text-[10px] pr-1">
+                                    <div className="flex w-full justify-between items-start leading-normal">
+                                        <div className='w-1/2'>
+                                            <p>No PO : {poNumber}</p>
+                                        </div>
+                                        <div className="w-1/2 text-right text-[10px] pr-1">
                                             
-                                            {/* CONTAINER GABUNGAN: Subtotal Items + DP + Negosiasi + Pelunasan */}
                                             <div className="w-full">
-                                                {/* Subtotal Items */}
                                                 <div className="text-right w-full">
-                                                    {/* Penyesuaian Garis (Opsional, sesuaikan nilai 18px jika tinggi baris Anda berbeda) */}
                                                     {chunk.length < 5 && <div className="h-0.5 border-b border-black w-1/4 ml-auto" style={{marginTop: `-${(10 - chunk.length) * 18}px`}}></div>}
                                                     <p className="font-normal mb-0">Subtotal Item: {formatCurrency(subTotalItems)}</p>
                                                 </div>
 
-                                                {/* Negosiasi */}
                                                 {negotiation > 0 && (
                                                     <div className='flex justify-end space-x-2'>
                                                         <p className='mb-0'>A/Negotiation :</p>
@@ -329,7 +325,6 @@ const InvoicePreviewPage = () => {
                                                     </div>
                                                 )}
 
-                                                {/* DP */}
                                                 {dpValue > 0 && (
                                                     <div className='flex justify-end space-x-2'>
                                                         <p className='mb-0'>DP {dpPercent ? `${dpPercent}%` : 'Value'} :</p>
@@ -337,7 +332,6 @@ const InvoicePreviewPage = () => {
                                                     </div>
                                                 )}
 
-                                                 {/* Pelunasan */}
                                                  {pelunasan > 0 && (
                                                     <div className='flex justify-end space-x-2 font-semibold'>
                                                         <p className='mb-0'>Pelunasan:</p>
@@ -345,9 +339,7 @@ const InvoicePreviewPage = () => {
                                                     </div>
                                                 )}
                                             </div>
-                                    
-                                    <div className="w-full flex justify-start items-end leading-normal mt-0">
-                                        <p>No PO : {poNumber}</p>
+                                        </div>
                                     </div>
                                     <div className="border-t border-black w-full my-1"></div>
                                     <div className="flex justify-end mt-1">
@@ -369,15 +361,17 @@ const InvoicePreviewPage = () => {
                                     <div className="border-t border-black w-full my-1"></div>
                                     <div className="mt-0 pt-1">
                                         <div className="flex">
-                                            <div className="w-[55%] pr-4 text-[10px] space-y-0.5 leading-normal"> 
-                                                <div className="flex items-start">
-                                                    <p className='shrink-0 w-16 mb-0'>Payment:</p> 
-                                                    <p className='flex-1 ml-1 font-normal mb-0'>{paymentTerms}</p>
+                                            
+                                            <div className="w-[55%] pr-4 text-[10px] space-y-0.5 leading-normal">
+                                                
+                                                <div className="grid grid-cols-[max-content_1fr] gap-x-2 items-start leading-tight">
+                                                    <p className='shrink-0 w-max mb-0'>**Payment:**</p> 
+                                                    <p className='font-normal mb-0'>{paymentTerms}</p>
+                                                    
+                                                    <p className='shrink-0 w-max mb-0'>**Please state with your payment:**</p>
+                                                    <p className='font-bold mb-0'>{invoiceId}</p>
                                                 </div>
-                                                <div className="flex items-start">
-                                                    <p className='shrink-0 w-max mb-0'>Please state with your payment:</p>
-                                                    <p className='flex-1 ml-1 font-bold mb-0'>{invoiceId}</p>
-                                                </div>
+                                                
                                                 <p className='mt-2 mb-1'>For payment, please transfer to our account:</p>
                                                 <p className="font-semibold text-[10px] mb-1">PT. Jembo Cable Company Tbk</p>
                                                 
@@ -397,24 +391,24 @@ const InvoicePreviewPage = () => {
                                                 <div className="text-center my-1">OR</div>
 
                                                 <div className="grid grid-cols-[max-content_1fr] gap-x-2 leading-tight">
-                                                   <div>
+                                                    <div>
                                                         <p className='mb-0'>Bank BCA - Jakarta</p>
                                                         <p className='mb-0'>Cabang KEM TOWER</p>
-                                                   </div>
-                                                   <div>
+                                                    </div>
+                                                    <div>
                                                         <p className='mb-0'>A/C No. : 684-0198977 (Rp)</p>
-                                                   </div>
+                                                    </div>
                                                 </div>
                                             </div>
+                                            
                                             <div className="w-[45%] pl-0 flex flex-col justify-between text-[10px] text-center" style={{ minHeight: '130px' }}>
                                                 <p className="font-semibold text-[10px]">PT. JEMBO CABLE COMPANY Tbk</p>
                                                 <div className="flex-grow"></div>
                                                 <div className='border-b border-black w-24 mx-auto mb-1 mt-20'></div>
                                                 <p className="font-semibold">Finance</p>
                                             </div>
+                                            
                                         </div>
-                                    </div>
-                                    </div>
                                     </div>
                                 </footer>
                             )}
