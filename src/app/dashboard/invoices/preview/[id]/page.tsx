@@ -370,41 +370,40 @@ const InvoicePreviewPage = () => {
                                     <div className="mt-0 pt-1">
                                         <div className="flex">
                                             <div className="w-[55%] pr-4 text-[10px] space-y-0.5 leading-normal"> 
-                                                <div className="flex">
-                                                    <p className='shrink-0 w-[50px] mb-0'>Payment:</p> 
-                                                    <p className='w-full ml-1 font-normal mb-0'>{paymentTerms}</p>
+                                                <div className="flex items-start">
+                                                    <p className='shrink-0 w-16 mb-0'>Payment:</p> 
+                                                    <p className='flex-1 ml-1 font-normal mb-0'>{paymentTerms}</p>
                                                 </div>
-                                                <div className="flex">
-                                                    <p className='shrink-0 w-[150px] mb-0'>Please state with your payment:</p>
-                                                    <p className='w-full ml-1 font-bold mb-0'>{invoiceId}</p>
+                                                <div className="flex items-start">
+                                                    <p className='shrink-0 w-max mb-0'>Please state with your payment:</p>
+                                                    <p className='flex-1 ml-1 font-bold mb-0'>{invoiceId}</p>
                                                 </div>
                                                 <p className='mt-2 mb-1'>For payment, please transfer to our account:</p>
                                                 <p className="font-semibold text-[10px] mb-1">PT. Jembo Cable Company Tbk</p>
-                                                <div className="space-y-0 leading-tight">
-                                                    <div className="flex">
-                                                        <span className="w-1/3 pr-2 mb-0">Bank Mandiri -</span>
-                                                        <span className="flex-1 mb-0">A/C No. : 102-0100206827 (Rp)</span>
+                                                
+                                                <div className="grid grid-cols-[max-content_1fr] gap-x-2 leading-tight">
+                                                    <div>
+                                                        <p className='mb-0'>Bank Mandiri -</p>
+                                                        <p className='mb-0'>Jakarta Cabang</p>
+                                                        <p className='mb-0'>Sudirman</p>
                                                     </div>
-                                                    <div className="flex">
-                                                        <span className="w-1/3 pr-2 mb-0">Jakarta Cabang</span>
-                                                        <span className="flex-1 mb-0">A/C No. : 102-0005000218 (Rp)</span>
-                                                    </div>
-                                                    <div className="flex">
-                                                        <span className="w-1/3 pr-2 mb-0">Sudirman</span>
-                                                        <span className="flex-1 mb-0">A/C No. : 102-0005000226 (USD)</span>
+                                                    <div>
+                                                        <p className='mb-0'>A/C No. : 102-0100206827 (Rp)</p>
+                                                        <p className='mb-0'>A/C No. : 102-0005000218 (Rp)</p>
+                                                        <p className='mb-0'>A/C No. : 102-0005000226 (USD)</p>
                                                     </div>
                                                 </div>
+
                                                 <div className="text-center my-1">OR</div>
-                                                <div className="space-y-0 leading-tight">
-                                                    <div className="flex">
-                                                        <div className="w-1/3 pr-2 leading-tight space-y-0">
-                                                            <p className='mb-0'>Bank BCA - Jakarta</p>
-                                                            <p className='mt-0'>Cabang KEM TOWER</p>
-                                                        </div>
-                                                        <div className="flex-1 text-left">
-                                                            <p className='mb-0'>A/C No. : 684-0198977 (Rp)</p>
-                                                        </div>
-                                                    </div>
+
+                                                <div className="grid grid-cols-[max-content_1fr] gap-x-2 leading-tight">
+                                                   <div>
+                                                        <p className='mb-0'>Bank BCA - Jakarta</p>
+                                                        <p className='mb-0'>Cabang KEM TOWER</p>
+                                                   </div>
+                                                   <div>
+                                                        <p className='mb-0'>A/C No. : 684-0198977 (Rp)</p>
+                                                   </div>
                                                 </div>
                                             </div>
                                             <div className="w-[45%] pl-0 flex flex-col justify-between text-[10px] text-center" style={{ minHeight: '130px' }}>
