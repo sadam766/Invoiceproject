@@ -1,4 +1,5 @@
 
+
 'use client';
 
 import { useEffect, useState, useMemo } from 'react';
@@ -408,6 +409,7 @@ export default function AddInvoicePage() {
       status,
       printType,
       items: items.map((item, index) => ({
+        id: item.id || Date.now() + index,
         no: index + 1,
         item: item.name,
         name: item.name,

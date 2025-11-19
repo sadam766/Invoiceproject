@@ -1,4 +1,5 @@
 
+
 'use client';
 import React, { useRef, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
@@ -286,7 +287,7 @@ const InvoicePreviewPage = () => {
                                     </thead>
                                     <tbody>
                                         {chunk.map((item, itemIdx) => (
-                                            <tr key={item.id} className='align-top'>
+                                            <tr key={item.id || itemIdx} className='align-top'>
                                                 <td className="p-1 h-[18px]">{pageIndex * ITEMS_PER_PAGE + itemIdx + 1}</td>
                                                 <td className="p-1">{item.name}</td>
                                                 <td className="p-1 text-center">{item.quantity.toLocaleString('id-ID')} {item.unit}</td>
