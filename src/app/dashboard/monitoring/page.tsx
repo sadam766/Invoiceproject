@@ -20,8 +20,8 @@ import { Badge } from '@/components/ui/badge';
 import { getSalesMonitoringData, SalesMonitoringData, SalesOrder } from '@/app/lib/data';
 import { Search, Eye } from 'lucide-react';
 import Link from 'next/link';
-import { useFirestore, useCollection, useMemoFirebase } from '@/firebase';
-import { collection } from 'firebase/firestore';
+import { useFirestore, useCollection, useMemoFirebase, useUser } from '@/firebase';
+import { collection, query, where } from 'firebase/firestore';
 
 
 const statusVariant: { [key: string]: 'outline' | 'destructive' | 'secondary' } = {
@@ -44,13 +44,14 @@ function cn(...inputs: (string | undefined | null | false)[]): string {
 
 export default function SalesMonitoringPage() {
   const firestore = useFirestore();
+  const { user } = useUser();
   const [activeTab, setActiveTab] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
 
   const salesOrdersCollection = useMemoFirebase(() => {
-    if (!firestore) return null;
-    return collection(firestore, 'salesOrders');
-  }, [firestore]);
+    if (!firestore || !user) return null;
+    return query(collection(firestore, 'salesOrders'), where('ownerId', '==', user.uid));
+  }, [firestore, user]);
   const { data: salesOrderListData, isLoading } = useCollection<SalesOrder>(salesOrdersCollection);
   
   const salesMonitoringData = useMemo(() => {

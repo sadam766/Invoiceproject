@@ -31,8 +31,8 @@ import { cn, formatNumberWithCommas, parseFormattedNumber } from '@/lib/utils';
 import { format } from 'date-fns';
 import type { InvoiceNumber, Customer, SalesOrder } from '@/app/lib/data';
 import { useToast } from '@/hooks/use-toast';
-import { useFirestore, useCollection, useMemoFirebase } from '@/firebase';
-import { collection } from 'firebase/firestore';
+import { useFirestore, useCollection, useMemoFirebase, useUser } from '@/firebase';
+import { collection, query, where } from 'firebase/firestore';
 
 
 type AddInvoiceNumberDialogProps = {
@@ -47,6 +47,7 @@ type AddInvoiceNumberDialogProps = {
 
 export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceData, onAddClick, allInvoiceNumbers }: AddInvoiceNumberDialogProps) {
   const firestore = useFirestore();
+  const { user } = useUser();
   const [date, setDate] = useState<Date | undefined>(new Date());
   const [invoiceType, setInvoiceType] = useState<'sar' | 'kw'>('kw');
   const [isAutoNumber, setIsAutoNumber] = useState(true);
@@ -66,15 +67,15 @@ export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceDa
   const { toast } = useToast();
 
   const customersCollection = useMemoFirebase(() => {
-    if (!firestore) return null;
-    return collection(firestore, 'customers');
-  }, [firestore]);
+    if (!firestore || !user) return null;
+    return query(collection(firestore, 'customers'), where('ownerId', '==', user.uid));
+  }, [firestore, user]);
   const { data: customerListData } = useCollection<Customer>(customersCollection);
 
   const salesOrdersCollection = useMemoFirebase(() => {
-    if (!firestore) return null;
-    return collection(firestore, 'salesOrders');
-  }, [firestore]);
+    if (!firestore || !user) return null;
+    return query(collection(firestore, 'salesOrders'), where('ownerId', '==', user.uid));
+  }, [firestore, user]);
   const { data: salesOrderListData } = useCollection<SalesOrder>(salesOrdersCollection);
 
   const uniqueSalesOrders = useMemo(() => {
@@ -91,12 +92,13 @@ export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceDa
       .map(inv => {
         const id = inv.id || '';
         let match;
+        const separator = /[\/_]/;
         // Regex to capture number from SAR/xxx or SAR_xxx
         if (type === 'sar') {
-          match = id.match(/^(?:SAR[_\/])([0-9]+)/);
+          match = id.match(/^(?:SAR)[\/_]([0-9]+)/);
         } else { // kw
            // Regex to capture number from KW/xxx/KEU/yyyy or KW_xxx_KEU_yyyy
-          match = id.match(/^(?:KW[_\/])(.*?)(?:[_\/]KEU[_\/].*)?$/);
+           match = id.match(/^(?:KW)[\/_](.*?)((?:[\/_]KEU[\/_].*)?)$/);
         }
 
         if (match && match[1]) {
@@ -127,66 +129,71 @@ export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceDa
     }
   };
 
-  useEffect(() => {
-    if (!isOpen) return;
+  const handleManualSetup = (invoice: InvoiceNumber) => {
+    const type = invoice.id.startsWith('SAR') ? 'sar' : 'kw';
+    const separator = /[_\/]/;
+    const parts = invoice.id.split(separator);
 
-    if (invoiceData) {
-      // --- EDIT MODE ---
-      const type = invoiceData.id.startsWith('SAR') ? 'sar' : 'kw';
-      const separator = /[_\/]/;
-      const parts = invoiceData.id.split(separator);
+    let extractedPrefix = '';
+    let extractedMainNumber = '';
+    let extractedSuffix = '';
 
-      let extractedPrefix = '';
-      let extractedMainNumber = '';
-      let extractedSuffix = '';
-      
-      if (type === 'sar') {
-          extractedPrefix = parts[0] + '/';
-          extractedMainNumber = parts.slice(1).join('');
-      } else { // kw
-          extractedPrefix = parts[0] + '/';
-          if (parts.length >= 4 && parts[parts.length - 2] === 'KEU') {
-              extractedMainNumber = parts.slice(1, parts.length - 2).join('/');
-              extractedSuffix = '/' + parts.slice(parts.length - 2).join('/');
-          } else {
-              extractedMainNumber = parts.slice(1).join('/');
-          }
-      }
-      
-      setInvoiceType(type);
-      setPrefix(extractedPrefix);
-      setMainNumber(extractedMainNumber);
-      setSuffix(extractedSuffix);
-      setIsAutoNumber(false); // Always start in manual for editing
-
-      setCustomer(invoiceData.customer);
-      setSalesOrder(invoiceData.salesOrder);
-      if (invoiceData.date) {
-        const dateParts = invoiceData.date.split('/');
-        if (dateParts.length === 3) {
-          const [day, month, year] = dateParts;
-          setDate(new Date(parseInt(year), parseInt(month) - 1, parseInt(day)));
+    if (type === 'sar') {
+        extractedPrefix = parts[0] + '/';
+        extractedMainNumber = parts.slice(1).join('');
+    } else { // kw
+        extractedPrefix = parts[0] + '/';
+        if (parts.length >= 4 && parts[parts.length - 2] === 'KEU') {
+            extractedMainNumber = parts.slice(1, parts.length - 2).join('/');
+            extractedSuffix = '/' + parts.slice(parts.length - 2).join('/');
         } else {
-          setDate(new Date());
+            extractedMainNumber = parts.slice(1).join('/');
         }
+    }
+    
+    setInvoiceType(type);
+    setPrefix(extractedPrefix);
+    setMainNumber(extractedMainNumber);
+    setSuffix(extractedSuffix);
+    setIsAutoNumber(false); // Always start in manual for editing
+
+    setCustomer(invoice.customer);
+    setSalesOrder(invoice.salesOrder);
+    if (invoice.date) {
+      const dateParts = invoice.date.split('/');
+      if (dateParts.length === 3) {
+        const [day, month, year] = dateParts;
+        setDate(new Date(parseInt(year), parseInt(month) - 1, parseInt(day)));
       } else {
         setDate(new Date());
       }
-      setAmount(formatNumberWithCommas(invoiceData.amount));
-
     } else {
-      // --- ADD NEW MODE ---
-      const initialType = 'kw';
-      setInvoiceType(initialType);
-      setIsAutoNumber(true);
-      setupForAddMode(initialType);
-      
-      setCustomer('');
-      setSalesOrder('');
       setDate(new Date());
-      setAmount(0);
     }
-  }, [isOpen, invoiceData, allInvoiceNumbers]); 
+    setAmount(formatNumberWithCommas(invoice.amount));
+  }
+
+  // This effect runs ONCE when the dialog opens
+  useEffect(() => {
+      if (!isOpen) return;
+
+      if (invoiceData) {
+          // --- EDIT MODE ---
+          handleManualSetup(invoiceData);
+      } else {
+          // --- ADD NEW MODE ---
+          const initialType = 'kw';
+          setInvoiceType(initialType);
+          setIsAutoNumber(true);
+          setupForAddMode(initialType);
+          
+          // Reset other fields
+          setCustomer('');
+          setSalesOrder('');
+          setDate(new Date());
+          setAmount(0);
+      }
+  }, [isOpen, invoiceData, allInvoiceNumbers]); // Dependencies ensure it re-runs if key props change while dialog is open
 
   // This effect updates the full invoice number whenever its parts change
   useEffect(() => {
@@ -194,10 +201,10 @@ export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceDa
   }, [prefix, mainNumber, suffix]);
 
   const handleInvoiceTypeChange = (newType: 'sar' | 'kw') => {
-    if (invoiceData) return; // Don't allow type change in edit mode
+    if (invoiceType === newType) return;
     setInvoiceType(newType);
-    if (isAutoNumber) {
-      setupForAddMode(newType);
+    if (!invoiceData && isAutoNumber) {
+        setupForAddMode(newType);
     }
   }
 

@@ -33,8 +33,8 @@ import {
   } from '@/components/ui/dropdown-menu';
   import { DeleteConfirmationDialog } from '@/app/components/delete-confirmation-dialog';
   import { useToast } from '@/hooks/use-toast';
-  import { useFirestore, useCollection, useMemoFirebase } from '@/firebase';
-  import { collection } from 'firebase/firestore';
+  import { useFirestore, useCollection, useMemoFirebase, useUser } from '@/firebase';
+  import { collection, query, where } from 'firebase/firestore';
 
 
   export default function InvoiceListPage() {
@@ -47,17 +47,18 @@ import {
     const [selectedInvoices, setSelectedInvoices] = useState<Set<string>>(new Set());
     const { toast } = useToast();
     const firestore = useFirestore();
+    const { user } = useUser();
     
     const customersCollection = useMemoFirebase(() => {
-        if (!firestore) return null;
-        return collection(firestore, 'customers');
-    }, [firestore]);
+        if (!firestore || !user) return null;
+        return query(collection(firestore, 'customers'), where('ownerId', '==', user.uid));
+    }, [firestore, user]);
     const { data: customerListData } = useCollection<Customer>(customersCollection);
 
     const salesOrdersCollection = useMemoFirebase(() => {
-        if (!firestore) return null;
-        return collection(firestore, 'salesOrders');
-    }, [firestore]);
+        if (!firestore || !user) return null;
+        return query(collection(firestore, 'salesOrders'), where('ownerId', '==', user.uid));
+    }, [firestore, user]);
     const { data: salesOrderListData } = useCollection<SalesOrder>(salesOrdersCollection);
 
 

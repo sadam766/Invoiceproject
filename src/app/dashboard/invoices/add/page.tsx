@@ -56,8 +56,8 @@ import Link from 'next/link';
 import { type InvoiceNumber, type Customer, type ProductListItem, invoiceListData, type Invoice, type SalesOrder } from '@/app/lib/data';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
-import { useFirestore, useCollection, useMemoFirebase } from '@/firebase';
-import { collection } from 'firebase/firestore';
+import { useFirestore, useCollection, useMemoFirebase, useUser } from '@/firebase';
+import { collection, query, where } from 'firebase/firestore';
 
 type InvoiceItem = {
     id: number;
@@ -73,6 +73,7 @@ export default function AddInvoicePage() {
   const searchParams = useSearchParams();
   const { toast } = useToast();
   const firestore = useFirestore();
+  const { user } = useUser();
 
   const invoiceNumberId = searchParams.get('invoiceNumberId');
   const editInvoiceId = searchParams.get('editInvoiceId');
@@ -111,9 +112,9 @@ export default function AddInvoicePage() {
   const [productPopoverOpen, setProductPopoverOpen] = useState<number | null>(null);
 
   const customersCollection = useMemoFirebase(() => {
-    if (!firestore) return null;
-    return collection(firestore, 'customers');
-  }, [firestore]);
+    if (!firestore || !user) return null;
+    return query(collection(firestore, 'customers'), where('ownerId', '==', user.uid));
+  }, [firestore, user]);
   const { data: customerListData } = useCollection<Customer>(customersCollection);
 
   const productsCollection = useMemoFirebase(() => {
@@ -123,9 +124,9 @@ export default function AddInvoicePage() {
   const { data: productListData } = useCollection<ProductListItem>(productsCollection);
 
   const salesOrdersCollection = useMemoFirebase(() => {
-    if (!firestore) return null;
-    return collection(firestore, 'salesOrders');
-  }, [firestore]);
+    if (!firestore || !user) return null;
+    return query(collection(firestore, 'salesOrders'), where('ownerId', '==', user.uid));
+  }, [firestore, user]);
   const { data: salesOrderListData } = useCollection<SalesOrder>(salesOrdersCollection);
 
   const uniqueSalesOrders = useMemo(() => {
