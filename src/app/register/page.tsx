@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -7,15 +8,17 @@ import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Checkbox } from '@/components/ui/checkbox';
 import { Eye, EyeOff, Mountain } from 'lucide-react';
 import { useAuth, useUser } from '@/firebase';
 import {
+  createUserWithEmailAndPassword,
+  updateProfile,
   GoogleAuthProvider,
   signInWithPopup,
-  signInWithEmailAndPassword,
 } from 'firebase/auth';
 import { useToast } from '@/hooks/use-toast';
+import { doc, setDoc } from 'firebase/firestore';
+import { useFirestore } from '@/firebase';
 
 function GoogleIcon(props: React.SVGProps<SVGSVGElement>) {
   return (
@@ -37,13 +40,15 @@ function GoogleIcon(props: React.SVGProps<SVGSVGElement>) {
   );
 }
 
-export default function LoginPage() {
+export default function RegisterPage() {
   const [showPassword, setShowPassword] = useState(false);
+  const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
 
   const auth = useAuth();
+  const firestore = useFirestore();
   const { user, isUserLoading } = useUser();
   const router = useRouter();
   const { toast } = useToast();
@@ -54,29 +59,51 @@ export default function LoginPage() {
     }
   }, [user, isUserLoading, router]);
 
-  const handleLogin = async (e: React.FormEvent) => {
+  const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
     try {
-      await signInWithEmailAndPassword(auth, email, password);
+      const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+      await updateProfile(userCredential.user, { displayName: name });
+      
+      // Create user document in Firestore with 'user' role
+      const userDocRef = doc(firestore, 'users', userCredential.user.uid);
+      await setDoc(userDocRef, {
+        uid: userCredential.user.uid,
+        email: userCredential.user.email,
+        displayName: name,
+        role: 'user' // Default role for new users
+      });
+      
       router.push('/dashboard');
     } catch (error: any) {
       toast({
         variant: 'destructive',
-        title: 'Login Gagal',
-        description: 'Email atau password salah. Silakan coba lagi.',
+        title: 'Registrasi Gagal',
+        description: error.message || 'Terjadi kesalahan. Silakan coba lagi.',
       });
-      console.error('Login error:', error);
+      console.error('Registration error:', error);
     } finally {
       setIsLoading(false);
     }
   };
-
+  
   const handleGoogleLogin = async () => {
     setIsLoading(true);
     const provider = new GoogleAuthProvider();
     try {
-      await signInWithPopup(auth, provider);
+      const result = await signInWithPopup(auth, provider);
+      const user = result.user;
+      
+      // Create user document in Firestore with 'user' role
+      const userDocRef = doc(firestore, 'users', user.uid);
+      await setDoc(userDocRef, {
+        uid: user.uid,
+        email: user.email,
+        displayName: user.displayName,
+        role: 'user' // Default role for new users
+      }, { merge: true }); // Use merge to avoid overwriting existing data if user logs in again
+
       router.push('/dashboard');
     } catch (error: any) {
       toast({
@@ -90,7 +117,7 @@ export default function LoginPage() {
       setIsLoading(false);
     }
   };
-  
+
   if (isUserLoading || (!isUserLoading && user)) {
     return (
       <div className="flex h-screen w-full items-center justify-center">
@@ -101,6 +128,16 @@ export default function LoginPage() {
 
   return (
     <div className="w-full lg:grid lg:min-h-screen lg:grid-cols-2 xl:min-h-screen">
+      <div className="hidden bg-muted lg:block">
+        <Image
+          src="https://picsum.photos/seed/register/1200/1800"
+          alt="Image"
+          width="1920"
+          height="1080"
+          className="h-full w-full object-cover dark:brightness-[0.2] dark:grayscale"
+          data-ai-hint="office building modern"
+        />
+      </div>
       <div className="flex items-center justify-center py-12">
         <div className="mx-auto grid w-[350px] gap-6">
           <div className="grid gap-2">
@@ -108,12 +145,23 @@ export default function LoginPage() {
               <Mountain className="h-6 w-6 text-primary" />
               <span className="text-xl font-semibold">Acme Inc</span>
             </div>
-            <h1 className="text-3xl font-bold">Welcome back !</h1>
+            <h1 className="text-3xl font-bold">Create an Account</h1>
             <p className="text-balance text-muted-foreground">
-              Enter to get unlimited access to data & information.
+              Enter your information to get started.
             </p>
           </div>
-          <form onSubmit={handleLogin} className="grid gap-4">
+          <form onSubmit={handleRegister} className="grid gap-4">
+            <div className="grid gap-2">
+              <Label htmlFor="name">Name</Label>
+              <Input
+                id="name"
+                type="text"
+                placeholder="Enter your full name"
+                required
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+              />
+            </div>
             <div className="grid gap-2">
               <Label htmlFor="email">Email</Label>
               <Input
@@ -149,22 +197,8 @@ export default function LoginPage() {
                 )}
               </button>
             </div>
-            <div className="flex items-center justify-between">
-              <div className="flex items-center space-x-2">
-                <Checkbox id="remember-me" />
-                <Label
-                  htmlFor="remember-me"
-                  className="text-sm font-medium"
-                >
-                  Remember me
-                </Label>
-              </div>
-              <Link href="#" className="text-sm text-primary hover:underline">
-                Forgot your password?
-              </Link>
-            </div>
             <Button type="submit" className="w-full" disabled={isLoading}>
-              {isLoading ? 'Logging in...' : 'Log In'}
+              {isLoading ? 'Creating Account...' : 'Create Account'}
             </Button>
           </form>
           <div className="relative my-4">
@@ -173,7 +207,7 @@ export default function LoginPage() {
             </div>
             <div className="relative flex justify-center text-xs uppercase">
               <span className="bg-background px-2 text-muted-foreground">
-                Or, Login with
+                Or, Sign up with
               </span>
             </div>
           </div>
@@ -184,25 +218,15 @@ export default function LoginPage() {
             disabled={isLoading}
           >
             <GoogleIcon className="mr-2 h-4 w-4" />
-            Sign up with google
+            Sign up with Google
           </Button>
           <div className="mt-4 text-center text-sm">
-            Don&apos;t have an account?{' '}
-            <Link href="/register" className="underline text-primary">
-              Register here
+            Already have an account?{' '}
+            <Link href="/login" className="underline text-primary">
+              Log in here
             </Link>
           </div>
         </div>
-      </div>
-      <div className="hidden bg-muted lg:block">
-        <Image
-          src="https://picsum.photos/seed/login/1200/1800"
-          alt="Image"
-          width="1920"
-          height="1080"
-          className="h-full w-full object-cover dark:brightness-[0.2] dark:grayscale"
-          data-ai-hint="geometric abstract"
-        />
       </div>
     </div>
   );
