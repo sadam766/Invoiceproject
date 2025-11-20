@@ -83,36 +83,27 @@ export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceDa
   },[salesOrderListData]);
 
   const generateNextNumber = (type: 'sar' | 'kw') => {
+    if (!allInvoiceNumbers) return;
     const currentYear = new Date().getFullYear();
     let nextNum = 1;
-  
-    if (allInvoiceNumbers) {
-        const relevantNumbers = allInvoiceNumbers
-            .filter(inv => {
-                const id = inv.id || '';
-                if (type === 'sar') {
-                    return id.startsWith('SAR/') || id.startsWith('SAR_');
-                }
-                return id.startsWith('KW/');
-            })
-            .map(inv => {
-                const id = inv.id || '';
-                if (type === 'sar') {
-                     // Regex to split by the first occurrence of / or _
-                    const parts = id.split(/[/_](.+)/);
-                    if (parts.length > 1) return parseInt(parts[1], 10);
-                } else { // type === 'kw'
-                    // Regex to find KW/{numbers}/...
-                    const match = id.match(/^KW\/(\d+)\//);
-                    if (match && match[1]) return parseInt(match[1], 10);
-                }
-                return 0;
-            })
-            .filter(num => !isNaN(num) && num > 0);
-  
-        if (relevantNumbers.length > 0) {
-            nextNum = Math.max(...relevantNumbers) + 1;
+
+    const relevantNumbers = allInvoiceNumbers
+      .map(inv => {
+        const id = inv.id || '';
+        let match;
+        if (type === 'sar') {
+          match = id.match(/^(?:SAR\/|SAR_)([0-9]+)/);
+          if (match && match[1]) return parseInt(match[1], 10);
+        } else { // kw
+          match = id.match(/^KW\/([0-9]+)\//);
+          if (match && match[1]) return parseInt(match[1], 10);
         }
+        return 0;
+      })
+      .filter(num => !isNaN(num) && num > 0);
+
+    if (relevantNumbers.length > 0) {
+      nextNum = Math.max(...relevantNumbers) + 1;
     }
   
     if (type === 'sar') {
@@ -126,17 +117,10 @@ export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceDa
     }
   };
   
+  // This effect runs only when the dialog opens.
   useEffect(() => {
     if (!isOpen) {
-      // Reset form state when dialog is closed
-      setDate(new Date());
-      setInvoiceType('kw');
-      setIsAutoNumber(true);
-      setSalesOrder('');
-      setCustomer('');
-      setAmount(0);
-      setMainNumber(''); // Clear main number
-      return;
+      return; // Do nothing if dialog is closed
     }
 
     if (invoiceData) {
@@ -144,25 +128,31 @@ export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceDa
       const type = invoiceData.id.startsWith('SAR/') || invoiceData.id.startsWith('SAR_') ? 'sar' : 'kw';
       
       let extractedMainNumber = '';
+      let extractedPrefix = '';
+      let extractedSuffix = '';
       
       if (type === 'sar') {
-          const parts = invoiceData.id.split(/[/_](.+)/);
-          extractedMainNumber = parts.length > 1 ? parts[1] : '';
-          setPrefix('SAR/');
-          setSuffix('');
-      } else if (type === 'kw' && invoiceData.id.includes('/')) {
-          const kwParts = invoiceData.id.split('/');
-          if (kwParts.length >= 2) {
-            extractedMainNumber = kwParts[1];
-            setPrefix(`KW/`);
-            setSuffix(`/${kwParts.slice(2).join('/')}`);
-          }
+        const match = invoiceData.id.match(/^(SAR\/|SAR_)(.+)/);
+        if (match) {
+          extractedPrefix = match[1];
+          extractedMainNumber = match[2];
+        }
+      } else { // type === 'kw'
+        const match = invoiceData.id.match(/^(KW\/)(.*?)(?=\/KEU|$)(.*)/);
+        if (match) {
+          extractedPrefix = match[1];
+          extractedMainNumber = match[2];
+          extractedSuffix = match[3];
+        }
       }
-      
+
       setInvoiceType(type);
+      setPrefix(extractedPrefix);
       setMainNumber(extractedMainNumber);
-      setIsAutoNumber(false); // Always start in manual for editing
-      
+      setSuffix(extractedSuffix);
+      setIsAutoNumber(false); // ALWAYS start in manual for editing
+
+      // Populate other fields
       setCustomer(invoiceData.customer);
       setSalesOrder(invoiceData.salesOrder);
       if (invoiceData.date) {
@@ -179,8 +169,10 @@ export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceDa
       setAmount(formatNumberWithCommas(invoiceData.amount));
     } else {
       // ===== ADD NEW MODE =====
-      setIsAutoNumber(true); // Default to auto number
-      generateNextNumber(invoiceType); // Generate number based on default type 'kw'
+      setIsAutoNumber(true);
+      const initialType = 'kw';
+      setInvoiceType(initialType);
+      generateNextNumber(initialType);
       
       // Reset other fields for a new entry
       setCustomer('');
@@ -188,15 +180,29 @@ export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceDa
       setDate(new Date());
       setAmount(0);
     }
-  }, [invoiceData, isOpen]);
-  
-  // This effect runs when user toggles invoice type in ADD mode or toggles auto-number
-  useEffect(() => {
-    if (isOpen && !invoiceData && isAutoNumber) {
-      generateNextNumber(invoiceType);
-    }
-  }, [invoiceType, isAutoNumber, isOpen, invoiceData, allInvoiceNumbers]); // Rerun on dependencies change
+  }, [isOpen, invoiceData, allInvoiceNumbers]); // Dependency on allInvoiceNumbers ensures it uses fresh data
 
+  // This effect updates the full invoice number whenever its parts change
+  useEffect(() => {
+    setFullInvoiceNumber(`${prefix}${mainNumber}${suffix}`);
+  }, [prefix, mainNumber, suffix]);
+
+  // Handle manual change of invoice type in ADD mode
+  const handleInvoiceTypeChange = (newType: 'sar' | 'kw') => {
+    if (invoiceData) return; // Don't allow type change in edit mode
+    setInvoiceType(newType);
+    if (isAutoNumber) {
+        generateNextNumber(newType);
+    }
+  }
+
+  // Handle toggling of the auto-number checkbox
+  const handleAutoNumberToggle = (checked: boolean) => {
+    setIsAutoNumber(checked);
+    if (checked && !invoiceData) { // Only regenerate number in add mode
+        generateNextNumber(invoiceType);
+    }
+  }
 
   const handleSalesOrderSelect = (currentValue: string) => {
     const newSalesOrder = currentValue === salesOrder ? '' : currentValue;
@@ -225,17 +231,6 @@ export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceDa
     setSoPopoverOpen(false);
   };
   
-
-  useEffect(() => {
-    setFullInvoiceNumber(`${prefix}${mainNumber}${suffix}`);
-  }, [prefix, mainNumber, suffix]);
-
-
-  const handleMainNumberChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setIsAutoNumber(false);
-    setMainNumber(e.target.value);
-  }
-  
   const handleAmountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
     const parsedValue = parseFormattedNumber(value);
@@ -254,7 +249,11 @@ export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceDa
         return;
     }
     const finalInvoiceNumber = `${prefix}${mainNumber}${suffix}`;
-    if (!invoiceData && allInvoiceNumbers?.some(inv => inv.id === finalInvoiceNumber)) {
+    // In edit mode, invoiceData.id will be the original ID. Check if it's different from the new one.
+    const isChangingId = invoiceData && invoiceData.id !== finalInvoiceNumber;
+    
+    // Check for duplicates only if it's a new invoice OR if the ID is being changed in edit mode.
+    if ((!invoiceData || isChangingId) && allInvoiceNumbers?.some(inv => inv.id === finalInvoiceNumber)) {
       toast({
         variant: "destructive",
         title: "Duplicate Invoice Number",
@@ -296,10 +295,7 @@ export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceDa
                  <div className="flex w-full rounded-md border border-input">
                     <Button
                         variant={invoiceType === 'sar' ? 'default' : 'ghost'}
-                        onClick={() => {
-                          if (invoiceData) return; // Don't change type in edit mode
-                          setInvoiceType('sar')
-                        }}
+                        onClick={() => handleInvoiceTypeChange('sar')}
                         className="flex-1 rounded-r-none"
                         disabled={!!invoiceData}
                     >
@@ -307,10 +303,7 @@ export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceDa
                     </Button>
                     <Button
                         variant={invoiceType === 'kw' ? 'default' : 'ghost'}
-                        onClick={() => {
-                           if (invoiceData) return; // Don't change type in edit mode
-                           setInvoiceType('kw')
-                        }}
+                        onClick={() => handleInvoiceTypeChange('kw')}
                         className="flex-1 rounded-l-none"
                         disabled={!!invoiceData}
                     >
@@ -323,12 +316,12 @@ export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceDa
            <div className="space-y-2">
             <Label>Nomor Faktur</Label>
             <div className="flex items-center space-x-2">
-              <Checkbox id="auto-number" checked={isAutoNumber} onCheckedChange={(checked) => setIsAutoNumber(!!checked)} />
+              <Checkbox id="auto-number" checked={isAutoNumber} onCheckedChange={(checked) => handleAutoNumberToggle(!!checked)} />
               <Label htmlFor="auto-number" className="font-normal">Nomor Otomatis</Label>
             </div>
             <div className="grid grid-cols-[auto_1fr_auto] items-center gap-2">
               <Input value={prefix} className="bg-muted text-right" readOnly tabIndex={-1} />
-              <Input value={mainNumber} onChange={handleMainNumberChange} />
+              <Input value={mainNumber} onChange={(e) => setMainNumber(e.target.value)} disabled={isAutoNumber} />
               {suffix && <Input value={suffix} className="bg-muted" readOnly tabIndex={-1} />}
             </div>
             <Input id="full-invoice-number" value={fullInvoiceNumber} disabled className="bg-muted font-semibold text-center" />
