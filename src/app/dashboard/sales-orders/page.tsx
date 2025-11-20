@@ -1,4 +1,3 @@
-
 'use client';
 import { useState, useMemo, useRef } from 'react';
 import {
@@ -28,11 +27,12 @@ import {
   import { AddSalesOrderDialog } from './_components/add-sales-order-dialog';
   import { useToast } from '@/hooks/use-toast';
   import { exportToExcel, importFromExcel, generateExcelTemplate } from '@/lib/utils';
-  import { useFirestore, useCollection, useMemoFirebase } from '@/firebase';
-  import { collection, doc, setDoc, deleteDoc, writeBatch } from 'firebase/firestore';
+  import { useFirestore, useUser, useCollection, useMemoFirebase } from '@/firebase';
+  import { collection, doc, setDoc, deleteDoc, writeBatch, query, where } from 'firebase/firestore';
   
   export default function SalesOrderListPage() {
     const firestore = useFirestore();
+    const { user } = useUser();
     const [editingOrder, setEditingOrder] = useState<SalesOrder | undefined>(undefined);
     const [isDialogOpen, setIsDialogOpen] = useState(false);
     const [searchQuery, setSearchQuery] = useState('');
@@ -41,9 +41,9 @@ import {
     const { toast } = useToast();
 
     const salesOrdersCollection = useMemoFirebase(() => {
-        if (!firestore) return null;
-        return collection(firestore, 'salesOrders');
-    }, [firestore]);
+        if (!firestore || !user) return null;
+        return query(collection(firestore, 'salesOrders'), where('ownerId', '==', user.uid));
+    }, [firestore, user]);
 
     const { data: orders, isLoading } = useCollection<SalesOrder>(salesOrdersCollection);
 
@@ -81,14 +81,14 @@ import {
     };
 
     const handleSave = (order: SalesOrder) => {
-        if (!firestore) return;
+        if (!firestore || !user) return;
         let orderId = order.id || editingOrder?.id;
         if (!orderId) {
             orderId = doc(collection(firestore, 'salesOrders')).id;
         }
 
         const docRef = doc(firestore, 'salesOrders', orderId);
-        setDoc(docRef, { ...order, id: orderId }, { merge: true });
+        setDoc(docRef, { ...order, id: orderId, ownerId: user.uid }, { merge: true });
         
         toast({
             title: editingOrder ? 'Sales Order Updated' : 'Sales Order Added',
@@ -124,14 +124,14 @@ import {
 
     const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
         const file = event.target.files?.[0];
-        if (file && firestore) {
+        if (file && firestore && user) {
             try {
-                const data = await importFromExcel(file) as Omit<SalesOrder, 'id'>[];
+                const data = await importFromExcel(file) as Omit<SalesOrder, 'id' | 'ownerId'>[];
                 const batch = writeBatch(firestore);
 
                 data.forEach(orderData => {
                     const newDocRef = doc(collection(firestore, 'salesOrders'));
-                    batch.set(newDocRef, { ...orderData, id: newDocRef.id });
+                    batch.set(newDocRef, { ...orderData, id: newDocRef.id, ownerId: user.uid });
                 });
 
                 await batch.commit();

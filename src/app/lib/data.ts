@@ -1,4 +1,3 @@
-
 import type { LucideIcon } from 'lucide-react';
 import { DollarSign, Users, Package, Activity, Zap } from 'lucide-react';
 import { PlaceHolderImages, type ImagePlaceholder } from '@/lib/placeholder-images';
@@ -124,7 +123,7 @@ export function getSalesMonitoringData(salesOrders: SalesOrder[]): SalesMonitori
         if (!acc[order.soNumber]) {
             acc[order.soNumber] = {
                 soNumber: order.soNumber,
-                customer: 'N/A', // Customer data is removed from sales order
+                customer: order.customer,
                 date: new Date().toLocaleDateString('en-CA'), // Placeholder date
                 amount: 0,
             };
@@ -167,6 +166,7 @@ export type Invoice = {
   amount: number;
   status: 'paid' | 'unpaid' | 'sent' | 'draft';
   spdNumber: string;
+  ownerId?: string;
 };
 
 export let invoiceListData: Invoice[] = [
@@ -198,6 +198,7 @@ export type InvoiceNumber = {
   salesOrder: string;
   date: string;
   amount: number;
+  ownerId?: string;
 };
 
 export let invoiceNumberData: InvoiceNumber[] = [
@@ -244,6 +245,7 @@ export type ProductListItem = {
     quantity: number;
     unit: string;
     price: number;
+    ownerId?: string;
 };
 
 export type SalesOrder = {
@@ -254,6 +256,8 @@ export type SalesOrder = {
     quantity: number;
     unit: string;
     price: number;
+    ownerId?: string;
+    customer: string;
 };
 
 export type Customer = {
@@ -261,6 +265,7 @@ export type Customer = {
   name: string;
   address: string;
   spdAddress: string;
+  ownerId?: string;
 };
 
 export type SalesListItem = {
@@ -271,6 +276,7 @@ export type SalesListItem = {
   amount: number;
   status: 'Paid' | 'Unpaid';
   paidDate?: string;
+  ownerId?: string;
 };
 
 export const salesListData: SalesListItem[] = [
@@ -326,5 +332,3 @@ export let spdData: SpdData[] = [
         suratJalan: '-',
     }
 ];
-
-    

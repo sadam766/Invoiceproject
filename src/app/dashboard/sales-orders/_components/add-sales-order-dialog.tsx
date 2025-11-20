@@ -1,4 +1,3 @@
-
 'use client';
 import { Button } from '@/components/ui/button';
 import {
@@ -35,6 +34,7 @@ type AddSalesOrderDialogProps = {
 export function AddSalesOrderDialog({ isOpen, onOpenChange, onSave, orderData, onAddClick }: AddSalesOrderDialogProps) {
   const [soNumber, setSoNumber] = useState('');
   const [productName, setProductName] = useState('');
+  const [customer, setCustomer] = useState('');
   const [category, setCategory] = useState('');
   const [quantity, setQuantity] = useState<number|string>(0);
   const [unit, setUnit] = useState('');
@@ -48,6 +48,7 @@ export function AddSalesOrderDialog({ isOpen, onOpenChange, onSave, orderData, o
       setQuantity(formatNumberWithCommas(orderData.quantity));
       setUnit(orderData.unit);
       setPrice(formatNumberWithCommas(orderData.price));
+      setCustomer(orderData.customer);
     } else if (!isOpen) {
       setSoNumber('');
       setProductName('');
@@ -55,6 +56,7 @@ export function AddSalesOrderDialog({ isOpen, onOpenChange, onSave, orderData, o
       setQuantity(0);
       setUnit('');
       setPrice(0);
+      setCustomer('');
     }
   }, [orderData, isOpen]);
 
@@ -74,7 +76,8 @@ export function AddSalesOrderDialog({ isOpen, onOpenChange, onSave, orderData, o
         category, 
         quantity: typeof quantity === 'string' ? parseFormattedNumber(quantity) : quantity, 
         unit, 
-        price: typeof price === 'string' ? parseFormattedNumber(price) : price 
+        price: typeof price === 'string' ? parseFormattedNumber(price) : price,
+        customer,
     });
     onOpenChange(false);
   };
@@ -102,6 +105,12 @@ export function AddSalesOrderDialog({ isOpen, onOpenChange, onSave, orderData, o
               SO Number
             </Label>
             <Input id="so-number" value={soNumber} onChange={(e) => setSoNumber(e.target.value)} className="col-span-3" />
+          </div>
+          <div className="grid grid-cols-4 items-center gap-4">
+            <Label htmlFor="customer" className="text-right">
+              Customer
+            </Label>
+            <Input id="customer" value={customer} onChange={(e) => setCustomer(e.target.value)} className="col-span-3" />
           </div>
           <div className="grid grid-cols-4 items-center gap-4">
             <Label htmlFor="product-name" className="text-right">

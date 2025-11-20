@@ -1,4 +1,3 @@
-
 'use client';
 import { useState, useMemo, useRef } from 'react';
 import {
@@ -28,11 +27,12 @@ import {
   import { DeleteConfirmationDialog } from '@/app/components/delete-confirmation-dialog';
   import { useToast } from '@/hooks/use-toast';
   import { exportToExcel, importFromExcel, generateExcelTemplate } from '@/lib/utils';
-  import { useFirestore, useCollection, useMemoFirebase, errorEmitter, FirestorePermissionError } from '@/firebase';
+  import { useFirestore, useUser, useCollection, useMemoFirebase, errorEmitter, FirestorePermissionError } from '@/firebase';
   import { collection, doc, setDoc, deleteDoc, writeBatch } from 'firebase/firestore';
   
   export default function ProductListPage() {
     const firestore = useFirestore();
+    const { user } = useUser();
     const [editingProduct, setEditingProduct] = useState<ProductListItem | undefined>(undefined);
     const [isDialogOpen, setIsDialogOpen] = useState(false);
     const [searchQuery, setSearchQuery] = useState('');
@@ -90,17 +90,16 @@ import {
     };
 
     const handleSave = (product: Omit<ProductListItem, 'id'> & { id?: string }) => {
-        if (!firestore) return;
+        if (!firestore || !user) return;
 
         let productId = product.id;
         const isNewProduct = !productId;
         if (isNewProduct) {
-            // Create a new ID for a new product if it's not being edited
             productId = doc(collection(firestore, 'products')).id;
         }
 
         const docRef = doc(firestore, 'products', productId!);
-        const dataToSave = { ...product, id: productId };
+        const dataToSave = { ...product, id: productId, ownerId: user.uid };
 
         setDoc(docRef, dataToSave, { merge: !isNewProduct })
             .then(() => {
@@ -147,14 +146,14 @@ import {
 
     const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
         const file = event.target.files?.[0];
-        if (file && firestore) {
+        if (file && firestore && user) {
             try {
-                const data = await importFromExcel(file) as Omit<ProductListItem, 'id'>[];
+                const data = await importFromExcel(file) as Omit<ProductListItem, 'id'|'ownerId'>[];
                 const batch = writeBatch(firestore);
 
                 data.forEach(productData => {
                     const newDocRef = doc(collection(firestore, 'products'));
-                    batch.set(newDocRef, { ...productData, id: newDocRef.id });
+                    batch.set(newDocRef, { ...productData, id: newDocRef.id, ownerId: user.uid });
                 });
 
                 await batch.commit();

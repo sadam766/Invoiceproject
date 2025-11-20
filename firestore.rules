@@ -1,114 +1,108 @@
 /**
  * @file Firestore Security Rules
  * @description This ruleset enforces a strict user-ownership model for customer and sale data,
- *              and restricts product creation/modification to admin users.
+ *              and restricts product management to admin users. It also secures sales orders
+ *              and invoice numbers under user ownership.
  *
  * Data Structure:
- * - /products/{productId}: Stores product information, write-protected for admins only.
- * - /customers/{customerId}: Stores customer data, accessible only by the customer themselves.
+ * - /products/{productId}: Stores product information, readable by any user, writable only by admins.
+ * - /customers/{customerId}: Stores customer data, accessible only by the customer who created it.
  * - /sales/{saleId}: Stores sale data, accessible only by the customer associated with the sale.
- * - /roles_admin/{uid}: Indicates admin privileges; presence of a document grants admin rights.
+ * - /salesOrders/{orderId}: Stores sales order items, accessible only by the user who created them.
+ * - /invoiceNumbers/{invoiceNumberId}: Stores invoice numbers, accessible only by the user who created them.
+ * - /users/{uid}: Stores user profile and role information.
  */
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    /**
-     * @description Allows authenticated users to manage product information.
-     * @path /products/{productId}
-     * @allow (get, list): Any authenticated user can read product information.
-     * @allow (create, update, delete): Any signed-in user can create, update, or delete products.
-     * @principle Enforces role-based access control for product management.
-     */
-    match /products/{productId} {
-      allow read, write: if isSignedIn();
-    }
-
-    /**
-     * @description Allows a customer to read and write their own customer data.
-     * @path /customers/{customerId}
-     * @allow (get, create, update, delete, list): Only the customer with matching UID can perform these operations.
-     * @deny (get, create, update, delete, list): Other users cannot access this data.
-     * @principle Enforces document ownership for customer data.
-     */
-    match /customers/{customerId} {
-      allow get: if isOwner(customerId);
-      allow list: if isSignedIn();
-      allow create: if isSignedIn() && request.resource.data.id == request.auth.uid;
-      allow update: if isOwner(customerId) && resource != null && request.resource.data.id == resource.data.id;
-      allow delete: if isExistingOwner(customerId);
-    }
-
-    /**
-     * @description Allows authenticated users to manage sales order information.
-     * @path /salesOrders/{orderId}
-     * @allow read, write: Any signed-in user can perform these operations.
-     * @principle Allows broad access for development purposes.
-     */
-    match /salesOrders/{orderId} {
-        allow read, write: if isSignedIn();
-    }
-
-    /**
-     * @description Allows authenticated users to manage invoice number information.
-     * @path /invoiceNumbers/{invoiceNumberId}
-     * @allow read, write: Any signed-in user can perform these operations.
-     * @principle Allows broad access for development purposes.
-     */
-    match /invoiceNumbers/{invoiceNumberId} {
-        allow read, write: if isSignedIn();
-    }
-
-    /**
-     * @description Allows a customer to read and write their own sale data, verified by customerId in the document.
-     * @path /sales/{saleId}
-     * @allow (get, create, update, delete, list): Only the customer associated with the sale can perform these operations.
-     * @deny (get, create, update, delete, list): Other users cannot access this data.
-     * @principle Enforces document ownership based on the `customerId` field in the sale document.
-     */
-    match /sales/{saleId} {
-      allow get, list: if isCustomerForSale(resource.data.customerId);
-      allow create: if isCustomerForSale(request.resource.data.customerId) && request.resource.data.customerId == request.auth.uid;
-      allow update: if isCustomerForSale(resource.data.customerId) && resource != null && request.resource.data.customerId == resource.data.customerId;
-      allow delete: if isExistingCustomerForSale(resource.data.customerId);
-    }
-
-    /**
-     * @description Determines admin privileges based on the existence of a document with the user's UID.
-     * @path /roles_admin/{uid}
-     * @allow (get, list): Publicly readable to determine admin status.
-     * @allow (create): Only the user themselves can create this document (to self-nominate, requires additional backend logic to approve).
-     * @deny (create, update, delete):  Updates and deletes are disallowed via rules.
-     * @principle Grants admin privileges based on document existence.
-     */
-    match /roles_admin/{uid} {
-      allow get, list: if true;
-      allow create: if isOwner(uid);
-      allow update, delete: if false;
-    }
-
+    // Helper functions
     function isSignedIn() {
       return request.auth != null;
     }
 
     function isOwner(userId) {
-      return isSignedIn() && request.auth.uid == userId;
+      return request.auth.uid == userId;
     }
 
-    function isCustomerForSale(customerId) {
-      return isSignedIn() && request.auth.uid == customerId;
-    }
-
-    function isExistingOwner(userId) {
-        return isOwner(userId) && resource != null;
-    }
-
-    function isExistingCustomerForSale(customerId) {
-        return isCustomerForSale(customerId) && resource != null;
+    function getRole() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role;
     }
 
     function isAdmin() {
-      return exists(/databases/$(database)/documents/roles_admin/$(request.auth.uid));
+      return getRole() == 'admin';
+    }
+
+    /**
+     * @description Public user data and roles.
+     * @path /users/{userId}
+     * @allow (read): Any signed-in user can read public user profiles.
+     * @allow (write): Users can only create/update their own profile.
+     * @principle User profile management.
+     */
+    match /users/{userId} {
+      allow read: if isSignedIn();
+      allow write: if isOwner(userId);
+    }
+
+    /**
+     * @description Products can be read by anyone, but only managed by admins.
+     * @path /products/{productId}
+     * @allow (read): Any authenticated user can read product information.
+     * @allow (write): Only users with the 'admin' role can manage products.
+     * @principle Enforces role-based access control for product management.
+     */
+    match /products/{productId} {
+      allow read: if isSignedIn();
+      allow write: if isSignedIn() && isAdmin();
+    }
+
+    /**
+     * @description Enforces ownership for customer data.
+     * @path /customers/{customerId}
+     * @allow (read, write): Only the user who created the customer document can access it.
+     *                       The query from the client MUST include `where('ownerId', '==', request.auth.uid)`.
+     * @principle Enforces strict data ownership.
+     */
+    match /customers/{customerId} {
+      allow read, write: if isSignedIn() && request.auth.uid == resource.data.ownerId;
+      allow create: if isSignedIn() && request.resource.data.ownerId == request.auth.uid;
+    }
+
+    /**
+     * @description Enforces ownership for sales order data.
+     * @path /salesOrders/{orderId}
+     * @allow (read, write): Only the user who created the sales order can access it.
+     *                       The query from the client MUST include `where('ownerId', '==', request.auth.uid)`.
+     * @principle Enforces strict data ownership.
+     */
+    match /salesOrders/{orderId} {
+       allow read, write: if isSignedIn() && request.auth.uid == resource.data.ownerId;
+       allow create: if isSignedIn() && request.resource.data.ownerId == request.auth.uid;
+    }
+
+    /**
+     * @description Enforces ownership for invoice number data.
+     * @path /invoiceNumbers/{invoiceNumberId}
+     * @allow (read, write): Only the user who created the invoice number can access it.
+     *                       The query from the client MUST include `where('ownerId', '==', request.auth.uid)`.
+     * @principle Enforces strict data ownership.
+     */
+    match /invoiceNumbers/{invoiceNumberId} {
+        allow read, write: if isSignedIn() && request.auth.uid == resource.data.ownerId;
+        allow create: if isSignedIn() && request.resource.data.ownerId == request.auth.uid;
+    }
+
+    /**
+     * @description Enforces ownership for sales data.
+     * @path /sales/{saleId}
+     * @allow (read, write): Only the user who created the sale document can access it.
+     *                       The query from the client MUST include `where('ownerId', '==', request.auth.uid)`.
+     * @principle Enforces strict data ownership based on an `ownerId` field.
+     */
+    match /sales/{saleId} {
+      allow read, write: if isSignedIn() && request.auth.uid == resource.data.ownerId;
+      allow create: if isSignedIn() && request.resource.data.ownerId == request.auth.uid;
     }
   }
 }

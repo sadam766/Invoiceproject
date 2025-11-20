@@ -19,9 +19,9 @@ import {
   import { AddCustomerDialog } from './_components/add-customer-dialog';
   import { DeleteConfirmationDialog } from '@/app/components/delete-confirmation-dialog';
   import { useToast } from '@/hooks/use-toast';
-  import { exportToExcel, importFromExcel, generateExcelTemplate } from '@/lib/utils';
+  import { exportToExcel, generateExcelTemplate } from '@/lib/utils';
   import { useFirestore, useUser, useCollection, useMemoFirebase, errorEmitter, FirestorePermissionError } from '@/firebase';
-  import { collection, doc, setDoc, deleteDoc, writeBatch } from 'firebase/firestore';
+  import { collection, doc, setDoc, deleteDoc, writeBatch, query, where } from 'firebase/firestore';
 
   export default function CustomerListPage() {
     const firestore = useFirestore();
@@ -33,9 +33,9 @@ import {
     const { toast } = useToast();
 
     const customersCollection = useMemoFirebase(() => {
-        if (!firestore) return null;
-        return collection(firestore, 'customers');
-    }, [firestore]);
+        if (!firestore || !user) return null;
+        return query(collection(firestore, 'customers'), where('ownerId', '==', user.uid));
+    }, [firestore, user]);
 
     const { data: customers, isLoading } = useCollection<Customer>(customersCollection);
 
@@ -77,13 +77,12 @@ import {
             });
     };
 
-    const handleSave = (customer: Omit<Customer, 'id'> & { id?: string }) => {
+    const handleSave = (customer: Omit<Customer, 'id' | 'ownerId'> & { id?: string }) => {
         if (!firestore || !user) return;
         
         const isNewCustomer = !customer.id && !editingCustomer?.id;
         let customerId = customer.id || editingCustomer?.id;
         if (isNewCustomer) {
-            // For new customers, their ID should be auto-generated.
             customerId = doc(collection(firestore, 'customers')).id;
         }
 
@@ -99,7 +98,7 @@ import {
 
 
         const docRef = doc(firestore, 'customers', customerId);
-        const dataToSave = { ...customer, id: customerId };
+        const dataToSave = { ...customer, id: customerId, ownerId: user.uid };
         
         setDoc(docRef, dataToSave, { merge: !isNewCustomer })
             .then(() => {
@@ -146,17 +145,15 @@ import {
 
     const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
         const file = event.target.files?.[0];
-        if (file && firestore) {
+        if (file && firestore && user) {
             try {
-                const data = await importFromExcel(file) as Omit<Customer, 'id'>[];
+                const data = await importFromExcel(file) as Omit<Customer, 'id' | 'ownerId'>[];
                 const batch = writeBatch(firestore);
-                const importedDataForError: any[] = [];
     
                 data.forEach(customerData => {
                     const newDocRef = doc(collection(firestore, 'customers'));
-                    const fullData = { ...customerData, id: newDocRef.id };
+                    const fullData = { ...customerData, id: newDocRef.id, ownerId: user.uid };
                     batch.set(newDocRef, fullData);
-                    importedDataForError.push(fullData);
                 });
     
                 await batch.commit();

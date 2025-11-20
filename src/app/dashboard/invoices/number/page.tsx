@@ -1,4 +1,3 @@
-
 'use client';
 import { useState, useRef, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
@@ -23,13 +22,14 @@ import {
   import { Skeleton } from '@/components/ui/skeleton';
   import { exportToExcel, importFromExcel, generateExcelTemplate } from '@/lib/utils';
   import { useToast } from '@/hooks/use-toast';
-  import { useFirestore, useCollection, useMemoFirebase, errorEmitter, FirestorePermissionError } from '@/firebase';
-  import { collection, doc, setDoc, deleteDoc, writeBatch } from 'firebase/firestore';
+  import { useFirestore, useUser, useCollection, useMemoFirebase, errorEmitter, FirestorePermissionError } from '@/firebase';
+  import { collection, doc, setDoc, deleteDoc, writeBatch, query, where } from 'firebase/firestore';
 
   export default function InvoiceNumberPage() {
     const router = useRouter();
     const { toast } = useToast();
     const firestore = useFirestore();
+    const { user } = useUser();
 
     const fileInputRef = useRef<HTMLInputElement>(null);
     const [searchQuery, setSearchQuery] = useState('');
@@ -38,9 +38,9 @@ import {
     const [isDialogOpen, setIsDialogOpen] = useState(false);
     
     const invoiceNumbersCollection = useMemoFirebase(() => {
-        if (!firestore) return null;
-        return collection(firestore, 'invoiceNumbers');
-    }, [firestore]);
+        if (!firestore || !user) return null;
+        return query(collection(firestore, 'invoiceNumbers'), where('ownerId', '==', user.uid));
+    }, [firestore, user]);
     const { data: invoices, isLoading } = useCollection<InvoiceNumber>(invoiceNumbersCollection);
 
     const filteredInvoices = useMemo(() => {
@@ -88,13 +88,13 @@ import {
             });
     };
 
-    const handleSave = (invoice: Omit<InvoiceNumber, 'id'> & {id: string}) => {
-      if (!firestore) return;
+    const handleSave = (invoice: Omit<InvoiceNumber, 'id' | 'ownerId'> & {id: string}) => {
+      if (!firestore || !user) return;
       const { id, ...invoiceData } = invoice;
       const safeId = id.replace(/\//g, '_');
       
       const docRef = doc(firestore, 'invoiceNumbers', safeId);
-      const dataToSave = { ...invoiceData, id: id };
+      const dataToSave = { ...invoiceData, id: id, ownerId: user.uid };
 
       setDoc(docRef, dataToSave, { merge: true })
         .then(() => {
@@ -143,16 +143,16 @@ import {
     
     const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
       const file = event.target.files?.[0];
-      if (file && firestore) {
+      if (file && firestore && user) {
         try {
-          const data = await importFromExcel(file) as InvoiceNumber[];
+          const data = await importFromExcel(file) as Omit<InvoiceNumber, 'ownerId'>[];
           const batch = writeBatch(firestore);
           
           data.forEach(item => {
               if (item.id) {
                 const safeId = item.id.replace(/\//g, '_');
                 const docRef = doc(firestore, 'invoiceNumbers', safeId);
-                const dataToSave = { ...item, id: item.id };
+                const dataToSave = { ...item, id: item.id, ownerId: user.uid };
                 batch.set(docRef, dataToSave);
               }
           });
