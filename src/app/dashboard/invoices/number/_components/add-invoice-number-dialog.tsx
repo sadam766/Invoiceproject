@@ -74,7 +74,7 @@ export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceDa
   const salesOrdersCollection = useMemoFirebase(() => {
     if (!firestore) return null;
     return collection(firestore, 'salesOrders');
-  },- [firestore]);
+  }, [firestore]);
   const { data: salesOrderListData } = useCollection<SalesOrder>(salesOrdersCollection);
 
   const uniqueSalesOrders = useMemo(() => {
@@ -83,7 +83,7 @@ export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceDa
   },[salesOrderListData]);
 
   const generateNextNumber = (type: 'sar' | 'kw') => {
-    if (!allInvoiceNumbers) return;
+    if (!allInvoiceNumbers) return "1"; // Default if no invoices exist
     const currentYear = new Date().getFullYear();
     let nextNum = 1;
   
@@ -91,41 +91,49 @@ export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceDa
       .map(inv => {
         const id = inv.id || '';
         let match;
+        // Regex to capture number from SAR/xxx or SAR_xxx
         if (type === 'sar') {
-          match = id.match(/^(?:SAR[\/_])([0-9]+)/);
+          match = id.match(/^(?:SAR[_\/])([0-9]+)/);
         } else { // kw
-          match = id.match(/^(?:KW[\/_])(.*?)(?:[\/_]KEU[\/_].*)?$/);
+           // Regex to capture number from KW/xxx/KEU/yyyy or KW_xxx_KEU_yyyy
+          match = id.match(/^(?:KW[_\/])(.*?)(?:[_\/]KEU[_\/].*)?$/);
         }
+
         if (match && match[1]) {
-          return parseInt(match[1], 10);
+          const num = parseInt(match[1], 10);
+          return isNaN(num) ? 0 : num;
         }
         return 0;
       })
-      .filter(num => !isNaN(num) && num > 0);
+      .filter(num => num > 0);
   
     if (relevantNumbers.length > 0) {
       nextNum = Math.max(...relevantNumbers) + 1;
     }
+
+    return nextNum.toString();
+  };
   
+  const setupForAddMode = (type: 'sar' | 'kw') => {
+    const nextNumStr = generateNextNumber(type);
     if (type === 'sar') {
       setPrefix('SAR/');
       setSuffix('');
-      setMainNumber(nextNum.toString());
+      setMainNumber(nextNumStr);
     } else { // kw
       setPrefix('KW/');
-      setSuffix(`/KEU/${currentYear}`);
-      setMainNumber(nextNum.toString().padStart(2, '0'));
+      setSuffix(`/KEU/${new Date().getFullYear()}`);
+      setMainNumber(nextNumStr.padStart(2, '0'));
     }
   };
-  
-  // This effect runs to initialize the dialog state
+
   useEffect(() => {
     if (!isOpen) return;
 
     if (invoiceData) {
       // --- EDIT MODE ---
       const type = invoiceData.id.startsWith('SAR') ? 'sar' : 'kw';
-      const separator = /[\/_]/;
+      const separator = /[_\/]/;
       const parts = invoiceData.id.split(separator);
 
       let extractedPrefix = '';
@@ -171,17 +179,14 @@ export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceDa
       const initialType = 'kw';
       setInvoiceType(initialType);
       setIsAutoNumber(true);
-      generateNextNumber(initialType);
+      setupForAddMode(initialType);
       
       setCustomer('');
       setSalesOrder('');
       setDate(new Date());
       setAmount(0);
-      setPrefix('');
-      setMainNumber('');
-      setSuffix('');
     }
-  }, [isOpen, invoiceData]); // Rerun only when dialog opens or data changes
+  }, [isOpen, invoiceData, allInvoiceNumbers]); 
 
   // This effect updates the full invoice number whenever its parts change
   useEffect(() => {
@@ -192,14 +197,14 @@ export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceDa
     if (invoiceData) return; // Don't allow type change in edit mode
     setInvoiceType(newType);
     if (isAutoNumber) {
-      generateNextNumber(newType);
+      setupForAddMode(newType);
     }
   }
 
   const handleAutoNumberToggle = (checked: boolean) => {
     setIsAutoNumber(checked);
     if (checked && !invoiceData) {
-      generateNextNumber(invoiceType);
+      setupForAddMode(invoiceType);
     }
   }
 
@@ -459,7 +464,3 @@ export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceDa
     </Dialog>
   );
 }
-
-    
-
-    
