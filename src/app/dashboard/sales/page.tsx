@@ -27,17 +27,21 @@ import {
   import { Button } from '@/components/ui/button';
   import { Badge } from '@/components/ui/badge';
   import { Checkbox } from '@/components/ui/checkbox';
-  import { salesListData, type SalesListItem } from '@/app/lib/data';
+  import { type SalesListItem } from '@/app/lib/data';
   import { Search, Filter, MoreHorizontal, ArrowUpDown, Plus, Upload, Download, Eye, Edit } from 'lucide-react';
   import { AddSaleDialog } from './_components/add-sale-dialog';
   import { useToast } from '@/hooks/use-toast';
   import { DeleteConfirmationDialog } from '@/app/components/delete-confirmation-dialog';
   import { exportToExcel, importFromExcel } from '@/lib/utils';
+  import { useFirestore, useUser, useCollection, useMemoFirebase, errorEmitter, FirestorePermissionError } from '@/firebase';
+  import { collection, doc, setDoc, deleteDoc, writeBatch, query, where } from 'firebase/firestore';
   
   export default function SalesListPage() {
     const router = useRouter();
     const { toast } = useToast();
-    const [sales, setSales] = useState<SalesListItem[]>(salesListData);
+    const firestore = useFirestore();
+    const { user } = useUser();
+    
     const [editingSale, setEditingSale] = useState<SalesListItem | undefined>(undefined);
     const [isDialogOpen, setIsDialogOpen] = useState(false);
     const fileInputRef = useRef<HTMLInputElement>(null);
@@ -45,11 +49,18 @@ import {
     const [searchQuery, setSearchQuery] = useState('');
     const [activeTab, setActiveTab] = useState('all');
 
-    const totalFiltered = sales.reduce((sum, item) => sum + item.amount, 0);
-    const totalPaid = sales.filter(item => item.status === 'Paid').reduce((sum, item) => sum + item.amount, 0);
-    const totalUnpaid = sales.filter(item => item.status === 'Unpaid').reduce((sum, item) => sum + item.amount, 0);
+    const salesCollection = useMemoFirebase(() => {
+        if (!firestore || !user) return null;
+        return query(collection(firestore, 'sales'), where('ownerId', '==', user.uid));
+    }, [firestore, user]);
+    const { data: sales, isLoading } = useCollection<SalesListItem>(salesCollection);
+
+    const totalFiltered = sales?.reduce((sum, item) => sum + item.amount, 0) || 0;
+    const totalPaid = sales?.filter(item => item.status === 'Paid').reduce((sum, item) => sum + item.amount, 0) || 0;
+    const totalUnpaid = sales?.filter(item => item.status === 'Unpaid').reduce((sum, item) => sum + item.amount, 0) || 0;
   
     const filteredSales = useMemo(() => {
+        if (!sales) return [];
         let filtered = sales;
         if (activeTab !== 'all') {
             filtered = sales.filter(s => s.status.toLowerCase() === activeTab);
@@ -76,8 +87,19 @@ import {
     };
 
     const handleDelete = (soNumber: string) => {
-        setSales(sales.filter(s => s.soNumber !== soNumber));
-        toast({ title: "Sale Deleted", description: `Sale ${soNumber} has been removed.` });
+        if (!firestore || !user) return;
+        const docRef = doc(firestore, 'sales', soNumber);
+        deleteDoc(docRef)
+            .then(() => {
+                toast({ title: "Sale Deleted", description: `Sale ${soNumber} has been removed.` });
+            })
+            .catch(async (serverError) => {
+                const permissionError = new FirestorePermissionError({
+                    path: docRef.path,
+                    operation: 'delete',
+                });
+                errorEmitter.emit('permission-error', permissionError);
+            });
     };
 
     const handlePreview = (sale: SalesListItem) => {
@@ -86,15 +108,26 @@ import {
     };
 
     const handleSave = (sale: SalesListItem) => {
-        if (editingSale) {
-            setSales(sales.map(s => (s.soNumber === editingSale.soNumber ? sale : s)));
-            toast({ title: "Sale Updated", description: `Sale ${sale.soNumber} has been updated.` });
-        } else {
-            setSales([...sales, sale]);
-            toast({ title: "Sale Added", description: `New sale ${sale.soNumber} has been added.` });
-        }
-        setIsDialogOpen(false);
-        setEditingSale(undefined);
+        if (!firestore || !user) return;
+
+        const isNew = !editingSale;
+        const docRef = doc(firestore, 'sales', sale.soNumber);
+        const dataToSave = { ...sale, ownerId: user.uid };
+        
+        setDoc(docRef, dataToSave, { merge: !isNew })
+            .then(() => {
+                toast({ title: isNew ? "Sale Added" : "Sale Updated" });
+                setIsDialogOpen(false);
+                setEditingSale(undefined);
+            })
+            .catch(async (serverError) => {
+                const permissionError = new FirestorePermissionError({
+                    path: docRef.path,
+                    operation: isNew ? 'create' : 'update',
+                    requestResourceData: dataToSave,
+                });
+                errorEmitter.emit('permission-error', permissionError);
+            });
     };
 
     const handleDialogStateChange = (open: boolean) => {
@@ -105,7 +138,7 @@ import {
     };
     
     const handleExport = () => {
-        exportToExcel(sales, 'sales');
+        if(sales) exportToExcel(sales, 'sales');
         toast({ title: "Export Successful", description: "Sales data has been exported to Excel." });
     };
 
@@ -115,20 +148,24 @@ import {
 
     const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
         const file = event.target.files?.[0];
-        if (file) {
+        if (file && firestore && user) {
             try {
                 const data = await importFromExcel(file) as SalesListItem[];
-                setSales(prev => [...prev, ...data]);
+                const batch = writeBatch(firestore);
+                data.forEach(item => {
+                    const docRef = doc(firestore, 'sales', item.soNumber);
+                    batch.set(docRef, { ...item, ownerId: user.uid });
+                });
+                await batch.commit();
                 toast({
                     title: "Import Successful",
                     description: `${data.length} sales records imported successfully.`,
                 });
-            } catch (error) {
-                console.error("Error importing file:", error);
+            } catch (error: any) {
                 toast({
                     variant: "destructive",
                     title: "Import Error",
-                    description: "Failed to import the Excel file. Please check the file format.",
+                    description: error.message || "Failed to import the Excel file.",
                 });
             }
         }
@@ -221,9 +258,9 @@ import {
                     </div>
                     <div className="flex justify-between items-center">
                     <TabsList>
-                        <TabsTrigger value="all">All Sales <Badge variant="secondary" className="ml-2">{sales.length}</Badge></TabsTrigger>
-                        <TabsTrigger value="paid">Paid <Badge variant="secondary" className="ml-2">{sales.filter(s=>s.status === 'Paid').length}</Badge></TabsTrigger>
-                        <TabsTrigger value="unpaid">Unpaid <Badge variant="secondary" className="ml-2">{sales.filter(s=>s.status === 'Unpaid').length}</Badge></TabsTrigger>
+                        <TabsTrigger value="all">All Sales <Badge variant="secondary" className="ml-2">{sales?.length || 0}</Badge></TabsTrigger>
+                        <TabsTrigger value="paid">Paid <Badge variant="secondary" className="ml-2">{sales?.filter(s=>s.status === 'Paid').length || 0}</Badge></TabsTrigger>
+                        <TabsTrigger value="unpaid">Unpaid <Badge variant="secondary" className="ml-2">{sales?.filter(s=>s.status === 'Unpaid').length || 0}</Badge></TabsTrigger>
                     </TabsList>
                     <div className="flex items-center gap-2">
                         <div className="relative w-64">
@@ -240,13 +277,10 @@ import {
                     </div>
                     </div>
                     <TabsContent value="all" className="mt-4">
-                        {/* This content is now handled by filteredSales */}
                     </TabsContent>
                     <TabsContent value="paid" className="mt-4">
-                        {/* This content is now handled by filteredSales */}
                     </TabsContent>
                     <TabsContent value="unpaid" className="mt-4">
-                        {/* This content is now handled by filteredSales */}
                     </TabsContent>
                     
                     <div className="mt-4 w-full overflow-auto">
@@ -266,7 +300,8 @@ import {
                             </TableRow>
                         </TableHeader>
                         <TableBody>
-                            {filteredSales.map((sale) => (
+                            {isLoading && <TableRow><TableCell colSpan={8} className="text-center">Loading sales...</TableCell></TableRow>}
+                            {filteredSales?.map((sale) => (
                             <TableRow key={sale.soNumber}>
                                 <TableCell>
                                     <Checkbox />
@@ -299,7 +334,7 @@ import {
                                                 <Edit className="mr-2 h-4 w-4" />
                                                 Edit
                                             </DropdownMenuItem>
-                                            <DropdownMenuItem className="text-destructive focus:text-destructive focus:bg-destructive/10" asChild>
+                                            <DropdownMenuItem className="text-destructive focus:text-destructive focus:bg-destructive/10">
                                                 <DeleteConfirmationDialog onConfirm={() => handleDelete(sale.soNumber)} />
                                             </DropdownMenuItem>
                                         </DropdownMenuContent>
@@ -311,7 +346,7 @@ import {
                         </Table>
                     </div>
                     <div className="text-sm text-muted-foreground mt-4">
-                        Showing 1 to {filteredSales.length} of {sales.length} entries
+                        Showing 1 to {filteredSales?.length || 0} of {sales?.length || 0} entries
                     </div>
 
                 </Tabs>

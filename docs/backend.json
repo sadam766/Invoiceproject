@@ -63,22 +63,21 @@
       "type": "object",
       "description": "Represents a sale transaction in the sales dashboard.",
       "properties": {
-        "id": {
+        "soNumber": {
           "type": "string",
-          "description": "Unique identifier for the sale transaction."
+          "description": "Unique identifier for the sale transaction (Sales Order number)."
         },
-        "customerId": {
+        "customer": {
           "type": "string",
-          "description": "Reference to Customer. (Relationship: Customer 1:N Sale)"
+          "description": "Name of the customer."
         },
-        "productId": {
+        "sales": {
           "type": "string",
-          "description": "Reference to Product. (Relationship: Product 1:N Sale)"
+          "description": "Name of the salesperson."
         },
-        "date": {
+        "poNumber": {
           "type": "string",
-          "description": "Date of the sale transaction.",
-          "format": "date-time"
+          "description": "Purchase Order number from the customer."
         },
         "amount": {
           "type": "number",
@@ -86,16 +85,30 @@
         },
         "status": {
           "type": "string",
-          "description": "Status of the sale transaction (e.g., 'completed', 'pending', 'cancelled')."
+          "description": "Status of the sale transaction.",
+          "enum": [
+            "Paid",
+            "Unpaid"
+          ]
+        },
+        "paidDate": {
+          "type": "string",
+          "description": "Date the sale was paid.",
+          "format": "date"
+        },
+        "ownerId": {
+          "type": "string",
+          "description": "The UID of the user who owns this document."
         }
       },
       "required": [
-        "id",
-        "customerId",
-        "productId",
-        "date",
+        "soNumber",
+        "customer",
+        "sales",
+        "poNumber",
         "amount",
-        "status"
+        "status",
+        "ownerId"
       ]
     },
     "Invoice": {
@@ -131,15 +144,20 @@
         "status": {
           "type": "string",
           "description": "The current status of the invoice.",
-          "enum": ["paid", "unpaid", "sent", "draft"]
+          "enum": [
+            "paid",
+            "unpaid",
+            "sent",
+            "draft"
+          ]
         },
         "spdNumber": {
           "type": "string",
           "description": "The SPD (Surat Pengantar Dokumen) number associated with this invoice, if any."
         },
         "ownerId": {
-            "type": "string",
-            "description": "The UID of the user who owns this document."
+          "type": "string",
+          "description": "The UID of the user who owns this document."
         }
       },
       "required": [
@@ -151,6 +169,107 @@
         "status",
         "ownerId"
       ]
+    },
+    "SPD": {
+      "title": "SPD",
+      "description": "Surat Pengantar Dokumen (Document Delivery Letter).",
+      "type": "object",
+      "properties": {
+        "spd": {
+          "type": "string",
+          "description": "Unique identifier for the SPD."
+        },
+        "tanggal": {
+          "type": "string",
+          "format": "date"
+        },
+        "sales": {
+          "type": "string"
+        },
+        "customer": {
+          "type": "string"
+        },
+        "noInvoice": {
+          "type": "string"
+        },
+        "tanggalInvoice": {
+          "type": "string",
+          "format": "date"
+        },
+        "tglTerimaCustomer": {
+          "type": "string"
+        },
+        "tglJatuhTempo": {
+          "type": "string"
+        },
+        "totalPiutang": {
+          "type": "number"
+        },
+        "keterangan": {
+          "type": "string"
+        },
+        "noKuitansi": {
+          "type": "string"
+        },
+        "noFakturPajak": {
+          "type": "string"
+        },
+        "suratJalan": {
+          "type": "string"
+        },
+        "ownerId": {
+          "type": "string",
+          "description": "The UID of the user who owns this document."
+        }
+      },
+      "required": [
+        "spd",
+        "tanggal",
+        "customer",
+        "noInvoice",
+        "totalPiutang",
+        "ownerId"
+      ]
+    },
+    "TaxInvoice": {
+      "title": "Tax Invoice",
+      "description": "Represents a tax invoice document.",
+      "type": "object",
+      "properties": {
+        "taxInvoiceNumber": {
+          "type": "string",
+          "description": "Unique identifier for the tax invoice."
+        },
+        "buyerNpwp": {
+          "type": "string"
+        },
+        "buyerName": {
+          "type": "string"
+        },
+        "status": {
+          "type": "string"
+        },
+        "taxInvoiceDate": {
+          "type": "string",
+          "format": "date"
+        },
+        "invoiceNumber": {
+          "type": "string"
+        },
+        "ownerId": {
+          "type": "string",
+          "description": "The UID of the user who owns this document."
+        }
+      },
+      "required": [
+        "taxInvoiceNumber",
+        "buyerNpwp",
+        "buyerName",
+        "status",
+        "taxInvoiceDate",
+        "invoiceNumber",
+        "ownerId"
+      ]
     }
   },
   "auth": {
@@ -160,86 +279,50 @@
     ]
   },
   "firestore": {
-    "structure": [
-      {
-        "path": "/products/{productId}",
-        "definition": {
-          "entityName": "Product",
-          "schema": {
-            "$ref": "#/backend/entities/Product"
-          },
-          "description": "Stores product information. Write access is restricted to users with admin privileges (checked via /users/{uid}).",
-          "params": [
-            {
-              "name": "productId",
-              "description": "The unique identifier for the product."
-            }
-          ]
-        }
+    "/products/{productId}": {
+      "schema": {
+        "$ref": "#/entities/Product"
       },
-      {
-        "path": "/customers/{customerId}",
-        "definition": {
-          "entityName": "Customer",
-          "schema": {
-            "$ref": "#/backend/entities/Customer"
-          },
-          "description": "Stores customer data. Only the user who created it (ownerId) can read/write their own data.",
-          "params": [
-            {
-              "name": "customerId",
-              "description": "The unique identifier for the customer."
-            }
-          ]
-        }
+      "description": "Stores product information. Write access is restricted to users with admin privileges."
+    },
+    "/customers/{customerId}": {
+      "schema": {
+        "$ref": "#/entities/Customer"
       },
-      {
-        "path": "/sales/{saleId}",
-        "definition": {
-          "entityName": "Sale",
-          "schema": {
-            "$ref": "#/backend/entities/Sale"
-          },
-          "description": "Stores sale transaction data. Only the user who created it (ownerId) can read/write the sale data.",
-          "params": [
-            {
-              "name": "saleId",
-              "description": "The unique identifier for the sale transaction."
-            }
-          ]
-        }
+      "description": "Stores customer data. Only the user who created it (ownerId) can read/write their own data."
+    },
+    "/sales/{saleId}": {
+      "schema": {
+        "$ref": "#/entities/Sale"
       },
-      {
-        "path": "/invoices/{invoiceId}",
-        "definition": {
-            "entityName": "Invoice",
-            "schema": {
-                "$ref": "#/entities/Invoice"
-            },
-            "description": "Stores invoice documents. Only the user who created it (ownerId) can access it.",
-            "params": [
-                {
-                    "name": "invoiceId",
-                    "description": "The unique identifier for the invoice."
-                }
-            ]
-        }
+      "description": "Stores sale transaction data. The 'saleId' is the 'soNumber'. Only the user who created it (ownerId) can read/write it."
+    },
+    "/invoices/{invoiceId}": {
+      "schema": {
+        "$ref": "#/entities/Invoice"
       },
-      {
-        "path": "/users/{uid}",
-        "definition": {
-          "description": "Stores user profile information, including their role.",
-          "params": [
-            {
-              "name": "uid",
-              "description": "The Firebase Auth UID of the user."
-            }
-          ]
-        }
-      }
-    ],
-    "reasoning": "The Firestore structure is designed to securely manage product, customer, and sales data for the sales dashboard application. It prioritizes Authorization Independence, clarity, and ease of querying.\n\n**Authorization Independence:**\n\n*   Sales are stored directly under a `sales` collection. To enforce security without relying on hierarchical `get()` calls, `customerId` is denormalized inside the Sale document. This allows rules to validate that the `customerId` matches the `request.auth.uid` when creating or modifying sales, without needing to read the customer document.\n\n**Structural Segregation:**\n\n*   Each entity type (products, customers, sales) is stored in its own top-level collection. This segregation simplifies security rules because each collection has a distinct access pattern.\n\n**Access Modeling:**\n\n*   **Customers:** Customers are stored in the `/customers/{customerId}` collection. This path-based ownership allows simple rules enforcing that only the authenticated user (with `uid` equal to `customerId`) can read/write their customer data.\n*   **Sales:** Sales are stored in the `/sales/{saleId}` collection. Security is enforced using denormalized `customerId` to restrict access to sales associated with the authenticated user.\n*   **Products:** Products are stored in the `/products/{productId}` collection. Assuming all products are publicly readable but only admins can create/update them, a separate `/roles_admin/{uid}` collection controls administrative privileges.  Rules on the `/products` collection check for the existence of a document in `/roles_admin/{request.auth.uid}` to grant write access.\n\n**QAPs (Rules are not Filters):**\n\n*   The structure supports secure listing of sales associated with a specific customer because the `customerId` is available in each `Sale` document. This allows rules to filter sales based on the `request.auth.uid` (which represents the `customerId`). Products are secured based on admin roles.\n\n**Invariants:**\n\n*   Timestamps could be added to documents (e.g., `createdAt`, `updatedAt`) to track changes. Security rules can enforce that `createdAt` is only set on creation and `updatedAt` is always updated on modifications.\n"
+      "description": "Stores invoice documents. Only the user who created it (ownerId) can access it."
+    },
+    "/users/{uid}": {
+      "description": "Stores user profile information, including their role."
+    },
+    "/salesOrders/{orderId}": {
+      "description": "Stores individual items of a sales order. Only the user who created it can access it."
+    },
+    "/invoiceNumbers/{invoiceNumberId}": {
+      "description": "Stores generated invoice numbers. Only the user who created it can access it."
+    },
+    "/spds/{spdId}": {
+      "schema": {
+        "$ref": "#/entities/SPD"
+      },
+      "description": "Stores SPD documents. The 'spdId' is the 'spd' field. Only the user who created it can access it."
+    },
+    "/taxInvoices/{taxInvoiceId}": {
+      "schema": {
+        "$ref": "#/entities/TaxInvoice"
+      },
+      "description": "Stores tax invoice documents. The 'taxInvoiceId' is the 'taxInvoiceNumber'. Only the user who created it can access it."
+    }
   }
 }
-
-    

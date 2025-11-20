@@ -1,18 +1,19 @@
 
 /**
  * @file Firestore Security Rules
- * @description This ruleset enforces a strict user-ownership model for customer and sale data,
- *              and restricts product management to admin users. It also secures sales orders
- *              and invoice numbers under user ownership.
+ * @description This ruleset enforces a strict user-ownership model for all user-generated data,
+ *              and restricts product management to admin users.
  *
  * Data Structure:
+ * - /users/{userId}: Stores user profile and role information.
  * - /products/{productId}: Stores product information, readable by any user, writable only by admins.
- * - /customers/{customerId}: Stores customer data, accessible only by the customer who created it.
- * - /sales/{saleId}: Stores sale data, accessible only by the customer associated with the sale.
- * - /salesOrders/{orderId}: Stores sales order items, accessible only by the user who created them.
- * - /invoiceNumbers/{invoiceNumberId}: Stores invoice numbers, accessible only by the user who created them.
- * - /invoices/{invoiceId}: Stores invoice documents, accessible only by the user who created them.
- * - /users/{uid}: Stores user profile and role information.
+ * - /customers/{customerId}: Accessible only by the owner.
+ * - /sales/{saleId}: Accessible only by the owner.
+ * - /salesOrders/{orderId}: Accessible only by the owner.
+ * - /invoiceNumbers/{invoiceNumberId}: Accessible only by the owner.
+ * - /invoices/{invoiceId}: Accessible only by the owner.
+ * - /spds/{spdId}: Accessible only by the owner.
+ * - /taxInvoices/{taxInvoiceId}: Accessible only by the owner.
  */
 rules_version = '2';
 service cloud.firestore {
@@ -33,6 +34,14 @@ service cloud.firestore {
 
     function isAdmin() {
       return getRole() == 'admin';
+    }
+    
+    function isOwnerOfDoc() {
+      return request.auth.uid == resource.data.ownerId;
+    }
+    
+    function isCreatingOwnerDoc() {
+       return request.auth.uid == request.resource.data.ownerId;
     }
 
     /**
@@ -62,63 +71,64 @@ service cloud.firestore {
     /**
      * @description Enforces ownership for customer data.
      * @path /customers/{customerId}
-     * @allow (read, write): Only the user who created the customer document can access it.
-     *                       The query from the client MUST include `where('ownerId', '==', request.auth.uid)`.
-     * @principle Enforces strict data ownership.
      */
     match /customers/{customerId} {
-      allow read, write: if isSignedIn() && request.auth.uid == resource.data.ownerId;
-      allow create: if isSignedIn() && request.resource.data.ownerId == request.auth.uid;
+      allow read, write: if isSignedIn() && isOwnerOfDoc();
+      allow create: if isSignedIn() && isCreatingOwnerDoc();
     }
 
     /**
      * @description Enforces ownership for sales order data.
      * @path /salesOrders/{orderId}
-     * @allow (read, write): Only the user who created the sales order can access it.
-     *                       The query from the client MUST include `where('ownerId', '==', request.auth.uid)`.
-     * @principle Enforces strict data ownership.
      */
     match /salesOrders/{orderId} {
-       allow read, write: if isSignedIn() && request.auth.uid == resource.data.ownerId;
-       allow create: if isSignedIn() && request.resource.data.ownerId == request.auth.uid;
+       allow read, write: if isSignedIn() && isOwnerOfDoc();
+       allow create: if isSignedIn() && isCreatingOwnerDoc();
     }
 
     /**
      * @description Enforces ownership for invoice number data.
      * @path /invoiceNumbers/{invoiceNumberId}
-     * @allow (read, write): Only the user who created the invoice number can access it.
-     *                       The query from the client MUST include `where('ownerId', '==', request.auth.uid)`.
-     * @principle Enforces strict data ownership.
      */
     match /invoiceNumbers/{invoiceNumberId} {
-        allow read, write: if isSignedIn() && request.auth.uid == resource.data.ownerId;
-        allow create: if isSignedIn() && request.resource.data.ownerId == request.auth.uid;
+        allow read, write: if isSignedIn() && isOwnerOfDoc();
+        allow create: if isSignedIn() && isCreatingOwnerDoc();
     }
 
     /**
      * @description Enforces ownership for invoice data.
      * @path /invoices/{invoiceId}
-     * @allow (read, write): Only the user who created the invoice document can access it.
-     *                       The query from the client MUST include `where('ownerId', '==', request.auth.uid)`.
-     * @principle Enforces strict data ownership based on an `ownerId` field.
      */
     match /invoices/{invoiceId} {
-      allow read, write: if isSignedIn() && request.auth.uid == resource.data.ownerId;
-      allow create: if isSignedIn() && request.resource.data.ownerId == request.auth.uid;
+      allow read, write: if isSignedIn() && isOwnerOfDoc();
+      allow create: if isSignedIn() && isCreatingOwnerDoc();
+    }
+    
+    /**
+     * @description Enforces ownership for SPD data.
+     * @path /spds/{spdId}
+     */
+    match /spds/{spdId} {
+      allow read, write: if isSignedIn() && isOwnerOfDoc();
+      allow create: if isSignedIn() && isCreatingOwnerDoc();
+    }
+    
+    /**
+     * @description Enforces ownership for Tax Invoice data.
+     * @path /taxInvoices/{taxInvoiceId}
+     */
+    match /taxInvoices/{taxInvoiceId} {
+      allow read, write: if isSignedIn() && isOwnerOfDoc();
+      allow create: if isSignedIn() && isCreatingOwnerDoc();
     }
 
     /**
      * @description Enforces ownership for sales data.
      * @path /sales/{saleId}
-     * @allow (read, write): Only the user who created the sale document can access it.
-     *                       The query from the client MUST include `where('ownerId', '==', request.auth.uid)`.
-     * @principle Enforces strict data ownership based on an `ownerId` field.
      */
     match /sales/{saleId} {
-      allow read, write: if isSignedIn() && request.auth.uid == resource.data.ownerId;
-      allow create: if isSignedIn() && request.resource.data.ownerId == request.auth.uid;
+      allow read, write: if isSignedIn() && isOwnerOfDoc();
+      allow create: if isSignedIn() && isCreatingOwnerDoc();
     }
   }
 }
-
-    

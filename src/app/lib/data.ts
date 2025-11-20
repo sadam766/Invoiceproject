@@ -1,3 +1,4 @@
+
 import type { LucideIcon } from 'lucide-react';
 import { DollarSign, Users, Package, Activity, Zap } from 'lucide-react';
 import { PlaceHolderImages, type ImagePlaceholder } from '@/lib/placeholder-images';
@@ -9,75 +10,12 @@ export type Kpi = {
   icon: LucideIcon;
 };
 
-export const kpiData: Kpi[] = [
-  {
-    title: 'Total Revenue',
-    value: 'Rp 1.500.000',
-    change: '+0.0% vs last month',
-    icon: DollarSign,
-  },
-  {
-    title: 'Total Customers',
-    value: '2',
-    change: '+0.0% vs last month',
-    icon: Users,
-  },
-  {
-    title: 'Total Products',
-    value: '3',
-    change: '+0.0% vs last month',
-    icon: Package,
-  },
-  {
-    title: 'Conversion Rate',
-    value: '50.0%',
-    change: '+0.0% vs last month',
-    icon: Zap,
-  },
-];
-
-export const salesChartData = [
-    { month: 'Nov', revenue: 0, sales: 0 },
-    { month: 'Dec', revenue: 1000000, sales: 500 },
-    { month: 'Jan', revenue: 1500000, sales: 750 },
-    { month: 'Feb', revenue: 1200000, sales: 600 },
-    { month: 'Mar', revenue: 2000000, sales: 1000 },
-    { month: 'Apr', revenue: 1800000, sales: 900 },
-    { month: 'May', revenue: 2500000, sales: 1250 },
-    { month: 'Jun', revenue: 2300000, sales: 1150 },
-    { month: 'Jul', revenue: 3000000, sales: 1500 },
-    { month: 'Aug', revenue: 2800000, sales: 1400 },
-    { month: 'Sep', revenue: 3500000, sales: 1750 },
-    { month: 'Oct', revenue: 4000000, sales: 2000 },
-];
-
 export type Product = {
   name: string;
   image: ImagePlaceholder;
   sales: number;
   quantity: number;
 };
-
-export const topProducts: Product[] = [
-  {
-    name: 'Kabel Tembaga 2.5mm',
-    image: PlaceHolderImages[0],
-    sales: 1500000,
-    quantity: 200,
-  },
-  {
-    name: 'Konektor RJ45',
-    image: PlaceHolderImages[1],
-    sales: 250000,
-    quantity: 100,
-  },
-  {
-    name: 'Kabel Fiber Optik',
-    image: PlaceHolderImages[2],
-    sales: 750000,
-    quantity: 50,
-  },
-];
 
 export type Sale = {
   invoiceId: string;
@@ -86,23 +24,6 @@ export type Sale = {
   amount: number;
   status: 'Paid' | 'Unpaid';
 };
-
-export const recentSales: Sale[] = [
-  {
-    invoiceId: 'INV/2024/002',
-    customer: 'CV. Maju Jaya',
-    date: 'May 13, 2024',
-    amount: 1500000,
-    status: 'Paid',
-  },
-  {
-    invoiceId: 'INV/2024/001',
-    customer: 'PT. Sejahtera Abadi',
-    date: 'May 11, 2024',
-    amount: 1000000,
-    status: 'Unpaid',
-  },
-];
 
 export type SalesMonitoringData = {
   soNumber: string;
@@ -118,7 +39,7 @@ export type SalesMonitoringData = {
   needsSpd: boolean;
 };
 
-export function getSalesMonitoringData(salesOrders: SalesOrder[]): SalesMonitoringData[] {
+export function getSalesMonitoringData(salesOrders: SalesOrder[], invoiceListData: Invoice[], taxInvoiceData: TaxInvoice[], spdData: SpdData[]): SalesMonitoringData[] {
     const soData = salesOrders.reduce((acc, order) => {
         if (!acc[order.soNumber]) {
             acc[order.soNumber] = {
@@ -169,29 +90,6 @@ export type Invoice = {
   ownerId?: string;
 };
 
-export let invoiceListData: Invoice[] = [
-  {
-    id: 'INV/2024/001',
-    soNumber: 'SO-2024-001',
-    poNumber: 'PO-ABC-001',
-    customer: 'PT. Sejahtera Abadi',
-    date: '2024-05-11',
-    amount: 1000000,
-    status: 'unpaid',
-    spdNumber: '-',
-  },
-  {
-    id: 'INV/2024/002',
-    soNumber: 'SO-2024-002',
-    poNumber: 'PO-DEF-002',
-    customer: 'CV. Maju Jaya',
-    date: '2024-05-13',
-    amount: 1500000,
-    status: 'paid',
-    spdNumber: 'PS/1-J/KEU/2024/DK',
-  },
-];
-
 export type InvoiceNumber = {
   id: string;
   customer: string;
@@ -201,42 +99,15 @@ export type InvoiceNumber = {
   ownerId?: string;
 };
 
-export let invoiceNumberData: InvoiceNumber[] = [
-    {
-        id: 'SAR/25000001',
-        customer: 'PT. Sejahtera Abadi',
-        salesOrder: 'SO-2024-001',
-        date: '11/5/2024',
-        amount: 1000000,
-    },
-    {
-        id: 'SAR/25000002',
-        customer: 'CV. Maju Jaya',
-        salesOrder: 'SO-2024-002',
-        date: '13/5/2024',
-        amount: 1500000,
-    }
-]
-
 export type TaxInvoice = {
+    taxInvoiceNumber: string;
     buyerNpwp: string;
     buyerName: string;
     status: string;
-    taxInvoiceNumber: string;
     taxInvoiceDate: string;
     invoiceNumber: string;
+    ownerId?: string;
 };
-
-export const taxInvoiceData: TaxInvoice[] = [
-    {
-        buyerNpwp: '01.234.567.8-901.234',
-        buyerName: 'PT. Sejahtera Abadi',
-        status: 'APPROVED',
-        taxInvoiceNumber: '010.000-24.00000001',
-        taxInvoiceDate: '2024-05-11',
-        invoiceNumber: 'INV/2024/001',
-    }
-];
 
 export type ProductListItem = {
     id?: string;
@@ -279,31 +150,11 @@ export type SalesListItem = {
   ownerId?: string;
 };
 
-export const salesListData: SalesListItem[] = [
-  {
-    soNumber: 'SO-2024-001',
-    customer: 'PT. Sejahtera Abadi',
-    sales: 'Budi',
-    poNumber: 'PO-ABC-001',
-    amount: 1000000,
-    status: 'Unpaid',
-  },
-  {
-    soNumber: 'SO-2024-002',
-    customer: 'CV. Maju Jaya',
-    sales: 'Citra',
-    poNumber: 'PO-DEF-002',
-    amount: 1500000,
-    status: 'Paid',
-    paidDate: '2024-05-25',
-  },
-];
-
 export type SpdData = {
+    spd: string;
     tanggal: string;
     sales: string;
     customer: string;
-    spd: string;
     noInvoice: string;
     tanggalInvoice: string;
     tglTerimaCustomer: string;
@@ -313,22 +164,5 @@ export type SpdData = {
     noKuitansi: string;
     noFakturPajak: string;
     suratJalan: string;
+    ownerId?: string;
 };
-  
-export let spdData: SpdData[] = [
-    {
-        tanggal: '2024-05-20',
-        sales: 'Budi',
-        customer: 'CV. Maju Jaya',
-        spd: 'PS/1-J/KEU/2024/DK',
-        noInvoice: 'INV/2024/002',
-        tanggalInvoice: '2024-05-13',
-        tglTerimaCustomer: '-',
-        tglJatuhTempo: '-',
-        totalPiutang: 1500000,
-        keterangan: '-',
-        noKuitansi: '-',
-        noFakturPajak: '-',
-        suratJalan: '-',
-    }
-];

@@ -1,6 +1,6 @@
 
 'use client';
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import {
     Card,
@@ -16,26 +16,33 @@ import {
   } from '@/components/ui/table';
   import { Input } from '@/components/ui/input';
   import { Button } from '@/components/ui/button';
-  import { spdData as initialSpdData, type SpdData } from '@/app/lib/data';
+  import { type SpdData } from '@/app/lib/data';
   import { Search, Plus } from 'lucide-react';
   import { AddSpdDialog } from './_components/add-spd-dialog';
   import { useToast } from '@/hooks/use-toast';
   import { DeleteConfirmationDialog } from '@/app/components/delete-confirmation-dialog';
+  import { useFirestore, useUser, useCollection, useMemoFirebase, errorEmitter, FirestorePermissionError } from '@/firebase';
+  import { collection, doc, setDoc, deleteDoc, writeBatch, query, where } from 'firebase/firestore';
   
   export default function SpdPage() {
-    const [data, setData] = useState(initialSpdData);
+    const firestore = useFirestore();
+    const { user } = useUser();
+    const router = useRouter();
+    const { toast } = useToast();
+    
     const [editingSpd, setEditingSpd] = useState<SpdData | undefined>(undefined);
     const [isDialogOpen, setIsDialogOpen] = useState(false);
     const [searchQuery, setSearchQuery] = useState('');
-    const { toast } = useToast();
-    const router = useRouter();
 
-    useEffect(() => {
-        const storedSpdData = initialSpdData;
-        setData(storedSpdData);
-    }, []);
+    const spdsCollection = useMemoFirebase(() => {
+        if (!firestore || !user) return null;
+        return query(collection(firestore, 'spds'), where('ownerId', '==', user.uid));
+    }, [firestore, user]);
+    const { data, isLoading } = useCollection<SpdData>(spdsCollection);
+
 
     const filteredData = useMemo(() => {
+        if (!data) return [];
         if (!searchQuery) {
           return data;
         }
@@ -58,8 +65,19 @@ import {
     }
     
     const handleDelete = (spdId: string) => {
-        setData(prevData => prevData.filter(item => item.spd !== spdId));
-        toast({ title: "SPD Deleted", description: `SPD ${spdId} has been removed.` });
+        if (!firestore) return;
+        const docRef = doc(firestore, 'spds', spdId);
+        deleteDoc(docRef)
+            .then(() => {
+                toast({ title: "SPD Deleted", description: `SPD ${spdId} has been removed.` });
+            })
+            .catch(async (serverError) => {
+                const permissionError = new FirestorePermissionError({
+                    path: docRef.path,
+                    operation: 'delete',
+                });
+                errorEmitter.emit('permission-error', permissionError);
+            });
     };
 
     const handlePreview = (spdItem: SpdData) => {
@@ -68,21 +86,27 @@ import {
     };
 
 
-    const handleSave = (newItem: Omit<SpdData, 'totalPiutang'> & { totalPiutang: number | string }) => {
-        const newItemWithNumber = {
-            ...newItem,
-            totalPiutang: Number(newItem.totalPiutang)
-        };
+    const handleSave = (newItem: SpdData) => {
+        if (!firestore || !user) return;
+        
+        const isNew = !editingSpd;
+        const docRef = doc(firestore, 'spds', newItem.spd);
+        const dataToSave = { ...newItem, ownerId: user.uid };
 
-        if (editingSpd) {
-            setData(data.map((item) => (item.spd === editingSpd.spd ? newItemWithNumber : item)));
-            toast({ title: "SPD Updated", description: `SPD ${newItem.spd} has been updated.` });
-        } else {
-            setData([...data, newItemWithNumber]);
-            toast({ title: "SPD Added", description: `New SPD ${newItem.spd} has been added.` });
-        }
-        setIsDialogOpen(false);
-        setEditingSpd(undefined);
+        setDoc(docRef, dataToSave, { merge: !isNew })
+            .then(() => {
+                toast({ title: isNew ? "SPD Added" : "SPD Updated" });
+                setIsDialogOpen(false);
+                setEditingSpd(undefined);
+            })
+            .catch(async (serverError) => {
+                const permissionError = new FirestorePermissionError({
+                    path: docRef.path,
+                    operation: isNew ? 'create' : 'update',
+                    requestResourceData: dataToSave,
+                });
+                errorEmitter.emit('permission-error', permissionError);
+            });
     };
 
     const handleDialogClose = (open: boolean) => {
@@ -146,7 +170,8 @@ import {
                             </TableRow>
                         </TableHeader>
                         <TableBody>
-                            {filteredData.map((item, index) => (
+                            {isLoading && <TableRow><TableCell colSpan={14} className="text-center">Loading SPDs...</TableCell></TableRow>}
+                            {filteredData?.map((item, index) => (
                                 <TableRow key={index}>
                                     <TableCell>{item.tanggal}</TableCell>
                                     <TableCell>{item.sales}</TableCell>
@@ -176,7 +201,7 @@ import {
                     </Table>
                 </div>
                 <div className="text-sm text-muted-foreground mt-4">
-                    Showing 1 to {filteredData.length} of {data.length} entries
+                    Showing 1 to {filteredData?.length || 0} of {data?.length || 0} entries
                 </div>
             </CardContent>
         </Card>

@@ -17,7 +17,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { getSalesMonitoringData, SalesMonitoringData, SalesOrder } from '@/app/lib/data';
+import { getSalesMonitoringData, SalesMonitoringData, SalesOrder, Invoice, TaxInvoice, SpdData } from '@/app/lib/data';
 import { Search, Eye } from 'lucide-react';
 import Link from 'next/link';
 import { useFirestore, useCollection, useMemoFirebase, useUser } from '@/firebase';
@@ -58,15 +58,27 @@ export default function SalesMonitoringPage() {
     if (!firestore || !user) return null;
     return query(collection(firestore, 'invoices'), where('ownerId', '==', user.uid));
   }, [firestore, user]);
-  const { data: invoiceListData, isLoading: isInvoicesLoading } = useCollection<any>(invoicesCollection);
+  const { data: invoiceListData, isLoading: isInvoicesLoading } = useCollection<Invoice>(invoicesCollection);
+
+  const taxInvoicesCollection = useMemoFirebase(() => {
+    if (!firestore || !user) return null;
+    return query(collection(firestore, 'taxInvoices'), where('ownerId', '==', user.uid));
+  }, [firestore, user]);
+  const { data: taxInvoiceListData, isLoading: isTaxInvoicesLoading } = useCollection<TaxInvoice>(taxInvoicesCollection);
+
+  const spdsCollection = useMemoFirebase(() => {
+    if (!firestore || !user) return null;
+    return query(collection(firestore, 'spds'), where('ownerId', '==', user.uid));
+  }, [firestore, user]);
+  const { data: spdListData, isLoading: isSpdsLoading } = useCollection<SpdData>(spdsCollection);
 
 
-  const isLoading = isSalesOrdersLoading || isInvoicesLoading;
+  const isLoading = isSalesOrdersLoading || isInvoicesLoading || isTaxInvoicesLoading || isSpdsLoading;
   
   const salesMonitoringData = useMemo(() => {
-    if (!salesOrderListData || !invoiceListData) return [];
-    return getSalesMonitoringData(salesOrderListData, invoiceListData);
-  }, [salesOrderListData, invoiceListData]);
+    if (!salesOrderListData || !invoiceListData || !taxInvoiceListData || !spdListData) return [];
+    return getSalesMonitoringData(salesOrderListData, invoiceListData, taxInvoiceListData, spdListData);
+  }, [salesOrderListData, invoiceListData, taxInvoiceListData, spdListData]);
 
   const needsInvoiceData = salesMonitoringData.filter(d => d.needsInvoice);
   const needsSpdData = salesMonitoringData.filter(d => d.needsSpd);
@@ -222,5 +234,3 @@ export default function SalesMonitoringPage() {
     </main>
   );
 }
-
-    

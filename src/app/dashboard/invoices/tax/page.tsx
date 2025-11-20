@@ -20,20 +20,30 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
-import { taxInvoiceData, type TaxInvoice } from '@/app/lib/data';
+import { type TaxInvoice } from '@/app/lib/data';
 import { Search, Upload, Download, Filter, ArrowUpDown } from 'lucide-react';
 import { AddTaxInvoiceDialog } from './_components/add-tax-invoice-dialog';
 import { useToast } from '@/hooks/use-toast';
 import { exportToExcel, importFromExcel } from '@/lib/utils';
+import { useFirestore, useUser, useCollection, useMemoFirebase, errorEmitter, FirestorePermissionError } from '@/firebase';
+import { collection, doc, setDoc, writeBatch, query, where } from 'firebase/firestore';
 
 export default function TaxInvoicePage() {
-    const [data, setData] = useState(taxInvoiceData);
+    const firestore = useFirestore();
+    const { user } = useUser();
     const [searchQuery, setSearchQuery] = useState('');
     const [activeTab, setActiveTab] = useState('all');
     const fileInputRef = useRef<HTMLInputElement>(null);
     const { toast } = useToast();
 
+    const taxInvoicesCollection = useMemoFirebase(() => {
+        if (!firestore || !user) return null;
+        return query(collection(firestore, 'taxInvoices'), where('ownerId', '==', user.uid));
+    }, [firestore, user]);
+    const { data, isLoading } = useCollection<TaxInvoice>(taxInvoicesCollection);
+
     const filteredData = useMemo(() => {
+        if (!data) return [];
         let filtered = data;
         if (activeTab !== 'all') {
             filtered = data.filter(i => i.status.toLowerCase() === activeTab);
@@ -47,7 +57,7 @@ export default function TaxInvoicePage() {
     }, [data, searchQuery, activeTab]);
     
     const handleExport = () => {
-        exportToExcel(data, 'tax-invoices');
+        if (data) exportToExcel(data, 'tax-invoices');
         toast({ title: "Export Successful", description: "Tax invoice data has been exported to Excel." });
     };
 
@@ -57,20 +67,24 @@ export default function TaxInvoicePage() {
 
     const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
         const file = event.target.files?.[0];
-        if (file) {
+        if (file && firestore && user) {
             try {
-                const imported = await importFromExcel(file) as TaxInvoice[];
-                setData(prev => [...prev, ...imported]);
+                const importedData = await importFromExcel(file) as TaxInvoice[];
+                const batch = writeBatch(firestore);
+                importedData.forEach(item => {
+                    const docRef = doc(firestore, 'taxInvoices', item.taxInvoiceNumber);
+                    batch.set(docRef, { ...item, ownerId: user.uid });
+                });
+                await batch.commit();
                 toast({
                     title: "Import Successful",
-                    description: `${imported.length} tax invoices imported successfully.`,
+                    description: `${importedData.length} tax invoices imported successfully.`,
                 });
-            } catch (error) {
-                console.error("Error importing file:", error);
+            } catch (error: any) {
                 toast({
                     variant: "destructive",
                     title: "Import Error",
-                    description: "Failed to import the Excel file. Please check the file format.",
+                    description: error.message || "Failed to import the Excel file.",
                 });
             }
         }
@@ -88,7 +102,7 @@ export default function TaxInvoicePage() {
             <CardTitle className="text-sm font-medium text-blue-900/80">Total Nilai Faktur (Filtered)</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-3xl font-bold text-blue-950">Rp 1.008.000,00</div>
+            <div className="text-3xl font-bold text-blue-950">Rp 0,00</div>
           </CardContent>
         </Card>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:col-span-3 gap-4">
@@ -97,7 +111,7 @@ export default function TaxInvoicePage() {
               <CardTitle className="text-sm font-medium">Nilai Approval</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">Rp 1.008.000,00</div>
+              <div className="text-2xl font-bold">Rp 0,00</div>
             </CardContent>
           </Card>
           <Card>
@@ -105,7 +119,7 @@ export default function TaxInvoicePage() {
               <CardTitle className="text-sm font-medium">Nilai (Kode 01)</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">Rp 1.008.000,00</div>
+              <div className="text-2xl font-bold">Rp 0,00</div>
             </CardContent>
           </Card>
           <Card>
@@ -113,7 +127,7 @@ export default function TaxInvoicePage() {
               <CardTitle className="text-sm font-medium">Total DPP</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">Rp 900.000,00</div>
+              <div className="text-2xl font-bold">Rp 0,00</div>
             </CardContent>
           </Card>
           <Card>
@@ -121,7 +135,7 @@ export default function TaxInvoicePage() {
               <CardTitle className="text-sm font-medium">Total PPN</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">Rp 108.000,00</div>
+              <div className="text-2xl font-bold">Rp 0,00</div>
             </CardContent>
           </Card>
         </div>
@@ -144,9 +158,9 @@ export default function TaxInvoicePage() {
             </div>
             <div className="flex justify-between items-center">
               <TabsList>
-                <TabsTrigger value="all">All <Badge variant="secondary" className="ml-2">{data.length}</Badge></TabsTrigger>
-                <TabsTrigger value="approved">APPROVED <Badge variant="secondary" className="ml-2">{data.filter(i=>i.status === 'APPROVED').length}</Badge></TabsTrigger>
-                <TabsTrigger value="cancelled">Dibatalkan <Badge variant="secondary" className="ml-2">{data.filter(i=>i.status === 'Dibatalkan').length}</Badge></TabsTrigger>
+                <TabsTrigger value="all">All <Badge variant="secondary" className="ml-2">{data?.length || 0}</Badge></TabsTrigger>
+                <TabsTrigger value="approved">APPROVED <Badge variant="secondary" className="ml-2">{data?.filter(i=>i.status === 'APPROVED').length || 0}</Badge></TabsTrigger>
+                <TabsTrigger value="cancelled">Dibatalkan <Badge variant="secondary" className="ml-2">{data?.filter(i=>i.status === 'Dibatalkan').length || 0}</Badge></TabsTrigger>
               </TabsList>
               <div className="flex items-center gap-2">
                 <div className="relative w-64">
@@ -171,7 +185,8 @@ export default function TaxInvoicePage() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {filteredData.map((invoice) => (
+                    {isLoading && <TableRow><TableCell colSpan={7} className="text-center">Loading tax invoices...</TableCell></TableRow>}
+                    {filteredData?.map((invoice) => (
                       <TableRow key={invoice.taxInvoiceNumber}>
                         <TableCell><Checkbox /></TableCell>
                         <TableCell className="font-medium">{invoice.buyerNpwp}</TableCell>
@@ -188,7 +203,7 @@ export default function TaxInvoicePage() {
                 </Table>
               </div>
               <div className="text-sm text-muted-foreground mt-4">
-                Showing 1 to {filteredData.length} of {data.length} entries
+                Showing 1 to {filteredData?.length || 0} of {data?.length || 0} entries
               </div>
             </TabsContent>
           </Tabs>
