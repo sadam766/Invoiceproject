@@ -1,4 +1,5 @@
 
+
 'use client';
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
@@ -26,7 +27,9 @@ import {
   import { Badge } from '@/components/ui/badge';
   import { Calendar, ChevronRight, Edit, Search, ArrowUpDown, List, LayoutGrid, Plus, MoreVertical } from 'lucide-react';
   import { AddDocumentDialog } from './_components/add-document-dialog';
-  import { salesListData, invoiceListData, type SalesListItem, type Invoice } from '@/app/lib/data';
+  import { type SalesListItem, type Invoice } from '@/app/lib/data';
+  import { useFirestore, useUser, useCollection, useMemoFirebase } from '@/firebase';
+  import { collection, query, where } from 'firebase/firestore';
 
   type SaleDetails = {
     totalEstimates: number;
@@ -43,15 +46,30 @@ import {
     const [selectedSale, setSelectedSale] = useState<SalesListItem | null>(null);
     const [details, setDetails] = useState<SaleDetails | null>(null);
 
+    const firestore = useFirestore();
+    const { user } = useUser();
+
+    const invoicesCollection = useMemoFirebase(() => {
+        if (!firestore || !user || !selectedSale) return null;
+        // This logic might need refinement. Querying by soNumber OR poNumber is not directly possible.
+        // For simplicity, we'll query by soNumber, as it's more likely to be unique and indexed.
+        return query(collection(firestore, 'invoices'), where('ownerId', '==', user.uid), where('soNumber', '==', selectedSale.soNumber));
+    }, [firestore, user, selectedSale]);
+
+    const { data: invoiceListData, isLoading } = useCollection<Invoice>(invoicesCollection);
+
+
     useEffect(() => {
         const dataFromSession = sessionStorage.getItem('salesPreviewData');
         if (dataFromSession) {
             const sale = JSON.parse(dataFromSession);
             setSelectedSale(sale);
+        }
+    }, []);
 
-            const relatedInvoices = invoiceListData.filter(
-                inv => inv.soNumber === sale.soNumber || (sale.poNumber && inv.poNumber === sale.poNumber)
-            );
+    useEffect(() => {
+        if (selectedSale && invoiceListData) {
+            const relatedInvoices = invoiceListData; // Already filtered by the hook
             
             const totalEstimates = relatedInvoices.reduce((sum, inv) => sum + inv.amount, 0);
             const totalPaid = relatedInvoices
@@ -68,9 +86,9 @@ import {
                 relatedInvoices: relatedInvoices,
             });
         }
-    }, []);
+    }, [selectedSale, invoiceListData]);
 
-    if (!selectedSale || !details) {
+    if (!selectedSale || !details || isLoading) {
         return (
             <main className="flex flex-1 flex-col gap-4 p-4 md:gap-8 md:p-8">
                 <div className="text-center text-muted-foreground">

@@ -1,7 +1,7 @@
 
 'use client';
 import Link from 'next/link';
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import {
     Card,
@@ -22,7 +22,7 @@ import {
   import { Button } from '@/components/ui/button';
   import { Badge } from '@/components/ui/badge';
   import { Checkbox } from '@/components/ui/checkbox';
-  import { invoiceListData, type Invoice, spdData, type SpdData, type SalesOrder, type Customer } from '@/app/lib/data';
+  import { type Invoice, spdData, type SpdData, type SalesOrder, type Customer } from '@/app/lib/data';
   import { Search, Filter, MoreHorizontal, ArrowUpDown, Plus, Eye, Pencil } from 'lucide-react';
   import { Skeleton } from '@/components/ui/skeleton';
   import {
@@ -33,21 +33,25 @@ import {
   } from '@/components/ui/dropdown-menu';
   import { DeleteConfirmationDialog } from '@/app/components/delete-confirmation-dialog';
   import { useToast } from '@/hooks/use-toast';
-  import { useFirestore, useCollection, useMemoFirebase, useUser } from '@/firebase';
-  import { collection, query, where } from 'firebase/firestore';
+  import { useFirestore, useCollection, useMemoFirebase, useUser, errorEmitter, FirestorePermissionError } from '@/firebase';
+  import { collection, query, where, doc, deleteDoc } from 'firebase/firestore';
 
 
   export default function InvoiceListPage() {
     const router = useRouter();
-    const [invoices, setInvoices] = useState<Invoice[]>(invoiceListData);
     const [currentSpdData, setCurrentSpdData] = useState<SpdData[]>(spdData);
-    const [isLoading, setIsLoading] = useState(false);
     const [activeTab, setActiveTab] = useState('all');
     const [searchQuery, setSearchQuery] = useState('');
     const [selectedInvoices, setSelectedInvoices] = useState<Set<string>>(new Set());
     const { toast } = useToast();
     const firestore = useFirestore();
     const { user } = useUser();
+    
+    const invoicesCollection = useMemoFirebase(() => {
+        if (!firestore || !user) return null;
+        return query(collection(firestore, 'invoices'), where('ownerId', '==', user.uid));
+    }, [firestore, user]);
+    const { data: invoices, isLoading } = useCollection<Invoice>(invoicesCollection);
     
     const customersCollection = useMemoFirebase(() => {
         if (!firestore || !user) return null;
@@ -63,6 +67,7 @@ import {
 
 
     const filteredInvoices = useMemo(() => {
+        if (!invoices) return [];
         let filtered = invoices;
         if (activeTab !== 'all') {
             filtered = invoices.filter(i => {
@@ -88,7 +93,20 @@ import {
     const totalUnpaid = invoices?.filter(item => item.status === 'unpaid' || item.status === 'sent' || item.status === 'draft').reduce((sum, item) => sum + item.amount, 0) || 0;
 
     const handleDelete = (invoiceId: string) => {
-        setInvoices(invoices.filter((inv) => inv.id !== invoiceId));
+        if (!firestore) return;
+        const safeId = invoiceId.replace(/\//g, '_');
+        const docRef = doc(firestore, 'invoices', safeId);
+        deleteDoc(docRef)
+            .then(() => {
+                toast({ title: 'Invoice Deleted', description: `Invoice ${invoiceId} has been removed.` });
+            })
+            .catch(async (serverError) => {
+                const permissionError = new FirestorePermissionError({
+                    path: docRef.path,
+                    operation: 'delete',
+                });
+                errorEmitter.emit('permission-error', permissionError);
+            });
     };
 
     const handleEdit = (invoice: Invoice) => {
@@ -164,7 +182,7 @@ import {
     };
     
     const handleCreateSpd = () => {
-        if (selectedInvoices.size === 0) {
+        if (selectedInvoices.size === 0 || !invoices) {
             toast({
                 variant: 'destructive',
                 title: 'No Invoices Selected',
@@ -211,12 +229,26 @@ import {
         setCurrentSpdData(prev => [...prev, newSpdEntry]);
         console.log("New SPD created:", newSpdEntry); // For debugging
 
-        // Update invoices with the new SPD number
-        setInvoices(prevInvoices => 
-            prevInvoices.map(inv => 
-                selectedInvoices.has(inv.id) ? { ...inv, spdNumber: newSpdNumber } : inv
-            )
-        );
+        // Update invoices in Firestore
+        if (firestore && user) {
+            selected.forEach(inv => {
+                const safeId = inv.id.replace(/\//g, '_');
+                const docRef = doc(firestore, 'invoices', safeId);
+                const updatedData = { ...inv, spdNumber: newSpdNumber, ownerId: user.uid };
+                
+                // We use setDoc with merge to avoid overwriting other fields unintentionally
+                // and to create the doc if it somehow doesn't exist.
+                setDoc(docRef, updatedData, { merge: true }).catch(async (serverError) => {
+                    const permissionError = new FirestorePermissionError({
+                        path: docRef.path,
+                        operation: 'update',
+                        requestResourceData: updatedData,
+                    });
+                    errorEmitter.emit('permission-error', permissionError);
+                });
+            });
+        }
+
 
         toast({
             title: 'SPD Created Successfully',

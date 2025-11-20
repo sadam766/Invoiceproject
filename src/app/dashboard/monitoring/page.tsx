@@ -52,12 +52,21 @@ export default function SalesMonitoringPage() {
     if (!firestore || !user) return null;
     return query(collection(firestore, 'salesOrders'), where('ownerId', '==', user.uid));
   }, [firestore, user]);
-  const { data: salesOrderListData, isLoading } = useCollection<SalesOrder>(salesOrdersCollection);
+  const { data: salesOrderListData, isLoading: isSalesOrdersLoading } = useCollection<SalesOrder>(salesOrdersCollection);
+
+  const invoicesCollection = useMemoFirebase(() => {
+    if (!firestore || !user) return null;
+    return query(collection(firestore, 'invoices'), where('ownerId', '==', user.uid));
+  }, [firestore, user]);
+  const { data: invoiceListData, isLoading: isInvoicesLoading } = useCollection<any>(invoicesCollection);
+
+
+  const isLoading = isSalesOrdersLoading || isInvoicesLoading;
   
   const salesMonitoringData = useMemo(() => {
-    if (!salesOrderListData) return [];
-    return getSalesMonitoringData(salesOrderListData);
-  }, [salesOrderListData]);
+    if (!salesOrderListData || !invoiceListData) return [];
+    return getSalesMonitoringData(salesOrderListData, invoiceListData);
+  }, [salesOrderListData, invoiceListData]);
 
   const needsInvoiceData = salesMonitoringData.filter(d => d.needsInvoice);
   const needsSpdData = salesMonitoringData.filter(d => d.needsSpd);
@@ -213,3 +222,5 @@ export default function SalesMonitoringPage() {
     </main>
   );
 }
+
+    

@@ -5,25 +5,33 @@ import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { ArrowLeft, Printer, Upload } from 'lucide-react';
-import { type SpdData, spdData as initialSpdData, type Customer, invoiceListData } from '@/app/lib/data';
+import { type SpdData, spdData as initialSpdData, type Customer, type Invoice } from '@/app/lib/data';
 import { format } from 'date-fns';
 import { id as indonesiaLocale } from 'date-fns/locale';
-import { useFirestore, useCollection, useMemoFirebase } from '@/firebase';
-import { collection } from 'firebase/firestore';
+import { useFirestore, useCollection, useMemoFirebase, useUser } from '@/firebase';
+import { collection, query, where } from 'firebase/firestore';
 
 export default function SpdPreviewPage() {
     const router = useRouter();
     const params = useParams();
     const { id } = params;
     const firestore = useFirestore();
+    const { user } = useUser();
 
     const [spdItem, setSpdItem] = useState<SpdData | null>(null);
     
     const customersCollection = useMemoFirebase(() => {
-        if (!firestore) return null;
-        return collection(firestore, 'customers');
-    }, [firestore]);
+        if (!firestore || !user) return null;
+        return query(collection(firestore, 'customers'), where('ownerId', '==', user.uid));
+    }, [firestore, user]);
     const { data: customerListData } = useCollection<Customer>(customersCollection);
+
+    const invoicesCollection = useMemoFirebase(() => {
+        if (!firestore || !user || !spdItem) return null;
+        return query(collection(firestore, 'invoices'), where('ownerId', '==', user.uid), where('id', '==', spdItem.noInvoice));
+    }, [firestore, user, spdItem]);
+    const { data: invoiceListData } = useCollection<Invoice>(invoicesCollection);
+
 
     useEffect(() => {
         const dataFromSession = sessionStorage.getItem('spdPreviewData');
@@ -33,6 +41,8 @@ export default function SpdPreviewPage() {
                 setSpdItem(parsedData);
             }
         } else if (id) {
+            // This part is a fallback and might not be needed if session storage is reliable
+            // It also relies on a static data source which we are moving away from.
             const decodedId = decodeURIComponent(id as string);
             const foundSpd = initialSpdData.find(item => item.spd === decodedId);
             setSpdItem(foundSpd || null);
@@ -55,7 +65,7 @@ export default function SpdPreviewPage() {
     }
     
     const customerDetails = customerListData?.find(c => c.name === spdItem.customer);
-    const relatedInvoice = invoiceListData.find(i => i.id === spdItem.noInvoice);
+    const relatedInvoice = invoiceListData?.[0]; // useCollection returns an array
     const suratJalanParts = spdItem.suratJalan.split(',').map(s => s.trim());
 
     return (
@@ -174,3 +184,4 @@ export default function SpdPreviewPage() {
     );
 }
 
+    

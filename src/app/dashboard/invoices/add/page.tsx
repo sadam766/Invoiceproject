@@ -53,11 +53,11 @@ import {
   Check
 } from 'lucide-react';
 import Link from 'next/link';
-import { type InvoiceNumber, type Customer, type ProductListItem, invoiceListData, type Invoice, type SalesOrder } from '@/app/lib/data';
+import { type InvoiceNumber, type Customer, type ProductListItem, type Invoice, type SalesOrder } from '@/app/lib/data';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
-import { useFirestore, useCollection, useMemoFirebase, useUser } from '@/firebase';
-import { collection, query, where } from 'firebase/firestore';
+import { useFirestore, useCollection, useMemoFirebase, useUser, useDoc, errorEmitter, FirestorePermissionError } from '@/firebase';
+import { collection, query, where, doc, setDoc } from 'firebase/firestore';
 
 type InvoiceItem = {
     id: number;
@@ -79,10 +79,7 @@ export default function AddInvoicePage() {
   const editInvoiceId = searchParams.get('editInvoiceId');
 
   const [invoiceNumberDataState, setInvoiceNumberDataState] = useState<InvoiceNumber | undefined>(undefined);
-  const [isInvoiceNumberLoading, setIsInvoiceNumberLoading] = useState(!!invoiceNumberId || !!editInvoiceId);
   
-  const isLoading = isInvoiceNumberLoading;
-
   const [invoiceId, setInvoiceId] = useState('');
   const [soNumber, setSoNumber] = useState('');
   const [poNumber, setPoNumber] = useState('');
@@ -135,80 +132,71 @@ export default function AddInvoicePage() {
   }, [salesOrderListData]);
 
 
-  const invoiceNumberCollection = useMemoFirebase(() => {
-    if (!firestore) return null;
-    return collection(firestore, 'invoiceNumbers');
-  }, [firestore]);
-  const { data: invoiceNumberData } = useCollection<InvoiceNumber>(invoiceNumberCollection);
+  const invoiceNumberRef = useMemoFirebase(() => {
+    if (!firestore || !invoiceNumberId) return null;
+    return doc(firestore, 'invoiceNumbers', invoiceNumberId);
+  }, [firestore, invoiceNumberId]);
+  const { data: invoiceNumberData, isLoading: isInvoiceNumberLoading } = useDoc<InvoiceNumber>(invoiceNumberRef);
+
+  const invoiceToEditRef = useMemoFirebase(() => {
+    if (!firestore || !editInvoiceId) return null;
+    return doc(firestore, 'invoices', editInvoiceId);
+  }, [firestore, editInvoiceId]);
+  const { data: invoiceToEditData, isLoading: isEditInvoiceLoading } = useDoc<Invoice>(invoiceToEditRef);
+  
+  const isLoading = isInvoiceNumberLoading || isEditInvoiceLoading;
 
   useEffect(() => {
-    if (invoiceNumberId) {
-      setIsInvoiceNumberLoading(true);
-      setTimeout(() => {
-        const foundInvoice = invoiceNumberData?.find(inv => inv.id.replace(/\//g, '_') === invoiceNumberId);
-        setInvoiceNumberDataState(foundInvoice);
-        setIsInvoiceNumberLoading(false);
-      }, 500);
-    } else if (editInvoiceId) {
-      setIsInvoiceNumberLoading(true);
-      setTimeout(() => {
-        const decodedId = editInvoiceId.replace(/_/g, '/');
-        const foundInvoice = invoiceListData.find(inv => inv.id === decodedId);
-        if (foundInvoice) {
-            setInvoiceId(foundInvoice.id);
-            setSoNumber(foundInvoice.soNumber);
-            setPoNumber(foundInvoice.poNumber);
-            setStatus(foundInvoice.status);
-            
-            const foundCustomer = customerListData?.find(c => c.name === foundInvoice.customer);
-            setCustomer(foundCustomer);
-
-            if (foundInvoice.date) {
-                setIssueDate(new Date(foundInvoice.date));
-            }
-
-            if(foundInvoice.soNumber && salesOrderListData) {
-                const soItems = salesOrderListData.filter(so => so.soNumber === foundInvoice.soNumber);
-                 if (soItems.length > 0) {
-                    const newItems: InvoiceItem[] = soItems.map((item, index) => ({
-                        id: Date.now() + index,
-                        name: item.productName,
-                        quantity: item.quantity,
-                        unit: item.unit,
-                        price: item.price,
-                        total: item.quantity * item.price,
-                    }));
-                    setItems(newItems);
-                }
-            }
-        }
-        setIsInvoiceNumberLoading(false);
-      }, 500);
-    }
-  }, [invoiceNumberId, editInvoiceId, customerListData, invoiceNumberData, salesOrderListData]);
-
-
-  useEffect(() => {
-    if (invoiceNumberDataState) {
-      setInvoiceId(invoiceNumberDataState.id);
+    if (invoiceNumberData) {
+      setInvoiceId(invoiceNumberData.id);
       
-      // Pre-fill SO and customer if they exist
-      if (invoiceNumberDataState.salesOrder) {
-        handleSoSelect(invoiceNumberDataState.salesOrder);
+      if (invoiceNumberData.salesOrder) {
+        handleSoSelect(invoiceNumberData.salesOrder);
       } else {
-        const foundCustomer = customerListData?.find(c => c.name === invoiceNumberDataState.customer);
+        const foundCustomer = customerListData?.find(c => c.name === invoiceNumberData.customer);
         setCustomer(foundCustomer);
       }
 
-      if (invoiceNumberDataState.date) {
-        const parts = invoiceNumberDataState.date.split('/');
+      if (invoiceNumberData.date) {
+        const parts = invoiceNumberData.date.split('/');
         if (parts.length === 3) {
             const [day, month, year] = parts;
             setIssueDate(new Date(`${year}-${month}-${day}`));
         }
       }
     }
-  }, [invoiceNumberDataState, customerListData]);
+  }, [invoiceNumberData, customerListData]);
+
+  useEffect(() => {
+    if (invoiceToEditData) {
+        setInvoiceId(invoiceToEditData.id);
+        setSoNumber(invoiceToEditData.soNumber);
+        setPoNumber(invoiceToEditData.poNumber);
+        setStatus(invoiceToEditData.status);
+        
+        const foundCustomer = customerListData?.find(c => c.name === invoiceToEditData.customer);
+        setCustomer(foundCustomer);
+
+        if (invoiceToEditData.date) {
+            setIssueDate(new Date(invoiceToEditData.date));
+        }
+
+        if(invoiceToEditData.soNumber && salesOrderListData) {
+            const soItems = salesOrderListData.filter(so => so.soNumber === invoiceToEditData.soNumber);
+             if (soItems.length > 0) {
+                const newItems: InvoiceItem[] = soItems.map((item, index) => ({
+                    id: Date.now() + index,
+                    name: item.productName,
+                    quantity: item.quantity,
+                    unit: item.unit,
+                    price: item.price,
+                    total: item.quantity * item.price,
+                }));
+                setItems(newItems);
+            }
+        }
+    }
+  }, [invoiceToEditData, customerListData, salesOrderListData]);
   
   const handleSoSelect = (selectedSo: string) => {
     setSoNumber(selectedSo);
@@ -284,7 +272,7 @@ export default function AddInvoicePage() {
 
   
   const handleSaveInvoice = async (invoiceStatus: 'draft' | 'sent' | 'paid' | 'unpaid' = 'draft') => {
-    if (!invoiceId || !customer || !issueDate) {
+    if (!firestore || !user || !invoiceId || !customer || !issueDate) {
         toast({
             variant: "destructive",
             title: "Validation Error",
@@ -293,33 +281,36 @@ export default function AddInvoicePage() {
         return;
     }
 
-    const newInvoice: Invoice = {
-        id: invoiceId,
+    const safeId = invoiceId.replace(/\//g, '_');
+    const docRef = doc(firestore, 'invoices', safeId);
+    
+    const newInvoice: Omit<Invoice, 'id'> & { ownerId: string } = {
         soNumber: soNumber,
         poNumber: poNumber,
         customer: customer.name,
         date: format(issueDate, 'yyyy-MM-dd'),
         amount: grandTotal + vat12,
         status: invoiceStatus,
-        spdNumber: '-', // Default value
+        spdNumber: invoiceToEditData?.spdNumber || '-', // Preserve existing SPD number
+        ownerId: user.uid,
     };
     
-    // Check if invoice with the same ID already exists
-    const existingInvoiceIndex = invoiceListData.findIndex(inv => inv.id === newInvoice.id);
-
-    if (existingInvoiceIndex !== -1) {
-        // Update existing invoice
-        invoiceListData[existingInvoiceIndex] = newInvoice;
-    } else {
-        // Add new invoice to the beginning of the list
-        invoiceListData.unshift(newInvoice);
-    }
-
-    toast({
-      title: "Invoice Saved",
-      description: `Invoice ${invoiceId} has been successfully saved as ${invoiceStatus}.`,
-    });
-    router.push('/dashboard/invoices');
+    setDoc(docRef, newInvoice, { merge: true })
+        .then(() => {
+            toast({
+              title: "Invoice Saved",
+              description: `Invoice ${invoiceId} has been successfully saved as ${invoiceStatus}.`,
+            });
+            router.push('/dashboard/invoices');
+        })
+        .catch(async (serverError) => {
+            const permissionError = new FirestorePermissionError({
+                path: docRef.path,
+                operation: editInvoiceId ? 'update' : 'create',
+                requestResourceData: { id: invoiceId, ...newInvoice },
+            });
+            errorEmitter.emit('permission-error', permissionError);
+        });
   };
 
   const handleAddItem = () => {
@@ -435,7 +426,7 @@ export default function AddInvoicePage() {
   };
 
 
-  if (isLoading && !invoiceNumberDataState) {
+  if (isLoading) {
     return (
         <main className="flex flex-1 flex-col gap-4 p-4 md:gap-8 md:p-8">
             <div className="flex items-center gap-4">
@@ -855,3 +846,5 @@ export default function AddInvoicePage() {
     </main>
   );
 }
+
+    

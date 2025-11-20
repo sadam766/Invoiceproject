@@ -5,25 +5,33 @@ import { useState, useMemo } from 'react';
 import { addDays, format, startOfToday, isSameDay, isWithinInterval } from 'date-fns';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Calendar } from '@/components/ui/calendar';
-import { invoiceListData, type Invoice, type Customer } from '@/app/lib/data';
+import { type Invoice, type Customer } from '@/app/lib/data';
 import { Badge } from '@/components/ui/badge';
 import { Bell } from 'lucide-react';
-import { useFirestore, useCollection, useMemoFirebase } from '@/firebase';
-import { collection } from 'firebase/firestore';
+import { useFirestore, useCollection, useMemoFirebase, useUser } from '@/firebase';
+import { collection, query, where } from 'firebase/firestore';
 
 export default function CalendarPage() {
   const [date, setDate] = useState<Date | undefined>(new Date());
   const firestore = useFirestore();
+  const { user } = useUser();
 
   const customersCollection = useMemoFirebase(() => {
-    if (!firestore) return null;
-    return collection(firestore, 'customers');
-  }, [firestore]);
+    if (!firestore || !user) return null;
+    return query(collection(firestore, 'customers'), where('ownerId', '==', user.uid));
+  }, [firestore, user]);
   const { data: customerListData } = useCollection<Customer>(customersCollection);
   
+  const invoicesCollection = useMemoFirebase(() => {
+    if (!firestore || !user) return null;
+    return query(collection(firestore, 'invoices'), where('ownerId', '==', user.uid));
+  }, [firestore, user]);
+  const { data: invoiceListData } = useCollection<Invoice>(invoicesCollection);
+
   const unpaidInvoices = useMemo(() => {
+    if (!invoiceListData) return [];
     return invoiceListData.filter(invoice => invoice.status === 'unpaid' || invoice.status === 'sent');
-  }, []);
+  }, [invoiceListData]);
 
   const invoiceDueDates = useMemo(() => {
     return unpaidInvoices.map(invoice => ({
@@ -130,3 +138,4 @@ export default function CalendarPage() {
   );
 }
 
+    

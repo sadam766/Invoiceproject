@@ -1,3 +1,4 @@
+
 {
   "entities": {
     "Product": {
@@ -96,6 +97,60 @@
         "amount",
         "status"
       ]
+    },
+    "Invoice": {
+      "title": "Invoice",
+      "description": "Represents an invoice document.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the invoice, often formatted (e.g., INV/2024/001)."
+        },
+        "soNumber": {
+          "type": "string",
+          "description": "Sales Order number related to this invoice."
+        },
+        "poNumber": {
+          "type": "string",
+          "description": "Purchase Order number from the customer."
+        },
+        "customer": {
+          "type": "string",
+          "description": "Name of the customer being invoiced."
+        },
+        "date": {
+          "type": "string",
+          "description": "The date the invoice was issued.",
+          "format": "date"
+        },
+        "amount": {
+          "type": "number",
+          "description": "The total amount of the invoice."
+        },
+        "status": {
+          "type": "string",
+          "description": "The current status of the invoice.",
+          "enum": ["paid", "unpaid", "sent", "draft"]
+        },
+        "spdNumber": {
+          "type": "string",
+          "description": "The SPD (Surat Pengantar Dokumen) number associated with this invoice, if any."
+        },
+        "ownerId": {
+            "type": "string",
+            "description": "The UID of the user who owns this document."
+        }
+      },
+      "required": [
+        "id",
+        "soNumber",
+        "customer",
+        "date",
+        "amount",
+        "status",
+        "ownerId"
+      ]
     }
   },
   "auth": {
@@ -113,7 +168,7 @@
           "schema": {
             "$ref": "#/backend/entities/Product"
           },
-          "description": "Stores product information.  Write access is restricted to users with admin privileges (checked via `/roles_admin/{uid}`).",
+          "description": "Stores product information. Write access is restricted to users with admin privileges (checked via /users/{uid}).",
           "params": [
             {
               "name": "productId",
@@ -129,11 +184,11 @@
           "schema": {
             "$ref": "#/backend/entities/Customer"
           },
-          "description": "Stores customer data. Only the customer (identified by their UID) can read/write their own data.",
+          "description": "Stores customer data. Only the user who created it (ownerId) can read/write their own data.",
           "params": [
             {
               "name": "customerId",
-              "description": "The unique identifier for the customer, which matches their Firebase Auth UID."
+              "description": "The unique identifier for the customer."
             }
           ]
         }
@@ -145,7 +200,7 @@
           "schema": {
             "$ref": "#/backend/entities/Sale"
           },
-          "description": "Stores sale transaction data. Includes denormalized `customerId` for authorization independence.  Only the customer associated with the sale can read/write the sale data.",
+          "description": "Stores sale transaction data. Only the user who created it (ownerId) can read/write the sale data.",
           "params": [
             {
               "name": "saleId",
@@ -155,17 +210,29 @@
         }
       },
       {
-        "path": "/roles_admin/{uid}",
+        "path": "/invoices/{invoiceId}",
         "definition": {
-          "entityName": "roles_admin",
-          "schema": {
-            "$ref": "#/backend/entities/user"
-          },
-          "description": "Collection to store UIDs of users with admin privileges. Existence of a document grants admin rights.",
+            "entityName": "Invoice",
+            "schema": {
+                "$ref": "#/entities/Invoice"
+            },
+            "description": "Stores invoice documents. Only the user who created it (ownerId) can access it.",
+            "params": [
+                {
+                    "name": "invoiceId",
+                    "description": "The unique identifier for the invoice."
+                }
+            ]
+        }
+      },
+      {
+        "path": "/users/{uid}",
+        "definition": {
+          "description": "Stores user profile information, including their role.",
           "params": [
             {
               "name": "uid",
-              "description": "The Firebase Auth UID of the admin user."
+              "description": "The Firebase Auth UID of the user."
             }
           ]
         }
@@ -174,3 +241,5 @@
     "reasoning": "The Firestore structure is designed to securely manage product, customer, and sales data for the sales dashboard application. It prioritizes Authorization Independence, clarity, and ease of querying.\n\n**Authorization Independence:**\n\n*   Sales are stored directly under a `sales` collection. To enforce security without relying on hierarchical `get()` calls, `customerId` is denormalized inside the Sale document. This allows rules to validate that the `customerId` matches the `request.auth.uid` when creating or modifying sales, without needing to read the customer document.\n\n**Structural Segregation:**\n\n*   Each entity type (products, customers, sales) is stored in its own top-level collection. This segregation simplifies security rules because each collection has a distinct access pattern.\n\n**Access Modeling:**\n\n*   **Customers:** Customers are stored in the `/customers/{customerId}` collection. This path-based ownership allows simple rules enforcing that only the authenticated user (with `uid` equal to `customerId`) can read/write their customer data.\n*   **Sales:** Sales are stored in the `/sales/{saleId}` collection. Security is enforced using denormalized `customerId` to restrict access to sales associated with the authenticated user.\n*   **Products:** Products are stored in the `/products/{productId}` collection. Assuming all products are publicly readable but only admins can create/update them, a separate `/roles_admin/{uid}` collection controls administrative privileges.  Rules on the `/products` collection check for the existence of a document in `/roles_admin/{request.auth.uid}` to grant write access.\n\n**QAPs (Rules are not Filters):**\n\n*   The structure supports secure listing of sales associated with a specific customer because the `customerId` is available in each `Sale` document. This allows rules to filter sales based on the `request.auth.uid` (which represents the `customerId`). Products are secured based on admin roles.\n\n**Invariants:**\n\n*   Timestamps could be added to documents (e.g., `createdAt`, `updatedAt`) to track changes. Security rules can enforce that `createdAt` is only set on creation and `updatedAt` is always updated on modifications.\n"
   }
 }
+
+    

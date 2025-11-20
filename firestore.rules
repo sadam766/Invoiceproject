@@ -1,3 +1,4 @@
+
 /**
  * @file Firestore Security Rules
  * @description This ruleset enforces a strict user-ownership model for customer and sale data,
@@ -10,6 +11,7 @@
  * - /sales/{saleId}: Stores sale data, accessible only by the customer associated with the sale.
  * - /salesOrders/{orderId}: Stores sales order items, accessible only by the user who created them.
  * - /invoiceNumbers/{invoiceNumberId}: Stores invoice numbers, accessible only by the user who created them.
+ * - /invoices/{invoiceId}: Stores invoice documents, accessible only by the user who created them.
  * - /users/{uid}: Stores user profile and role information.
  */
 rules_version = '2';
@@ -94,6 +96,18 @@ service cloud.firestore {
     }
 
     /**
+     * @description Enforces ownership for invoice data.
+     * @path /invoices/{invoiceId}
+     * @allow (read, write): Only the user who created the invoice document can access it.
+     *                       The query from the client MUST include `where('ownerId', '==', request.auth.uid)`.
+     * @principle Enforces strict data ownership based on an `ownerId` field.
+     */
+    match /invoices/{invoiceId} {
+      allow read, write: if isSignedIn() && request.auth.uid == resource.data.ownerId;
+      allow create: if isSignedIn() && request.resource.data.ownerId == request.auth.uid;
+    }
+
+    /**
      * @description Enforces ownership for sales data.
      * @path /sales/{saleId}
      * @allow (read, write): Only the user who created the sale document can access it.
@@ -106,3 +120,5 @@ service cloud.firestore {
     }
   }
 }
+
+    
