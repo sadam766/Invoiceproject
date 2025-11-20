@@ -92,11 +92,9 @@ export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceDa
         const id = inv.id || '';
         let match;
         if (type === 'sar') {
-          // Match SAR/ or SAR_ followed by numbers
           match = id.match(/^(?:SAR[\/_])([0-9]+)/);
         } else { // kw
-          // Match KW/ or KW_ followed by numbers
-          match = id.match(/^(?:KW[\/_])([0-9]+)/);
+          match = id.match(/^(?:KW[\/_])(.*?)(?:[\/_]KEU[\/_].*)?$/);
         }
         if (match && match[1]) {
           return parseInt(match[1], 10);
@@ -116,47 +114,43 @@ export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceDa
     } else { // kw
       setPrefix('KW/');
       setSuffix(`/KEU/${currentYear}`);
-      setMainNumber(nextNum.toString().padStart(4, '0'));
+      setMainNumber(nextNum.toString().padStart(2, '0'));
     }
   };
   
-  
-  // This effect runs only when the dialog opens.
+  // This effect runs to initialize the dialog state
   useEffect(() => {
-    if (!isOpen) {
-      return; // Do nothing if dialog is closed
-    }
+    if (!isOpen) return;
 
     if (invoiceData) {
-      // ===== EDIT MODE =====
-      const type = invoiceData.id.startsWith('SAR/') || invoiceData.id.startsWith('SAR_') ? 'sar' : 'kw';
-      
-      let extractedMainNumber = '';
+      // --- EDIT MODE ---
+      const type = invoiceData.id.startsWith('SAR') ? 'sar' : 'kw';
+      const separator = /[\/_]/;
+      const parts = invoiceData.id.split(separator);
+
       let extractedPrefix = '';
+      let extractedMainNumber = '';
       let extractedSuffix = '';
       
       if (type === 'sar') {
-        const match = invoiceData.id.match(/^(SAR[\/_])(.+)/);
-        if (match) {
-          extractedPrefix = match[1];
-          extractedMainNumber = match[2];
-        }
-      } else { // type === 'kw'
-        const match = invoiceData.id.match(/^(KW[\/_])(.*?)([\/_]KEU[\/_].*|$)/);
-        if (match) {
-          extractedPrefix = match[1];
-          extractedMainNumber = match[2];
-          extractedSuffix = match[3];
-        }
+          extractedPrefix = parts[0] + '/';
+          extractedMainNumber = parts.slice(1).join('');
+      } else { // kw
+          extractedPrefix = parts[0] + '/';
+          if (parts.length >= 4 && parts[parts.length - 2] === 'KEU') {
+              extractedMainNumber = parts.slice(1, parts.length - 2).join('/');
+              extractedSuffix = '/' + parts.slice(parts.length - 2).join('/');
+          } else {
+              extractedMainNumber = parts.slice(1).join('/');
+          }
       }
-
+      
       setInvoiceType(type);
       setPrefix(extractedPrefix);
       setMainNumber(extractedMainNumber);
       setSuffix(extractedSuffix);
-      setIsAutoNumber(false); // ALWAYS start in manual for editing
+      setIsAutoNumber(false); // Always start in manual for editing
 
-      // Populate other fields
       setCustomer(invoiceData.customer);
       setSalesOrder(invoiceData.salesOrder);
       if (invoiceData.date) {
@@ -171,40 +165,41 @@ export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceDa
         setDate(new Date());
       }
       setAmount(formatNumberWithCommas(invoiceData.amount));
+
     } else {
-      // ===== ADD NEW MODE =====
-      setIsAutoNumber(true);
+      // --- ADD NEW MODE ---
       const initialType = 'kw';
       setInvoiceType(initialType);
+      setIsAutoNumber(true);
       generateNextNumber(initialType);
       
-      // Reset other fields for a new entry
       setCustomer('');
       setSalesOrder('');
       setDate(new Date());
       setAmount(0);
+      setPrefix('');
+      setMainNumber('');
+      setSuffix('');
     }
-  }, [isOpen, invoiceData, allInvoiceNumbers]); // Dependency on allInvoiceNumbers ensures it uses fresh data
+  }, [isOpen, invoiceData]); // Rerun only when dialog opens or data changes
 
   // This effect updates the full invoice number whenever its parts change
   useEffect(() => {
     setFullInvoiceNumber(`${prefix}${mainNumber}${suffix}`);
   }, [prefix, mainNumber, suffix]);
 
-  // Handle manual change of invoice type in ADD mode
   const handleInvoiceTypeChange = (newType: 'sar' | 'kw') => {
     if (invoiceData) return; // Don't allow type change in edit mode
     setInvoiceType(newType);
     if (isAutoNumber) {
-        generateNextNumber(newType);
+      generateNextNumber(newType);
     }
   }
 
-  // Handle toggling of the auto-number checkbox
   const handleAutoNumberToggle = (checked: boolean) => {
     setIsAutoNumber(checked);
-    if (checked && !invoiceData) { // Only regenerate number in add mode
-        generateNextNumber(invoiceType);
+    if (checked && !invoiceData) {
+      generateNextNumber(invoiceType);
     }
   }
 
@@ -464,5 +459,7 @@ export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceDa
     </Dialog>
   );
 }
+
+    
 
     
