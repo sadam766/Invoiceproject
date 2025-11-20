@@ -74,7 +74,7 @@ export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceDa
   const salesOrdersCollection = useMemoFirebase(() => {
     if (!firestore) return null;
     return collection(firestore, 'salesOrders');
-  }, [firestore]);
+  },- [firestore]);
   const { data: salesOrderListData } = useCollection<SalesOrder>(salesOrdersCollection);
 
   const uniqueSalesOrders = useMemo(() => {
@@ -86,36 +86,40 @@ export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceDa
     if (!allInvoiceNumbers) return;
     const currentYear = new Date().getFullYear();
     let nextNum = 1;
-
+  
     const relevantNumbers = allInvoiceNumbers
       .map(inv => {
         const id = inv.id || '';
         let match;
         if (type === 'sar') {
-          match = id.match(/^(?:SAR\/|SAR_)([0-9]+)/);
-          if (match && match[1]) return parseInt(match[1], 10);
+          // Match SAR/ or SAR_ followed by numbers
+          match = id.match(/^(?:SAR[\/_])([0-9]+)/);
         } else { // kw
-          match = id.match(/^KW\/([0-9]+)\//);
-          if (match && match[1]) return parseInt(match[1], 10);
+          // Match KW/ or KW_ followed by numbers
+          match = id.match(/^(?:KW[\/_])([0-9]+)/);
+        }
+        if (match && match[1]) {
+          return parseInt(match[1], 10);
         }
         return 0;
       })
       .filter(num => !isNaN(num) && num > 0);
-
+  
     if (relevantNumbers.length > 0) {
       nextNum = Math.max(...relevantNumbers) + 1;
     }
   
     if (type === 'sar') {
-        setPrefix('SAR/');
-        setSuffix('');
-        setMainNumber(nextNum.toString());
+      setPrefix('SAR/');
+      setSuffix('');
+      setMainNumber(nextNum.toString());
     } else { // kw
-        setPrefix('KW/');
-        setSuffix(`/KEU/${currentYear}`);
-        setMainNumber(nextNum.toString().padStart(4, '0'));
+      setPrefix('KW/');
+      setSuffix(`/KEU/${currentYear}`);
+      setMainNumber(nextNum.toString().padStart(4, '0'));
     }
   };
+  
   
   // This effect runs only when the dialog opens.
   useEffect(() => {
@@ -132,13 +136,13 @@ export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceDa
       let extractedSuffix = '';
       
       if (type === 'sar') {
-        const match = invoiceData.id.match(/^(SAR\/|SAR_)(.+)/);
+        const match = invoiceData.id.match(/^(SAR[\/_])(.+)/);
         if (match) {
           extractedPrefix = match[1];
           extractedMainNumber = match[2];
         }
       } else { // type === 'kw'
-        const match = invoiceData.id.match(/^(KW\/)(.*?)(?=\/KEU|$)(.*)/);
+        const match = invoiceData.id.match(/^(KW[\/_])(.*?)([\/_]KEU[\/_].*|$)/);
         if (match) {
           extractedPrefix = match[1];
           extractedMainNumber = match[2];
@@ -248,16 +252,16 @@ export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceDa
         });
         return;
     }
-    const finalInvoiceNumber = `${prefix}${mainNumber}${suffix}`;
+    const finalInvoiceNumber = `${prefix}${mainNumber}${suffix}`.replace(/\//g, '_');
     // In edit mode, invoiceData.id will be the original ID. Check if it's different from the new one.
-    const isChangingId = invoiceData && invoiceData.id !== finalInvoiceNumber;
+    const isChangingId = invoiceData && invoiceData.id.replace(/\//g, '_') !== finalInvoiceNumber;
     
     // Check for duplicates only if it's a new invoice OR if the ID is being changed in edit mode.
-    if ((!invoiceData || isChangingId) && allInvoiceNumbers?.some(inv => inv.id === finalInvoiceNumber)) {
+    if ((!invoiceData || isChangingId) && allInvoiceNumbers?.some(inv => inv.id.replace(/\//g, '_') === finalInvoiceNumber)) {
       toast({
         variant: "destructive",
         title: "Duplicate Invoice Number",
-        description: `Invoice number "${finalInvoiceNumber}" already exists. Please use a different number.`,
+        description: `Invoice number "${finalInvoiceNumber.replace(/_/g, '/')}" already exists. Please use a different number.`,
       });
       return; 
     }
@@ -265,7 +269,7 @@ export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceDa
     const formattedDate = date ? format(date, 'dd/MM/yyyy') : '';
     const numericAmount = typeof amount === 'string' ? parseFormattedNumber(amount) : amount;
     onSave({
-      id: finalInvoiceNumber,
+      id: finalInvoiceNumber.replace(/_/g, '/'),
       customer,
       salesOrder,
       date: formattedDate,
@@ -320,9 +324,9 @@ export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceDa
               <Label htmlFor="auto-number" className="font-normal">Nomor Otomatis</Label>
             </div>
             <div className="grid grid-cols-[auto_1fr_auto] items-center gap-2">
-              <Input value={prefix} className="bg-muted text-right" readOnly tabIndex={-1} />
+              <Input value={prefix} onChange={e => setPrefix(e.target.value)} className="bg-muted text-right" readOnly={isAutoNumber} tabIndex={-1} />
               <Input value={mainNumber} onChange={(e) => setMainNumber(e.target.value)} disabled={isAutoNumber} />
-              {suffix && <Input value={suffix} className="bg-muted" readOnly tabIndex={-1} />}
+              {suffix && <Input value={suffix} onChange={e => setSuffix(e.target.value)} className="bg-muted" readOnly={isAutoNumber} tabIndex={-1} />}
             </div>
             <Input id="full-invoice-number" value={fullInvoiceNumber} disabled className="bg-muted font-semibold text-center" />
           </div>
@@ -460,3 +464,5 @@ export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceDa
     </Dialog>
   );
 }
+
+    
