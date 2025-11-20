@@ -22,7 +22,7 @@ import {
   import { Button } from '@/components/ui/button';
   import { Badge } from '@/components/ui/badge';
   import { Checkbox } from '@/components/ui/checkbox';
-  import { type Invoice, spdData, type SpdData, type SalesOrder, type Customer } from '@/app/lib/data';
+  import { type Invoice, type SpdData, type SalesOrder, type Customer } from '@/app/lib/data';
   import { Search, Filter, MoreHorizontal, ArrowUpDown, Plus, Eye, Pencil } from 'lucide-react';
   import { Skeleton } from '@/components/ui/skeleton';
   import {
@@ -34,12 +34,11 @@ import {
   import { DeleteConfirmationDialog } from '@/app/components/delete-confirmation-dialog';
   import { useToast } from '@/hooks/use-toast';
   import { useFirestore, useCollection, useMemoFirebase, useUser, errorEmitter, FirestorePermissionError } from '@/firebase';
-  import { collection, query, where, doc, deleteDoc } from 'firebase/firestore';
+  import { collection, query, where, doc, deleteDoc, writeBatch, setDoc } from 'firebase/firestore';
 
 
   export default function InvoiceListPage() {
     const router = useRouter();
-    const [currentSpdData, setCurrentSpdData] = useState<SpdData[]>(spdData);
     const [activeTab, setActiveTab] = useState('all');
     const [searchQuery, setSearchQuery] = useState('');
     const [selectedInvoices, setSelectedInvoices] = useState<Set<string>>(new Set());
@@ -181,8 +180,8 @@ import {
         }
     };
     
-    const handleCreateSpd = () => {
-        if (selectedInvoices.size === 0 || !invoices) {
+    const handleCreateSpd = async () => {
+        if (!firestore || !user || selectedInvoices.size === 0 || !invoices) {
             toast({
                 variant: 'destructive',
                 title: 'No Invoices Selected',
@@ -190,10 +189,9 @@ import {
             });
             return;
         }
-
+    
         const selected = invoices.filter(inv => selectedInvoices.has(inv.id));
         
-        // Cek jika ada invoice yang sudah punya SPD
         const alreadyHasSpd = selected.some(inv => inv.spdNumber && inv.spdNumber !== '-');
         if (alreadyHasSpd) {
             toast({
@@ -208,8 +206,8 @@ import {
         const totalAmount = selected.reduce((sum, inv) => sum + inv.amount, 0);
         const customerNames = Array.from(new Set(selected.map(inv => inv.customer))).join(', ');
         const invoiceNumbers = selected.map(inv => inv.id).join(', ');
-
-        const newSpdEntry: SpdData = {
+    
+        const newSpdEntry: Omit<SpdData, 'ownerId'> = {
             spd: newSpdNumber,
             tanggal: new Date().toISOString().split('T')[0],
             sales: 'System', // Placeholder
@@ -225,37 +223,45 @@ import {
             suratJalan: '-',
         };
         
-        // This is a simulation, in a real app you would send this to a server
-        setCurrentSpdData(prev => [...prev, newSpdEntry]);
-        console.log("New SPD created:", newSpdEntry); // For debugging
+        const spdDocRef = doc(firestore, 'spds', newSpdNumber);
+        const spdDataToSave = { ...newSpdEntry, ownerId: user.uid };
 
-        // Update invoices in Firestore
-        if (firestore && user) {
+        try {
+            const batch = writeBatch(firestore);
+    
+            // 1. Create the new SPD document
+            batch.set(spdDocRef, spdDataToSave);
+    
+            // 2. Update all selected invoices with the new SPD number
             selected.forEach(inv => {
                 const safeId = inv.id.replace(/\//g, '_');
                 const docRef = doc(firestore, 'invoices', safeId);
-                const updatedData = { ...inv, spdNumber: newSpdNumber, ownerId: user.uid };
-                
-                // We use setDoc with merge to avoid overwriting other fields unintentionally
-                // and to create the doc if it somehow doesn't exist.
-                setDoc(docRef, updatedData, { merge: true }).catch(async (serverError) => {
-                    const permissionError = new FirestorePermissionError({
-                        path: docRef.path,
-                        operation: 'update',
-                        requestResourceData: updatedData,
-                    });
-                    errorEmitter.emit('permission-error', permissionError);
-                });
+                batch.update(docRef, { spdNumber: newSpdNumber });
+            });
+    
+            // 3. Commit all changes at once
+            await batch.commit();
+    
+            toast({
+                title: 'SPD Created Successfully',
+                description: `SPD ${newSpdNumber} has been created for ${selected.size} invoices.`,
+            });
+    
+            setSelectedInvoices(new Set()); // Clear selection after successful creation
+        } catch (error) {
+            console.error("Failed to create SPD and update invoices:", error);
+            const permissionError = new FirestorePermissionError({
+                path: 'spds or invoices',
+                operation: 'write',
+                requestResourceData: 'Batch SPD creation'
+            });
+            errorEmitter.emit('permission-error', permissionError);
+            toast({
+                variant: 'destructive',
+                title: 'Error Creating SPD',
+                description: 'Could not create SPD or update invoices. Please check permissions and try again.',
             });
         }
-
-
-        toast({
-            title: 'SPD Created Successfully',
-            description: `SPD ${newSpdNumber} has been created for ${selected.size} invoices.`,
-        });
-
-        setSelectedInvoices(new Set());
     };
   
     return (
