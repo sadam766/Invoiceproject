@@ -1,3 +1,4 @@
+
 'use client';
 import { useState, useMemo, useRef } from 'react';
 import {
@@ -19,7 +20,7 @@ import {
   import { AddCustomerDialog } from './_components/add-customer-dialog';
   import { DeleteConfirmationDialog } from '@/app/components/delete-confirmation-dialog';
   import { useToast } from '@/hooks/use-toast';
-  import { exportToExcel, generateExcelTemplate } from '@/lib/utils';
+  import { exportToExcel, generateExcelTemplate, importFromExcel } from '@/lib/utils';
   import { useFirestore, useUser, useCollection, useMemoFirebase, errorEmitter, FirestorePermissionError } from '@/firebase';
   import { collection, doc, setDoc, deleteDoc, writeBatch, query, where } from 'firebase/firestore';
 
@@ -255,3 +256,5 @@ import {
       </main>
     );
   }
+
+    
