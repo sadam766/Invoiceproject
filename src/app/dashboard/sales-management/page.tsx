@@ -33,7 +33,7 @@ import {
 
   export default function SalesManagementPage() {
     const router = useRouter();
-    const [viewMode, setViewMode] = useState<DocumentView>('grid');
+    const [viewMode, setViewMode] = useState<DocumentView>('list');
     const [searchQuery, setSearchQuery] = useState('');
     const [sortOption, setSortOption] = useState('soNumber-desc');
 
@@ -79,7 +79,7 @@ import {
             docs = docs.filter(doc =>
                 doc.soNumber.toLowerCase().includes(searchQuery.toLowerCase()) ||
                 doc.customer.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                doc.invoice?.id.toLowerCase().includes(searchQuery.toLowerCase())
+                (doc.invoice?.id && doc.invoice.id.toLowerCase().includes(searchQuery.toLowerCase()))
             );
         }
 
@@ -94,6 +94,10 @@ import {
                 valA = a.soNumber;
                 valB = b.soNumber;
             }
+
+            if (valA === undefined) valA = 0;
+            if (valB === undefined) valB = 0;
+            
             if (valA < valB) return direction === 'asc' ? -1 : 1;
             if (valA > valB) return direction === 'asc' ? 1 : -1;
             return 0;
@@ -102,66 +106,6 @@ import {
 
         return docs;
     }, [salesList, invoiceList, taxInvoiceList, searchQuery, sortOption]);
-    
-    const GridView = ({ documents }: { documents: MergedDocument[] }) => (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {documents.map(doc => (
-                 <div className="rounded-lg border p-4" key={doc.soNumber}>
-                    <div className="flex justify-between items-start">
-                        <div className="grid grid-cols-2 gap-x-8 gap-y-1 text-sm">
-                            <div className="font-medium text-muted-foreground">NO. SO</div>
-                            <div className="font-medium">{doc.soNumber}</div>
-                            <div className="font-medium text-muted-foreground">NO. PO</div>
-                            <div>{doc.poNumber || '-'}</div>
-                        </div>
-                        <Button variant="ghost" size="icon">
-                            <MoreVertical className="h-4 w-4" />
-                        </Button>
-                    </div>
-                    <div className="flex justify-between items-center mt-2">
-                        <div>
-                            <div className="text-xs text-muted-foreground">Customer</div>
-                            <div className="font-medium">{doc.customer}</div>
-                        </div>
-                        <div>
-                            <div className="text-xs text-muted-foreground">Sales</div>
-                            <div className="font-medium">{doc.sales}</div>
-                        </div>
-                    </div>
-                    <Badge variant={doc.status === 'Paid' ? 'outline' : 'destructive'} className={cn("mt-2 capitalize", doc.status === 'Paid' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800')}>{doc.status}</Badge>
-                    <div className="flex justify-between items-end mt-4">
-                        <div>
-                            <div className="text-xs text-muted-foreground">Nilai Pembayaran</div>
-                            <div className="font-medium">Rp {(doc.status === 'Paid' ? doc.amount : 0).toLocaleString('id-ID')}</div>
-                        </div>
-                        <div>
-                            <div className="text-xs text-muted-foreground">Nilai Invoice</div>
-                            <div className="font-medium">Rp {doc.amount.toLocaleString('id-ID')}</div>
-                        </div>
-                    </div>
-                    <div className="border-t my-4"></div>
-                    <div className="grid grid-cols-2 gap-x-8 gap-y-2 text-sm">
-                        <div>
-                            <div className="text-muted-foreground">No. Invoice</div>
-                            <div className="font-medium">{doc.invoice?.id || '-'}</div>
-                        </div>
-                        <div>
-                            <div className="text-muted-foreground">No. Faktur Pajak</div>
-                            <div className="font-medium">{doc.taxInvoice?.taxInvoiceNumber || '-'}</div>
-                        </div>
-                        <div>
-                            <div className="text-muted-foreground">Tanggal Invoice</div>
-                            <div className="font-medium">{doc.invoice?.date ? new Date(doc.invoice.date).toLocaleDateString('id-ID') : '-'}</div>
-                        </div>
-                         <div>
-                            <div className="text-muted-foreground">Jatuh Tempo</div>
-                            <div className="font-medium">{doc.invoice?.date ? new Date(new Date(doc.invoice.date).setDate(new Date(doc.invoice.date).getDate() + 30)).toLocaleDateString('id-ID') : '-'}</div>
-                        </div>
-                    </div>
-                </div>
-            ))}
-        </div>
-    );
     
     return (
       <main className="flex flex-1 flex-col gap-4 p-4 md:gap-8 md:p-8">
@@ -215,9 +159,12 @@ import {
 
                 {isLoading && <div className="text-center p-8">Loading documents...</div>}
 
-                {!isLoading && viewMode === 'grid' && <GridView documents={mergedDocuments} />}
+                {!isLoading && viewMode === 'grid' && (
+                     <div className="text-center p-8 text-muted-foreground">
+                        Grid view is not yet implemented.
+                    </div>
+                )}
                 
-                {/* Placeholder for List View */}
                 {!isLoading && viewMode === 'list' && (
                     <div className="text-center p-8 text-muted-foreground">
                         List view is not yet implemented.
@@ -234,4 +181,5 @@ import {
       </main>
     );
   }
+
 
