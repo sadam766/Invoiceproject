@@ -56,8 +56,10 @@ export function getSalesMonitoringData(salesOrders: SalesOrder[], invoiceListDat
 
     return Object.values(soData).map(so => {
         const invoice = invoiceListData.find(inv => inv.soNumber === so.soNumber);
-        const taxInvoice = taxInvoiceData.find(ti => ti.invoiceNumber === invoice?.id);
-        const spd = spdData.find(s => s.noInvoice.includes(invoice?.id || ''));
+        
+        // Find related documents only if an invoice exists
+        const taxInvoice = invoice ? taxInvoiceData.find(ti => ti.invoiceNumber === invoice.id) : undefined;
+        const spd = invoice ? spdData.find(s => s.noInvoice.includes(invoice.id)) : undefined;
 
         const paymentStatus = (invoice?.status === 'paid') ? 'Paid' : 'Unpaid';
 

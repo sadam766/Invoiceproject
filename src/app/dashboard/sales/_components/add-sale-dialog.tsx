@@ -27,7 +27,7 @@ import { formatNumberWithCommas, parseFormattedNumber } from '@/lib/utils';
 type AddSaleDialogProps = {
     isOpen: boolean;
     onOpenChange: (isOpen: boolean) => void;
-    onSave: (sale: SalesListItem) => void;
+    onSave: (sale: Omit<SalesListItem, 'ownerId'>) => void;
     saleData?: SalesListItem;
     onAddClick: () => void;
 };

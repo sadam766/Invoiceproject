@@ -107,7 +107,7 @@ import {
         router.push('/dashboard/sales-management');
     };
 
-    const handleSave = (sale: SalesListItem) => {
+    const handleSave = (sale: Omit<SalesListItem, 'ownerId'>) => {
         if (!firestore || !user) return;
 
         const isNew = !editingSale;
@@ -276,79 +276,73 @@ import {
                         <Button variant="outline"><Filter className="mr-2 h-4 w-4" /> Filters</Button>
                     </div>
                     </div>
-                    <TabsContent value="all" className="mt-4">
+                    <TabsContent value={activeTab}>
+                        <div className="mt-4 w-full overflow-auto">
+                            <Table>
+                            <TableHeader>
+                                <TableRow>
+                                    <TableHead className="w-[40px]">
+                                        <Checkbox />
+                                    </TableHead>
+                                    <TableHead>NUMBER SO <ArrowUpDown className="inline-block ml-2 h-4 w-4" /></TableHead>
+                                    <TableHead>CUSTOMER <ArrowUpDown className="inline-block ml-2 h-4 w-4" /></TableHead>
+                                    <TableHead>SALES <ArrowUpDown className="inline-block ml-2 h-4 w-4" /></TableHead>
+                                    <TableHead>NO. PO <ArrowUpDown className="inline-block ml-2 h-4 w-4" /></TableHead>
+                                    <TableHead>AMOUNT <ArrowUpDown className="inline-block ml-2 h-4 w-4" /></TableHead>
+                                    <TableHead>STATUS <ArrowUpDown className="inline-block ml-2 h-4 w-4" /></TableHead>
+                                    <TableHead></TableHead>
+                                </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                                {isLoading && <TableRow><TableCell colSpan={8} className="text-center">Loading sales...</TableCell></TableRow>}
+                                {filteredSales?.map((sale) => (
+                                <TableRow key={sale.soNumber}>
+                                    <TableCell>
+                                        <Checkbox />
+                                    </TableCell>
+                                    <TableCell className="font-medium">{sale.soNumber}</TableCell>
+                                    <TableCell>{sale.customer}</TableCell>
+                                    <TableCell>{sale.sales}</TableCell>
+                                    <TableCell>{sale.poNumber}</TableCell>
+                                    <TableCell>Rp {sale.amount.toLocaleString('id-ID')},00</TableCell>
+                                    <TableCell>
+                                        <Badge variant={sale.status === 'Paid' ? 'outline' : 'destructive'} 
+                                        className={sale.status === 'Paid' ? 'bg-green-100 text-green-800 border-green-200' : 'bg-red-100 text-red-800 border-red-200'}>
+                                            {sale.status}
+                                        </Badge>
+                                        {sale.paidDate && <div className="text-xs text-muted-foreground">on: {sale.paidDate}</div>}
+                                    </TableCell>
+                                    <TableCell>
+                                        <DropdownMenu>
+                                            <DropdownMenuTrigger asChild>
+                                                <Button variant="ghost" size="icon">
+                                                    <MoreHorizontal className="h-4 w-4" />
+                                                </Button>
+                                            </DropdownMenuTrigger>
+                                            <DropdownMenuContent align="end">
+                                                <DropdownMenuItem onClick={() => handlePreview(sale)}>
+                                                    <Eye className="mr-2 h-4 w-4" />
+                                                    Preview
+                                                </DropdownMenuItem>
+                                                <DropdownMenuItem onClick={() => handleEdit(sale)}>
+                                                    <Edit className="mr-2 h-4 w-4" />
+                                                    Edit
+                                                </DropdownMenuItem>
+                                                <DropdownMenuItem className="text-destructive focus:text-destructive focus:bg-destructive/10">
+                                                    <DeleteConfirmationDialog onConfirm={() => handleDelete(sale.soNumber)} />
+                                                </DropdownMenuItem>
+                                            </DropdownMenuContent>
+                                        </DropdownMenu>
+                                    </TableCell>
+                                </TableRow>
+                                ))}
+                            </TableBody>
+                            </Table>
+                        </div>
+                        <div className="text-sm text-muted-foreground mt-4">
+                            Showing 1 to {filteredSales?.length || 0} of {sales?.length || 0} entries
+                        </div>
                     </TabsContent>
-                    <TabsContent value="paid" className="mt-4">
-                    </TabsContent>
-                    <TabsContent value="unpaid" className="mt-4">
-                    </TabsContent>
-                    
-                    <div className="mt-4 w-full overflow-auto">
-                        <Table>
-                        <TableHeader>
-                            <TableRow>
-                                <TableHead className="w-[40px]">
-                                    <Checkbox />
-                                </TableHead>
-                                <TableHead>NUMBER SO <ArrowUpDown className="inline-block ml-2 h-4 w-4" /></TableHead>
-                                <TableHead>CUSTOMER <ArrowUpDown className="inline-block ml-2 h-4 w-4" /></TableHead>
-                                <TableHead>SALES <ArrowUpDown className="inline-block ml-2 h-4 w-4" /></TableHead>
-                                <TableHead>NO. PO <ArrowUpDown className="inline-block ml-2 h-4 w-4" /></TableHead>
-                                <TableHead>AMOUNT <ArrowUpDown className="inline-block ml-2 h-4 w-4" /></TableHead>
-                                <TableHead>STATUS <ArrowUpDown className="inline-block ml-2 h-4 w-4" /></TableHead>
-                                <TableHead></TableHead>
-                            </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                            {isLoading && <TableRow><TableCell colSpan={8} className="text-center">Loading sales...</TableCell></TableRow>}
-                            {filteredSales?.map((sale) => (
-                            <TableRow key={sale.soNumber}>
-                                <TableCell>
-                                    <Checkbox />
-                                </TableCell>
-                                <TableCell className="font-medium">{sale.soNumber}</TableCell>
-                                <TableCell>{sale.customer}</TableCell>
-                                <TableCell>{sale.sales}</TableCell>
-                                <TableCell>{sale.poNumber}</TableCell>
-                                <TableCell>Rp {sale.amount.toLocaleString('id-ID')},00</TableCell>
-                                <TableCell>
-                                    <Badge variant={sale.status === 'Paid' ? 'outline' : 'destructive'} 
-                                    className={sale.status === 'Paid' ? 'bg-green-100 text-green-800 border-green-200' : 'bg-red-100 text-red-800 border-red-200'}>
-                                        {sale.status}
-                                    </Badge>
-                                    {sale.paidDate && <div className="text-xs text-muted-foreground">on: {sale.paidDate}</div>}
-                                </TableCell>
-                                <TableCell>
-                                    <DropdownMenu>
-                                        <DropdownMenuTrigger asChild>
-                                            <Button variant="ghost" size="icon">
-                                                <MoreHorizontal className="h-4 w-4" />
-                                            </Button>
-                                        </DropdownMenuTrigger>
-                                        <DropdownMenuContent align="end">
-                                            <DropdownMenuItem onClick={() => handlePreview(sale)}>
-                                                <Eye className="mr-2 h-4 w-4" />
-                                                Preview
-                                            </DropdownMenuItem>
-                                            <DropdownMenuItem onClick={() => handleEdit(sale)}>
-                                                <Edit className="mr-2 h-4 w-4" />
-                                                Edit
-                                            </DropdownMenuItem>
-                                            <DropdownMenuItem className="text-destructive focus:text-destructive focus:bg-destructive/10">
-                                                <DeleteConfirmationDialog onConfirm={() => handleDelete(sale.soNumber)} />
-                                            </DropdownMenuItem>
-                                        </DropdownMenuContent>
-                                    </DropdownMenu>
-                                </TableCell>
-                            </TableRow>
-                            ))}
-                        </TableBody>
-                        </Table>
-                    </div>
-                    <div className="text-sm text-muted-foreground mt-4">
-                        Showing 1 to {filteredSales?.length || 0} of {sales?.length || 0} entries
-                    </div>
-
                 </Tabs>
             </CardContent>
         </Card>
