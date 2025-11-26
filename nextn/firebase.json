@@ -1,0 +1,11 @@
+{
+  "hosting": {
+    "source": ".next/standalone",
+    "rewrites": [
+      {
+        "source": "**",
+        "function": "server"
+      }
+    ]
+  }
+}
