@@ -203,7 +203,7 @@ export default function AddInvoicePage() {
         const parts = invoiceNumberData.date.split('/');
         if (parts.length === 3) {
             const [day, month, year] = parts;
-            setDate(new Date(`${year}-${month}-${day}`));
+            setIssueDate(new Date(`${year}-${month}-${day}`));
         }
       }
     }
@@ -939,3 +939,5 @@ export default function AddInvoicePage() {
     </main>
   );
 }
+
+    
