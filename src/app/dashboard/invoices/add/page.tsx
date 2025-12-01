@@ -326,12 +326,16 @@ export default function AddInvoicePage() {
     }
 
     const batch = writeBatch(firestore);
+    const safeInvoiceId = invoiceId.replace(/\//g, '_');
+    
+    // If an SO is provided, use it. Otherwise, use the invoice ID as the reference for items.
+    const itemReferenceSONumber = soNumber || safeInvoiceId;
 
     // 1. Save the main invoice document
-    const safeId = invoiceId.replace(/\//g, '_');
-    const invoiceDocRef = doc(firestore, 'invoices', safeId);
+    const invoiceDocRef = doc(firestore, 'invoices', safeInvoiceId);
     const newInvoiceData = {
-        soNumber: soNumber,
+        id: invoiceId,
+        soNumber: itemReferenceSONumber, // Use the reference SO number
         poNumber: poNumber,
         customer: customer.name,
         date: format(issueDate, 'yyyy-MM-dd'),
@@ -343,62 +347,55 @@ export default function AddInvoicePage() {
     batch.set(invoiceDocRef, newInvoiceData, { merge: true });
 
     // 2. Query for existing salesOrder items to delete
-    const salesOrderQuery = soNumber
-        ? query(collection(firestore, 'salesOrders'), where('soNumber', '==', soNumber))
-        : null;
+    const salesOrderQuery = query(collection(firestore, 'salesOrders'), where('soNumber', '==', itemReferenceSONumber));
 
-    if (salesOrderQuery) {
-        try {
-            const existingSoItemsSnapshot = await getDocs(salesOrderQuery);
-            existingSoItemsSnapshot.forEach(doc => {
-                batch.delete(doc.ref);
+    try {
+        const existingSoItemsSnapshot = await getDocs(salesOrderQuery);
+        existingSoItemsSnapshot.forEach(doc => {
+            batch.delete(doc.ref);
+        });
+
+        // 3. Save the updated invoice items to the salesOrders collection
+        if (items.length > 0) {
+            items.forEach(item => {
+                const newSalesOrderItemRef = doc(collection(firestore, 'salesOrders'));
+                const salesOrderItem = {
+                    id: newSalesOrderItemRef.id,
+                    soNumber: itemReferenceSONumber, // Always associate items with the reference SO
+                    customer: customer.name,
+                    productName: item.name,
+                    quantity: item.quantity,
+                    unit: item.unit,
+                    price: item.price,
+                    category: productListData?.find(p => p.name === item.name)?.category || '',
+                    ownerId: user.uid,
+                };
+                batch.set(newSalesOrderItemRef, salesOrderItem);
             });
-        } catch (error) {
-            // Handle query error, though less likely for read operations if permissions are right
-            console.error("Failed to query existing sales orders:", error);
         }
-    }
-    
-    // 3. Save the updated invoice items to the salesOrders collection
-    if (items.length > 0 && soNumber) {
-        items.forEach(item => {
-            const newSalesOrderItemRef = doc(collection(firestore, 'salesOrders'));
-            const salesOrderItem = {
-                id: newSalesOrderItemRef.id,
-                soNumber: soNumber,
-                customer: customer.name,
-                productName: item.name,
-                quantity: item.quantity,
-                unit: item.unit,
-                price: item.price,
-                category: productListData?.find(p => p.name === item.name)?.category || '',
-                ownerId: user.uid,
-            };
-            batch.set(newSalesOrderItemRef, salesOrderItem);
+        
+        // 4. Commit the batch
+        await batch.commit();
+
+        sessionStorage.removeItem(ADD_INVOICE_SESSION_KEY);
+        toast({
+          title: "Invoice Saved",
+          description: `Invoice ${invoiceId} has been successfully saved as ${invoiceStatus}.`,
         });
-    }
-    
-    // 4. Commit the batch
-    batch.commit()
-        .then(() => {
-            sessionStorage.removeItem(ADD_INVOICE_SESSION_KEY);
-            toast({
-              title: "Invoice Saved",
-              description: `Invoice ${invoiceId} has been successfully saved as ${invoiceStatus}.`,
-            });
-            router.push('/dashboard/invoices');
-        })
-        .catch(async (serverError) => {
-            const permissionError = new FirestorePermissionError({
-                path: `batch write to invoices and salesOrders`,
-                operation: editInvoiceId ? 'update' : 'create',
-                requestResourceData: {
-                    invoice: newInvoiceData,
-                    items: items,
-                },
-            });
-            errorEmitter.emit('permission-error', permissionError);
+        router.push('/dashboard/invoices');
+
+    } catch (serverError) {
+        console.error("Batch write failed:", serverError);
+        const permissionError = new FirestorePermissionError({
+            path: `batch write to invoices and salesOrders`,
+            operation: editInvoiceId ? 'update' : 'create',
+            requestResourceData: {
+                invoice: newInvoiceData,
+                items: items,
+            },
         });
+        errorEmitter.emit('permission-error', permissionError);
+    }
   };
 
   const handleAddItem = () => {
@@ -939,5 +936,7 @@ export default function AddInvoicePage() {
     </main>
   );
 }
+
+    
 
     
