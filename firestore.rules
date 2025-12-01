@@ -70,8 +70,7 @@ service cloud.firestore {
     match /salesOrders/{orderId} {
         allow read, list: if isSignedIn();
         allow create: if isSignedIn() && isCreatingOwnerDoc();
-        allow update: if isSignedIn() && isCreatingOwnerDoc();
-        allow delete: if isSignedIn() && isOwnerOfDoc();
+        allow update, delete: if isSignedIn() && isOwnerOfDoc();
     }
 
     /**
@@ -87,15 +86,13 @@ service cloud.firestore {
     match /invoiceNumbers/{invoiceNumberId} {
       allow read, list: if isSignedIn();
       allow create: if isSignedIn() && isCreatingOwnerDoc();
-      allow update: if isSignedIn() && isCreatingOwnerDoc();
-      allow delete: if isSignedIn() && isOwnerOfDoc();
+      allow update, delete: if isSignedIn() && isOwnerOfDoc();
     }
     
     match /invoices/{invoiceId} {
       allow read, list: if isSignedIn();
       allow create: if isSignedIn() && isCreatingOwnerDoc();
-      allow update: if isSignedIn() && isCreatingOwnerDoc();
-      allow delete: if isSignedIn() && isOwnerOfDoc();
+      allow update, delete: if isSignedIn() && isOwnerOfDoc();
     }
     
     match /spds/{spdId} {
