@@ -1,4 +1,5 @@
 
+
 'use client';
 
 import { useEffect, useState, useMemo } from 'react';
@@ -324,76 +325,80 @@ export default function AddInvoicePage() {
         return;
     }
 
-    try {
-        const batch = writeBatch(firestore);
+    const batch = writeBatch(firestore);
 
-        // 1. Save the main invoice document
-        const safeId = invoiceId.replace(/\//g, '_');
-        const invoiceDocRef = doc(firestore, 'invoices', safeId);
-        const newInvoice: Omit<Invoice, 'id'> & { ownerId: string } = {
-            soNumber: soNumber,
-            poNumber: poNumber,
-            customer: customer.name,
-            date: format(issueDate, 'yyyy-MM-dd'),
-            amount: grandTotal + vat12,
-            status: invoiceStatus,
-            spdNumber: invoiceToEditData?.spdNumber || '-',
-            ownerId: user.uid,
-        };
-        batch.set(invoiceDocRef, newInvoice, { merge: true });
+    // 1. Save the main invoice document
+    const safeId = invoiceId.replace(/\//g, '_');
+    const invoiceDocRef = doc(firestore, 'invoices', safeId);
+    const newInvoiceData = {
+        soNumber: soNumber,
+        poNumber: poNumber,
+        customer: customer.name,
+        date: format(issueDate, 'yyyy-MM-dd'),
+        amount: grandTotal + vat12,
+        status: invoiceStatus,
+        spdNumber: invoiceToEditData?.spdNumber || '-',
+        ownerId: user.uid,
+    };
+    batch.set(invoiceDocRef, newInvoiceData, { merge: true });
 
-        // 2. Delete existing salesOrder items for this SO if they exist
-        if (soNumber) {
-            const salesOrderQuery = query(collection(firestore, 'salesOrders'), where('soNumber', '==', soNumber));
+    // 2. Query for existing salesOrder items to delete
+    const salesOrderQuery = soNumber
+        ? query(collection(firestore, 'salesOrders'), where('soNumber', '==', soNumber))
+        : null;
+
+    if (salesOrderQuery) {
+        try {
             const existingSoItemsSnapshot = await getDocs(salesOrderQuery);
             existingSoItemsSnapshot.forEach(doc => {
                 batch.delete(doc.ref);
             });
+        } catch (error) {
+            // Handle query error, though less likely for read operations if permissions are right
+            console.error("Failed to query existing sales orders:", error);
         }
-        
-        // 3. Save the updated invoice items to the salesOrders collection
-        if (items.length > 0 && soNumber) {
-            items.forEach(item => {
-                const newSalesOrderItemRef = doc(collection(firestore, 'salesOrders'));
-                const salesOrderItem: SalesOrder = {
-                    id: newSalesOrderItemRef.id,
-                    soNumber: soNumber,
-                    customer: customer.name,
-                    productName: item.name,
-                    quantity: item.quantity,
-                    unit: item.unit,
-                    price: item.price,
-                    category: productListData?.find(p => p.name === item.name)?.category || '',
-                    ownerId: user.uid,
-                };
-                batch.set(newSalesOrderItemRef, salesOrderItem);
-            });
-        }
-        
-        // 4. Commit the batch
-        await batch.commit();
-
-        sessionStorage.removeItem(ADD_INVOICE_SESSION_KEY);
-        toast({
-          title: "Invoice Saved",
-          description: `Invoice ${invoiceId} has been successfully saved as ${invoiceStatus}.`,
-        });
-        router.push('/dashboard/invoices');
-
-    } catch (serverError) {
-        console.error("Failed to save invoice:", serverError);
-        const permissionError = new FirestorePermissionError({
-            path: 'invoices or salesOrders',
-            operation: editInvoiceId ? 'update' : 'create',
-            requestResourceData: 'Batch invoice save operation',
-        });
-        errorEmitter.emit('permission-error', permissionError);
-        toast({
-            variant: "destructive",
-            title: "Save Error",
-            description: "Could not save the invoice and its items. Please check permissions.",
+    }
+    
+    // 3. Save the updated invoice items to the salesOrders collection
+    if (items.length > 0 && soNumber) {
+        items.forEach(item => {
+            const newSalesOrderItemRef = doc(collection(firestore, 'salesOrders'));
+            const salesOrderItem = {
+                id: newSalesOrderItemRef.id,
+                soNumber: soNumber,
+                customer: customer.name,
+                productName: item.name,
+                quantity: item.quantity,
+                unit: item.unit,
+                price: item.price,
+                category: productListData?.find(p => p.name === item.name)?.category || '',
+                ownerId: user.uid,
+            };
+            batch.set(newSalesOrderItemRef, salesOrderItem);
         });
     }
+    
+    // 4. Commit the batch
+    batch.commit()
+        .then(() => {
+            sessionStorage.removeItem(ADD_INVOICE_SESSION_KEY);
+            toast({
+              title: "Invoice Saved",
+              description: `Invoice ${invoiceId} has been successfully saved as ${invoiceStatus}.`,
+            });
+            router.push('/dashboard/invoices');
+        })
+        .catch(async (serverError) => {
+            const permissionError = new FirestorePermissionError({
+                path: `batch write to invoices and salesOrders`,
+                operation: editInvoiceId ? 'update' : 'create',
+                requestResourceData: {
+                    invoice: newInvoiceData,
+                    items: items,
+                },
+            });
+            errorEmitter.emit('permission-error', permissionError);
+        });
   };
 
   const handleAddItem = () => {
