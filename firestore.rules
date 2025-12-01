@@ -77,8 +77,37 @@ service cloud.firestore {
      * @description Shared data collections. Readable by all signed-in users.
      *              Write access is restricted to the owner of the document.
      */
-    match /{collection}/{docId} 
-        where collection in ['customers', 'invoiceNumbers', 'invoices', 'spds', 'taxInvoices', 'sales'] {
+    match /customers/{customerId} {
+      allow read, list: if isSignedIn();
+      allow create: if isSignedIn() && isCreatingOwnerDoc();
+      allow update, delete: if isSignedIn() && isOwnerOfDoc();
+    }
+    
+    match /invoiceNumbers/{invoiceNumberId} {
+      allow read, list: if isSignedIn();
+      allow create: if isSignedIn() && isCreatingOwnerDoc();
+      allow update, delete: if isSignedIn() && isOwnerOfDoc();
+    }
+    
+    match /invoices/{invoiceId} {
+      allow read, list: if isSignedIn();
+      allow create: if isSignedIn() && isCreatingOwnerDoc();
+      allow update, delete: if isSignedIn() && isOwnerOfDoc();
+    }
+    
+    match /spds/{spdId} {
+      allow read, list: if isSignedIn();
+      allow create: if isSignedIn() && isCreatingOwnerDoc();
+      allow update, delete: if isSignedIn() && isOwnerOfDoc();
+    }
+    
+    match /taxInvoices/{taxInvoiceId} {
+      allow read, list: if isSignedIn();
+      allow create: if isSignedIn() && isCreatingOwnerDoc();
+      allow update, delete: if isSignedIn() && isOwnerOfDoc();
+    }
+    
+    match /sales/{saleId} {
       allow read, list: if isSignedIn();
       allow create: if isSignedIn() && isCreatingOwnerDoc();
       allow update, delete: if isSignedIn() && isOwnerOfDoc();
