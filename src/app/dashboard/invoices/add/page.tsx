@@ -210,7 +210,7 @@ export default function AddInvoicePage() {
   }, [invoiceNumberData, customerListData, salesOrderListData]);
 
   useEffect(() => {
-    if (invoiceToEditData) {
+    if (invoiceToEditData && salesOrderListData) {
         // Clear session storage to start fresh with data from invoice to edit
         sessionStorage.removeItem(ADD_INVOICE_SESSION_KEY);
         setInvoiceId(invoiceToEditData.id);
@@ -225,7 +225,7 @@ export default function AddInvoicePage() {
             setIssueDate(new Date(invoiceToEditData.date));
         }
 
-        if(invoiceToEditData.soNumber && salesOrderListData) {
+        if(invoiceToEditData.soNumber) {
             const soItems = salesOrderListData.filter(so => so.soNumber === invoiceToEditData.soNumber);
              if (soItems.length > 0) {
                 const newItems: InvoiceItem[] = soItems.map((item, index) => ({
@@ -375,17 +375,29 @@ export default function AddInvoicePage() {
         }
         
         // 4. Commit the batch
-        await batch.commit();
-
-        sessionStorage.removeItem(ADD_INVOICE_SESSION_KEY);
-        toast({
-          title: "Invoice Saved",
-          description: `Invoice ${invoiceId} has been successfully saved as ${invoiceStatus}.`,
+        await batch.commit()
+        .then(() => {
+            sessionStorage.removeItem(ADD_INVOICE_SESSION_KEY);
+            toast({
+              title: "Invoice Saved",
+              description: `Invoice ${invoiceId} has been successfully saved as ${invoiceStatus}.`,
+            });
+            router.push('/dashboard/invoices');
+        })
+        .catch(async (serverError) => {
+            const permissionError = new FirestorePermissionError({
+                path: `batch write to invoices and salesOrders`,
+                operation: editInvoiceId ? 'update' : 'create',
+                requestResourceData: {
+                    invoice: newInvoiceData,
+                    items: items,
+                },
+            });
+            errorEmitter.emit('permission-error', permissionError);
         });
-        router.push('/dashboard/invoices');
 
     } catch (serverError) {
-        console.error("Batch write failed:", serverError);
+        console.error("Batch query/setup failed:", serverError);
         const permissionError = new FirestorePermissionError({
             path: `batch write to invoices and salesOrders`,
             operation: editInvoiceId ? 'update' : 'create',
@@ -936,7 +948,3 @@ export default function AddInvoicePage() {
     </main>
   );
 }
-
-    
-
-    
