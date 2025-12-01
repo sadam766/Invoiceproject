@@ -67,6 +67,8 @@ type InvoiceItem = {
     total: number;
 };
 
+const ADD_INVOICE_SESSION_KEY = 'addInvoiceFormState';
+
 export default function AddInvoicePage() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -144,9 +146,51 @@ export default function AddInvoicePage() {
   const { data: invoiceToEditData, isLoading: isEditInvoiceLoading } = useDoc<Invoice>(invoiceToEditRef);
   
   const isLoading = isInvoiceNumberLoading || isEditInvoiceLoading;
+  
+  const formState = {
+    invoiceId, soNumber, poNumber, customer, issueDate: issueDate?.toISOString(), dueDate: dueDate?.toISOString(), status, printType, items, negotiation, dpPercent, dpValue, dpPelunasanPercent, pelunasan
+  };
+
+  // Load state from sessionStorage on initial render
+  useEffect(() => {
+    const savedStateJSON = sessionStorage.getItem(ADD_INVOICE_SESSION_KEY);
+    if (savedStateJSON) {
+        try {
+            const savedState = JSON.parse(savedStateJSON);
+            setInvoiceId(savedState.invoiceId || '');
+            setSoNumber(savedState.soNumber || '');
+            setPoNumber(savedState.poNumber || '');
+            setCustomer(savedState.customer);
+            setIssueDate(savedState.issueDate ? new Date(savedState.issueDate) : new Date());
+            setDueDate(savedState.dueDate ? new Date(savedState.dueDate) : undefined);
+            setStatus(savedState.status || 'draft');
+            setPrintType(savedState.printType || 'original');
+            setItems(savedState.items || []);
+            setNegotiation(savedState.negotiation || 0);
+            setDpPercent(savedState.dpPercent || '');
+            setDpValue(savedState.dpValue || '');
+            setDpPelunasanPercent(savedState.dpPelunasanPercent || '');
+            setPelunasan(savedState.pelunasan || '');
+        } catch (e) {
+            console.error("Failed to parse saved invoice state:", e);
+        }
+    }
+  }, []);
+
+  // Save state to sessionStorage whenever it changes
+  useEffect(() => {
+    // We don't save on initial load if it's an edit/create from number flow,
+    // to avoid overwriting the intended data with empty initial state.
+    if (!isLoading) {
+      sessionStorage.setItem(ADD_INVOICE_SESSION_KEY, JSON.stringify(formState));
+    }
+  }, [formState, isLoading]);
+
 
   useEffect(() => {
     if (invoiceNumberData) {
+      // Clear session storage to start fresh with data from invoice number
+      sessionStorage.removeItem(ADD_INVOICE_SESSION_KEY);
       setInvoiceId(invoiceNumberData.id);
       
       if (invoiceNumberData.salesOrder) {
@@ -168,6 +212,8 @@ export default function AddInvoicePage() {
 
   useEffect(() => {
     if (invoiceToEditData) {
+        // Clear session storage to start fresh with data from invoice to edit
+        sessionStorage.removeItem(ADD_INVOICE_SESSION_KEY);
         setInvoiceId(invoiceToEditData.id);
         setSoNumber(invoiceToEditData.soNumber);
         setPoNumber(invoiceToEditData.poNumber);
@@ -296,6 +342,7 @@ export default function AddInvoicePage() {
     
     setDoc(docRef, newInvoice, { merge: true })
         .then(() => {
+            sessionStorage.removeItem(ADD_INVOICE_SESSION_KEY); // Clear snapshot on successful save
             toast({
               title: "Invoice Saved",
               description: `Invoice ${invoiceId} has been successfully saved as ${invoiceStatus}.`,
@@ -445,16 +492,21 @@ export default function AddInvoicePage() {
   }
   
   const pageTitle = editInvoiceId ? "Edit Invoice" : "Create Invoice";
+  
+  const handleBack = () => {
+    // Clear snapshot only when explicitly navigating away to the main list
+    sessionStorage.removeItem(ADD_INVOICE_SESSION_KEY);
+    router.push('/dashboard/invoices');
+  };
+
 
   return (
     <main className="flex flex-1 flex-col gap-4 p-4 md:gap-8 md:p-8">
       <div className="flex items-center gap-4">
-        <Link href="/dashboard/invoices" passHref>
-          <Button variant="outline" size="icon" className="h-7 w-7">
+        <Button variant="outline" size="icon" className="h-7 w-7" onClick={handleBack}>
             <ChevronLeft className="h-4 w-4" />
             <span className="sr-only">Back</span>
-          </Button>
-        </Link>
+        </Button>
         <h1 className="flex-1 shrink-0 whitespace-nowrap text-xl font-semibold tracking-tight sm:grow-0">
           {pageTitle}
         </h1>
