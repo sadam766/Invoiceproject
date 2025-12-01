@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useEffect, useState, useMemo } from 'react';
@@ -748,7 +749,7 @@ export default function AddInvoicePage() {
                                         <CommandGroup>
                                             {productListData?.map((product) => (
                                                 <CommandItem
-                                                    key={product.name}
+                                                    key={product.id}
                                                     value={product.name}
                                                     onSelect={() => handleProductSelect(item.id, product)}
                                                 >
