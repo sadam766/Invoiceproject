@@ -78,8 +78,6 @@ export default function AddInvoicePage() {
 
   const invoiceNumberId = searchParams.get('invoiceNumberId');
   const editInvoiceId = searchParams.get('editInvoiceId');
-
-  const [invoiceNumberDataState, setInvoiceNumberDataState] = useState<InvoiceNumber | undefined>(undefined);
   
   const [invoiceId, setInvoiceId] = useState('');
   const [soNumber, setSoNumber] = useState('');
@@ -208,7 +206,7 @@ export default function AddInvoicePage() {
         }
       }
     }
-  }, [invoiceNumberData, customerListData]);
+  }, [invoiceNumberData, customerListData, salesOrderListData]);
 
   useEffect(() => {
     if (invoiceToEditData) {
