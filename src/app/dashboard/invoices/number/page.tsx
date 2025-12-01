@@ -1,3 +1,4 @@
+
 'use client';
 import { useState, useRef, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
@@ -23,7 +24,7 @@ import {
   import { exportToExcel, importFromExcel, generateExcelTemplate } from '@/lib/utils';
   import { useToast } from '@/hooks/use-toast';
   import { useFirestore, useUser, useCollection, useMemoFirebase, errorEmitter, FirestorePermissionError } from '@/firebase';
-  import { collection, doc, setDoc, deleteDoc, writeBatch, query, where } from 'firebase/firestore';
+  import { collection, doc, setDoc, deleteDoc, writeBatch, query } from 'firebase/firestore';
 
   export default function InvoiceNumberPage() {
     const router = useRouter();
@@ -38,9 +39,9 @@ import {
     const [isDialogOpen, setIsDialogOpen] = useState(false);
     
     const invoiceNumbersCollection = useMemoFirebase(() => {
-        if (!firestore || !user) return null;
-        return query(collection(firestore, 'invoiceNumbers'), where('ownerId', '==', user.uid));
-    }, [firestore, user]);
+        if (!firestore) return null;
+        return query(collection(firestore, 'invoiceNumbers'));
+    }, [firestore]);
     const { data: invoices, isLoading } = useCollection<InvoiceNumber>(invoiceNumbersCollection);
 
     const filteredInvoices = useMemo(() => {

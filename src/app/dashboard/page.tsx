@@ -4,7 +4,6 @@ import { useMemo } from 'react';
 import {
   Card,
   CardContent,
-  CardDescription,
   CardHeader,
   CardTitle,
 } from '@/components/ui/card';
@@ -17,22 +16,22 @@ import { Button } from '@/components/ui/button';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { ChevronDown, DollarSign, Users, Package, ShoppingCart } from 'lucide-react';
 import { useFirestore, useUser, useCollection, useMemoFirebase } from '@/firebase';
-import { collection, query, where } from 'firebase/firestore';
+import { collection, query } from 'firebase/firestore';
 
 export default function DashboardPage() {
   const { user } = useUser();
   const firestore = useFirestore();
 
   const salesCollection = useMemoFirebase(() => {
-    if (!firestore || !user) return null;
-    return query(collection(firestore, 'sales'), where('ownerId', '==', user.uid));
-  }, [firestore, user]);
+    if (!firestore) return null;
+    return query(collection(firestore, 'sales'));
+  }, [firestore]);
   const { data: sales } = useCollection<SalesListItem>(salesCollection);
 
   const customersCollection = useMemoFirebase(() => {
-    if (!firestore || !user) return null;
-    return query(collection(firestore, 'customers'), where('ownerId', '==', user.uid));
-  }, [firestore, user]);
+    if (!firestore) return null;
+    return query(collection(firestore, 'customers'));
+  }, [firestore]);
   const { data: customers } = useCollection<Customer>(customersCollection);
 
   const productsCollection = useMemoFirebase(() => {

@@ -21,7 +21,7 @@ import { getSalesMonitoringData, SalesMonitoringData, SalesOrder, Invoice, TaxIn
 import { Search, Eye } from 'lucide-react';
 import Link from 'next/link';
 import { useFirestore, useCollection, useMemoFirebase, useUser } from '@/firebase';
-import { collection, query, where } from 'firebase/firestore';
+import { collection, query } from 'firebase/firestore';
 
 
 const statusVariant: { [key: string]: 'outline' | 'destructive' | 'secondary' } = {
@@ -49,27 +49,27 @@ export default function SalesMonitoringPage() {
   const [searchQuery, setSearchQuery] = useState('');
 
   const salesOrdersCollection = useMemoFirebase(() => {
-    if (!firestore || !user) return null;
-    return query(collection(firestore, 'salesOrders'), where('ownerId', '==', user.uid));
-  }, [firestore, user]);
+    if (!firestore) return null;
+    return query(collection(firestore, 'salesOrders'));
+  }, [firestore]);
   const { data: salesOrderListData, isLoading: isSalesOrdersLoading } = useCollection<SalesOrder>(salesOrdersCollection);
 
   const invoicesCollection = useMemoFirebase(() => {
-    if (!firestore || !user) return null;
-    return query(collection(firestore, 'invoices'), where('ownerId', '==', user.uid));
-  }, [firestore, user]);
+    if (!firestore) return null;
+    return query(collection(firestore, 'invoices'));
+  }, [firestore]);
   const { data: invoiceListData, isLoading: isInvoicesLoading } = useCollection<Invoice>(invoicesCollection);
 
   const taxInvoicesCollection = useMemoFirebase(() => {
-    if (!firestore || !user) return null;
-    return query(collection(firestore, 'taxInvoices'), where('ownerId', '==', user.uid));
-  }, [firestore, user]);
+    if (!firestore) return null;
+    return query(collection(firestore, 'taxInvoices'));
+  }, [firestore]);
   const { data: taxInvoiceListData, isLoading: isTaxInvoicesLoading } = useCollection<TaxInvoice>(taxInvoicesCollection);
 
   const spdsCollection = useMemoFirebase(() => {
-    if (!firestore || !user) return null;
-    return query(collection(firestore, 'spds'), where('ownerId', '==', user.uid));
-  }, [firestore, user]);
+    if (!firestore) return null;
+    return query(collection(firestore, 'spds'));
+  }, [firestore]);
   const { data: spdListData, isLoading: isSpdsLoading } = useCollection<SpdData>(spdsCollection);
 
 

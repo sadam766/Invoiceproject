@@ -1,5 +1,4 @@
 
-
 'use client';
 
 import { useEffect, useState, useMemo } from 'react';
@@ -57,7 +56,7 @@ import { type InvoiceNumber, type Customer, type ProductListItem, type Invoice, 
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useFirestore, useCollection, useMemoFirebase, useUser, useDoc, errorEmitter, FirestorePermissionError } from '@/firebase';
-import { collection, query, where, doc, setDoc } from 'firebase/firestore';
+import { collection, query, doc, setDoc } from 'firebase/firestore';
 
 type InvoiceItem = {
     id: number;
@@ -109,9 +108,9 @@ export default function AddInvoicePage() {
   const [productPopoverOpen, setProductPopoverOpen] = useState<number | null>(null);
 
   const customersCollection = useMemoFirebase(() => {
-    if (!firestore || !user) return null;
-    return query(collection(firestore, 'customers'), where('ownerId', '==', user.uid));
-  }, [firestore, user]);
+    if (!firestore) return null;
+    return query(collection(firestore, 'customers'));
+  }, [firestore]);
   const { data: customerListData } = useCollection<Customer>(customersCollection);
 
   const productsCollection = useMemoFirebase(() => {
@@ -121,9 +120,9 @@ export default function AddInvoicePage() {
   const { data: productListData } = useCollection<ProductListItem>(productsCollection);
 
   const salesOrdersCollection = useMemoFirebase(() => {
-    if (!firestore || !user) return null;
-    return query(collection(firestore, 'salesOrders'), where('ownerId', '==', user.uid));
-  }, [firestore, user]);
+    if (!firestore) return null;
+    return query(collection(firestore, 'salesOrders'));
+  }, [firestore]);
   const { data: salesOrderListData } = useCollection<SalesOrder>(salesOrdersCollection);
 
   const uniqueSalesOrders = useMemo(() => {
@@ -846,5 +845,3 @@ export default function AddInvoicePage() {
     </main>
   );
 }
-
-    

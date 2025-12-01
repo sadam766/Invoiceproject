@@ -32,7 +32,7 @@ import { format } from 'date-fns';
 import type { InvoiceNumber, Customer, SalesOrder } from '@/app/lib/data';
 import { useToast } from '@/hooks/use-toast';
 import { useFirestore, useCollection, useMemoFirebase, useUser } from '@/firebase';
-import { collection, query, where } from 'firebase/firestore';
+import { collection, query } from 'firebase/firestore';
 
 
 type AddInvoiceNumberDialogProps = {
@@ -67,15 +67,15 @@ export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceDa
   const { toast } = useToast();
 
   const customersCollection = useMemoFirebase(() => {
-    if (!firestore || !user) return null;
-    return query(collection(firestore, 'customers'), where('ownerId', '==', user.uid));
-  }, [firestore, user]);
+    if (!firestore) return null;
+    return query(collection(firestore, 'customers'));
+  }, [firestore]);
   const { data: customerListData } = useCollection<Customer>(customersCollection);
 
   const salesOrdersCollection = useMemoFirebase(() => {
-    if (!firestore || !user) return null;
-    return query(collection(firestore, 'salesOrders'), where('ownerId', '==', user.uid));
-  }, [firestore, user]);
+    if (!firestore) return null;
+    return query(collection(firestore, 'salesOrders'));
+  }, [firestore]);
   const { data: salesOrderListData } = useCollection<SalesOrder>(salesOrdersCollection);
 
   const uniqueSalesOrders = useMemo(() => {

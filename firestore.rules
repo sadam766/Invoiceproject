@@ -1,19 +1,15 @@
 
 /**
  * @file Firestore Security Rules
- * @description This ruleset enforces a strict user-ownership model for all user-generated data,
- *              and restricts product management to admin users.
+ * @description This ruleset allows any signed-in user to read all data to facilitate
+ *              collaboration and prevent duplication. Write access is still
+ *              controlled to ensure data integrity.
  *
  * Data Structure:
  * - /users/{userId}: Stores user profile and role information.
  * - /products/{productId}: Stores product information, readable by any user, writable only by admins.
- * - /customers/{customerId}: Accessible only by the owner.
- * - /sales/{saleId}: Accessible only by the owner.
- * - /salesOrders/{orderId}: Accessible only by the owner.
- * - /invoiceNumbers/{invoiceNumberId}: Accessible only by the owner.
- * - /invoices/{invoiceId}: Accessible only by the owner.
- * - /spds/{spdId}: Accessible only by the owner.
- * - /taxInvoices/{taxInvoiceId}: Accessible only by the owner.
+ * - /customers, /sales, /salesOrders, etc.: All data is readable by any signed-in user.
+ *   Writes are protected by ensuring the user is signed in and owns the document they are creating/modifying.
  */
 rules_version = '2';
 service cloud.firestore {
@@ -69,66 +65,14 @@ service cloud.firestore {
     }
 
     /**
-     * @description Enforces ownership for customer data.
-     * @path /customers/{customerId}
+     * @description Shared data collections. Readable by all signed-in users.
+     *              Write access is restricted to the owner of the document.
      */
-    match /customers/{customerId} {
-      allow read, write: if isSignedIn() && isOwnerOfDoc();
+    match /{collection}/{docId} 
+        where collection in ['customers', 'salesOrders', 'invoiceNumbers', 'invoices', 'spds', 'taxInvoices', 'sales'] {
+      allow read: if isSignedIn();
       allow create: if isSignedIn() && isCreatingOwnerDoc();
-    }
-
-    /**
-     * @description Enforces ownership for sales order data.
-     * @path /salesOrders/{orderId}
-     */
-    match /salesOrders/{orderId} {
-       allow read, write: if isSignedIn() && isOwnerOfDoc();
-       allow create: if isSignedIn() && isCreatingOwnerDoc();
-    }
-
-    /**
-     * @description Enforces ownership for invoice number data.
-     * @path /invoiceNumbers/{invoiceNumberId}
-     */
-    match /invoiceNumbers/{invoiceNumberId} {
-        allow read, write: if isSignedIn() && isOwnerOfDoc();
-        allow create: if isSignedIn() && isCreatingOwnerDoc();
-    }
-
-    /**
-     * @description Enforces ownership for invoice data.
-     * @path /invoices/{invoiceId}
-     */
-    match /invoices/{invoiceId} {
-      allow read, write: if isSignedIn() && isOwnerOfDoc();
-      allow create: if isSignedIn() && isCreatingOwnerDoc();
-    }
-    
-    /**
-     * @description Enforces ownership for SPD data.
-     * @path /spds/{spdId}
-     */
-    match /spds/{spdId} {
-      allow read, write: if isSignedIn() && isOwnerOfDoc();
-      allow create: if isSignedIn() && isCreatingOwnerDoc();
-    }
-    
-    /**
-     * @description Enforces ownership for Tax Invoice data.
-     * @path /taxInvoices/{taxInvoiceId}
-     */
-    match /taxInvoices/{taxInvoiceId} {
-      allow read, write: if isSignedIn() && isOwnerOfDoc();
-      allow create: if isSignedIn() && isCreatingOwnerDoc();
-    }
-
-    /**
-     * @description Enforces ownership for sales data.
-     * @path /sales/{saleId}
-     */
-    match /sales/{saleId} {
-      allow read, write: if isSignedIn() && isOwnerOfDoc();
-      allow create: if isSignedIn() && isCreatingOwnerDoc();
+      allow update, delete: if isSignedIn() && isOwnerOfDoc();
     }
   }
 }

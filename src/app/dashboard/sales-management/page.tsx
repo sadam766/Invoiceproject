@@ -1,5 +1,4 @@
 
-
 'use client';
 import { useEffect, useState, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
@@ -21,7 +20,7 @@ import {
   import { AddDocumentDialog } from './_components/add-document-dialog';
   import { type SalesListItem, type Invoice, type TaxInvoice } from '@/app/lib/data';
   import { useFirestore, useUser, useCollection, useMemoFirebase } from '@/firebase';
-  import { collection, query, where } from 'firebase/firestore';
+  import { collection, query } from 'firebase/firestore';
   import { cn } from '@/lib/utils';
   
   type DocumentView = 'grid' | 'list';
@@ -42,21 +41,21 @@ import {
 
     // Fetch all necessary data collections
     const salesCollection = useMemoFirebase(() => {
-        if (!firestore || !user) return null;
-        return query(collection(firestore, 'sales'), where('ownerId', '==', user.uid));
-    }, [firestore, user]);
+        if (!firestore) return null;
+        return query(collection(firestore, 'sales'));
+    }, [firestore]);
     const { data: salesList, isLoading: isSalesLoading } = useCollection<SalesListItem>(salesCollection);
 
     const invoicesCollection = useMemoFirebase(() => {
-        if (!firestore || !user) return null;
-        return query(collection(firestore, 'invoices'), where('ownerId', '==', user.uid));
-    }, [firestore, user]);
+        if (!firestore) return null;
+        return query(collection(firestore, 'invoices'));
+    }, [firestore]);
     const { data: invoiceList, isLoading: isInvoicesLoading } = useCollection<Invoice>(invoicesCollection);
     
     const taxInvoicesCollection = useMemoFirebase(() => {
-        if (!firestore || !user) return null;
-        return query(collection(firestore, 'taxInvoices'), where('ownerId', '==', user.uid));
-    }, [firestore, user]);
+        if (!firestore) return null;
+        return query(collection(firestore, 'taxInvoices'));
+    }, [firestore]);
     const { data: taxInvoiceList, isLoading: isTaxInvoicesLoading } = useCollection<TaxInvoice>(taxInvoicesCollection);
     
     const isLoading = isSalesLoading || isInvoicesLoading || isTaxInvoicesLoading;
@@ -160,14 +159,74 @@ import {
                 {isLoading && <div className="text-center p-8">Loading documents...</div>}
 
                 {!isLoading && viewMode === 'grid' && (
-                     <div className="text-center p-8 text-muted-foreground">
-                        Grid view is not yet implemented.
+                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                        {mergedDocuments.map((doc) => (
+                            <Card key={doc.soNumber} className="flex flex-col">
+                                <CardHeader className="flex-row items-center justify-between pb-2">
+                                    <CardTitle className="text-base font-bold">{doc.soNumber}</CardTitle>
+                                    <Badge variant={doc.status === 'Paid' ? 'outline' : 'destructive'} className={cn(doc.status === 'Paid' ? 'bg-green-100 text-green-800 border-green-200' : 'bg-red-100 text-red-800 border-red-200', "capitalize")}>{doc.status}</Badge>
+                                </CardHeader>
+                                <CardContent className="flex-grow">
+                                    <p className="text-sm font-medium text-gray-800 dark:text-gray-200">{doc.customer}</p>
+                                    <p className="text-xs text-muted-foreground">{doc.sales}</p>
+                                    <div className="my-3 border-t border-dashed" />
+                                    <div className="space-y-1 text-xs">
+                                        <div className="flex justify-between">
+                                            <span className="text-muted-foreground">PO Number:</span>
+                                            <span className="font-medium">{doc.poNumber}</span>
+                                        </div>
+                                        <div className="flex justify-between">
+                                            <span className="text-muted-foreground">Amount:</span>
+                                            <span className="font-medium">Rp {doc.amount.toLocaleString('id-ID')}</span>
+                                        </div>
+                                        <div className="flex justify-between">
+                                            <span className="text-muted-foreground">Invoice:</span>
+                                            <span className="font-medium">{doc.invoice?.id || 'Not Invoiced'}</span>
+                                        </div>
+                                         <div className="flex justify-between">
+                                            <span className="text-muted-foreground">Tax Invoice:</span>
+                                            <span className="font-medium">{doc.taxInvoice?.taxInvoiceNumber || '-'}</span>
+                                        </div>
+                                    </div>
+                                </CardContent>
+                                <CardFooter className="bg-muted/50 p-3 flex justify-end">
+                                     <Button variant="ghost" size="sm">View Details</Button>
+                                </CardFooter>
+                            </Card>
+                        ))}
                     </div>
                 )}
                 
                 {!isLoading && viewMode === 'list' && (
-                    <div className="text-center p-8 text-muted-foreground">
-                        List view is not yet implemented.
+                    <div className="w-full overflow-auto">
+                        <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                            <thead className="bg-gray-50 dark:bg-gray-700">
+                                <tr>
+                                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">SO Number</th>
+                                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">Customer</th>
+                                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">Amount</th>
+                                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">Status</th>
+                                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">Invoice ID</th>
+                                    <th scope="col" className="relative px-6 py-3"><span className="sr-only">Actions</span></th>
+                                </tr>
+                            </thead>
+                            <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
+                                {mergedDocuments.map((doc) => (
+                                    <tr key={doc.soNumber}>
+                                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white">{doc.soNumber}</td>
+                                        <td className="px-6 py-4 whitespace-nowrap text-sm text-muted-foreground">{doc.customer}</td>
+                                        <td className="px-6 py-4 whitespace-nowrap text-sm text-muted-foreground">Rp {doc.amount.toLocaleString('id-ID')}</td>
+                                        <td className="px-6 py-4 whitespace-nowrap text-sm">
+                                            <Badge variant={doc.status === 'Paid' ? 'outline' : 'destructive'} className={cn(doc.status === 'Paid' ? 'bg-green-100 text-green-800 border-green-200' : 'bg-red-100 text-red-800 border-red-200', "capitalize")}>{doc.status}</Badge>
+                                        </td>
+                                        <td className="px-6 py-4 whitespace-nowrap text-sm text-muted-foreground">{doc.invoice?.id || '-'}</td>
+                                        <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                                            <Button variant="ghost" size="icon"><MoreVertical className="h-4 w-4"/></Button>
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
                     </div>
                 )}
                 
@@ -181,5 +240,3 @@ import {
       </main>
     );
   }
-
-

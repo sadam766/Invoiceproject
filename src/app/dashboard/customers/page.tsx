@@ -22,7 +22,7 @@ import {
   import { useToast } from '@/hooks/use-toast';
   import { exportToExcel, generateExcelTemplate, importFromExcel } from '@/lib/utils';
   import { useFirestore, useUser, useCollection, useMemoFirebase, errorEmitter, FirestorePermissionError } from '@/firebase';
-  import { collection, doc, setDoc, deleteDoc, writeBatch, query, where } from 'firebase/firestore';
+  import { collection, doc, setDoc, deleteDoc, writeBatch, query } from 'firebase/firestore';
 
   export default function CustomerListPage() {
     const firestore = useFirestore();
@@ -34,9 +34,9 @@ import {
     const { toast } = useToast();
 
     const customersCollection = useMemoFirebase(() => {
-        if (!firestore || !user) return null;
-        return query(collection(firestore, 'customers'), where('ownerId', '==', user.uid));
-    }, [firestore, user]);
+        if (!firestore) return null;
+        return query(collection(firestore, 'customers'));
+    }, [firestore]);
 
     const { data: customers, isLoading } = useCollection<Customer>(customersCollection);
 
@@ -256,5 +256,3 @@ import {
       </main>
     );
   }
-
-    

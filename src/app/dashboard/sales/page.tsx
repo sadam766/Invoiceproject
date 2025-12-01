@@ -34,7 +34,7 @@ import {
   import { DeleteConfirmationDialog } from '@/app/components/delete-confirmation-dialog';
   import { exportToExcel, importFromExcel } from '@/lib/utils';
   import { useFirestore, useUser, useCollection, useMemoFirebase, errorEmitter, FirestorePermissionError } from '@/firebase';
-  import { collection, doc, setDoc, deleteDoc, writeBatch, query, where } from 'firebase/firestore';
+  import { collection, doc, setDoc, deleteDoc, writeBatch, query } from 'firebase/firestore';
   
   export default function SalesListPage() {
     const router = useRouter();
@@ -50,9 +50,9 @@ import {
     const [activeTab, setActiveTab] = useState('all');
 
     const salesCollection = useMemoFirebase(() => {
-        if (!firestore || !user) return null;
-        return query(collection(firestore, 'sales'), where('ownerId', '==', user.uid));
-    }, [firestore, user]);
+        if (!firestore) return null;
+        return query(collection(firestore, 'sales'));
+    }, [firestore]);
     const { data: sales, isLoading } = useCollection<SalesListItem>(salesCollection);
 
     const totalFiltered = sales?.reduce((sum, item) => sum + item.amount, 0) || 0;

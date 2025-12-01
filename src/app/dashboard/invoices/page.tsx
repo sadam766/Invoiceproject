@@ -1,7 +1,7 @@
 
 'use client';
 import Link from 'next/link';
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import {
     Card,
@@ -34,7 +34,7 @@ import {
   import { DeleteConfirmationDialog } from '@/app/components/delete-confirmation-dialog';
   import { useToast } from '@/hooks/use-toast';
   import { useFirestore, useCollection, useMemoFirebase, useUser, errorEmitter, FirestorePermissionError } from '@/firebase';
-  import { collection, query, where, doc, deleteDoc, writeBatch, setDoc } from 'firebase/firestore';
+  import { collection, query, doc, deleteDoc, writeBatch, setDoc } from 'firebase/firestore';
 
 
   export default function InvoiceListPage() {
@@ -47,21 +47,21 @@ import {
     const { user } = useUser();
     
     const invoicesCollection = useMemoFirebase(() => {
-        if (!firestore || !user) return null;
-        return query(collection(firestore, 'invoices'), where('ownerId', '==', user.uid));
-    }, [firestore, user]);
+        if (!firestore) return null;
+        return query(collection(firestore, 'invoices'));
+    }, [firestore]);
     const { data: invoices, isLoading } = useCollection<Invoice>(invoicesCollection);
     
     const customersCollection = useMemoFirebase(() => {
-        if (!firestore || !user) return null;
-        return query(collection(firestore, 'customers'), where('ownerId', '==', user.uid));
-    }, [firestore, user]);
+        if (!firestore) return null;
+        return query(collection(firestore, 'customers'));
+    }, [firestore]);
     const { data: customerListData } = useCollection<Customer>(customersCollection);
 
     const salesOrdersCollection = useMemoFirebase(() => {
-        if (!firestore || !user) return null;
-        return query(collection(firestore, 'salesOrders'), where('ownerId', '==', user.uid));
-    }, [firestore, user]);
+        if (!firestore) return null;
+        return query(collection(firestore, 'salesOrders'));
+    }, [firestore]);
     const { data: salesOrderListData } = useCollection<SalesOrder>(salesOrdersCollection);
 
 
@@ -459,5 +459,3 @@ import {
       </main>
     );
   }
-
-    

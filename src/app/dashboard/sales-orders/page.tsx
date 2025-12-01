@@ -1,3 +1,4 @@
+
 'use client';
 import { useState, useMemo, useRef } from 'react';
 import {
@@ -28,7 +29,7 @@ import {
   import { useToast } from '@/hooks/use-toast';
   import { exportToExcel, importFromExcel, generateExcelTemplate } from '@/lib/utils';
   import { useFirestore, useUser, useCollection, useMemoFirebase } from '@/firebase';
-  import { collection, doc, setDoc, deleteDoc, writeBatch, query, where } from 'firebase/firestore';
+  import { collection, doc, setDoc, deleteDoc, writeBatch, query } from 'firebase/firestore';
   
   export default function SalesOrderListPage() {
     const firestore = useFirestore();
@@ -41,9 +42,9 @@ import {
     const { toast } = useToast();
 
     const salesOrdersCollection = useMemoFirebase(() => {
-        if (!firestore || !user) return null;
-        return query(collection(firestore, 'salesOrders'), where('ownerId', '==', user.uid));
-    }, [firestore, user]);
+        if (!firestore) return null;
+        return query(collection(firestore, 'salesOrders'));
+    }, [firestore]);
 
     const { data: orders, isLoading } = useCollection<SalesOrder>(salesOrdersCollection);
 

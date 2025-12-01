@@ -22,7 +22,7 @@ import {
   import { useToast } from '@/hooks/use-toast';
   import { DeleteConfirmationDialog } from '@/app/components/delete-confirmation-dialog';
   import { useFirestore, useUser, useCollection, useMemoFirebase, errorEmitter, FirestorePermissionError } from '@/firebase';
-  import { collection, doc, setDoc, deleteDoc, writeBatch, query, where } from 'firebase/firestore';
+  import { collection, doc, setDoc, deleteDoc, writeBatch, query } from 'firebase/firestore';
   
   export default function SpdPage() {
     const firestore = useFirestore();
@@ -35,9 +35,9 @@ import {
     const [searchQuery, setSearchQuery] = useState('');
 
     const spdsCollection = useMemoFirebase(() => {
-        if (!firestore || !user) return null;
-        return query(collection(firestore, 'spds'), where('ownerId', '==', user.uid));
-    }, [firestore, user]);
+        if (!firestore) return null;
+        return query(collection(firestore, 'spds'));
+    }, [firestore]);
     const { data, isLoading } = useCollection<SpdData>(spdsCollection);
 
 

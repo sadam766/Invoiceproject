@@ -9,7 +9,7 @@ import { type Invoice, type Customer } from '@/app/lib/data';
 import { Badge } from '@/components/ui/badge';
 import { Bell } from 'lucide-react';
 import { useFirestore, useCollection, useMemoFirebase, useUser } from '@/firebase';
-import { collection, query, where } from 'firebase/firestore';
+import { collection, query } from 'firebase/firestore';
 
 export default function CalendarPage() {
   const [date, setDate] = useState<Date | undefined>(new Date());
@@ -17,15 +17,15 @@ export default function CalendarPage() {
   const { user } = useUser();
 
   const customersCollection = useMemoFirebase(() => {
-    if (!firestore || !user) return null;
-    return query(collection(firestore, 'customers'), where('ownerId', '==', user.uid));
-  }, [firestore, user]);
+    if (!firestore) return null;
+    return query(collection(firestore, 'customers'));
+  }, [firestore]);
   const { data: customerListData } = useCollection<Customer>(customersCollection);
   
   const invoicesCollection = useMemoFirebase(() => {
-    if (!firestore || !user) return null;
-    return query(collection(firestore, 'invoices'), where('ownerId', '==', user.uid));
-  }, [firestore, user]);
+    if (!firestore) return null;
+    return query(collection(firestore, 'invoices'));
+  }, [firestore]);
   const { data: invoiceListData } = useCollection<Invoice>(invoicesCollection);
 
   const unpaidInvoices = useMemo(() => {
@@ -137,5 +137,3 @@ export default function CalendarPage() {
     </main>
   );
 }
-
-    

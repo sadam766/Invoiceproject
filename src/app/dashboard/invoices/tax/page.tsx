@@ -26,7 +26,7 @@ import { AddTaxInvoiceDialog } from './_components/add-tax-invoice-dialog';
 import { useToast } from '@/hooks/use-toast';
 import { exportToExcel, importFromExcel } from '@/lib/utils';
 import { useFirestore, useUser, useCollection, useMemoFirebase, errorEmitter, FirestorePermissionError } from '@/firebase';
-import { collection, doc, setDoc, writeBatch, query, where } from 'firebase/firestore';
+import { collection, doc, setDoc, writeBatch, query } from 'firebase/firestore';
 
 export default function TaxInvoicePage() {
     const firestore = useFirestore();
@@ -37,9 +37,9 @@ export default function TaxInvoicePage() {
     const { toast } = useToast();
 
     const taxInvoicesCollection = useMemoFirebase(() => {
-        if (!firestore || !user) return null;
-        return query(collection(firestore, 'taxInvoices'), where('ownerId', '==', user.uid));
-    }, [firestore, user]);
+        if (!firestore) return null;
+        return query(collection(firestore, 'taxInvoices'));
+    }, [firestore]);
     const { data, isLoading } = useCollection<TaxInvoice>(taxInvoicesCollection);
 
     const filteredData = useMemo(() => {
