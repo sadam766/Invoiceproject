@@ -270,6 +270,59 @@
         "invoiceNumber",
         "ownerId"
       ]
+    },
+    "SalesOrder": {
+        "title": "Sales Order Item",
+        "description": "Represents a single line item within a sales order.",
+        "type": "object",
+        "properties": {
+            "id": {
+                "type": "string",
+                "description": "Unique identifier for the sales order item."
+            },
+            "soNumber": {
+                "type": "string",
+                "description": "The sales order number this item belongs to."
+            },
+            "customer": {
+                "type": "string",
+                "description": "The customer associated with this sales order."
+            },
+            "productName": {
+                "type": "string",
+                "description": "Name of the product."
+            },
+            "category": {
+                "type": "string",
+                "description": "Category of the product."
+            },
+            "quantity": {
+                "type": "number",
+                "description": "Quantity of the product ordered."
+            },
+            "unit": {
+                "type": "string",
+                "description": "Unit of measurement for the quantity."
+            },
+            "price": {
+                "type": "number",
+                "description": "Price per unit of the product."
+            },
+            "ownerId": {
+                "type": "string",
+                "description": "The UID of the user who owns this document."
+            }
+        },
+        "required": [
+            "id",
+            "soNumber",
+            "customer",
+            "productName",
+            "quantity",
+            "unit",
+            "price",
+            "ownerId"
+        ]
     }
   },
   "auth": {
@@ -307,6 +360,9 @@
       "description": "Stores user profile information, including their role."
     },
     "/salesOrders/{orderId}": {
+      "schema": {
+          "$ref": "#/entities/SalesOrder"
+      },
       "description": "Stores individual items of a sales order. Only the user who created it can access it."
     },
     "/invoiceNumbers/{invoiceNumberId}": {
