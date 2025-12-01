@@ -65,11 +65,20 @@ service cloud.firestore {
     }
 
     /**
+     * @description Sales orders collection. Readable by all.
+     */
+    match /salesOrders/{orderId} {
+        allow read, list: if isSignedIn();
+        allow create: if isSignedIn() && isCreatingOwnerDoc();
+        allow update, delete: if isSignedIn() && isOwnerOfDoc();
+    }
+
+    /**
      * @description Shared data collections. Readable by all signed-in users.
      *              Write access is restricted to the owner of the document.
      */
     match /{collection}/{docId} 
-        where collection in ['customers', 'salesOrders', 'invoiceNumbers', 'invoices', 'spds', 'taxInvoices', 'sales'] {
+        where collection in ['customers', 'invoiceNumbers', 'invoices', 'spds', 'taxInvoices', 'sales'] {
       allow read: if isSignedIn();
       allow create: if isSignedIn() && isCreatingOwnerDoc();
       allow update, delete: if isSignedIn() && isOwnerOfDoc();
