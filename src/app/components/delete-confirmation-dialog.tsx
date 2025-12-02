@@ -10,25 +10,27 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-  AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
-import { Button, buttonVariants } from '@/components/ui/button';
+import { buttonVariants } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
-import { Trash2 } from 'lucide-react';
+import type { ReactNode } from 'react';
 
 type DeleteConfirmationDialogProps = {
   onConfirm: () => void;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  children: ReactNode; // The trigger component
 };
 
-export function DeleteConfirmationDialog({ onConfirm }: DeleteConfirmationDialogProps) {
+export function DeleteConfirmationDialog({ 
+  onConfirm,
+  open,
+  onOpenChange,
+  children
+}: DeleteConfirmationDialogProps) {
   return (
-    <AlertDialog>
-      <AlertDialogTrigger asChild>
-        <button className='flex items-center text-red-600 hover:text-red-800'>
-          <Trash2 className="mr-2 h-4 w-4" />
-          <span>Hapus</span>
-        </button>
-      </AlertDialogTrigger>
+    <AlertDialog open={open} onOpenChange={onOpenChange}>
+      {children}
       <AlertDialogContent>
         <AlertDialogHeader>
           <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
