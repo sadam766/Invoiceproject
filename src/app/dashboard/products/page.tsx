@@ -22,13 +22,13 @@ import {
   import { Input } from '@/components/ui/input';
   import { Button } from '@/components/ui/button';
   import type { ProductListItem } from '@/app/lib/data';
-  import { Search, Upload, Download } from 'lucide-react';
+  import { Search, Upload, Download, Trash2 } from 'lucide-react';
   import { AddProductDialog } from './_components/add-product-dialog';
   import { DeleteConfirmationDialog } from '@/app/components/delete-confirmation-dialog';
   import { useToast } from '@/hooks/use-toast';
   import { exportToExcel, importFromExcel, generateExcelTemplate } from '@/lib/utils';
   import { useFirestore, useUser, useCollection, useMemoFirebase, errorEmitter, FirestorePermissionError } from '@/firebase';
-  import { collection, doc, setDoc, deleteDoc, writeBatch } from 'firebase/firestore';
+  import { collection, doc, setDoc, deleteDoc, writeBatch, query } from 'firebase/firestore';
   
   export default function ProductListPage() {
     const firestore = useFirestore();
@@ -39,10 +39,12 @@ import {
     const [categoryFilter, setCategoryFilter] = useState('all');
     const fileInputRef = useRef<HTMLInputElement>(null);
     const { toast } = useToast();
+    const [deleteDialogState, setDeleteDialogState] = useState<{ isOpen: boolean; productId?: string }>({ isOpen: false });
+
 
     const productsCollection = useMemoFirebase(() => {
         if (!firestore) return null;
-        return collection(firestore, 'products');
+        return query(collection(firestore, 'products'));
     }, [firestore]);
 
     const { data: products, isLoading } = useCollection<ProductListItem>(productsCollection);
@@ -73,12 +75,13 @@ import {
         setIsDialogOpen(true);
     };
 
-    const handleDelete = (productId: string) => {
-        if (!firestore) return;
-        const docRef = doc(firestore, 'products', productId);
+    const handleDeleteConfirm = () => {
+        if (!firestore || !deleteDialogState.productId) return;
+        const docRef = doc(firestore, 'products', deleteDialogState.productId);
         deleteDoc(docRef)
           .then(() => {
             toast({ title: 'Product deleted' });
+            setDeleteDialogState({ isOpen: false, productId: undefined });
           })
           .catch(async (serverError) => {
             const permissionError = new FirestorePermissionError({
@@ -86,7 +89,12 @@ import {
               operation: 'delete',
             });
             errorEmitter.emit('permission-error', permissionError);
+            setDeleteDialogState({ isOpen: false, productId: undefined });
           });
+    };
+    
+    const openDeleteDialog = (productId: string) => {
+        setDeleteDialogState({ isOpen: true, productId: productId });
     };
 
     const handleSave = (product: Omit<ProductListItem, 'id'> & { id?: string }) => {
@@ -249,7 +257,15 @@ import {
                                     <TableCell>
                                         <div className="flex gap-2">
                                             <Button variant="link" className="p-0 h-auto" onClick={() => handleEdit(product)}>Edit</Button>
-                                            <DeleteConfirmationDialog onConfirm={() => handleDelete(product.id!)} />
+                                            <DeleteConfirmationDialog 
+                                                open={deleteDialogState.isOpen && deleteDialogState.productId === product.id}
+                                                onOpenChange={(open) => setDeleteDialogState({isOpen: open, productId: open ? product.id : undefined})}
+                                                onConfirm={handleDeleteConfirm}
+                                            >
+                                                <Button variant="link" className="p-0 h-auto text-destructive" onClick={(e) => { e.stopPropagation(); openDeleteDialog(product.id!); }}>
+                                                    Hapus
+                                                </Button>
+                                            </DeleteConfirmationDialog>
                                         </div>
                                     </TableCell>
                                 </TableRow>
@@ -265,3 +281,4 @@ import {
       </main>
     );
   }
+    

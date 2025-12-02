@@ -1,4 +1,3 @@
-
 'use client';
 import { useState, useMemo, useRef } from 'react';
 import {
@@ -16,7 +15,7 @@ import {
   import { Input } from '@/components/ui/input';
   import { Button } from '@/components/ui/button';
   import type { Customer } from '@/app/lib/data';
-  import { Search, Upload, Download } from 'lucide-react';
+  import { Search, Upload, Download, Trash2 } from 'lucide-react';
   import { AddCustomerDialog } from './_components/add-customer-dialog';
   import { DeleteConfirmationDialog } from '@/app/components/delete-confirmation-dialog';
   import { useToast } from '@/hooks/use-toast';
@@ -32,6 +31,8 @@ import {
     const [searchQuery, setSearchQuery] = useState('');
     const fileInputRef = useRef<HTMLInputElement>(null);
     const { toast } = useToast();
+    const [deleteDialogState, setDeleteDialogState] = useState<{ isOpen: boolean; customerId?: string }>({ isOpen: false });
+
 
     const customersCollection = useMemoFirebase(() => {
         if (!firestore) return null;
@@ -62,12 +63,13 @@ import {
         setIsDialogOpen(true);
     };
 
-    const handleDelete = (customerId: string) => {
-        if (!firestore) return;
-        const docRef = doc(firestore, 'customers', customerId);
+    const handleDeleteConfirm = () => {
+        if (!firestore || !deleteDialogState.customerId) return;
+        const docRef = doc(firestore, 'customers', deleteDialogState.customerId);
         deleteDoc(docRef)
             .then(() => {
                 toast({ title: 'Customer deleted' });
+                setDeleteDialogState({ isOpen: false, customerId: undefined });
             })
             .catch(async (serverError) => {
                 const permissionError = new FirestorePermissionError({
@@ -75,7 +77,12 @@ import {
                     operation: 'delete',
                 });
                 errorEmitter.emit('permission-error', permissionError);
+                setDeleteDialogState({ isOpen: false, customerId: undefined });
             });
+    };
+
+    const openDeleteDialog = (customerId: string) => {
+        setDeleteDialogState({ isOpen: true, customerId: customerId });
     };
 
     const handleSave = (customer: Omit<Customer, 'id' | 'ownerId'> & { id?: string }) => {
@@ -238,10 +245,18 @@ import {
                                     <TableCell>{customer.address}</TableCell>
                                     <TableCell>{customer.spdAddress}</TableCell>
                                     <TableCell>
-                                        <div className="flex gap-2">
-                                            <Button variant="link" className="p-0 h-auto" onClick={() => handleEdit(customer)}>Edit</Button>
-                                            <DeleteConfirmationDialog onConfirm={() => handleDelete(customer.id!)} />
-                                        </div>
+                                    <div className="flex gap-2">
+                                        <Button variant="link" className="p-0 h-auto" onClick={() => handleEdit(customer)}>Edit</Button>
+                                        <DeleteConfirmationDialog 
+                                            open={deleteDialogState.isOpen && deleteDialogState.customerId === customer.id}
+                                            onOpenChange={(open) => setDeleteDialogState({isOpen: open, customerId: open ? customer.id : undefined})}
+                                            onConfirm={handleDeleteConfirm}
+                                        >
+                                            <Button variant="link" className="p-0 h-auto text-destructive" onClick={(e) => { e.stopPropagation(); openDeleteDialog(customer.id!); }}>
+                                                Hapus
+                                            </Button>
+                                        </DeleteConfirmationDialog>
+                                    </div>
                                     </TableCell>
                                 </TableRow>
                             ))}
@@ -256,3 +271,4 @@ import {
       </main>
     );
   }
+    

@@ -1,4 +1,3 @@
-
 'use client';
 import { useState, useMemo, useRef } from 'react';
 import { useRouter } from 'next/navigation';
@@ -28,7 +27,7 @@ import {
   import { Badge } from '@/components/ui/badge';
   import { Checkbox } from '@/components/ui/checkbox';
   import { type SalesListItem } from '@/app/lib/data';
-  import { Search, Filter, MoreHorizontal, ArrowUpDown, Plus, Upload, Download, Eye, Edit } from 'lucide-react';
+  import { Search, Filter, MoreHorizontal, ArrowUpDown, Plus, Upload, Download, Eye, Edit, Trash2 } from 'lucide-react';
   import { AddSaleDialog } from './_components/add-sale-dialog';
   import { useToast } from '@/hooks/use-toast';
   import { DeleteConfirmationDialog } from '@/app/components/delete-confirmation-dialog';
@@ -45,6 +44,8 @@ import {
     const [editingSale, setEditingSale] = useState<SalesListItem | undefined>(undefined);
     const [isDialogOpen, setIsDialogOpen] = useState(false);
     const fileInputRef = useRef<HTMLInputElement>(null);
+    const [deleteDialogState, setDeleteDialogState] = useState<{ isOpen: boolean; soNumber?: string }>({ isOpen: false });
+
     
     const [searchQuery, setSearchQuery] = useState('');
     const [activeTab, setActiveTab] = useState('all');
@@ -86,12 +87,13 @@ import {
         setIsDialogOpen(true);
     };
 
-    const handleDelete = (soNumber: string) => {
-        if (!firestore || !user) return;
-        const docRef = doc(firestore, 'sales', soNumber);
+    const handleDeleteConfirm = () => {
+        if (!firestore || !user || !deleteDialogState.soNumber) return;
+        const docRef = doc(firestore, 'sales', deleteDialogState.soNumber);
         deleteDoc(docRef)
             .then(() => {
-                toast({ title: "Sale Deleted", description: `Sale ${soNumber} has been removed.` });
+                toast({ title: "Sale Deleted", description: `Sale ${deleteDialogState.soNumber} has been removed.` });
+                setDeleteDialogState({ isOpen: false, soNumber: undefined });
             })
             .catch(async (serverError) => {
                 const permissionError = new FirestorePermissionError({
@@ -99,7 +101,12 @@ import {
                     operation: 'delete',
                 });
                 errorEmitter.emit('permission-error', permissionError);
+                setDeleteDialogState({ isOpen: false, soNumber: undefined });
             });
+    };
+    
+    const openDeleteDialog = (soNumber: string) => {
+        setDeleteDialogState({ isOpen: true, soNumber: soNumber });
     };
 
     const handlePreview = (sale: SalesListItem) => {
@@ -328,9 +335,22 @@ import {
                                                     <Edit className="mr-2 h-4 w-4" />
                                                     Edit
                                                 </DropdownMenuItem>
-                                                <DropdownMenuItem className="text-destructive focus:text-destructive focus:bg-destructive/10">
-                                                    <DeleteConfirmationDialog onConfirm={() => handleDelete(sale.soNumber)} />
-                                                </DropdownMenuItem>
+                                                <DeleteConfirmationDialog 
+                                                    open={deleteDialogState.isOpen && deleteDialogState.soNumber === sale.soNumber}
+                                                    onOpenChange={(open) => setDeleteDialogState({isOpen: open, soNumber: open ? sale.soNumber : undefined})}
+                                                    onConfirm={handleDeleteConfirm}
+                                                >
+                                                    <DropdownMenuItem
+                                                        className="text-destructive focus:text-destructive focus:bg-destructive/10"
+                                                        onSelect={(e) => {
+                                                        e.preventDefault();
+                                                        openDeleteDialog(sale.soNumber);
+                                                        }}
+                                                    >
+                                                        <Trash2 className="mr-2 h-4 w-4" />
+                                                        Hapus
+                                                    </DropdownMenuItem>
+                                                </DeleteConfirmationDialog>
                                             </DropdownMenuContent>
                                         </DropdownMenu>
                                     </TableCell>
@@ -349,3 +369,4 @@ import {
       </main>
     );
   }
+    

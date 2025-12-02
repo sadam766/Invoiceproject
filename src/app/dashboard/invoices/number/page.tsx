@@ -1,4 +1,3 @@
-
 'use client';
 import { useState, useRef, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
@@ -14,10 +13,16 @@ import {
     TableHeader,
     TableRow,
   } from '@/components/ui/table';
+  import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuTrigger,
+  } from '@/components/ui/dropdown-menu';
   import { Input } from '@/components/ui/input';
   import { Button } from '@/components/ui/button';
   import { type InvoiceNumber } from '@/app/lib/data';
-  import { Search, Upload, Download, Filter } from 'lucide-react';
+  import { Search, Upload, Download, Filter, MoreHorizontal, Edit, Trash2 } from 'lucide-react';
   import { AddInvoiceNumberDialog } from './_components/add-invoice-number-dialog';
   import { DeleteConfirmationDialog } from '@/app/components/delete-confirmation-dialog';
   import { Skeleton } from '@/components/ui/skeleton';
@@ -37,6 +42,8 @@ import {
 
     const [editingInvoice, setEditingInvoice] = useState<InvoiceNumber | undefined>(undefined);
     const [isDialogOpen, setIsDialogOpen] = useState(false);
+    const [deleteDialogState, setDeleteDialogState] = useState<{ isOpen: boolean; invoiceId?: string }>({ isOpen: false });
+
     
     const invoiceNumbersCollection = useMemoFirebase(() => {
         if (!firestore) return null;
@@ -72,13 +79,14 @@ import {
         setIsDialogOpen(true);
     };
 
-    const handleDelete = (invoiceId: string) => {
-        if (!firestore || !invoiceId) return;
-        const safeId = invoiceId.replace(/\//g, '_');
+    const handleDeleteConfirm = () => {
+        if (!firestore || !deleteDialogState.invoiceId) return;
+        const safeId = deleteDialogState.invoiceId.replace(/\//g, '_');
         const docRef = doc(firestore, 'invoiceNumbers', safeId);
         deleteDoc(docRef)
             .then(() => {
                 toast({ title: 'Invoice Number Deleted' });
+                setDeleteDialogState({ isOpen: false, invoiceId: undefined });
             })
             .catch(async (serverError) => {
                 const permissionError = new FirestorePermissionError({
@@ -86,7 +94,12 @@ import {
                     operation: 'delete',
                 });
                 errorEmitter.emit('permission-error', permissionError);
+                setDeleteDialogState({ isOpen: false, invoiceId: undefined });
             });
+    };
+    
+    const openDeleteDialog = (invoiceId: string) => {
+        setDeleteDialogState({ isOpen: true, invoiceId: invoiceId });
     };
 
     const handleSave = (invoice: Omit<InvoiceNumber, 'id' | 'ownerId'> & {id: string}) => {
@@ -229,7 +242,7 @@ import {
                                 <TableHead>SALES ORDER/SO</TableHead>
                                 <TableHead>TANGGAL</TableHead>
                                 <TableHead>JUMLAH</TableHead>
-                                <TableHead>TINDAKAN</TableHead>
+                                <TableHead className="text-right">TINDAKAN</TableHead>
                             </TableRow>
                         </TableHeader>
                         <TableBody>
@@ -252,11 +265,36 @@ import {
                                         <TableCell>{invoice.salesOrder}</TableCell>
                                         <TableCell>{invoice.date}</TableCell>
                                         <TableCell>Rp {invoice.amount.toLocaleString('id-ID')},00</TableCell>
-                                        <TableCell>
-                                            <div className="flex gap-2">
-                                                <Button variant="link" className="p-0 h-auto" onClick={() => handleEdit(invoice)}>Edit</Button>
-                                                <DeleteConfirmationDialog onConfirm={() => handleDelete(invoice.id!)} />
-                                            </div>
+                                        <TableCell className="text-right">
+                                            <DropdownMenu>
+                                                <DropdownMenuTrigger asChild>
+                                                    <Button variant="ghost" size="icon">
+                                                        <MoreHorizontal className="h-4 w-4" />
+                                                    </Button>
+                                                </DropdownMenuTrigger>
+                                                <DropdownMenuContent align="end">
+                                                    <DropdownMenuItem onClick={() => handleEdit(invoice)}>
+                                                        <Edit className="mr-2 h-4 w-4" />
+                                                        Edit
+                                                    </DropdownMenuItem>
+                                                    <DeleteConfirmationDialog 
+                                                      open={deleteDialogState.isOpen && deleteDialogState.invoiceId === invoice.id}
+                                                      onOpenChange={(open) => setDeleteDialogState({isOpen: open, invoiceId: open ? invoice.id : undefined})}
+                                                      onConfirm={handleDeleteConfirm}
+                                                    >
+                                                        <DropdownMenuItem
+                                                            className="text-destructive focus:text-destructive focus:bg-destructive/10"
+                                                            onSelect={(e) => {
+                                                              e.preventDefault();
+                                                              openDeleteDialog(invoice.id);
+                                                            }}
+                                                          >
+                                                          <Trash2 className="mr-2 h-4 w-4" />
+                                                          Hapus
+                                                        </DropdownMenuItem>
+                                                    </DeleteConfirmationDialog>
+                                                </DropdownMenuContent>
+                                            </DropdownMenu>
                                         </TableCell>
                                     </TableRow>
                                 ))
@@ -272,3 +310,4 @@ import {
       </main>
     );
   }
+    

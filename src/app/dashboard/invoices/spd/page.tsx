@@ -1,4 +1,3 @@
-
 'use client';
 import { useState, useMemo, useRef } from 'react';
 import { useRouter } from 'next/navigation';
@@ -33,6 +32,8 @@ import {
     const [editingSpd, setEditingSpd] = useState<SpdData | undefined>(undefined);
     const [isDialogOpen, setIsDialogOpen] = useState(false);
     const [searchQuery, setSearchQuery] = useState('');
+    const [deleteDialogState, setDeleteDialogState] = useState<{ isOpen: boolean; spdId?: string }>({ isOpen: false });
+
 
     const spdsCollection = useMemoFirebase(() => {
         if (!firestore) return null;
@@ -64,12 +65,13 @@ import {
         setIsDialogOpen(true);
     }
     
-    const handleDelete = (spdId: string) => {
-        if (!firestore) return;
-        const docRef = doc(firestore, 'spds', spdId);
+    const handleDeleteConfirm = () => {
+        if (!firestore || !deleteDialogState.spdId) return;
+        const docRef = doc(firestore, 'spds', deleteDialogState.spdId);
         deleteDoc(docRef)
             .then(() => {
-                toast({ title: "SPD Deleted", description: `SPD ${spdId} has been removed.` });
+                toast({ title: "SPD Deleted", description: `SPD ${deleteDialogState.spdId} has been removed.` });
+                setDeleteDialogState({ isOpen: false, spdId: undefined });
             })
             .catch(async (serverError) => {
                 const permissionError = new FirestorePermissionError({
@@ -77,7 +79,12 @@ import {
                     operation: 'delete',
                 });
                 errorEmitter.emit('permission-error', permissionError);
+                setDeleteDialogState({ isOpen: false, spdId: undefined });
             });
+    };
+
+    const openDeleteDialog = (spdId: string) => {
+        setDeleteDialogState({ isOpen: true, spdId: spdId });
     };
 
     const handlePreview = (spdItem: SpdData) => {
@@ -190,9 +197,15 @@ import {
                                         <div className="flex gap-2">
                                             <Button variant="link" className="p-0 h-auto text-blue-600" onClick={() => handlePreview(item)}>Pratinjau</Button>
                                             <Button variant="link" className="p-0 h-auto" onClick={() => handleEdit(item)}>Edit</Button>
-                                            <div className="text-red-600">
-                                                <DeleteConfirmationDialog onConfirm={() => handleDelete(item.spd)} />
-                                            </div>
+                                            <DeleteConfirmationDialog 
+                                                open={deleteDialogState.isOpen && deleteDialogState.spdId === item.spd}
+                                                onOpenChange={(open) => setDeleteDialogState({isOpen: open, spdId: open ? item.spd : undefined})}
+                                                onConfirm={handleDeleteConfirm}
+                                            >
+                                                <Button variant="link" className="p-0 h-auto text-destructive" onClick={(e) => { e.stopPropagation(); openDeleteDialog(item.spd); }}>
+                                                    Hapus
+                                                </Button>
+                                            </DeleteConfirmationDialog>
                                         </div>
                                     </TableCell>
                                 </TableRow>
@@ -208,3 +221,4 @@ import {
       </main>
     );
   }
+    

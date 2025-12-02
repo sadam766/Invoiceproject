@@ -1,4 +1,3 @@
-
 'use client';
 import { useState, useMemo, useRef } from 'react';
 import {
@@ -23,7 +22,7 @@ import {
   import { Input } from '@/components/ui/input';
   import { Button } from '@/components/ui/button';
   import { type SalesOrder, type Invoice } from '@/app/lib/data';
-  import { Search, Upload, Download } from 'lucide-react';
+  import { Search, Upload, Download, Trash2 } from 'lucide-react';
   import { DeleteConfirmationDialog } from '@/app/components/delete-confirmation-dialog';
   import { AddSalesOrderDialog } from './_components/add-sales-order-dialog';
   import { useToast } from '@/hooks/use-toast';
@@ -40,6 +39,8 @@ import {
     const [categoryFilter, setCategoryFilter] = useState('all');
     const fileInputRef = useRef<HTMLInputElement>(null);
     const { toast } = useToast();
+    const [deleteDialogState, setDeleteDialogState] = useState<{ isOpen: boolean; orderId?: string, soNumber?: string }>({ isOpen: false });
+
 
     const salesOrdersCollection = useMemoFirebase(() => {
         if (!firestore) return null;
@@ -80,21 +81,22 @@ import {
         setIsDialogOpen(true);
     };
 
-    const handleDelete = async (orderId: string, soNumber: string) => {
-        if (!firestore) return;
+    const handleDeleteConfirm = async () => {
+        if (!firestore || !deleteDialogState.orderId || !deleteDialogState.soNumber) return;
     
         // Check if the soNumber is used in any invoice
-        if (invoiceList && invoiceList.some(invoice => invoice.soNumber === soNumber)) {
+        if (invoiceList && invoiceList.some(invoice => invoice.soNumber === deleteDialogState.soNumber)) {
             toast({
                 variant: 'destructive',
                 title: "Deletion Failed",
                 description: "Sales Order cannot be deleted because it is linked to an existing invoice.",
             });
+            setDeleteDialogState({ isOpen: false });
             return;
         }
 
         // Proceed with deletion if not linked
-        const docRef = doc(firestore, 'salesOrders', orderId);
+        const docRef = doc(firestore, 'salesOrders', deleteDialogState.orderId);
         try {
             await deleteDoc(docRef);
             toast({ title: 'Sales Order deleted' });
@@ -110,25 +112,43 @@ import {
                 title: "Error",
                 description: "Could not delete the sales order. Please check permissions.",
             });
+        } finally {
+            setDeleteDialogState({ isOpen: false });
         }
+    };
+    
+    const openDeleteDialog = (orderId: string, soNumber: string) => {
+        setDeleteDialogState({ isOpen: true, orderId, soNumber });
     };
 
     const handleSave = (order: SalesOrder) => {
         if (!firestore || !user) return;
         let orderId = order.id || editingOrder?.id;
+        const isNew = !orderId;
         if (!orderId) {
             orderId = doc(collection(firestore, 'salesOrders')).id;
         }
 
         const docRef = doc(firestore, 'salesOrders', orderId);
-        setDoc(docRef, { ...order, id: orderId, ownerId: user.uid }, { merge: true });
-        
-        toast({
-            title: editingOrder ? 'Sales Order Updated' : 'Sales Order Added',
-            description: `Sales Order ${order.soNumber} has been saved.`,
-        });
-        setIsDialogOpen(false);
-        setEditingOrder(undefined);
+        const dataToSave = { ...order, id: orderId, ownerId: user.uid };
+
+        setDoc(docRef, dataToSave, { merge: !isNew })
+            .then(() => {
+                 toast({
+                    title: editingOrder ? 'Sales Order Updated' : 'Sales Order Added',
+                    description: `Sales Order ${order.soNumber} has been saved.`,
+                });
+                setIsDialogOpen(false);
+                setEditingOrder(undefined);
+            })
+            .catch((error) => {
+                const permissionError = new FirestorePermissionError({
+                    path: docRef.path,
+                    operation: isNew ? 'create' : 'update',
+                    requestResourceData: dataToSave,
+                });
+                errorEmitter.emit('permission-error', permissionError);
+            });
     };
 
     const handleDialogStateChange = (open: boolean) => {
@@ -258,7 +278,15 @@ import {
                                     <TableCell>
                                         <div className="flex gap-2">
                                             <Button variant="link" className="p-0 h-auto" onClick={() => handleEdit(order)}>Edit</Button>
-                                            <DeleteConfirmationDialog onConfirm={() => handleDelete(order.id!, order.soNumber)} />
+                                            <DeleteConfirmationDialog
+                                                open={deleteDialogState.isOpen && deleteDialogState.orderId === order.id}
+                                                onOpenChange={(open) => setDeleteDialogState({isOpen: open, orderId: open ? order.id : undefined, soNumber: open ? order.soNumber : undefined })}
+                                                onConfirm={handleDeleteConfirm}
+                                            >
+                                                <Button variant="link" className="p-0 h-auto text-destructive" onClick={(e) => { e.stopPropagation(); openDeleteDialog(order.id!, order.soNumber); }}>
+                                                    Hapus
+                                                </Button>
+                                            </DeleteConfirmationDialog>
                                         </div>
                                     </TableCell>
                                 </TableRow>
@@ -274,5 +302,4 @@ import {
       </main>
     );
   }
-
     
