@@ -21,14 +21,14 @@ import {
   } from '@/components/ui/select';
   import { Input } from '@/components/ui/input';
   import { Button } from '@/components/ui/button';
-  import { type SalesOrder, type Invoice } from '@/app/lib/data';
+  import { type SalesOrder } from '@/app/lib/data';
   import { Search, Upload, Download, Trash2 } from 'lucide-react';
   import { DeleteConfirmationDialog } from '@/app/components/delete-confirmation-dialog';
   import { AddSalesOrderDialog } from './_components/add-sales-order-dialog';
   import { useToast } from '@/hooks/use-toast';
   import { exportToExcel, importFromExcel, generateExcelTemplate } from '@/lib/utils';
   import { useFirestore, useUser, useCollection, useMemoFirebase, errorEmitter, FirestorePermissionError } from '@/firebase';
-  import { collection, doc, setDoc, deleteDoc, writeBatch, query, getDocs, where } from 'firebase/firestore';
+  import { collection, doc, setDoc, deleteDoc, writeBatch, query } from 'firebase/firestore';
   
   export default function SalesOrderListPage() {
     const firestore = useFirestore();
@@ -47,12 +47,6 @@ import {
         return query(collection(firestore, 'salesOrders'));
     }, [firestore]);
     const { data: orders, isLoading } = useCollection<SalesOrder>(salesOrdersCollection);
-
-    const invoicesCollection = useMemoFirebase(() => {
-        if (!firestore) return null;
-        return query(collection(firestore, 'invoices'));
-    }, [firestore]);
-    const { data: invoiceList, isLoading: isInvoicesLoading } = useCollection<Invoice>(invoicesCollection);
 
 
     const filteredOrders = useMemo(() => {
@@ -82,20 +76,8 @@ import {
     };
 
     const handleDeleteConfirm = async () => {
-        if (!firestore || !deleteDialogState.orderId || !deleteDialogState.soNumber) return;
+        if (!firestore || !deleteDialogState.orderId) return;
     
-        // Check if the soNumber is used in any invoice
-        if (invoiceList && invoiceList.some(invoice => invoice.soNumber === deleteDialogState.soNumber)) {
-            toast({
-                variant: 'destructive',
-                title: "Deletion Failed",
-                description: "Sales Order cannot be deleted because it is linked to an existing invoice.",
-            });
-            setDeleteDialogState({ isOpen: false });
-            return;
-        }
-
-        // Proceed with deletion if not linked
         const docRef = doc(firestore, 'salesOrders', deleteDialogState.orderId);
         try {
             await deleteDoc(docRef);
