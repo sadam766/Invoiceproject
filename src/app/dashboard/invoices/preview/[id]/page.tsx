@@ -259,186 +259,137 @@ const InvoicePreviewPage = () => {
                     const isLastPage = pageIndex === totalPages - 1;
                     return (
                         <div key={pageIndex} className={`w-[210mm] h-[297mm] max-w-4xl mx-auto bg-white shadow-lg p-[10mm] text-[10px] leading-tight flex flex-col relative ${pageIndex > 0 ? 'page-break' : ''}`}>
-                            <header className="relative w-full h-[60mm] flex items-center">
-                                <div className="relative h-full w-full">
-                                    <Image src="/elementinvoice/LOGO.png" alt="logo" layout="fill" objectFit="contain" objectPosition="left top" />
+                             {/* Header Placeholder */}
+                            <header className="w-full h-[60mm] flex items-center justify-between border-b-4 border-gray-800 pb-2 mb-4">
+                                <div className="w-1/2">
+                                    <h1 className="text-2xl font-bold text-gray-800">Your Company</h1>
+                                    <p className="text-gray-600">123 Street, City, Country</p>
+                                </div>
+                                <div className="w-1/2 text-right">
+                                     <h2 className="text-3xl font-bold text-gray-700 uppercase">{invoiceTitle}</h2>
+                                     <p className="text-gray-500 mt-1">{invoiceId}</p>
                                 </div>
                             </header>
 
                             <main className='mt-0 flex-grow'>
-                                <div className="w-full text-center mb-1 leading-none">
-                                    <p className="font-bold uppercase text-xs tracking-tighter mb-0.5">{invoiceTitle}</p>
-                                    <p className="font-bold uppercase text-xs">{invoiceId}</p>
-                                </div>
                                 <div className='flex justify-between items-start mt-4'>
                                     <div className='w-[45%]'>
+                                        <p className="font-bold text-gray-600 uppercase mb-1">Bill To:</p>
                                         <p className="font-bold text-[10px] mb-0">{customer.name}</p>
                                         <p className="text-[10px] mb-0">{customer.address}</p>
                                     </div>
-                                    <div className="w-[30%] text-[10px] text-left leading-normal space-y-0">
-                                        <p className="mb-0">Sales Order: {soNumber}</p> 
-                                        <p className="mb-0">Order Date: </p>
-                                        <p className="mb-0">Reference A: </p>
+                                    <div className="w-[30%] text-[10px] text-left leading-normal space-y-1">
+                                        <p className="mb-0"><span className="font-bold">Sales Order:</span> {soNumber}</p> 
+                                        <p className="mb-0"><span className="font-bold">Date:</span> {formatDate(date)}</p>
+                                        <p className="mb-0"><span className="font-bold">PO Number:</span> {poNumber}</p>
                                     </div>
                                 </div>
-                                <div className='flex justify-between text-[10px] mt-2 mb-0 w-full py-1'>
-                                    <p className='mb-0'>Customer Code :</p>
-                                    <p className='mb-0'>Date: {formatDate(date)}</p>
-                                </div>
+                               
 
-                                <table className="w-full border-collapse text-[10px] mt-0">
+                                <table className="w-full border-collapse text-[10px] mt-8">
                                     <thead>
-                                        <tr className='bg-white border border-black'>
-                                            <th className="p-1 text-left w-[8%] border-r border-black border-b border-black font-normal">No.</th>
-                                            <th className="p-1 text-left w-[40%] border-r border-black border-b border-black font-normal">Item</th>
-                                            <th className="p-1 text-center w-[15%] border-r border-black border-b border-black font-normal">Quantity Unit</th>
-                                            <th className="p-1 text-right w-[17%] border-r border-black border-b border-black font-normal">Price</th>
-                                            <th className="p-1 text-right flex-1 border-b border-black font-normal">Amount</th>
+                                        <tr className='bg-gray-100 border-b-2 border-gray-300'>
+                                            <th className="p-2 text-left w-[8%] font-bold text-gray-600">No.</th>
+                                            <th className="p-2 text-left w-[40%] font-bold text-gray-600">Item</th>
+                                            <th className="p-2 text-center w-[15%] font-bold text-gray-600">Quantity Unit</th>
+                                            <th className="p-2 text-right w-[17%] font-bold text-gray-600">Price</th>
+                                            <th className="p-2 text-right flex-1 font-bold text-gray-600">Amount</th>
                                         </tr>
                                     </thead>
                                     <tbody>
                                         {chunk.map((item, itemIdx) => (
-                                            <tr key={item.id || itemIdx} className='align-top'>
-                                                <td className="p-1 h-[18px]">{pageIndex * ITEMS_PER_PAGE + itemIdx + 1}</td>
-                                                <td className="p-1">{item.name}</td>
-                                                <td className="p-1 text-center">{item.quantity.toLocaleString('id-ID')} {item.unit}</td>
-                                                <td className="p-1 text-right">{formatCurrency(item.price)}</td>
-                                                <td className="p-1 text-right">{formatCurrency(item.total)}</td>
+                                            <tr key={item.id || itemIdx} className='align-top border-b border-gray-200'>
+                                                <td className="p-2 h-[18px]">{pageIndex * ITEMS_PER_PAGE + itemIdx + 1}</td>
+                                                <td className="p-2">{item.name}</td>
+                                                <td className="p-2 text-center">{item.quantity.toLocaleString('id-ID')} {item.unit}</td>
+                                                <td className="p-2 text-right">{formatCurrency(item.price)}</td>
+                                                <td className="p-2 text-right">{formatCurrency(item.total)}</td>
                                             </tr>
                                         ))}
                                         {Array.from({ length: ITEMS_PER_PAGE - chunk.length }).map((_, i) => (
-                                            <tr key={`empty-${i}`}><td className="p-1 h-[18px]" colSpan={5}>&nbsp;</td></tr>
+                                            <tr key={`empty-${i}`}><td className="p-2 h-[26px]" colSpan={5}>&nbsp;</td></tr>
                                         ))}
                                     </tbody>
                                 </table>
                             </main>
                             
                             {isLastPage && (
-                                <div className="pt-0 text-black mt-auto text-[10px]">
+                                <div className="pt-4 text-black mt-auto text-[10px]">
                                     
-                                    <div className="flex w-full justify-between items-start leading-normal">
-                                        <div className='w-1/2'>
-                                            <p>No PO : {poNumber}</p>
-                                        </div>
-                                        <div className="w-1/2 text-right text-[10px] pr-1">
+                                    <div className="flex w-full justify-end items-start leading-normal">
+                                        <div className="w-1/2 text-right text-[10px] pr-1 space-y-1">
                                             
-                                            <div className="w-full">
-                                                <div className="text-right w-full">
-                                                    <div className="h-0.5 border-b border-black w-1/3 ml-auto mb-1"></div>
-                                                    <p className="font-normal mb-0">{formatCurrency(subTotalItems)}</p>
+                                            <div className="flex justify-between font-medium">
+                                                <span>Subtotal:</span>
+                                                <span>{formatCurrency(subTotalItems)}</span>
+                                            </div>
+
+                                            {negotiation > 0 && (
+                                                 <div className="flex justify-between text-gray-600">
+                                                    <span>A/Negotiation:</span>
+                                                    <span>({formatCurrency(negotiation)})</span> 
                                                 </div>
+                                            )}
 
-                                                {negotiation > 0 && (
-                                                    <div className='flex justify-end space-x-2'>
-                                                        <p className='mb-0'>A/Negotiation :</p>
-                                                        <p className='mb-0'>({formatCurrency(negotiation)})</p> 
-                                                    </div>
-                                                )}
+                                            {dpValue > 0 && (
+                                                <div className="flex justify-between text-gray-600">
+                                                    <span>DP {dpPercent ? `${dpPercent}%` : 'Value'}:</span>
+                                                    <span>({formatCurrency(dpValue)})</span>
+                                                </div>
+                                            )}
 
-                                                {dpValue > 0 && (
-                                                    <div className='flex justify-end space-x-2'>
-                                                        <p className='mb-0'>DP {dpPercent ? `${dpPercent}%` : 'Value'} :</p>
-                                                        <p className='mb-0'>{formatCurrency(dpValue)}</p>
-                                                    </div>
-                                                )}
-
-                                                 {pelunasan > 0 && (
-                                                    <div className='flex justify-end space-x-2 font-semibold'>
-                                                        <p className='mb-0'>Pelunasan:</p>
-                                                        <p className='mb-0'>{formatCurrency(pelunasan)}</p> 
-                                                    </div>
-                                                )}
+                                             {pelunasan > 0 && (
+                                                <div className="flex justify-between text-gray-600">
+                                                    <span>Pelunasan:</span>
+                                                    <span>({formatCurrency(pelunasan)})</span> 
+                                                </div>
+                                            )}
+                                             <div className="border-t border-gray-300 my-1"></div>
+                                             <div className="flex justify-between font-bold">
+                                                <span>Total Goods:</span>
+                                                <span>{formatCurrency(grandTotal)}</span>
+                                             </div>
+                                              <div className="flex justify-between text-gray-600">
+                                                <span>DPP VAT:</span>
+                                                <span>{formatCurrency(dppVat)}</span>
                                             </div>
-                                        </div>
-                                    </div>
-                                    <div className="border-t border-black w-full my-1"></div>
-                                    <div className="flex justify-end mt-1">
-                                        <div className="w-1/2 text-[10px] leading-snug">
-                                            <div className="grid grid-cols-[1fr_auto] gap-x-3">
-                                                <span className="text-right">Goods:</span>
-                                                <span className="text-right">{formatCurrency(grandTotal)}</span>
-                                                <span className="text-right">DPP VAT (11/12):</span>
-                                                <span className="text-right">{formatCurrency(dppVat)}</span>
-                                                <span className="text-right">VAT 12%:</span>
-                                                <span className="text-right">{formatCurrency(vat12)}</span>
+                                             <div className="flex justify-between text-gray-600">
+                                                <span>VAT 12%:</span>
+                                                <span>{formatCurrency(vat12)}</span>
                                             </div>
-                                            <div className="grid grid-cols-[1fr_auto] gap-x-3 font-normal">
-                                                <span className="text-right">Total Rp:</span>
-                                                <span className="text-right">{formatCurrency(totalRp)}</span>
+                                             <div className="border-t-2 border-gray-800 my-1"></div>
+                                             <div className="flex justify-between font-bold text-base">
+                                                <span>TOTAL:</span>
+                                                <span>Rp {formatCurrency(totalRp)}</span>
                                             </div>
                                         </div>
                                     </div>
-                                    <div className="border-t border-black w-full my-1"></div>
-                                    {/* --- BAGIAN PEMBAYARAN & TANDA TANGAN YANG DIPERBARUI --- */}
-                                    <div className="mt-0 pt-1">
-                                        <div className="flex">
+                                    
+                                    <div className="mt-8 pt-4 border-t border-gray-200">
+                                        <div className="flex justify-between">
                                             
-                                            <div className="w-[55%] pr-4 text-[10px] space-y-0.5 leading-normal">
-                                                
-                                                <div className="flex items-start">
-                                                    <p className='shrink-0 w-max mb-0'>Payment:</p> 
-                                                    <p className='ml-2 font-normal mb-0'>{paymentTerms}</p> 
-                                                </div>
-                                                <div className="flex items-start">
-                                                    <p className='shrink-0 w-max mb-0'>Please state with your payment:</p>
-                                                    <p className='ml-2 font-bold mb-0'>{invoiceId}</p>
-                                                </div>
-                                                
-                                                <p className='mt-2 mb-1'>For payment, please transfer to our account:</p>
-                                                <p className="font-semibold text-[10px] mb-1">PT. Jembo Cable Company Tbk</p>
-                                                
-                                                <div className="grid grid-cols-[35%_1fr] gap-x-2 leading-tight">
-                                                    <div>
-                                                        <p className='mb-0'>Bank Mandiri -</p>
-                                                        <p className='mb-0'>Jakarta Cabang</p>
-                                                        <p className='mb-0'>Sudirman</p>
-                                                    </div>
-                                                    <div>
-                                                        <p className='mb-0'>A/C No. : 102-0100206827 (Rp)</p>
-                                                        <p className='mb-0'>A/C No. : 102-0005000218 (Rp)</p>
-                                                        <p className='mb-0'>A/C No. : 102-0005000226 (USD)</p>
-                                                    </div>
-                                                </div>
-
-                                                <div className="text-center my-1">OR</div>
-
-                                                <div className="grid grid-cols-[35%_1fr] gap-x-2 leading-tight">
-                                                    <div>
-                                                        <p className='mb-0'>Bank BCA - Jakarta</p>
-                                                        <p className='mb-0'>Cabang KEM TOWER</p>
-                                                    </div>
-                                                    <div>
-                                                        <p className='mb-0'>A/C No. : 684-0198977 (Rp)</p>
-                                                    </div>
-                                                </div>
+                                            <div className="w-[55%] pr-4 text-[10px] space-y-1 leading-normal">
+                                                 <h4 className="font-bold uppercase text-gray-600 mb-2">Payment Details</h4>
+                                                 <p className='mb-1'><span className="font-semibold">Terms:</span> {paymentTerms}</p>
+                                                 <p className='mb-1'><span className="font-semibold">Bank:</span> Bank Central Asia (BCA)</p>
+                                                 <p className='mb-1'><span className="font-semibold">Account No:</span> 684-0198977 (Rp)</p>
+                                                 <p className='mb-1'><span className="font-semibold">Beneficiary:</span> PT. JEMBO CABLE COMPANY Tbk</p>
                                             </div>
                                             
-                                            <div className="w-[45%] pl-0 flex flex-col justify-between text-[10px] text-center" style={{ minHeight: '130px' }}>
+                                            <div className="w-[45%] pl-4 flex flex-col justify-between text-[10px] text-center" style={{ minHeight: '130px' }}>
                                                 <p className="font-semibold text-[10px]">PT. JEMBO CABLE COMPANY Tbk</p>
                                                 <div className="flex-grow"></div>
-                                                <div className='border-b border-black w-24 mx-auto mb-1 mt-20'></div>
-                                                <p className="font-semibold">Finance</p>
+                                                <div className='border-b border-black w-32 mx-auto mb-1 mt-20'></div>
+                                                <p className="font-semibold">Finance Department</p>
                                             </div>
                                             
                                         </div>
                                     </div>
                                 </div>
                             )}
-                             <footer className="absolute bottom-0 left-0 w-full h-[30mm] pointer-events-none">
-                                <div className="relative w-full h-full">
-                                    <Image src="/elementinvoice/ISO.png" alt="iso" layout="fill" objectFit="contain" objectPosition="left bottom" />
-                                </div>
-                                <div className="absolute bottom-[10mm] right-[10mm] flex items-center">
-                                    <div className="relative w-[50px] h-[15px]">
-                                        <Image src="/elementinvoice/HALAMAN.png" alt="halaman" layout="fill" objectFit="contain" />
-                                    </div>
-                                    <span className="ml-2">{pageIndex + 1} of {totalPages}</span>
-                                </div>
-                                <div className="absolute bottom-[10mm] left-[10mm]">
-                                     <div className="relative w-[100px] h-[15px]">
-                                        <Image src="/elementinvoice/nomor.png" alt="nomor" layout="fill" objectFit="contain" />
-                                     </div>
-                                </div>
+                             <footer className="w-full text-center text-gray-500 text-xs pt-4 border-t mt-4">
+                                <p>Thank you for your business!</p>
+                                <p>Page {pageIndex + 1} of {totalPages}</p>
                             </footer>
                         </div>
                     );
