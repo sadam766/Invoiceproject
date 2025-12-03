@@ -9,11 +9,6 @@ import { useToast } from '@/hooks/use-toast';
 import html2pdf from 'html2pdf.js';
 import type { Customer } from '@/app/lib/data';
 
-import LOGO from 'public/elementinvoice/LOGO.png';
-import ISO from 'public/elementinvoice/ISO.png';
-import HALAMAN from 'public/elementinvoice/HALAMAN.png';
-import NOMOR from 'public/elementinvoice/nomor.png';
-
 
 // --- DEFINISI TIPE DATA ---
 interface Item {
@@ -265,7 +260,7 @@ const InvoicePreviewPage = () => {
                     return (
                         <div key={pageIndex} className={`w-[210mm] h-[297mm] max-w-4xl mx-auto bg-white shadow-lg p-[10mm] text-[10px] leading-tight flex flex-col relative ${pageIndex > 0 ? 'page-break' : ''}`}>
                             <header className="relative w-full h-[60mm]">
-                                <Image src={LOGO} alt="logo" layout="fill" objectFit="contain" className="absolute top-0 left-0"/>
+                                <Image src="/elementinvoice/LOGO.png" alt="logo" layout="fill" objectFit="contain" className="absolute top-0 left-0"/>
                             </header>
 
                             <main className='mt-0 flex-grow'>
@@ -428,13 +423,13 @@ const InvoicePreviewPage = () => {
                                 </div>
                             )}
                              <footer className="absolute bottom-0 left-0 w-full h-[30mm]">
-                                <Image src={ISO} alt="iso" layout="fill" objectFit="contain" />
+                                <Image src="/elementinvoice/ISO.png" alt="iso" layout="fill" objectFit="contain" />
                                 <div className="absolute bottom-[10mm] right-[10mm] flex items-center">
-                                    <Image src={HALAMAN} alt="halaman" width={50} height={15} />
+                                    <Image src="/elementinvoice/HALAMAN.png" alt="halaman" width={50} height={15} />
                                     <span className="ml-2">{pageIndex + 1} of {totalPages}</span>
                                 </div>
                                 <div className="absolute bottom-[10mm] left-[10mm] flex items-center">
-                                    <Image src={NOMOR} alt="nomor" width={100} height={15} />
+                                    <Image src="/elementinvoice/nomor.png" alt="nomor" width={100} height={15} />
                                 </div>
                             </footer>
                         </div>
@@ -446,5 +441,3 @@ const InvoicePreviewPage = () => {
 };
 
 export default InvoicePreviewPage;
-
-    
