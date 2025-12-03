@@ -1,13 +1,19 @@
 
-
 'use client';
 import React, { useRef, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import Image from 'next/image';
 import { Download, Upload, ArrowLeft } from 'lucide-react';
 import { exportToExcel } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
 import html2pdf from 'html2pdf.js';
 import type { Customer } from '@/app/lib/data';
+
+import LOGO from 'public/elementinvoice/LOGO.png';
+import ISO from 'public/elementinvoice/ISO.png';
+import HALAMAN from 'public/elementinvoice/HALAMAN.png';
+import NOMOR from 'public/elementinvoice/nomor.png';
+
 
 // --- DEFINISI TIPE DATA ---
 interface Item {
@@ -127,10 +133,10 @@ const InvoicePreviewPage = () => {
             return;
         }
         const opt = {
-          margin:       [10, 10, 10, 10], // top, left, bottom, right
+          margin:       [0, 0, 0, 0], // top, left, bottom, right
           filename:     `Invoice-${invoiceData.id.replace(/\//g, '_')}.pdf`,
           image:        { type: 'jpeg', quality: 0.98 },
-          html2canvas:  { scale: 2, useCORS: true },
+          html2canvas:  { scale: 2, useCORS: true, logging: true },
           jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' }
         };
         html2pdf().from(element).set(opt).save();
@@ -208,6 +214,8 @@ const InvoicePreviewPage = () => {
                 @media print {
                     body {
                         background-color: #fff !important;
+                        -webkit-print-color-adjust: exact; 
+                        print-color-adjust: exact;
                     }
                     .page-break {
                         page-break-before: always;
@@ -221,6 +229,10 @@ const InvoicePreviewPage = () => {
                     .print-hidden, .print-hidden * {
                         display: none !important;
                     }
+                }
+                @page {
+                    size: A4;
+                    margin: 0;
                 }
             `}</style>
             <div className="flex justify-center space-x-4 mb-4 print-hidden">
@@ -251,9 +263,12 @@ const InvoicePreviewPage = () => {
                 {itemChunks.map((chunk, pageIndex) => {
                     const isLastPage = pageIndex === totalPages - 1;
                     return (
-                        <div key={pageIndex} className={`w-full max-w-4xl mx-auto bg-white shadow-lg p-4 my-8 text-[10px] leading-tight flex flex-col ${pageIndex > 0 ? 'page-break' : ''}`} style={{ height: '220mm' }}>
-                            <header className="relative pt-0 pb-0 text-[10px] leading-snug">
-                                <p className="absolute right-0 top-0 font-normal text-sm capitalize">{printType}</p>
+                        <div key={pageIndex} className={`w-[210mm] h-[297mm] max-w-4xl mx-auto bg-white shadow-lg p-[10mm] text-[10px] leading-tight flex flex-col relative ${pageIndex > 0 ? 'page-break' : ''}`}>
+                            <header className="relative w-full h-[60mm]">
+                                <Image src={LOGO} alt="logo" layout="fill" objectFit="contain" className="absolute top-0 left-0"/>
+                            </header>
+
+                            <main className='mt-0 flex-grow'>
                                 <div className="w-full text-center mb-1 leading-none">
                                     <p className="font-bold uppercase text-xs tracking-tighter mb-0.5">{invoiceTitle}</p>
                                     <p className="font-bold uppercase text-xs">{invoiceId}</p>
@@ -273,9 +288,7 @@ const InvoicePreviewPage = () => {
                                     <p className='mb-0'>Customer Code :</p>
                                     <p className='mb-0'>Date: {formatDate(date)}</p>
                                 </div>
-                            </header>
 
-                            <main className='mt-0 flex-grow'>
                                 <table className="w-full border-collapse text-[10px] mt-0">
                                     <thead>
                                         <tr className='bg-white border border-black'>
@@ -296,7 +309,7 @@ const InvoicePreviewPage = () => {
                                                 <td className="p-1 text-right">{formatCurrency(item.total)}</td>
                                             </tr>
                                         ))}
-                                        {!isLastPage && Array.from({ length: ITEMS_PER_PAGE - chunk.length }).map((_, i) => (
+                                        {Array.from({ length: ITEMS_PER_PAGE - chunk.length }).map((_, i) => (
                                             <tr key={`empty-${i}`}><td className="p-1 h-[18px]" colSpan={5}>&nbsp;</td></tr>
                                         ))}
                                     </tbody>
@@ -304,7 +317,7 @@ const InvoicePreviewPage = () => {
                             </main>
                             
                             {isLastPage && (
-                                <footer className="pt-0 text-black mt-auto text-[10px]">
+                                <div className="pt-0 text-black mt-auto text-[10px]">
                                     
                                     <div className="flex w-full justify-between items-start leading-normal">
                                         <div className='w-1/2'>
@@ -314,7 +327,7 @@ const InvoicePreviewPage = () => {
                                             
                                             <div className="w-full">
                                                 <div className="text-right w-full">
-                                                    {chunk.length < 5 && <div className="h-0.5 border-b border-black w-1/4 ml-auto" style={{marginTop: `-${(10 - chunk.length) * 18}px`}}></div>}
+                                                    <div className="h-0.5 border-b border-black w-1/3 ml-auto mb-1"></div>
                                                     <p className="font-normal mb-0">{formatCurrency(subTotalItems)}</p>
                                                 </div>
 
@@ -361,17 +374,12 @@ const InvoicePreviewPage = () => {
                                     <div className="border-t border-black w-full my-1"></div>
                                     {/* --- BAGIAN PEMBAYARAN & TANDA TANGAN YANG DIPERBARUI --- */}
                                     <div className="mt-0 pt-1">
-                                        {/* Menggunakan 'flex' untuk membagi menjadi dua kolom besar (Payment Info dan Tanda Tangan) */}
                                         <div className="flex">
                                             
-                                            {/* Kolom Kiri: Detail Pembayaran (55% Lebar) */}
                                             <div className="w-[55%] pr-4 text-[10px] space-y-0.5 leading-normal">
                                                 
-                                                {/* 1. Menggunakan GRID untuk merapikan 'Payment' dan 'Invoice ID' */}
                                                 <div className="flex items-start">
-                                                    {/* Hapus 'w-16' pada label agar lebarnya sesuai konten */}
                                                     <p className='shrink-0 w-max mb-0'>Payment:</p> 
-                                                    {/* Hapus 'flex-1' pada nilai, dan atur margin/padding sesuai keinginan */}
                                                     <p className='ml-2 font-normal mb-0'>{paymentTerms}</p> 
                                                 </div>
                                                 <div className="flex items-start">
@@ -382,7 +390,6 @@ const InvoicePreviewPage = () => {
                                                 <p className='mt-2 mb-1'>For payment, please transfer to our account:</p>
                                                 <p className="font-semibold text-[10px] mb-1">PT. Jembo Cable Company Tbk</p>
                                                 
-                                                {/* Bank Mandiri Details */}
                                                 <div className="grid grid-cols-[35%_1fr] gap-x-2 leading-tight">
                                                     <div>
                                                         <p className='mb-0'>Bank Mandiri -</p>
@@ -398,7 +405,6 @@ const InvoicePreviewPage = () => {
 
                                                 <div className="text-center my-1">OR</div>
 
-                                                {/* Bank BCA Details */}
                                                 <div className="grid grid-cols-[35%_1fr] gap-x-2 leading-tight">
                                                     <div>
                                                         <p className='mb-0'>Bank BCA - Jakarta</p>
@@ -410,7 +416,6 @@ const InvoicePreviewPage = () => {
                                                 </div>
                                             </div>
                                             
-                                            {/* Kolom Kanan: Tanda Tangan (45% Lebar) */}
                                             <div className="w-[45%] pl-0 flex flex-col justify-between text-[10px] text-center" style={{ minHeight: '130px' }}>
                                                 <p className="font-semibold text-[10px]">PT. JEMBO CABLE COMPANY Tbk</p>
                                                 <div className="flex-grow"></div>
@@ -420,11 +425,18 @@ const InvoicePreviewPage = () => {
                                             
                                         </div>
                                     </div>
-                                </footer>
+                                </div>
                             )}
-                            <div className="text-center text-gray-500 text-[8px] mt-auto pt-2">
-                                Halaman {pageIndex + 1} dari {totalPages}
-                            </div>
+                             <footer className="absolute bottom-0 left-0 w-full h-[30mm]">
+                                <Image src={ISO} alt="iso" layout="fill" objectFit="contain" />
+                                <div className="absolute bottom-[10mm] right-[10mm] flex items-center">
+                                    <Image src={HALAMAN} alt="halaman" width={50} height={15} />
+                                    <span className="ml-2">{pageIndex + 1} of {totalPages}</span>
+                                </div>
+                                <div className="absolute bottom-[10mm] left-[10mm] flex items-center">
+                                    <Image src={NOMOR} alt="nomor" width={100} height={15} />
+                                </div>
+                            </footer>
                         </div>
                     );
                 })}
@@ -434,3 +446,5 @@ const InvoicePreviewPage = () => {
 };
 
 export default InvoicePreviewPage;
+
+    
