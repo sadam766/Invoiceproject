@@ -259,8 +259,10 @@ const InvoicePreviewPage = () => {
                     const isLastPage = pageIndex === totalPages - 1;
                     return (
                         <div key={pageIndex} className={`w-[210mm] h-[297mm] max-w-4xl mx-auto bg-white shadow-lg p-[10mm] text-[10px] leading-tight flex flex-col relative ${pageIndex > 0 ? 'page-break' : ''}`}>
-                            <header className="relative w-full h-[60mm]">
-                                <Image src="/elementinvoice/LOGO.png" alt="logo" layout="fill" objectFit="contain" className="absolute top-0 left-0"/>
+                            <header className="relative w-full h-[60mm] flex items-center">
+                                <div className="relative h-full w-full">
+                                    <Image src="/elementinvoice/LOGO.png" alt="logo" layout="fill" objectFit="contain" objectPosition="left top" />
+                                </div>
                             </header>
 
                             <main className='mt-0 flex-grow'>
@@ -422,14 +424,20 @@ const InvoicePreviewPage = () => {
                                     </div>
                                 </div>
                             )}
-                             <footer className="absolute bottom-0 left-0 w-full h-[30mm]">
-                                <Image src="/elementinvoice/ISO.png" alt="iso" layout="fill" objectFit="contain" />
+                             <footer className="absolute bottom-0 left-0 w-full h-[30mm] pointer-events-none">
+                                <div className="relative w-full h-full">
+                                    <Image src="/elementinvoice/ISO.png" alt="iso" layout="fill" objectFit="contain" objectPosition="left bottom" />
+                                </div>
                                 <div className="absolute bottom-[10mm] right-[10mm] flex items-center">
-                                    <Image src="/elementinvoice/HALAMAN.png" alt="halaman" width={50} height={15} />
+                                    <div className="relative w-[50px] h-[15px]">
+                                        <Image src="/elementinvoice/HALAMAN.png" alt="halaman" layout="fill" objectFit="contain" />
+                                    </div>
                                     <span className="ml-2">{pageIndex + 1} of {totalPages}</span>
                                 </div>
-                                <div className="absolute bottom-[10mm] left-[10mm] flex items-center">
-                                    <Image src="/elementinvoice/nomor.png" alt="nomor" width={100} height={15} />
+                                <div className="absolute bottom-[10mm] left-[10mm]">
+                                     <div className="relative w-[100px] h-[15px]">
+                                        <Image src="/elementinvoice/nomor.png" alt="nomor" layout="fill" objectFit="contain" />
+                                     </div>
                                 </div>
                             </footer>
                         </div>
