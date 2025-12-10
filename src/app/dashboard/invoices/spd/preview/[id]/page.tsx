@@ -5,7 +5,7 @@ import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { ArrowLeft, Printer, Upload } from 'lucide-react';
-import { type SpdData, spdData as initialSpdData, type Customer, type Invoice } from '@/app/lib/data';
+import { type SpdData, type Customer, type Invoice } from '@/app/lib/data';
 import { format } from 'date-fns';
 import { id as indonesiaLocale } from 'date-fns/locale';
 import { useFirestore, useCollection, useMemoFirebase, useUser } from '@/firebase';
@@ -21,15 +21,15 @@ export default function SpdPreviewPage() {
     const [spdItem, setSpdItem] = useState<SpdData | null>(null);
     
     const customersCollection = useMemoFirebase(() => {
-        if (!firestore || !user) return null;
-        return query(collection(firestore, 'customers'), where('ownerId', '==', user.uid));
-    }, [firestore, user]);
+        if (!firestore) return null;
+        return query(collection(firestore, 'customers'));
+    }, [firestore]);
     const { data: customerListData } = useCollection<Customer>(customersCollection);
 
     const invoicesCollection = useMemoFirebase(() => {
-        if (!firestore || !user || !spdItem) return null;
-        return query(collection(firestore, 'invoices'), where('ownerId', '==', user.uid), where('id', '==', spdItem.noInvoice));
-    }, [firestore, user, spdItem]);
+        if (!firestore || !spdItem) return null;
+        return query(collection(firestore, 'invoices'), where('id', '==', spdItem.noInvoice));
+    }, [firestore, spdItem]);
     const { data: invoiceListData } = useCollection<Invoice>(invoicesCollection);
 
 
@@ -40,12 +40,6 @@ export default function SpdPreviewPage() {
             if (decodeURIComponent(id as string) === parsedData.spd) {
                 setSpdItem(parsedData);
             }
-        } else if (id) {
-            // This part is a fallback and might not be needed if session storage is reliable
-            // It also relies on a static data source which we are moving away from.
-            const decodedId = decodeURIComponent(id as string);
-            const foundSpd = initialSpdData.find(item => item.spd === decodedId);
-            setSpdItem(foundSpd || null);
         }
     }, [id]);
 
