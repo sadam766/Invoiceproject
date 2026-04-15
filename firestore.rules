@@ -1,51 +1,27 @@
 
 /**
  * @file Firestore Security Rules
- * @description This ruleset allows any signed-in user to read all data to facilitate
- *              collaboration and prevent duplication. Write access is still
- *              controlled to ensure data integrity.
- *
- * Data Structure:
- * - /users/{userId}: Stores user profile and role information.
- * - /products/{productId}: Stores product information, readable by any user, writable only by admins.
- * - /customers, /sales, /salesOrders, etc.: All data is readable by any signed-in user.
- *   Writes are protected by ensuring the user is signed in and owns the document they are creating/modifying.
+ * @description Aturan ini mengizinkan semua pengguna yang login untuk membaca dan menulis 
+ *              semua data operasional guna memfasilitasi kolaborasi tim dan mencegah 
+ *              terjadinya duplikasi data sesuai permintaan transparansi pengguna.
  */
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // Helper functions
+    // Fungsi pembantu untuk mengecek apakah user sudah login
     function isSignedIn() {
       return request.auth != null;
     }
 
+    // Fungsi pembantu untuk mengecek kepemilikan (untuk profil user)
     function isOwner(userId) {
       return request.auth.uid == userId;
     }
 
-    function getRole() {
-      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role;
-    }
-
-    function isAdmin() {
-      return getRole() == 'admin';
-    }
-    
-    function isOwnerOfDoc() {
-      return request.auth.uid == resource.data.ownerId;
-    }
-    
-    function isCreatingOwnerDoc() {
-       return request.auth.uid == request.resource.data.ownerId;
-    }
-
     /**
-     * @description Public user data and roles.
-     * @path /users/{userId}
-     * @allow (read): Any signed-in user can read public user profiles.
-     * @allow (write): Users can only create/update their own profile.
-     * @principle User profile management.
+     * @description Profil Pengguna.
+     * Hanya pemilik akun yang bisa mengubah data profilnya sendiri.
      */
     match /users/{userId} {
       allow read: if isSignedIn();
@@ -53,64 +29,41 @@ service cloud.firestore {
     }
 
     /**
-     * @description Products can be read by anyone, but only managed by admins.
-     * @path /products/{productId}
-     * @allow (read): Any authenticated user can read product information.
-     * @allow (write): Only users with the 'admin' role can manage products.
-     * @principle Enforces role-based access control for product management.
+     * @description Koleksi Data Bersama (Kolaboratif).
+     * Semua pengguna yang sudah login diizinkan untuk melihat, menambah, mengubah, 
+     * dan menghapus data di koleksi berikut agar transparansi data terjaga.
      */
+    
     match /products/{productId} {
-      allow read, list: if isSignedIn();
-      allow write: if isSignedIn() && isAdmin();
+      allow read, list, create, update, delete: if isSignedIn();
     }
 
-    /**
-     * @description Sales orders collection. Readable by all.
-     */
     match /salesOrders/{orderId} {
-        allow read, list: if isSignedIn();
-        allow create: if isSignedIn() && isCreatingOwnerDoc();
-        allow update, delete: if isSignedIn() && isOwnerOfDoc();
+      allow read, list, create, update, delete: if isSignedIn();
     }
 
-    /**
-     * @description Shared data collections. Readable by all signed-in users.
-     *              Write access is restricted to the owner of the document.
-     */
     match /customers/{customerId} {
-      allow read, list: if isSignedIn();
-      allow create: if isSignedIn() && isCreatingOwnerDoc();
-      allow update, delete: if isSignedIn() && isOwnerOfDoc();
+      allow read, list, create, update, delete: if isSignedIn();
     }
     
     match /invoiceNumbers/{invoiceNumberId} {
-      allow read, list: if isSignedIn();
-      allow create: if isSignedIn() && isCreatingOwnerDoc();
-      allow update, delete: if isSignedIn() && isOwnerOfDoc();
+      allow read, list, create, update, delete: if isSignedIn();
     }
     
     match /invoices/{invoiceId} {
-      allow read, list: if isSignedIn();
-      allow create: if isSignedIn() && isCreatingOwnerDoc();
-      allow update, delete: if isSignedIn() && isOwnerOfDoc();
+      allow read, list, create, update, delete: if isSignedIn();
     }
     
     match /spds/{spdId} {
-      allow read, list: if isSignedIn();
-      allow create: if isSignedIn() && isCreatingOwnerDoc();
-      allow update, delete: if isSignedIn() && isOwnerOfDoc();
+      allow read, list, create, update, delete: if isSignedIn();
     }
     
     match /taxInvoices/{taxInvoiceId} {
-      allow read, list: if isSignedIn();
-      allow create: if isSignedIn() && isCreatingOwnerDoc();
-      allow update, delete: if isSignedIn() && isOwnerOfDoc();
+      allow read, list, create, update, delete: if isSignedIn();
     }
     
     match /sales/{saleId} {
-      allow read, list: if isSignedIn();
-      allow create: if isSignedIn() && isCreatingOwnerDoc();
-      allow update, delete: if isSignedIn() && isOwnerOfDoc();
+      allow read, list, create, update, delete: if isSignedIn();
     }
   }
 }
