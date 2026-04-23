@@ -100,9 +100,10 @@ export default function AddInvoicePage() {
   const [dpPelunasanPercent, setDpPelunasanPercent] = useState<string | number>('');
   const [pelunasan, setPelunasan] = useState<string | number>('');
 
-  const [grandTotal, setGrandTotal] = useState(0);
-  const [dppVat, setDppVat] = useState(0);
-  const [vat12, setVat12] = useState(0);
+  const [grandTotal, setGrandTotal] = useState<string | number>(0);
+  const [dppVat, setDppVat] = useState<string | number>(0);
+  const [vat12, setVat12] = useState<string | number>(0);
+  const [totalAmount, setTotalAmount] = useState<string | number>(0);
 
   const [soPopoverOpen, setSoPopoverOpen] = useState(false);
   const [customerPopoverOpen, setCustomerPopoverOpen] = useState(false);
@@ -147,7 +148,7 @@ export default function AddInvoicePage() {
   const isLoading = isInvoiceNumberLoading || isEditInvoiceLoading;
   
   const formState = {
-    invoiceId, soNumber, poNumber, customer, issueDate: issueDate?.toISOString(), dueDate: dueDate?.toISOString(), status, printType, items, negotiation, dpPercent, dpValue, dpPelunasanPercent, pelunasan
+    invoiceId, soNumber, poNumber, customer, issueDate: issueDate?.toISOString(), dueDate: dueDate?.toISOString(), status, printType, items, negotiation, dpPercent, dpValue, dpPelunasanPercent, pelunasan, grandTotal, dppVat, vat12, totalAmount
   };
 
   // Load state from sessionStorage on initial render
@@ -170,6 +171,10 @@ export default function AddInvoicePage() {
             setDpValue(savedState.dpValue || '');
             setDpPelunasanPercent(savedState.dpPelunasanPercent || '');
             setPelunasan(savedState.pelunasan || '');
+            setGrandTotal(savedState.grandTotal || 0);
+            setDppVat(savedState.dppVat || 0);
+            setVat12(savedState.vat12 || 0);
+            setTotalAmount(savedState.totalAmount || 0);
         } catch (e) {
             console.error("Failed to parse saved invoice state:", e);
         }
@@ -178,8 +183,6 @@ export default function AddInvoicePage() {
 
   // Save state to sessionStorage whenever it changes
   useEffect(() => {
-    // We don't save on initial load if it's an edit/create from number flow,
-    // to avoid overwriting the intended data with empty initial state.
     if (!isLoading) {
       sessionStorage.setItem(ADD_INVOICE_SESSION_KEY, JSON.stringify(formState));
     }
@@ -188,7 +191,6 @@ export default function AddInvoicePage() {
 
   useEffect(() => {
     if (invoiceNumberData) {
-      // Clear session storage to start fresh with data from invoice number
       sessionStorage.removeItem(ADD_INVOICE_SESSION_KEY);
       setInvoiceId(invoiceNumberData.id);
       
@@ -211,7 +213,6 @@ export default function AddInvoicePage() {
 
   useEffect(() => {
     if (invoiceToEditData && salesOrderListData) {
-        // Clear session storage to start fresh with data from invoice to edit
         sessionStorage.removeItem(ADD_INVOICE_SESSION_KEY);
         setInvoiceId(invoiceToEditData.id);
         setSoNumber(invoiceToEditData.soNumber);
@@ -304,13 +305,15 @@ export default function AddInvoicePage() {
     }
   
     const currentGrandTotal = baseForCalculations - numericDpValue - numericPelunasan;
-    setGrandTotal(currentGrandTotal);
+    setGrandTotal(formatNumberWithCommas(currentGrandTotal));
     
     const currentDppVat = currentGrandTotal / 1.12;
-    setDppVat(currentDppVat);
+    setDppVat(formatNumberWithCommas(currentDppVat));
     
     const currentVat12 = currentDppVat * 0.12;
-    setVat12(currentVat12);
+    setVat12(formatNumberWithCommas(currentVat12));
+
+    setTotalAmount(formatNumberWithCommas(currentGrandTotal + currentVat12));
   
   }, [items, negotiation, dpPercent, dpValue, dpPelunasanPercent, pelunasan]);
 
@@ -328,25 +331,24 @@ export default function AddInvoicePage() {
     const batch = writeBatch(firestore);
     const safeInvoiceId = invoiceId.replace(/\//g, '_');
     
-    // If an SO is provided, use it. Otherwise, use the invoice ID as the reference for items.
     const itemReferenceSONumber = soNumber || safeInvoiceId;
+    const finalNumericAmount = typeof totalAmount === 'string' ? parseFormattedNumber(totalAmount) : totalAmount;
 
     // 1. Save the main invoice document
     const invoiceDocRef = doc(firestore, 'invoices', safeInvoiceId);
     const newInvoiceData = {
         id: invoiceId,
-        soNumber: itemReferenceSONumber, // Use the reference SO number
+        soNumber: itemReferenceSONumber,
         poNumber: poNumber,
         customer: customer.name,
         date: format(issueDate, 'yyyy-MM-dd'),
-        amount: grandTotal + vat12,
+        amount: finalNumericAmount,
         status: invoiceStatus,
         spdNumber: invoiceToEditData?.spdNumber || '-',
         ownerId: user.uid,
     };
     batch.set(invoiceDocRef, newInvoiceData, { merge: true });
 
-    // 2. Query for existing salesOrder items to delete
     const salesOrderQuery = query(collection(firestore, 'salesOrders'), where('soNumber', '==', itemReferenceSONumber));
 
     try {
@@ -355,13 +357,12 @@ export default function AddInvoicePage() {
             batch.delete(doc.ref);
         });
 
-        // 3. Save the updated invoice items to the salesOrders collection
         if (items.length > 0) {
             items.forEach(item => {
                 const newSalesOrderItemRef = doc(collection(firestore, 'salesOrders'));
                 const salesOrderItem = {
                     id: newSalesOrderItemRef.id,
-                    soNumber: itemReferenceSONumber, // Always associate items with the reference SO
+                    soNumber: itemReferenceSONumber,
                     customer: customer.name,
                     productName: item.name,
                     quantity: item.quantity,
@@ -374,7 +375,6 @@ export default function AddInvoicePage() {
             });
         }
         
-        // 4. Commit the batch
         await batch.commit()
         .then(() => {
             sessionStorage.removeItem(ADD_INVOICE_SESSION_KEY);
@@ -488,13 +488,18 @@ export default function AddInvoicePage() {
   };
   
   const handlePreview = () => {
+    const finalNumericGrandTotal = typeof grandTotal === 'string' ? parseFormattedNumber(grandTotal) : grandTotal;
+    const finalNumericDppVat = typeof dppVat === 'string' ? parseFormattedNumber(dppVat) : dppVat;
+    const finalNumericVat12 = typeof vat12 === 'string' ? parseFormattedNumber(vat12) : vat12;
+    const finalNumericTotal = typeof totalAmount === 'string' ? parseFormattedNumber(totalAmount) : totalAmount;
+
     const previewData = {
       id: invoiceId,
       soNumber,
       poNumber,
       customer,
       date: issueDate ? format(issueDate, 'yyyy-MM-dd') : '',
-      amount: grandTotal + vat12,
+      amount: finalNumericTotal,
       status,
       printType,
       items: items.map((item, index) => ({
@@ -509,14 +514,14 @@ export default function AddInvoicePage() {
         total: item.total
       })),
       subtotal,
-      dppVat,
-      vat12,
+      dppVat: finalNumericDppVat,
+      vat12: finalNumericVat12,
       negotiation: typeof negotiation === 'string' ? parseFormattedNumber(negotiation) : negotiation,
       dpPercent,
       dpValue: typeof dpValue === 'string' ? parseFormattedNumber(dpValue) : dpValue,
       dpPelunasanPercent,
       pelunasan: typeof pelunasan === 'string' ? parseFormattedNumber(pelunasan) : pelunasan,
-      grandTotal,
+      grandTotal: finalNumericGrandTotal,
     };
     sessionStorage.setItem('invoicePreviewData', JSON.stringify(previewData));
     router.push(`/dashboard/invoices/preview/${encodeURIComponent(invoiceId || 'new')}`);
@@ -545,7 +550,6 @@ export default function AddInvoicePage() {
   const pageTitle = editInvoiceId ? "Edit Invoice" : "Create Invoice";
   
   const handleBack = () => {
-    // Clear snapshot only when explicitly navigating away to the main list
     sessionStorage.removeItem(ADD_INVOICE_SESSION_KEY);
     router.push('/dashboard/invoices');
   };
@@ -873,19 +877,35 @@ export default function AddInvoicePage() {
                     </div>
                      <div className="flex justify-between items-center py-1 font-bold">
                         <span className="text-sm">Grand Total:</span>
-                        <span className="text-sm">Rp {formatNumberWithCommas(grandTotal)}</span>
+                        <Input 
+                           className="h-8 w-28 text-right font-bold" 
+                           value={grandTotal}
+                           onChange={handleNumericInputChange(setGrandTotal)}
+                        />
                     </div>
                      <div className="flex justify-between items-center py-1">
                         <span className="text-sm text-muted-foreground">DPP VAT:</span>
-                        <span className="text-sm font-medium">Rp {formatNumberWithCommas(dppVat)}</span>
+                        <Input 
+                           className="h-8 w-28 text-right" 
+                           value={dppVat}
+                           onChange={handleNumericInputChange(setDppVat)}
+                        />
                     </div>
                      <div className="flex justify-between items-center py-1">
                         <span className="text-sm text-muted-foreground">VAT 12%:</span>
-                        <span className="text-sm font-medium">Rp {formatNumberWithCommas(vat12)}</span>
+                        <Input 
+                           className="h-8 w-28 text-right" 
+                           value={vat12}
+                           onChange={handleNumericInputChange(setVat12)}
+                        />
                     </div>
                      <div className="flex justify-between items-center py-2 mt-2 border-t">
                         <span className="text-base font-bold">Total:</span>
-                        <span className="text-base font-bold">Rp {formatNumberWithCommas(grandTotal + vat12)}</span>
+                        <Input 
+                           className="h-8 w-28 text-right font-bold" 
+                           value={totalAmount}
+                           onChange={handleNumericInputChange(setTotalAmount)}
+                        />
                     </div>
                 </div>
             </div>
@@ -948,3 +968,4 @@ export default function AddInvoicePage() {
     </main>
   );
 }
+
