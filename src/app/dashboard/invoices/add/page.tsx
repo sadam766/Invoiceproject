@@ -56,12 +56,13 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { useFirestore, useCollection, useMemoFirebase, useUser, useDoc, errorEmitter, FirestorePermissionError } from '@/firebase';
 import { collection, query, doc, writeBatch, where, getDocs } from 'firebase/firestore';
 
+// Update type to allow string for flexible input
 type InvoiceItem = {
     id: number;
     name: string;
-    quantity: number;
+    quantity: number | string;
     unit: string;
-    price: number;
+    price: number | string;
     total: number;
 };
 
@@ -148,7 +149,6 @@ export default function AddInvoicePage() {
     invoiceId, soNumber, poNumber, customer, issueDate: issueDate?.toISOString(), dueDate: dueDate?.toISOString(), status, printType, items, negotiation, dpPercent, dpValue, dpPelunasanPercent, pelunasan, grandTotal, dppVat, vat12, totalAmount
   };
 
-  // Load state from sessionStorage on initial render
   useEffect(() => {
     const savedStateJSON = sessionStorage.getItem(ADD_INVOICE_SESSION_KEY);
     if (savedStateJSON) {
@@ -178,7 +178,6 @@ export default function AddInvoicePage() {
     }
   }, []);
 
-  // Save state to sessionStorage whenever it changes
   useEffect(() => {
     if (!isLoading) {
       sessionStorage.setItem(ADD_INVOICE_SESSION_KEY, JSON.stringify(formState));
@@ -273,18 +272,21 @@ export default function AddInvoicePage() {
     setCustomerPopoverOpen(false);
   }
 
-  // Effect for primary automatic calculation flow (Default Values)
+  // Effect for primary automatic calculation flow
   useEffect(() => {
-    const currentSubtotal = items.reduce((acc, item) => acc + item.total, 0);
+    const currentSubtotal = items.reduce((acc, item) => {
+        const q = parseFormattedNumber(item.quantity);
+        const p = parseFormattedNumber(item.price);
+        return acc + (q * p);
+    }, 0);
     setSubtotal(currentSubtotal);
   
-    const numericNegotiation = typeof negotiation === 'string' && negotiation !== '' ? parseFormattedNumber(negotiation) : (typeof negotiation === 'number' ? negotiation : 0);
-    
+    const numericNegotiation = parseFormattedNumber(String(negotiation));
     const baseForCalculations = currentSubtotal - numericNegotiation;
   
     // DP Calculation
     const numericDpPercent = typeof dpPercent === 'string' && dpPercent !== '' ? parseFloat(dpPercent.toString()) : (typeof dpPercent === 'number' ? dpPercent : 0);
-    let numericDpValue = typeof dpValue === 'string' && dpValue !== '' ? parseFormattedNumber(dpValue) : (typeof dpValue === 'number' ? dpValue : 0);
+    let numericDpValue = parseFormattedNumber(String(dpValue));
     
     if (numericDpPercent > 0 && (dpValue === '' || dpValue === 0)) {
       const calculatedDp = baseForCalculations * (numericDpPercent / 100);
@@ -294,7 +296,7 @@ export default function AddInvoicePage() {
   
     // Pelunasan Calculation
     const numericPelunasanPercent = typeof dpPelunasanPercent === 'string' && dpPelunasanPercent !== '' ? parseFloat(dpPelunasanPercent.toString()) : (typeof dpPelunasanPercent === 'number' ? dpPelunasanPercent : 0);
-    let numericPelunasan = typeof pelunasan === 'string' && pelunasan !== '' ? parseFormattedNumber(pelunasan) : (typeof pelunasan === 'number' ? pelunasan : 0);
+    let numericPelunasan = parseFormattedNumber(String(pelunasan));
   
     if (numericPelunasanPercent > 0 && (pelunasan === '' || pelunasan === 0)) {
         const calculatedPelunasan = baseForCalculations * (numericPelunasanPercent / 100);
@@ -315,11 +317,10 @@ export default function AddInvoicePage() {
   
   }, [items, negotiation, dpPercent, dpValue, dpPelunasanPercent, pelunasan]);
 
-  // --- MANUAL INPUT OVERRIDE HANDLERS (ONE-WAY CALCULATION) ---
+  // --- MANUAL INPUT OVERRIDE HANDLERS ---
   
   const handleGrandTotalChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const value = e.target.value;
-    setGrandTotal(value);
+    setGrandTotal(e.target.value);
   };
 
   const handleGrandTotalBlur = () => {
@@ -337,8 +338,7 @@ export default function AddInvoicePage() {
   };
 
   const handleDppVatChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const value = e.target.value;
-    setDppVat(value);
+    setDppVat(e.target.value);
   };
 
   const handleDppVatBlur = () => {
@@ -347,7 +347,6 @@ export default function AddInvoicePage() {
       const vat = numericDPP * 0.12;
       const total = numericDPP + vat;
       
-      // ISOLATION: Do not update grandTotal (Only update down the chain)
       setDppVat(formatNumberWithCommas(numericDPP));
       setVat12(formatNumberWithCommas(vat));
       setTotalAmount(formatNumberWithCommas(total));
@@ -355,8 +354,7 @@ export default function AddInvoicePage() {
   };
 
   const handleVat12Change = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const value = e.target.value;
-    setVat12(value);
+    setVat12(e.target.value);
   };
 
   const handleVat12Blur = () => {
@@ -378,7 +376,6 @@ export default function AddInvoicePage() {
     setTotalAmount(formatNumberWithCommas(String(totalAmount)));
   };
 
-  // Generic formatting for other numeric inputs
   const handleBlurFormat = (setter: React.Dispatch<React.SetStateAction<string | number>>, value: string | number) => {
     if (typeof value === 'string' || typeof value === 'number') {
         const formatted = formatNumberWithCommas(String(value));
@@ -399,11 +396,9 @@ export default function AddInvoicePage() {
 
     const batch = writeBatch(firestore);
     const safeInvoiceId = invoiceId.replace(/\//g, '_');
-    
     const itemReferenceSONumber = soNumber || safeInvoiceId;
-    const finalNumericAmount = typeof totalAmount === 'string' ? parseFormattedNumber(totalAmount) : totalAmount;
+    const finalNumericAmount = parseFormattedNumber(String(totalAmount));
 
-    // 1. Save the main invoice document
     const invoiceDocRef = doc(firestore, 'invoices', safeInvoiceId);
     const newInvoiceData = {
         id: invoiceId,
@@ -434,9 +429,9 @@ export default function AddInvoicePage() {
                     soNumber: itemReferenceSONumber,
                     customer: customer.name,
                     productName: item.name,
-                    quantity: item.quantity,
+                    quantity: parseFormattedNumber(String(item.quantity)),
                     unit: item.unit,
-                    price: item.price,
+                    price: parseFormattedNumber(String(item.price)),
                     category: productListData?.find(p => p.name === item.name)?.category || '',
                     ownerId: user.uid,
                 };
@@ -457,25 +452,13 @@ export default function AddInvoicePage() {
             const permissionError = new FirestorePermissionError({
                 path: `batch write to invoices and salesOrders`,
                 operation: editInvoiceId ? 'update' : 'create',
-                requestResourceData: {
-                    invoice: newInvoiceData,
-                    items: items,
-                },
+                requestResourceData: { invoice: newInvoiceData, items: items },
             });
             errorEmitter.emit('permission-error', permissionError);
         });
 
     } catch (serverError) {
         console.error("Batch query/setup failed:", serverError);
-        const permissionError = new FirestorePermissionError({
-            path: `batch write to invoices and salesOrders`,
-            operation: editInvoiceId ? 'update' : 'create',
-            requestResourceData: {
-                invoice: newInvoiceData,
-                items: items,
-            },
-        });
-        errorEmitter.emit('permission-error', permissionError);
     }
   };
 
@@ -486,13 +469,7 @@ export default function AddInvoicePage() {
   const handleItemChange = (id: number, field: keyof InvoiceItem, value: string | number) => {
     const newItems = items.map(item => {
       if (item.id === id) {
-        const updatedItem = { ...item, [field]: value };
-        if (field === 'quantity' || field === 'price') {
-            const quantity = field === 'quantity' ? (typeof value === 'string' ? parseFormattedNumber(value) : value) : item.quantity;
-            const price = field === 'price' ? (typeof value === 'string' ? parseFormattedNumber(value) : value) : item.price;
-            updatedItem.total = quantity * price;
-        }
-        return updatedItem;
+        return { ...item, [field]: value };
       }
       return item;
     });
@@ -502,12 +479,13 @@ export default function AddInvoicePage() {
   const handleProductSelect = (itemId: number, product: ProductListItem) => {
     const newItems = items.map(item => {
         if (item.id === itemId) {
+            const q = parseFormattedNumber(String(item.quantity));
             return {
                 ...item,
                 name: product.name,
                 unit: product.unit,
                 price: product.price,
-                total: item.quantity * product.price,
+                total: q * product.price,
             };
         }
         return item;
@@ -516,16 +494,14 @@ export default function AddInvoicePage() {
     setProductPopoverOpen(null);
   };
   
-  const handleNumericInputChange = (setter: React.Dispatch<React.SetStateAction<string | number>>) => (e: React.ChangeEvent<HTMLInputElement>) => {
-    setter(e.target.value);
-  };
-
   const handleNumericItemChange = (id: number, field: 'quantity' | 'price', value: string) => {
-    const parsedValue = parseFormattedNumber(value);
+    // Keep it as raw string to allow typing decimals (dot/comma)
     const newItems = items.map(item => {
         if (item.id === id) {
-            const updatedItem = { ...item, [field]: parsedValue || 0 };
-            updatedItem.total = updatedItem.quantity * updatedItem.price;
+            const updatedItem = { ...item, [field]: value };
+            const q = parseFormattedNumber(field === 'quantity' ? value : String(item.quantity));
+            const p = parseFormattedNumber(field === 'price' ? value : String(item.price));
+            updatedItem.total = q * p;
             return updatedItem;
         }
         return item;
@@ -534,9 +510,11 @@ export default function AddInvoicePage() {
   };
 
   const handleNumericItemBlur = (id: number, field: 'quantity' | 'price') => {
+    // Format to pretty display on blur
     const newItems = items.map(item => {
       if (item.id === id) {
-        return { ...item, [field]: parseFormattedNumber(String(item[field])) };
+        const parsed = parseFormattedNumber(String(item[field]));
+        return { ...item, [field]: formatNumberWithCommas(parsed) };
       }
       return item;
     });
@@ -549,10 +527,10 @@ export default function AddInvoicePage() {
   };
   
   const handlePreview = () => {
-    const finalNumericGrandTotal = typeof grandTotal === 'string' ? parseFormattedNumber(grandTotal) : grandTotal;
-    const finalNumericDppVat = typeof dppVat === 'string' ? parseFormattedNumber(dppVat) : dppVat;
-    const finalNumericVat12 = typeof vat12 === 'string' ? parseFormattedNumber(vat12) : vat12;
-    const finalNumericTotal = typeof totalAmount === 'string' ? parseFormattedNumber(totalAmount) : totalAmount;
+    const finalNumericGrandTotal = parseFormattedNumber(String(grandTotal));
+    const finalNumericDppVat = parseFormattedNumber(String(dppVat));
+    const finalNumericVat12 = parseFormattedNumber(String(vat12));
+    const finalNumericTotal = parseFormattedNumber(String(totalAmount));
 
     const previewData = {
       id: invoiceId,
@@ -568,20 +546,20 @@ export default function AddInvoicePage() {
         no: index + 1,
         item: item.name,
         name: item.name,
-        quantity: item.quantity,
+        quantity: parseFormattedNumber(String(item.quantity)),
         unit: item.unit,
-        price: item.price,
+        price: parseFormattedNumber(String(item.price)),
         amount: item.total,
         total: item.total
       })),
       subtotal,
       dppVat: finalNumericDppVat,
       vat12: finalNumericVat12,
-      negotiation: typeof negotiation === 'string' ? parseFormattedNumber(negotiation) : negotiation,
+      negotiation: parseFormattedNumber(String(negotiation)),
       dpPercent,
-      dpValue: typeof dpValue === 'string' ? parseFormattedNumber(dpValue) : dpValue,
+      dpValue: parseFormattedNumber(String(dpValue)),
       dpPelunasanPercent,
-      pelunasan: typeof pelunasan === 'string' ? parseFormattedNumber(pelunasan) : pelunasan,
+      pelunasan: parseFormattedNumber(String(pelunasan)),
       grandTotal: finalNumericGrandTotal,
     };
     sessionStorage.setItem('invoicePreviewData', JSON.stringify(previewData));
@@ -850,7 +828,7 @@ export default function AddInvoicePage() {
                     <TableCell>
                       <Input 
                         type="text" 
-                        value={formatNumberWithCommas(item.quantity)}
+                        value={item.quantity}
                         onChange={(e) => handleNumericItemChange(item.id, 'quantity', e.target.value)}
                         onBlur={() => handleNumericItemBlur(item.id, 'quantity')}
                         className="text-right w-24" 
@@ -865,8 +843,9 @@ export default function AddInvoicePage() {
                     </TableCell>
                     <TableCell>
                       <Input 
+                        type="text"
                         placeholder="Rp 0,00"
-                        value={formatNumberWithCommas(item.price)}
+                        value={item.price}
                         onChange={(e) => handleNumericItemChange(item.id, 'price', e.target.value)}
                         onBlur={() => handleNumericItemBlur(item.id, 'price')}
                         className="text-right w-36"
@@ -896,17 +875,17 @@ export default function AddInvoicePage() {
                     <div className="flex justify-between items-center py-1">
                         <span className="text-sm text-muted-foreground">A/Negotiation:</span>
                         <Input 
-                           className="h-8 w-36 text-right" 
+                           className="h-8 w-44 text-right" 
                            placeholder="e.g. 10.000"
                            value={negotiation}
-                           onChange={handleNumericInputChange(setNegotiation)}
+                           onChange={(e) => setNegotiation(e.target.value)}
                            onBlur={() => handleBlurFormat(setNegotiation, negotiation)}
                         />
                     </div>
                      <div className="flex justify-between items-center py-1">
                         <span className="text-sm text-muted-foreground">DP (%):</span>
                         <Input 
-                          className="h-8 w-36 text-right" 
+                          className="h-8 w-44 text-right" 
                           placeholder="e.g. 20"
                           value={dpPercent}
                           onChange={(e) => setDpPercent(e.target.value)}
@@ -915,17 +894,17 @@ export default function AddInvoicePage() {
                      <div className="flex justify-between items-center py-1">
                         <span className="text-sm text-muted-foreground">DP Value:</span>
                         <Input 
-                          className="h-8 w-36 text-right" 
+                          className="h-8 w-44 text-right" 
                           placeholder="Override value"
                           value={dpValue}
-                          onChange={handleNumericInputChange(setDpValue)}
+                          onChange={(e) => setDpValue(e.target.value)}
                           onBlur={() => handleBlurFormat(setDpValue, dpValue)}
                         />
                     </div>
                      <div className="flex justify-between items-center py-1">
                         <span className="text-sm text-muted-foreground">DP Pelunasan (%):</span>
                         <Input 
-                          className="h-8 w-36 text-right" 
+                          className="h-8 w-44 text-right" 
                           placeholder="e.g. 10"
                           value={dpPelunasanPercent}
                           onChange={(e) => setDpPelunasanPercent(e.target.value)}
@@ -934,17 +913,17 @@ export default function AddInvoicePage() {
                      <div className="flex justify-between items-center py-1">
                         <span className="text-sm text-muted-foreground">Pelunasan:</span>
                          <Input 
-                           className="h-8 w-36 text-right" 
+                           className="h-8 w-44 text-right" 
                            placeholder="e.g. 50.000"
                            value={pelunasan}
-                           onChange={handleNumericInputChange(setPelunasan)}
+                           onChange={(e) => setPelunasan(e.target.value)}
                            onBlur={() => handleBlurFormat(setPelunasan, pelunasan)}
                            />
                     </div>
                      <div className="flex justify-between items-center py-1 font-bold">
                         <span className="text-sm">Grand Total:</span>
                         <Input 
-                           className="h-8 w-40 text-right font-bold" 
+                           className="h-8 w-48 text-right font-bold" 
                            value={grandTotal}
                            onChange={handleGrandTotalChange}
                            onBlur={handleGrandTotalBlur}
@@ -953,7 +932,7 @@ export default function AddInvoicePage() {
                      <div className="flex justify-between items-center py-1">
                         <span className="text-sm text-muted-foreground">DPP VAT:</span>
                         <Input 
-                           className="h-8 w-40 text-right" 
+                           className="h-8 w-48 text-right" 
                            value={dppVat}
                            onChange={handleDppVatChange}
                            onBlur={handleDppVatBlur}
@@ -962,7 +941,7 @@ export default function AddInvoicePage() {
                      <div className="flex justify-between items-center py-1">
                         <span className="text-sm text-muted-foreground">VAT 12%:</span>
                         <Input 
-                           className="h-8 w-40 text-right" 
+                           className="h-8 w-48 text-right" 
                            value={vat12}
                            onChange={handleVat12Change}
                            onBlur={handleVat12Blur}
@@ -971,7 +950,7 @@ export default function AddInvoicePage() {
                      <div className="flex justify-between items-center py-2 mt-2 border-t">
                         <span className="text-base font-bold">Total:</span>
                         <Input 
-                           className="h-8 w-40 text-right font-bold" 
+                           className="h-8 w-48 text-right font-bold" 
                            value={totalAmount}
                            onChange={handleTotalAmountChange}
                            onBlur={handleTotalAmountBlur}

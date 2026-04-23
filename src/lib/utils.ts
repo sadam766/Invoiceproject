@@ -6,33 +6,77 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
 }
 
+/**
+ * Memformat angka ke format mata uang/akuntansi Indonesia (1.234,56)
+ * Membatasi maksimal 2 angka di belakang koma.
+ */
 export function formatNumberWithCommas(value: number | string | undefined): string {
   if (value === undefined || value === null || value === '') {
     return '';
   }
   
-  // Konversi ke number jika string, hapus pemisah ribuan titik sebelum parse
   const num = typeof value === 'string' 
-    ? parseFloat(value.replace(/\./g, '').replace(',', '.')) 
+    ? parseFormattedNumber(value) 
     : value;
 
   if (isNaN(num)) {
     return '';
   }
 
-  // Gunakan Intl.NumberFormat dengan pembatasan 2 desimal (Standar Akuntansi)
+  // Gunakan Intl.NumberFormat dengan standar Indonesia
   return new Intl.NumberFormat('id-ID', {
     minimumFractionDigits: 0,
     maximumFractionDigits: 2
   }).format(num);
 }
 
-export function parseFormattedNumber(value: string): number {
-  if (!value) return 0;
-  // Hapus titik (ribuan) dan ganti koma dengan titik (desimal) untuk parsing standar JS
-  const normalized = value.replace(/\./g, '').replace(',', '.');
-  const parsed = parseFloat(normalized);
-  return isNaN(parsed) ? 0 : parsed;
+/**
+ * Mengonversi string berformat (dengan titik/koma) kembali menjadi angka murni (float)
+ * Mendukung input fleksibel: "1.234,50", "1234.50", "1234,50"
+ */
+export function parseFormattedNumber(value: string | number): number {
+  if (typeof value === 'number') return value;
+  if (!value || value === '') return 0;
+
+  // Hapus karakter yang bukan angka, koma, titik, atau minus
+  let clean = value.replace(/[^\d.,-]/g, '');
+
+  // Jika mengandung keduanya (titik dan koma), tentukan mana yang desimal
+  if (clean.includes(',') && clean.includes('.')) {
+    const lastComma = clean.lastIndexOf(',');
+    const lastDot = clean.lastIndexOf('.');
+    if (lastComma > lastDot) {
+      // Format Indo: 1.234,56 -> hapus titik, ubah koma jadi titik
+      return parseFloat(clean.replace(/\./g, '').replace(',', '.')) || 0;
+    } else {
+      // Format US: 1,234.56 -> hapus koma
+      return parseFloat(clean.replace(/,/g, '')) || 0;
+    }
+  }
+
+  // Jika hanya ada koma, asumsikan itu desimal (Standar Indo)
+  if (clean.includes(',')) {
+    return parseFloat(clean.replace(',', '.')) || 0;
+  }
+
+  // Jika hanya ada titik, cek apakah itu ribuan atau desimal
+  if (clean.includes('.')) {
+    // Jika ada lebih dari satu titik, itu pasti ribuan
+    if ((clean.match(/\./g) || []).length > 1) {
+      return parseFloat(clean.replace(/\./g, '')) || 0;
+    }
+    // Jika satu titik diikuti tepat 3 angka, kemungkinan besar ribuan dalam konteks Indo
+    // Contoh: 1.000 vs 1.23. Tapi demi fleksibilitas input user:
+    const parts = clean.split('.');
+    if (parts[1].length === 3) {
+      // Ambil risiko ini ribuan jika tidak ada indikasi lain
+      // Namun jika user ingin desimal 1.000 (presisi 3), ini akan jadi 1000.
+      return parseFloat(clean.replace(/\./g, '')) || 0;
+    }
+    return parseFloat(clean) || 0;
+  }
+
+  return parseFloat(clean) || 0;
 }
 
 export const generateExcelTemplate = (headers: string[], fileName: string) => {
