@@ -1,4 +1,3 @@
-
 import { clsx, type ClassValue } from "clsx"
 import { twMerge } from "tailwind-merge"
 import * as XLSX from 'xlsx';
@@ -8,18 +7,32 @@ export function cn(...inputs: ClassValue[]) {
 }
 
 export function formatNumberWithCommas(value: number | string | undefined): string {
-  if (value === undefined || value === null) {
+  if (value === undefined || value === null || value === '') {
     return '';
   }
-  const num = typeof value === 'string' ? parseFloat(value.toString().replace(/[^0-9.-]+/g,"")) : value;
+  
+  // Konversi ke number jika string, hapus pemisah ribuan titik sebelum parse
+  const num = typeof value === 'string' 
+    ? parseFloat(value.replace(/\./g, '').replace(',', '.')) 
+    : value;
+
   if (isNaN(num)) {
     return '';
   }
-  return new Intl.NumberFormat('id-ID').format(num);
+
+  // Gunakan Intl.NumberFormat dengan pembatasan 2 desimal
+  return new Intl.NumberFormat('id-ID', {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 2
+  }).format(num);
 }
 
 export function parseFormattedNumber(value: string): number {
-  return parseFloat(value.replace(/\./g, '').replace(/,/g, '.'));
+  if (!value) return 0;
+  // Hapus titik (ribuan) dan ganti koma dengan titik (desimal) untuk parsing standar JS
+  const normalized = value.replace(/\./g, '').replace(',', '.');
+  const parsed = parseFloat(normalized);
+  return isNaN(parsed) ? 0 : parsed;
 }
 
 export const generateExcelTemplate = (headers: string[], fileName: string) => {

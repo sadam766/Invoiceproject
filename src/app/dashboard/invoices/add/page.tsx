@@ -50,12 +50,11 @@ import {
   ChevronsUpDown,
   Check
 } from 'lucide-react';
-import Link from 'next/link';
 import { type InvoiceNumber, type Customer, type ProductListItem, type Invoice, type SalesOrder } from '@/app/lib/data';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useFirestore, useCollection, useMemoFirebase, useUser, useDoc, errorEmitter, FirestorePermissionError } from '@/firebase';
-import { collection, query, doc, setDoc, writeBatch, where, getDocs, deleteDoc } from 'firebase/firestore';
+import { collection, query, doc, writeBatch, where, getDocs } from 'firebase/firestore';
 
 type InvoiceItem = {
     id: number;
@@ -320,9 +319,9 @@ export default function AddInvoicePage() {
   
   const handleGrandTotalChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
-    const numericGT = parseFormattedNumber(value);
-    setGrandTotal(value === '' ? '' : formatNumberWithCommas(numericGT));
+    setGrandTotal(value); // Biarkan user mengetik bebas di awal
     
+    const numericGT = parseFormattedNumber(value);
     if (!isNaN(numericGT)) {
       const dpp = numericGT / 1.12;
       const vat = dpp * 0.12;
@@ -336,9 +335,9 @@ export default function AddInvoicePage() {
 
   const handleDppVatChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
-    const numericDPP = parseFormattedNumber(value);
-    setDppVat(value === '' ? '' : formatNumberWithCommas(numericDPP));
+    setDppVat(value);
     
+    const numericDPP = parseFormattedNumber(value);
     if (!isNaN(numericDPP)) {
       const vat = numericDPP * 0.12;
       const gt = numericDPP * 1.12;
@@ -352,9 +351,9 @@ export default function AddInvoicePage() {
 
   const handleVat12Change = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
-    const numericVAT = parseFormattedNumber(value);
-    setVat12(value === '' ? '' : formatNumberWithCommas(numericVAT));
+    setVat12(value);
     
+    const numericVAT = parseFormattedNumber(value);
     if (!isNaN(numericVAT)) {
       const gt = typeof grandTotal === 'string' ? parseFormattedNumber(grandTotal) : (typeof grandTotal === 'number' ? grandTotal : 0);
       setTotalAmount(formatNumberWithCommas(gt + numericVAT));
@@ -362,9 +361,15 @@ export default function AddInvoicePage() {
   };
 
   const handleTotalAmountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const value = e.target.value;
-    const numericTotal = parseFormattedNumber(value);
-    setTotalAmount(value === '' ? '' : formatNumberWithCommas(numericTotal));
+    setTotalAmount(e.target.value);
+  };
+
+  // Handler onBlur untuk memformat angka saat pengguna selesai mengetik
+  const handleBlurFormat = (setter: React.Dispatch<React.SetStateAction<string | number>>, value: string | number) => {
+    if (typeof value === 'string') {
+        const formatted = formatNumberWithCommas(value);
+        setter(formatted);
+    }
   };
 
   
@@ -498,38 +503,20 @@ export default function AddInvoicePage() {
   };
   
   const handleNumericInputChange = (setter: React.Dispatch<React.SetStateAction<string | number>>) => (e: React.ChangeEvent<HTMLInputElement>) => {
-    const value = e.target.value;
-    const parsedValue = parseFormattedNumber(value);
-    if (!isNaN(parsedValue)) {
-        setter(formatNumberWithCommas(parsedValue));
-    } else if (value === '') {
-        setter('');
-    }
+    setter(e.target.value);
   };
 
   const handleNumericItemChange = (id: number, field: 'quantity' | 'price', value: string) => {
     const parsedValue = parseFormattedNumber(value);
-    if (!isNaN(parsedValue)) {
-        const newItems = items.map(item => {
-            if (item.id === id) {
-                const updatedItem = { ...item, [field]: parsedValue };
-                updatedItem.total = updatedItem.quantity * updatedItem.price;
-                return updatedItem;
-            }
-            return item;
-        });
-        setItems(newItems);
-    } else if (value === '') {
-         const newItems = items.map(item => {
-            if (item.id === id) {
-                const updatedItem = { ...item, [field]: 0 };
-                updatedItem.total = updatedItem.quantity * updatedItem.price;
-                return updatedItem;
-            }
-            return item;
-        });
-        setItems(newItems);
-    }
+    const newItems = items.map(item => {
+        if (item.id === id) {
+            const updatedItem = { ...item, [field]: parsedValue || 0 };
+            updatedItem.total = updatedItem.quantity * updatedItem.price;
+            return updatedItem;
+        }
+        return item;
+    });
+    setItems(newItems);
   };
 
 
@@ -883,16 +870,17 @@ export default function AddInvoicePage() {
                     <div className="flex justify-between items-center py-1">
                         <span className="text-sm text-muted-foreground">A/Negotiation:</span>
                         <Input 
-                           className="h-8 w-28 text-right" 
+                           className="h-8 w-36 text-right" 
                            placeholder="e.g. 10.000"
                            value={negotiation}
                            onChange={handleNumericInputChange(setNegotiation)}
+                           onBlur={() => handleBlurFormat(setNegotiation, negotiation)}
                         />
                     </div>
                      <div className="flex justify-between items-center py-1">
                         <span className="text-sm text-muted-foreground">DP (%):</span>
                         <Input 
-                          className="h-8 w-28 text-right" 
+                          className="h-8 w-36 text-right" 
                           placeholder="e.g. 20"
                           value={dpPercent}
                           onChange={(e) => setDpPercent(e.target.value)}
@@ -901,16 +889,17 @@ export default function AddInvoicePage() {
                      <div className="flex justify-between items-center py-1">
                         <span className="text-sm text-muted-foreground">DP Value:</span>
                         <Input 
-                          className="h-8 w-28 text-right" 
+                          className="h-8 w-36 text-right" 
                           placeholder="Override value"
                           value={dpValue}
                           onChange={handleNumericInputChange(setDpValue)}
+                          onBlur={() => handleBlurFormat(setDpValue, dpValue)}
                         />
                     </div>
                      <div className="flex justify-between items-center py-1">
                         <span className="text-sm text-muted-foreground">DP Pelunasan (%):</span>
                         <Input 
-                          className="h-8 w-28 text-right" 
+                          className="h-8 w-36 text-right" 
                           placeholder="e.g. 10"
                           value={dpPelunasanPercent}
                           onChange={(e) => setDpPelunasanPercent(e.target.value)}
@@ -919,42 +908,47 @@ export default function AddInvoicePage() {
                      <div className="flex justify-between items-center py-1">
                         <span className="text-sm text-muted-foreground">Pelunasan:</span>
                          <Input 
-                           className="h-8 w-28 text-right" 
+                           className="h-8 w-36 text-right" 
                            placeholder="e.g. 50.000"
                            value={pelunasan}
                            onChange={handleNumericInputChange(setPelunasan)}
+                           onBlur={() => handleBlurFormat(setPelunasan, pelunasan)}
                            />
                     </div>
                      <div className="flex justify-between items-center py-1 font-bold">
                         <span className="text-sm">Grand Total:</span>
                         <Input 
-                           className="h-8 w-28 text-right font-bold" 
+                           className="h-8 w-40 text-right font-bold" 
                            value={grandTotal}
                            onChange={handleGrandTotalChange}
+                           onBlur={() => handleBlurFormat(setGrandTotal, grandTotal)}
                         />
                     </div>
                      <div className="flex justify-between items-center py-1">
                         <span className="text-sm text-muted-foreground">DPP VAT:</span>
                         <Input 
-                           className="h-8 w-28 text-right" 
+                           className="h-8 w-40 text-right" 
                            value={dppVat}
                            onChange={handleDppVatChange}
+                           onBlur={() => handleBlurFormat(setDppVat, dppVat)}
                         />
                     </div>
                      <div className="flex justify-between items-center py-1">
                         <span className="text-sm text-muted-foreground">VAT 12%:</span>
                         <Input 
-                           className="h-8 w-28 text-right" 
+                           className="h-8 w-40 text-right" 
                            value={vat12}
                            onChange={handleVat12Change}
+                           onBlur={() => handleBlurFormat(setVat12, vat12)}
                         />
                     </div>
                      <div className="flex justify-between items-center py-2 mt-2 border-t">
                         <span className="text-base font-bold">Total:</span>
                         <Input 
-                           className="h-8 w-28 text-right font-bold" 
+                           className="h-8 w-40 text-right font-bold" 
                            value={totalAmount}
                            onChange={handleTotalAmountChange}
+                           onBlur={() => handleBlurFormat(setTotalAmount, totalAmount)}
                         />
                     </div>
                 </div>
