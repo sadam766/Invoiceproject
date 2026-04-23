@@ -20,7 +20,7 @@ export function formatNumberWithCommas(value: number | string | undefined): stri
     return '';
   }
 
-  // Gunakan Intl.NumberFormat dengan pembatasan 2 desimal
+  // Gunakan Intl.NumberFormat dengan pembatasan 2 desimal (Standar Akuntansi)
   return new Intl.NumberFormat('id-ID', {
     minimumFractionDigits: 0,
     maximumFractionDigits: 2

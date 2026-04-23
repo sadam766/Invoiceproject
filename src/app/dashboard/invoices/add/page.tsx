@@ -273,7 +273,7 @@ export default function AddInvoicePage() {
     setCustomerPopoverOpen(false);
   }
 
-  // Effect for primary automatic calculation flow
+  // Effect for primary automatic calculation flow (Default Values)
   useEffect(() => {
     const currentSubtotal = items.reduce((acc, item) => acc + item.total, 0);
     setSubtotal(currentSubtotal);
@@ -315,18 +315,21 @@ export default function AddInvoicePage() {
   
   }, [items, negotiation, dpPercent, dpValue, dpPelunasanPercent, pelunasan]);
 
-  // --- MANUAL INPUT SYNCHRONIZATION HANDLERS ---
+  // --- MANUAL INPUT OVERRIDE HANDLERS (ONE-WAY CALCULATION) ---
   
   const handleGrandTotalChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
-    setGrandTotal(value); // Biarkan user mengetik bebas di awal
-    
-    const numericGT = parseFormattedNumber(value);
+    setGrandTotal(value);
+  };
+
+  const handleGrandTotalBlur = () => {
+    const numericGT = parseFormattedNumber(String(grandTotal));
     if (!isNaN(numericGT)) {
       const dpp = numericGT / 1.12;
       const vat = dpp * 0.12;
       const total = numericGT + vat;
       
+      setGrandTotal(formatNumberWithCommas(numericGT));
       setDppVat(formatNumberWithCommas(dpp));
       setVat12(formatNumberWithCommas(vat));
       setTotalAmount(formatNumberWithCommas(total));
@@ -336,15 +339,17 @@ export default function AddInvoicePage() {
   const handleDppVatChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
     setDppVat(value);
-    
-    const numericDPP = parseFormattedNumber(value);
+  };
+
+  const handleDppVatBlur = () => {
+    const numericDPP = parseFormattedNumber(String(dppVat));
     if (!isNaN(numericDPP)) {
       const vat = numericDPP * 0.12;
-      const gt = numericDPP * 1.12;
       const total = numericDPP + vat;
       
+      // ISOLATION: Do not update grandTotal (Only update down the chain)
+      setDppVat(formatNumberWithCommas(numericDPP));
       setVat12(formatNumberWithCommas(vat));
-      setGrandTotal(formatNumberWithCommas(gt));
       setTotalAmount(formatNumberWithCommas(total));
     }
   };
@@ -352,11 +357,16 @@ export default function AddInvoicePage() {
   const handleVat12Change = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
     setVat12(value);
-    
-    const numericVAT = parseFormattedNumber(value);
+  };
+
+  const handleVat12Blur = () => {
+    const numericVAT = parseFormattedNumber(String(vat12));
     if (!isNaN(numericVAT)) {
-      const gt = typeof grandTotal === 'string' ? parseFormattedNumber(grandTotal) : (typeof grandTotal === 'number' ? grandTotal : 0);
-      setTotalAmount(formatNumberWithCommas(gt + numericVAT));
+      const dpp = parseFormattedNumber(String(dppVat));
+      const total = dpp + numericVAT;
+      
+      setVat12(formatNumberWithCommas(numericVAT));
+      setTotalAmount(formatNumberWithCommas(total));
     }
   };
 
@@ -364,10 +374,14 @@ export default function AddInvoicePage() {
     setTotalAmount(e.target.value);
   };
 
-  // Handler onBlur untuk memformat angka saat pengguna selesai mengetik
+  const handleTotalAmountBlur = () => {
+    setTotalAmount(formatNumberWithCommas(String(totalAmount)));
+  };
+
+  // Generic formatting for other numeric inputs
   const handleBlurFormat = (setter: React.Dispatch<React.SetStateAction<string | number>>, value: string | number) => {
-    if (typeof value === 'string') {
-        const formatted = formatNumberWithCommas(value);
+    if (typeof value === 'string' || typeof value === 'number') {
+        const formatted = formatNumberWithCommas(String(value));
         setter(formatted);
     }
   };
@@ -515,6 +529,16 @@ export default function AddInvoicePage() {
             return updatedItem;
         }
         return item;
+    });
+    setItems(newItems);
+  };
+
+  const handleNumericItemBlur = (id: number, field: 'quantity' | 'price') => {
+    const newItems = items.map(item => {
+      if (item.id === id) {
+        return { ...item, [field]: parseFormattedNumber(String(item[field])) };
+      }
+      return item;
     });
     setItems(newItems);
   };
@@ -828,6 +852,7 @@ export default function AddInvoicePage() {
                         type="text" 
                         value={formatNumberWithCommas(item.quantity)}
                         onChange={(e) => handleNumericItemChange(item.id, 'quantity', e.target.value)}
+                        onBlur={() => handleNumericItemBlur(item.id, 'quantity')}
                         className="text-right w-24" 
                       />
                     </TableCell>
@@ -843,6 +868,7 @@ export default function AddInvoicePage() {
                         placeholder="Rp 0,00"
                         value={formatNumberWithCommas(item.price)}
                         onChange={(e) => handleNumericItemChange(item.id, 'price', e.target.value)}
+                        onBlur={() => handleNumericItemBlur(item.id, 'price')}
                         className="text-right w-36"
                       />
                     </TableCell>
@@ -921,7 +947,7 @@ export default function AddInvoicePage() {
                            className="h-8 w-40 text-right font-bold" 
                            value={grandTotal}
                            onChange={handleGrandTotalChange}
-                           onBlur={() => handleBlurFormat(setGrandTotal, grandTotal)}
+                           onBlur={handleGrandTotalBlur}
                         />
                     </div>
                      <div className="flex justify-between items-center py-1">
@@ -930,7 +956,7 @@ export default function AddInvoicePage() {
                            className="h-8 w-40 text-right" 
                            value={dppVat}
                            onChange={handleDppVatChange}
-                           onBlur={() => handleBlurFormat(setDppVat, dppVat)}
+                           onBlur={handleDppVatBlur}
                         />
                     </div>
                      <div className="flex justify-between items-center py-1">
@@ -939,7 +965,7 @@ export default function AddInvoicePage() {
                            className="h-8 w-40 text-right" 
                            value={vat12}
                            onChange={handleVat12Change}
-                           onBlur={() => handleBlurFormat(setVat12, vat12)}
+                           onBlur={handleVat12Blur}
                         />
                     </div>
                      <div className="flex justify-between items-center py-2 mt-2 border-t">
@@ -948,7 +974,7 @@ export default function AddInvoicePage() {
                            className="h-8 w-40 text-right font-bold" 
                            value={totalAmount}
                            onChange={handleTotalAmountChange}
-                           onBlur={() => handleBlurFormat(setTotalAmount, totalAmount)}
+                           onBlur={handleTotalAmountBlur}
                         />
                     </div>
                 </div>
