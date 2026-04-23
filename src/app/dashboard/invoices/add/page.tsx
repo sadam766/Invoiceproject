@@ -1,5 +1,3 @@
-
-
 'use client';
 
 import { useEffect, useState, useMemo } from 'react';
@@ -276,6 +274,7 @@ export default function AddInvoicePage() {
     setCustomerPopoverOpen(false);
   }
 
+  // Effect for primary automatic calculation flow
   useEffect(() => {
     const currentSubtotal = items.reduce((acc, item) => acc + item.total, 0);
     setSubtotal(currentSubtotal);
@@ -316,6 +315,57 @@ export default function AddInvoicePage() {
     setTotalAmount(formatNumberWithCommas(currentGrandTotal + currentVat12));
   
   }, [items, negotiation, dpPercent, dpValue, dpPelunasanPercent, pelunasan]);
+
+  // --- MANUAL INPUT SYNCHRONIZATION HANDLERS ---
+  
+  const handleGrandTotalChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    const numericGT = parseFormattedNumber(value);
+    setGrandTotal(value === '' ? '' : formatNumberWithCommas(numericGT));
+    
+    if (!isNaN(numericGT)) {
+      const dpp = numericGT / 1.12;
+      const vat = dpp * 0.12;
+      const total = numericGT + vat;
+      
+      setDppVat(formatNumberWithCommas(dpp));
+      setVat12(formatNumberWithCommas(vat));
+      setTotalAmount(formatNumberWithCommas(total));
+    }
+  };
+
+  const handleDppVatChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    const numericDPP = parseFormattedNumber(value);
+    setDppVat(value === '' ? '' : formatNumberWithCommas(numericDPP));
+    
+    if (!isNaN(numericDPP)) {
+      const vat = numericDPP * 0.12;
+      const gt = numericDPP * 1.12;
+      const total = numericDPP + vat;
+      
+      setVat12(formatNumberWithCommas(vat));
+      setGrandTotal(formatNumberWithCommas(gt));
+      setTotalAmount(formatNumberWithCommas(total));
+    }
+  };
+
+  const handleVat12Change = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    const numericVAT = parseFormattedNumber(value);
+    setVat12(value === '' ? '' : formatNumberWithCommas(numericVAT));
+    
+    if (!isNaN(numericVAT)) {
+      const gt = typeof grandTotal === 'string' ? parseFormattedNumber(grandTotal) : (typeof grandTotal === 'number' ? grandTotal : 0);
+      setTotalAmount(formatNumberWithCommas(gt + numericVAT));
+    }
+  };
+
+  const handleTotalAmountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    const numericTotal = parseFormattedNumber(value);
+    setTotalAmount(value === '' ? '' : formatNumberWithCommas(numericTotal));
+  };
 
   
   const handleSaveInvoice = async (invoiceStatus: 'draft' | 'sent' | 'paid' | 'unpaid' = 'draft') => {
@@ -880,7 +930,7 @@ export default function AddInvoicePage() {
                         <Input 
                            className="h-8 w-28 text-right font-bold" 
                            value={grandTotal}
-                           onChange={handleNumericInputChange(setGrandTotal)}
+                           onChange={handleGrandTotalChange}
                         />
                     </div>
                      <div className="flex justify-between items-center py-1">
@@ -888,7 +938,7 @@ export default function AddInvoicePage() {
                         <Input 
                            className="h-8 w-28 text-right" 
                            value={dppVat}
-                           onChange={handleNumericInputChange(setDppVat)}
+                           onChange={handleDppVatChange}
                         />
                     </div>
                      <div className="flex justify-between items-center py-1">
@@ -896,7 +946,7 @@ export default function AddInvoicePage() {
                         <Input 
                            className="h-8 w-28 text-right" 
                            value={vat12}
-                           onChange={handleNumericInputChange(setVat12)}
+                           onChange={handleVat12Change}
                         />
                     </div>
                      <div className="flex justify-between items-center py-2 mt-2 border-t">
@@ -904,7 +954,7 @@ export default function AddInvoicePage() {
                         <Input 
                            className="h-8 w-28 text-right font-bold" 
                            value={totalAmount}
-                           onChange={handleNumericInputChange(setTotalAmount)}
+                           onChange={handleTotalAmountChange}
                         />
                     </div>
                 </div>
@@ -968,4 +1018,3 @@ export default function AddInvoicePage() {
     </main>
   );
 }
-
