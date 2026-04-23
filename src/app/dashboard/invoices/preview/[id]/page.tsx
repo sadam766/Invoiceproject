@@ -143,8 +143,11 @@ const InvoicePreviewPage = () => {
             });
             return;
         }
+
+        const displayInvoiceId = invoiceData.id.replace(/_/g, '/');
+
         const dataToExport = invoiceData.items.map(item => ({
-            'Invoice ID': invoiceData.id,
+            'Invoice ID': displayInvoiceId,
             'Customer': invoiceData.customer.name,
             'SO Number': invoiceData.soNumber,
             'Date': formatDate(invoiceData.date),
@@ -166,7 +169,7 @@ const InvoicePreviewPage = () => {
         exportToExcel(dataToExport, `Invoice-${invoiceData.id.replace(/\//g, '_')}`);
         toast({
             title: "Export Successful",
-            description: `Invoice ${invoiceData.id} has been exported to Excel.`,
+            description: `Invoice ${displayInvoiceId} has been exported to Excel.`,
         });
     };
     
@@ -191,6 +194,9 @@ const InvoicePreviewPage = () => {
         dpValue,
         pelunasan
     } = invoiceData;
+
+    // Nomor faktur untuk tampilan (mengganti _ dengan /)
+    const displayInvoiceId = invoiceId.replace(/_/g, '/');
 
     const itemChunks = Array.from({ length: Math.ceil(items.length / ITEMS_PER_PAGE) }, (_, i) =>
         items.slice(i * ITEMS_PER_PAGE, i * ITEMS_PER_PAGE + ITEMS_PER_PAGE)
@@ -255,7 +261,7 @@ const InvoicePreviewPage = () => {
                                 <p className="absolute right-0 top-0 font-normal text-sm capitalize">{printType}</p>
                                 <div className="w-full text-center mb-1 leading-none">
                                     <p className="font-bold uppercase text-xs tracking-tighter mb-0.5">{invoiceTitle}</p>
-                                    <p className="font-bold uppercase text-xs">{invoiceId}</p>
+                                    <p className="font-bold uppercase text-xs">{displayInvoiceId}</p>
                                 </div>
                                 <div className='flex justify-between items-start mt-4'>
                                     <div className='w-[45%]'>
@@ -363,7 +369,7 @@ const InvoicePreviewPage = () => {
                                                 </div>
                                                 <div className="flex">
                                                     <p className='shrink-0 w-[150px] mb-0'>Please state with your payment:</p>
-                                                    <p className='w-full ml-1 font-bold mb-0'>{invoiceId}</p>
+                                                    <p className='w-full ml-1 font-bold mb-0'>{displayInvoiceId}</p>
                                                 </div>
                                                 <p className='mt-2 mb-1'>For payment, please transfer to our account:</p>
                                                 <p className="font-semibold text-[10px] mb-1">PT. Jembo Cable Company Tbk</p>
