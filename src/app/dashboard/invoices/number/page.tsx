@@ -54,8 +54,10 @@ import {
     const filteredInvoices = useMemo(() => {
         if (!invoices) return [];
         const sortedInvoices = [...invoices].sort((a, b) => {
-            const numA = parseInt(a.id.split(/[/_]/)[1], 10);
-            const numB = parseInt(b.id.split(/[/_]/)[1], 10);
+            const matchA = a.id.match(/[_\/]([0-9]+)/);
+            const matchB = b.id.match(/[_\/]([0-9]+)/);
+            const numA = matchA ? parseInt(matchA[1], 10) : 0;
+            const numB = matchB ? parseInt(matchB[1], 10) : 0;
             return numB - numA;
         });
 
@@ -102,7 +104,7 @@ import {
         setDeleteDialogState({ isOpen: true, invoiceId: invoiceId });
     };
 
-    const handleSave = (invoice: Omit<InvoiceNumber, 'id' | 'ownerId'> & {id: string}) => {
+    const handleSave = (invoice: Omit<InvoiceNumber, 'id' | 'ownerId'> & {id: string}, action: 'save' | 'create') => {
       if (!firestore || !user) return;
       const { id, ...invoiceData } = invoice;
       const safeId = id.replace(/\//g, '_');
@@ -112,12 +114,12 @@ import {
 
       setDoc(docRef, dataToSave, { merge: true })
         .then(() => {
-            if (!editingInvoice) { 
-                router.push(`/dashboard/invoices/add?invoiceNumberId=${safeId}`);
-            }
              toast({
                 title: editingInvoice ? 'Invoice Number Updated' : 'Invoice Number Created',
              });
+             if (action === 'create') {
+                router.push(`/dashboard/invoices/add?invoiceNumberId=${safeId}`);
+             }
         })
         .catch(async (serverError) => {
             const permissionError = new FirestorePermissionError({
@@ -310,4 +312,3 @@ import {
       </main>
     );
   }
-    

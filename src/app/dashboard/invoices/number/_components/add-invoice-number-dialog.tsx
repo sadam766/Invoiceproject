@@ -1,4 +1,3 @@
-
 'use client';
 import { useState, useEffect, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
@@ -38,7 +37,7 @@ import { collection, query } from 'firebase/firestore';
 type AddInvoiceNumberDialogProps = {
   isOpen: boolean;
   onOpenChange: (isOpen: boolean) => void;
-  onSave: (invoice: Omit<InvoiceNumber, 'id'> & {id: string}) => void;
+  onSave: (invoice: Omit<InvoiceNumber, 'id'> & {id: string}, action: 'save' | 'create') => void;
   invoiceData?: InvoiceNumber;
   onAddClick: () => void;
   allInvoiceNumbers: InvoiceNumber[] | null;
@@ -85,14 +84,12 @@ export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceDa
 
   const generateNextNumber = (type: 'sar' | 'kw') => {
     if (!allInvoiceNumbers) return "1"; // Default if no invoices exist
-    const currentYear = new Date().getFullYear();
     let nextNum = 1;
   
     const relevantNumbers = allInvoiceNumbers
       .map(inv => {
         const id = inv.id || '';
         let match;
-        const separator = /[\/_]/;
         // Regex to capture number from SAR/xxx or SAR_xxx
         if (type === 'sar') {
           match = id.match(/^(?:SAR)[\/_]([0-9]+)/);
@@ -250,7 +247,7 @@ export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceDa
     }
   };
 
-  const handleSave = () => {
+  const handleSave = (action: 'save' | 'create') => {
     if (!mainNumber) {
         toast({
             variant: "destructive",
@@ -281,7 +278,7 @@ export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceDa
       salesOrder,
       date: formattedDate,
       amount: numericAmount
-    });
+    }, action);
     onOpenChange(false);
   }
 
@@ -465,7 +462,8 @@ export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceDa
         </div>
         <div className="pt-6 border-t flex justify-end gap-2">
           <Button variant="ghost" onClick={() => onOpenChange(false)}>Cancel</Button>
-          <Button type="button" onClick={handleSave}>Save & Create Invoice</Button>
+          <Button variant="outline" onClick={() => handleSave('save')}>Save</Button>
+          <Button type="button" onClick={() => handleSave('create')}>Create Invoice</Button>
         </div>
       </DialogContent>
     </Dialog>
