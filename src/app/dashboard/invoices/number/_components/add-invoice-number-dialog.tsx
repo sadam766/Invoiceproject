@@ -51,6 +51,9 @@ export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceDa
   const [invoiceType, setInvoiceType] = useState<'sar' | 'kw'>('kw');
   const [isAutoNumber, setIsAutoNumber] = useState(true);
   
+  // Starting point set by user
+  const [startingNumber, setStartingNumber] = useState<string>('');
+  
   const [prefix, setPrefix] = useState('');
   const [mainNumber, setMainNumber] = useState('');
   const [suffix, setSuffix] = useState('');
@@ -82,78 +85,81 @@ export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceDa
     return Array.from(new Set(salesOrderListData.map(item => item.soNumber)))
   },[salesOrderListData]);
 
-  const generateNextNumber = (type: 'sar' | 'kw') => {
-    if (!allInvoiceNumbers) return "1"; // Default if no invoices exist
-    let nextNum = 1;
-  
-    const relevantNumbers = allInvoiceNumbers
-      .map(inv => {
-        const id = inv.id || '';
-        let match;
-        // Regex to capture number from SAR/xxx or SAR_xxx
-        if (type === 'sar') {
-          match = id.match(/^(?:SAR)[\/_]([0-9]+)/);
-        } else { // kw
-           // Regex to capture number from KW/xxx/KEU/yyyy or KW_xxx_KEU_yyyy
-           match = id.match(/^(?:KW)[\/_](.*?)((?:[\/_]KEU[\/_].*)?)$/);
-        }
+  /**
+   * Menggenerate nomor urut berikutnya berdasarkan data yang ada di database 
+   * dan input 'Mulai Dari' yang diberikan user.
+   */
+  const generateNextNumber = (type: 'sar' | 'kw', startFrom: string = '') => {
+    let currentMax = 0;
+    
+    if (allInvoiceNumbers) {
+        allInvoiceNumbers.forEach(inv => {
+            const id = inv.id || '';
+            let match;
+            if (type === 'sar') {
+                // Mencari angka di tengah SAR_2601[XXX]A
+                match = id.match(/^SAR_2601(\d+)A$/);
+            } else {
+                // Mencari angka 4 digit untuk KW
+                match = id.match(/^(\d{4})$/);
+            }
 
-        if (match && match[1]) {
-          const num = parseInt(match[1], 10);
-          return isNaN(num) ? 0 : num;
-        }
-        return 0;
-      })
-      .filter(num => num > 0);
-  
-    if (relevantNumbers.length > 0) {
-      nextNum = Math.max(...relevantNumbers) + 1;
+            if (match && match[1]) {
+                const num = parseInt(match[1], 10);
+                if (num > currentMax) currentMax = num;
+            }
+        });
     }
 
-    return nextNum.toString();
+    // Jika user menentukan titik mulai, bandingkan dengan max yang ada
+    const userStart = parseInt(startFrom, 10);
+    const baseNumber = !isNaN(userStart) ? Math.max(currentMax, userStart - 1) : currentMax;
+    
+    const nextNum = baseNumber + 1;
+
+    // Padding sesuai tipe
+    if (type === 'sar') {
+        return nextNum.toString().padStart(3, '0');
+    } else {
+        return nextNum.toString().padStart(4, '0');
+    }
   };
   
-  const setupForAddMode = (type: 'sar' | 'kw') => {
-    const nextNumStr = generateNextNumber(type);
+  const setupForAddMode = (type: 'sar' | 'kw', startVal: string = '') => {
+    const nextNumStr = generateNextNumber(type, startVal);
     if (type === 'sar') {
-      setPrefix('SAR/');
-      setSuffix('');
+      setPrefix('SAR_2601');
+      setSuffix('A');
       setMainNumber(nextNumStr);
     } else { // kw
-      setPrefix('KW/');
-      setSuffix(`/KEU/${new Date().getFullYear()}`);
-      setMainNumber(nextNumStr.padStart(2, '0'));
+      setPrefix('');
+      setSuffix('');
+      setMainNumber(nextNumStr);
     }
   };
 
   const handleManualSetup = (invoice: InvoiceNumber) => {
-    const type = invoice.id.startsWith('SAR') ? 'sar' : 'kw';
-    const separator = /[_\/]/;
-    const parts = invoice.id.split(separator);
-
-    let extractedPrefix = '';
-    let extractedMainNumber = '';
-    let extractedSuffix = '';
-
-    if (type === 'sar') {
-        extractedPrefix = parts[0] + '/';
-        extractedMainNumber = parts.slice(1).join('');
-    } else { // kw
-        extractedPrefix = parts[0] + '/';
-        if (parts.length >= 4 && parts[parts.length - 2] === 'KEU') {
-            extractedMainNumber = parts.slice(1, parts.length - 2).join('/');
-            extractedSuffix = '/' + parts.slice(parts.length - 2).join('/');
-        } else {
-            extractedMainNumber = parts.slice(1).join('/');
-        }
+    // Logika parsing saat edit untuk memisahkan prefix/suffix
+    const id = invoice.id;
+    if (id.startsWith('SAR_2601') && id.endsWith('A')) {
+        setInvoiceType('sar');
+        setPrefix('SAR_2601');
+        setSuffix('A');
+        setMainNumber(id.substring(8, id.length - 1));
+    } else if (/^\d{4}$/.test(id)) {
+        setInvoiceType('kw');
+        setPrefix('');
+        setSuffix('');
+        setMainNumber(id);
+    } else {
+        // Fallback jika tidak sesuai format baru
+        setInvoiceType('kw');
+        setPrefix('');
+        setSuffix('');
+        setMainNumber(id);
     }
     
-    setInvoiceType(type);
-    setPrefix(extractedPrefix);
-    setMainNumber(extractedMainNumber);
-    setSuffix(extractedSuffix);
-    setIsAutoNumber(false); // Always start in manual for editing
-
+    setIsAutoNumber(false); 
     setCustomer(invoice.customer);
     setSalesOrder(invoice.salesOrder);
     if (invoice.date) {
@@ -170,29 +176,30 @@ export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceDa
     setAmount(formatNumberWithCommas(invoice.amount));
   }
 
-  // This effect runs ONCE when the dialog opens
   useEffect(() => {
       if (!isOpen) return;
 
       if (invoiceData) {
-          // --- EDIT MODE ---
           handleManualSetup(invoiceData);
       } else {
-          // --- ADD NEW MODE ---
-          const initialType = 'kw';
-          setInvoiceType(initialType);
+          setInvoiceType('sar');
           setIsAutoNumber(true);
-          setupForAddMode(initialType);
+          setupForAddMode('sar', startingNumber);
           
-          // Reset other fields
           setCustomer('');
           setSalesOrder('');
           setDate(new Date());
           setAmount(0);
       }
-  }, [isOpen, invoiceData, allInvoiceNumbers]); // Dependencies ensure it re-runs if key props change while dialog is open
+  }, [isOpen, invoiceData]);
 
-  // This effect updates the full invoice number whenever its parts change
+  // Update main number whenever startingNumber or type changes in Auto mode
+  useEffect(() => {
+      if (isAutoNumber && !invoiceData && isOpen) {
+          setupForAddMode(invoiceType, startingNumber);
+      }
+  }, [startingNumber, invoiceType, isAutoNumber, isOpen]);
+
   useEffect(() => {
     setFullInvoiceNumber(`${prefix}${mainNumber}${suffix}`);
   }, [prefix, mainNumber, suffix]);
@@ -200,16 +207,10 @@ export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceDa
   const handleInvoiceTypeChange = (newType: 'sar' | 'kw') => {
     if (invoiceType === newType) return;
     setInvoiceType(newType);
-    if (!invoiceData && isAutoNumber) {
-        setupForAddMode(newType);
-    }
   }
 
   const handleAutoNumberToggle = (checked: boolean) => {
     setIsAutoNumber(checked);
-    if (checked && !invoiceData) {
-      setupForAddMode(invoiceType);
-    }
   }
 
   const handleSalesOrderSelect = (currentValue: string) => {
@@ -256,16 +257,15 @@ export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceDa
         });
         return;
     }
-    const finalInvoiceNumber = `${prefix}${mainNumber}${suffix}`.replace(/\//g, '_');
-    // In edit mode, invoiceData.id will be the original ID. Check if it's different from the new one.
-    const isChangingId = invoiceData && invoiceData.id.replace(/\//g, '_') !== finalInvoiceNumber;
     
-    // Check for duplicates only if it's a new invoice OR if the ID is being changed in edit mode.
-    if ((!invoiceData || isChangingId) && allInvoiceNumbers?.some(inv => inv.id.replace(/\//g, '_') === finalInvoiceNumber)) {
+    const finalInvoiceNumber = fullInvoiceNumber;
+    const isChangingId = invoiceData && invoiceData.id !== finalInvoiceNumber;
+    
+    if ((!invoiceData || isChangingId) && allInvoiceNumbers?.some(inv => inv.id === finalInvoiceNumber)) {
       toast({
         variant: "destructive",
         title: "Duplicate Invoice Number",
-        description: `Invoice number "${finalInvoiceNumber.replace(/_/g, '/')}" already exists. Please use a different number.`,
+        description: `Invoice number "${finalInvoiceNumber}" already exists.`,
       });
       return; 
     }
@@ -273,7 +273,7 @@ export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceDa
     const formattedDate = date ? format(date, 'dd/MM/yyyy') : '';
     const numericAmount = typeof amount === 'string' ? parseFormattedNumber(amount) : amount;
     onSave({
-      id: finalInvoiceNumber.replace(/_/g, '/'),
+      id: finalInvoiceNumber,
       customer,
       salesOrder,
       date: formattedDate,
@@ -283,7 +283,6 @@ export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceDa
   }
 
   const dialogTitle = invoiceData ? "Edit Invoice Number" : "Add New Invoice Number";
-
 
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
@@ -323,16 +322,40 @@ export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceDa
 
            <div className="space-y-2">
             <Label>Nomor Faktur</Label>
-            <div className="flex items-center space-x-2">
-              <Checkbox id="auto-number" checked={isAutoNumber} onCheckedChange={(checked) => handleAutoNumberToggle(!!checked)} />
-              <Label htmlFor="auto-number" className="font-normal">Nomor Otomatis</Label>
+            <div className="flex items-center gap-4 mb-2">
+                <div className="flex items-center space-x-2">
+                  <Checkbox id="auto-number" checked={isAutoNumber} onCheckedChange={(checked) => handleAutoNumberToggle(!!checked)} />
+                  <Label htmlFor="auto-number" className="font-normal">Nomor Otomatis</Label>
+                </div>
+                
+                {isAutoNumber && (
+                    <div className="flex items-center gap-2">
+                        <Label htmlFor="mulai-dari" className="text-xs font-normal text-muted-foreground whitespace-nowrap">Mulai Dari:</Label>
+                        <Input 
+                            id="mulai-dari"
+                            placeholder="Contoh: 045"
+                            className="h-7 w-24 text-xs"
+                            value={startingNumber}
+                            onChange={(e) => setStartingNumber(e.target.value)}
+                        />
+                    </div>
+                )}
             </div>
+            
             <div className="grid grid-cols-[auto_1fr_auto] items-center gap-2">
-              <Input value={prefix} onChange={e => setPrefix(e.target.value)} className="bg-muted text-right" readOnly={isAutoNumber} tabIndex={-1} />
-              <Input value={mainNumber} onChange={(e) => setMainNumber(e.target.value)} disabled={isAutoNumber} />
-              {suffix && <Input value={suffix} onChange={e => setSuffix(e.target.value)} className="bg-muted" readOnly={isAutoNumber} tabIndex={-1} />}
+              {prefix && <div className="bg-muted px-3 py-2 rounded-md border text-sm font-mono">{prefix}</div>}
+              <Input 
+                value={mainNumber} 
+                onChange={(e) => setMainNumber(e.target.value)} 
+                disabled={isAutoNumber} 
+                placeholder={invoiceType === 'sar' ? "000" : "0000"}
+              />
+              {suffix && <div className="bg-muted px-3 py-2 rounded-md border text-sm font-mono">{suffix}</div>}
             </div>
-            <Input id="full-invoice-number" value={fullInvoiceNumber} disabled className="bg-muted font-semibold text-center" />
+            <div className="mt-2">
+                <Label className="text-[10px] uppercase text-muted-foreground">Preview Hasil:</Label>
+                <Input value={fullInvoiceNumber} disabled className="bg-muted/50 font-bold text-center border-dashed" />
+            </div>
           </div>
            <div className="space-y-2">
             <Label htmlFor="sales-order">Sales Order / SO (Opsional)</Label>
@@ -463,7 +486,7 @@ export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceDa
         <div className="pt-6 border-t flex justify-end gap-2">
           <Button variant="ghost" onClick={() => onOpenChange(false)}>Cancel</Button>
           <Button variant="outline" onClick={() => handleSave('save')}>Save</Button>
-          <Button type="button" onClick={() => handleSave('create')}>Create Invoice</Button>
+          <Button type="button" onClick={() => handleSave('create')} className="bg-primary text-primary-foreground">Create Invoice</Button>
         </div>
       </DialogContent>
     </Dialog>

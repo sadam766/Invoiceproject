@@ -53,12 +53,17 @@ import {
 
     const filteredInvoices = useMemo(() => {
         if (!invoices) return [];
+        
+        // Sorting berdasarkan angka di dalam string format baru
         const sortedInvoices = [...invoices].sort((a, b) => {
-            const matchA = a.id.match(/[_\/]([0-9]+)/);
-            const matchB = b.id.match(/[_\/]([0-9]+)/);
-            const numA = matchA ? parseInt(matchA[1], 10) : 0;
-            const numB = matchB ? parseInt(matchB[1], 10) : 0;
-            return numB - numA;
+            const getNum = (id: string) => {
+                const matchSAR = id.match(/SAR_2601(\d+)A/);
+                const matchKW = id.match(/^(\d{4})$/);
+                if (matchSAR) return parseInt(matchSAR[1], 10);
+                if (matchKW) return parseInt(matchKW[1], 10);
+                return 0;
+            };
+            return getNum(b.id) - getNum(a.id);
         });
 
         if (!searchQuery) {
@@ -107,9 +112,12 @@ import {
     const handleSave = (invoice: Omit<InvoiceNumber, 'id' | 'ownerId'> & {id: string}, action: 'save' | 'create') => {
       if (!firestore || !user) return;
       const { id, ...invoiceData } = invoice;
-      const safeId = id.replace(/\//g, '_');
       
-      const docRef = doc(firestore, 'invoiceNumbers', safeId);
+      // ID sekarang disimpan apa adanya (bisa mengandung _ atau /)
+      // Namun untuk path Firestore kita ganti / menjadi _ agar aman
+      const safePathId = id.replace(/\//g, '_');
+      
+      const docRef = doc(firestore, 'invoiceNumbers', safePathId);
       const dataToSave = { ...invoiceData, id: id, ownerId: user.uid };
 
       setDoc(docRef, dataToSave, { merge: true })
@@ -118,7 +126,7 @@ import {
                 title: editingInvoice ? 'Invoice Number Updated' : 'Invoice Number Created',
              });
              if (action === 'create') {
-                router.push(`/dashboard/invoices/add?invoiceNumberId=${safeId}`);
+                router.push(`/dashboard/invoices/add?invoiceNumberId=${safePathId}`);
              }
         })
         .catch(async (serverError) => {
