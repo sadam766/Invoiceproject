@@ -51,7 +51,7 @@ export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceDa
   const [invoiceType, setInvoiceType] = useState<'sar' | 'kw'>('kw');
   const [isAutoNumber, setIsAutoNumber] = useState(true);
   
-  // Starting point set by user
+  // Starting point set by user (only the numeric part)
   const [startingNumber, setStartingNumber] = useState<string>('');
   
   const [prefix, setPrefix] = useState('');
@@ -98,10 +98,11 @@ export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceDa
             let match;
             if (type === 'sar') {
                 // Mencari angka di tengah SAR_2601[XXX]A
-                match = id.match(/^SAR_2601(\d+)A$/);
+                match = id.match(/SAR_2601(\d+)A/);
             } else {
-                // Mencari angka 4 digit untuk KW
-                match = id.match(/^(\d{4})$/);
+                // Mencari angka di tengah KW/[XXXX]/KEU/2026
+                // Mencocokkan format asli atau format yang sudah disanitasi (dengan underscore)
+                match = id.match(/KW[\/_](\d+)[\/_]KEU[\/_]2026/);
             }
 
             if (match && match[1]) {
@@ -132,30 +133,34 @@ export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceDa
       setSuffix('A');
       setMainNumber(nextNumStr);
     } else { // kw
-      setPrefix('');
-      setSuffix('');
+      setPrefix('KW/');
+      setSuffix('/KEU/2026');
       setMainNumber(nextNumStr);
     }
   };
 
   const handleManualSetup = (invoice: InvoiceNumber) => {
-    // Logika parsing saat edit untuk memisahkan prefix/suffix
     const id = invoice.id;
-    if (id.startsWith('SAR_2601') && id.endsWith('A')) {
+    // Deteksi SAR
+    const sarMatch = id.match(/^(SAR_2601)(\d+)(A)$/);
+    // Deteksi KW (mendukung / atau _)
+    const kwMatch = id.match(/^(KW[\/_])(\d+)([\/_]KEU[\/_]2026)$/);
+
+    if (sarMatch) {
         setInvoiceType('sar');
-        setPrefix('SAR_2601');
-        setSuffix('A');
-        setMainNumber(id.substring(8, id.length - 1));
-    } else if (/^\d{4}$/.test(id)) {
+        setPrefix(sarMatch[1]);
+        setMainNumber(sarMatch[2]);
+        setSuffix(sarMatch[3]);
+    } else if (kwMatch) {
         setInvoiceType('kw');
-        setPrefix('');
-        setSuffix('');
-        setMainNumber(id);
+        setPrefix(kwMatch[1]);
+        setMainNumber(kwMatch[2]);
+        setSuffix(kwMatch[3]);
     } else {
-        // Fallback jika tidak sesuai format baru
+        // Fallback jika tidak sesuai format
         setInvoiceType('kw');
-        setPrefix('');
-        setSuffix('');
+        setPrefix('KW/');
+        setSuffix('/KEU/2026');
         setMainNumber(id);
     }
     
@@ -253,7 +258,7 @@ export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceDa
         toast({
             variant: "destructive",
             title: "Validation Error",
-            description: "Nomor Faktur tidak boleh kosong.",
+            description: "Nomor urut tidak boleh kosong.",
         });
         return;
     }
@@ -333,7 +338,7 @@ export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceDa
                         <Label htmlFor="mulai-dari" className="text-xs font-normal text-muted-foreground whitespace-nowrap">Mulai Dari:</Label>
                         <Input 
                             id="mulai-dari"
-                            placeholder="Contoh: 045"
+                            placeholder={invoiceType === 'sar' ? "045" : "0120"}
                             className="h-7 w-24 text-xs"
                             value={startingNumber}
                             onChange={(e) => setStartingNumber(e.target.value)}
