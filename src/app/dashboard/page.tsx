@@ -1,4 +1,3 @@
-
 'use client';
 import { useMemo } from 'react';
 import {
@@ -7,7 +6,7 @@ import {
   CardHeader,
   CardTitle,
 } from '@/components/ui/card';
-import { type SalesListItem, type Customer, type ProductListItem, type Sale } from '@/app/lib/data';
+import { type SalesListItem, type Customer, type ProductListItem, type Sale, type UserProfile } from '@/app/lib/data';
 import KpiCard from '../components/kpi-card';
 import SalesChart from '../components/sales-chart';
 import RecentSales from '../components/recent-sales';
@@ -22,14 +21,16 @@ export default function DashboardPage() {
   const { user } = useUser();
   const firestore = useFirestore();
 
-  // Fetch user profile to get the role
+  // Fetch user profile
   const userProfileRef = useMemoFirebase(() => {
     if (!firestore || !user) return null;
     return doc(firestore, 'users', user.uid);
   }, [firestore, user]);
-  const { data: userProfile } = useDoc(userProfileRef);
+  const { data: userProfile } = useDoc<UserProfile>(userProfileRef);
 
-  const userRole = userProfile?.role || 'staff';
+  // Super Admin / Leader Bypass
+  const isSuperAdmin = userProfile?.email === 'fa@gmail.com';
+  const userRole = isSuperAdmin ? 'admin' : (userProfile?.role || 'staff');
   const isAdmin = userRole === 'admin';
 
   const salesCollection = useMemoFirebase(() => {
@@ -103,7 +104,7 @@ export default function DashboardPage() {
     ].map(item => ({
         ...item,
         revenue: isAdmin ? (salesByMonth[item.month] || 0) : 0,
-        sales: (salesByMonth[item.month] || 0) / 1000 // Placeholder logic
+        sales: (salesByMonth[item.month] || 0) / 1000
     }));
 
     const recentSales: Sale[] = (sales || [])
@@ -112,7 +113,7 @@ export default function DashboardPage() {
         .map(sale => ({
             invoiceId: sale.soNumber,
             customer: sale.customer,
-            date: sale.paidDate ? new Date(sale.paidDate).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }) : 'N/A',
+            date: sale.paidDate ? new Date(sale.paidDate).toLocaleDateString('id-ID', { month: 'long', day: 'numeric', year: 'numeric' }) : 'N/A',
             amount: sale.amount,
             status: sale.status,
         }));
@@ -126,10 +127,8 @@ export default function DashboardPage() {
     <main className="flex flex-1 flex-col gap-4 p-4 md:gap-8 md:p-8">
         <div className="flex items-center justify-between">
             <div>
-                <h1 className="text-2xl font-bold tracking-tight">
-                Dashboard
-                </h1>
-                <p className="text-muted-foreground">Halo, {user?.displayName}. Berikut ringkasan performa bisnis.</p>
+                <h1 className="text-2xl font-bold tracking-tight">Dashboard</h1>
+                <p className="text-muted-foreground">Halo, {userProfile?.displayName || user?.displayName}. Selamat datang kembali.</p>
             </div>
             <DropdownMenu>
                 <DropdownMenuTrigger asChild>
@@ -176,9 +175,7 @@ export default function DashboardPage() {
           </CardContent>
         </Card>
         <Card className="lg:col-span-3">
-          <CardHeader>
-            <CardTitle>Top Products</CardTitle>
-          </CardHeader>
+          <CardHeader><CardTitle>Top Products</CardTitle></CardHeader>
           <CardContent>
             {topProducts.length > 0 ? <TopProducts products={topProducts} /> : <p className="text-sm text-muted-foreground">No product sales data available.</p>}
           </CardContent>
@@ -187,14 +184,10 @@ export default function DashboardPage() {
 
       <Card>
         <CardHeader className="flex flex-row items-center justify-between">
-            <div>
-                <CardTitle>Recent Sales</CardTitle>
-            </div>
+            <CardTitle>Recent Sales</CardTitle>
             <Button variant="link">View All</Button>
         </CardHeader>
-        <CardContent>
-          <RecentSales sales={recentSales} />
-        </CardContent>
+        <CardContent><RecentSales sales={recentSales} /></CardContent>
       </Card>
     </main>
   );

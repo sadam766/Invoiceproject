@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useEffect, useState, useMemo } from 'react';
@@ -57,7 +56,6 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { useFirestore, useCollection, useMemoFirebase, useUser, useDoc, errorEmitter, FirestorePermissionError } from '@/firebase';
 import { collection, query, doc, writeBatch, where, getDocs } from 'firebase/firestore';
 
-// Update type to allow string for flexible input
 type InvoiceItem = {
     id: number;
     name: string;
@@ -280,7 +278,6 @@ export default function AddInvoicePage() {
     setCustomerPopoverOpen(false);
   }
 
-  // Effect for primary automatic calculation flow
   useEffect(() => {
     const currentSubtotal = items.reduce((acc, item) => {
         const q = parseFormattedNumber(item.quantity);
@@ -292,7 +289,6 @@ export default function AddInvoicePage() {
     const numericNegotiation = parseFormattedNumber(String(negotiation));
     const baseForCalculations = currentSubtotal - numericNegotiation;
   
-    // DP Calculation
     const numericDpPercent = typeof dpPercent === 'string' && dpPercent !== '' ? parseFloat(dpPercent.toString()) : (typeof dpPercent === 'number' ? dpPercent : 0);
     let numericDpValue = parseFormattedNumber(String(dpValue));
     
@@ -302,7 +298,6 @@ export default function AddInvoicePage() {
       numericDpValue = calculatedDp;
     }
   
-    // Pelunasan Calculation
     const numericPelunasanPercent = typeof dpPelunasanPercent === 'string' && dpPelunasanPercent !== '' ? parseFloat(dpPelunasanPercent.toString()) : (typeof dpPelunasanPercent === 'number' ? dpPelunasanPercent : 0);
     let numericPelunasan = parseFormattedNumber(String(pelunasan));
   
@@ -325,19 +320,13 @@ export default function AddInvoicePage() {
   
   }, [items, negotiation, dpPercent, dpValue, dpPelunasanPercent, pelunasan]);
 
-  // --- MANUAL INPUT OVERRIDE HANDLERS ---
-  
-  const handleGrandTotalChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setGrandTotal(e.target.value);
-  };
-
+  const handleGrandTotalChange = (e: React.ChangeEvent<HTMLInputElement>) => setGrandTotal(e.target.value);
   const handleGrandTotalBlur = () => {
     const numericGT = parseFormattedNumber(String(grandTotal));
     if (!isNaN(numericGT)) {
       const dpp = numericGT / 1.12;
       const vat = dpp * 0.12;
       const total = numericGT + vat;
-      
       setGrandTotal(formatNumberWithCommas(numericGT));
       setDppVat(formatNumberWithCommas(dpp));
       setVat12(formatNumberWithCommas(vat));
@@ -345,60 +334,41 @@ export default function AddInvoicePage() {
     }
   };
 
-  const handleDppVatChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setDppVat(e.target.value);
-  };
-
+  const handleDppVatChange = (e: React.ChangeEvent<HTMLInputElement>) => setDppVat(e.target.value);
   const handleDppVatBlur = () => {
     const numericDPP = parseFormattedNumber(String(dppVat));
     if (!isNaN(numericDPP)) {
       const vat = numericDPP * 0.12;
       const total = numericDPP + vat;
-      
       setDppVat(formatNumberWithCommas(numericDPP));
       setVat12(formatNumberWithCommas(vat));
       setTotalAmount(formatNumberWithCommas(total));
     }
   };
 
-  const handleVat12Change = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setVat12(e.target.value);
-  };
-
+  const handleVat12Change = (e: React.ChangeEvent<HTMLInputElement>) => setVat12(e.target.value);
   const handleVat12Blur = () => {
     const numericVAT = parseFormattedNumber(String(vat12));
     if (!isNaN(numericVAT)) {
       const dpp = parseFormattedNumber(String(dppVat));
       const total = dpp + numericVAT;
-      
       setVat12(formatNumberWithCommas(numericVAT));
       setTotalAmount(formatNumberWithCommas(total));
     }
   };
 
-  const handleTotalAmountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setTotalAmount(e.target.value);
-  };
-
-  const handleTotalAmountBlur = () => {
-    setTotalAmount(formatNumberWithCommas(String(totalAmount)));
-  };
+  const handleTotalAmountChange = (e: React.ChangeEvent<HTMLInputElement>) => setTotalAmount(e.target.value);
+  const handleTotalAmountBlur = () => setTotalAmount(formatNumberWithCommas(String(totalAmount)));
 
   const handleBlurFormat = (setter: React.Dispatch<React.SetStateAction<string | number>>, value: string | number) => {
     if (typeof value === 'string' || typeof value === 'number') {
-        const formatted = formatNumberWithCommas(String(value));
-        setter(formatted);
+        setter(formatNumberWithCommas(String(value)));
     }
   };
 
-  
   const handleSaveInvoice = async (invoiceStatus: 'draft' | 'sent' | 'paid' | 'unpaid' = 'draft') => {
     if (!firestore || !user || !invoiceId || !customer || !issueDate) {
-        toast({
-            variant: "destructive",
-            title: "Validation Error",
-            description: "Please fill in Invoice No, Customer, and Issue Date.",
-        });
+        toast({ variant: "destructive", title: "Validation Error", description: "Lengkapi Nomor Invoice, Customer, dan Tanggal." });
         return;
     }
 
@@ -407,7 +377,7 @@ export default function AddInvoicePage() {
     const itemReferenceSONumber = soNumber || safeInvoiceId;
     const finalNumericAmount = parseFormattedNumber(String(totalAmount));
 
-    // Audit Trail: Record who created/updated this invoice automatically
+    // Audit Trail: Record creator automatically
     const creatorInfo = userProfile?.displayName || user.displayName || user.email || 'System';
 
     const invoiceDocRef = doc(firestore, 'invoices', safeInvoiceId);
@@ -421,7 +391,7 @@ export default function AddInvoicePage() {
         status: invoiceStatus,
         spdNumber: invoiceToEditData?.spdNumber || '-',
         ownerId: user.uid,
-        createdBy: invoiceToEditData?.createdBy || creatorInfo, // Don't overwrite original creator if editing
+        createdBy: invoiceToEditData?.createdBy || creatorInfo,
     };
     batch.set(invoiceDocRef, newInvoiceData, { merge: true });
 
@@ -429,14 +399,12 @@ export default function AddInvoicePage() {
 
     try {
         const existingSoItemsSnapshot = await getDocs(salesOrderQuery);
-        existingSoItemsSnapshot.forEach(doc => {
-            batch.delete(doc.ref);
-        });
+        existingSoItemsSnapshot.forEach(doc => batch.delete(doc.ref));
 
         if (items.length > 0) {
             items.forEach(item => {
                 const newSalesOrderItemRef = doc(collection(firestore, 'salesOrders'));
-                const salesOrderItem = {
+                batch.set(newSalesOrderItemRef, {
                     id: newSalesOrderItemRef.id,
                     soNumber: itemReferenceSONumber,
                     customer: customer.name,
@@ -446,69 +414,48 @@ export default function AddInvoicePage() {
                     price: parseFormattedNumber(String(item.price)),
                     category: productListData?.find(p => p.name === item.name)?.category || '',
                     ownerId: user.uid,
-                };
-                batch.set(newSalesOrderItemRef, salesOrderItem);
+                });
             });
         }
         
         await batch.commit()
         .then(() => {
             sessionStorage.removeItem(ADD_INVOICE_SESSION_KEY);
-            toast({
-              title: "Invoice Saved",
-              description: `Invoice ${invoiceId} has been successfully saved as ${invoiceStatus}.`,
-            });
+            toast({ title: "Invoice Disimpan", description: `Invoice ${invoiceId} berhasil disimpan.` });
             router.push('/dashboard/invoices');
         })
         .catch(async (serverError) => {
             const permissionError = new FirestorePermissionError({
                 path: `batch write to invoices and salesOrders`,
                 operation: editInvoiceId ? 'update' : 'create',
-                requestResourceData: { invoice: newInvoiceData, items: items },
+                requestResourceData: { invoice: newInvoiceData },
             });
             errorEmitter.emit('permission-error', permissionError);
         });
-
     } catch (serverError) {
         console.error("Batch query/setup failed:", serverError);
     }
   };
 
-  const handleAddItem = () => {
-    setItems([...items, { id: Date.now(), name: '', quantity: 1, unit: 'pcs', price: 0, total: 0 }]);
-  };
+  const handleAddItem = () => setItems([...items, { id: Date.now(), name: '', quantity: 1, unit: 'pcs', price: 0, total: 0 }]);
 
   const handleItemChange = (id: number, field: keyof InvoiceItem, value: string | number) => {
-    const newItems = items.map(item => {
-      if (item.id === id) {
-        return { ...item, [field]: value };
-      }
-      return item;
-    });
-    setItems(newItems);
+    setItems(items.map(item => item.id === id ? { ...item, [field]: value } : item));
   };
   
   const handleProductSelect = (itemId: number, product: ProductListItem) => {
-    const newItems = items.map(item => {
+    setItems(items.map(item => {
         if (item.id === itemId) {
             const q = parseFormattedNumber(String(item.quantity));
-            return {
-                ...item,
-                name: product.name,
-                unit: product.unit,
-                price: product.price,
-                total: q * product.price,
-            };
+            return { ...item, name: product.name, unit: product.unit, price: product.price, total: q * product.price };
         }
         return item;
-    });
-    setItems(newItems);
+    }));
     setProductPopoverOpen(null);
   };
   
   const handleNumericItemChange = (id: number, field: 'quantity' | 'price', value: string) => {
-    // Keep it as raw string to allow typing decimals (dot/comma)
-    const newItems = items.map(item => {
+    setItems(items.map(item => {
         if (item.id === id) {
             const updatedItem = { ...item, [field]: value };
             const q = parseFormattedNumber(field === 'quantity' ? value : String(item.quantity));
@@ -517,513 +464,113 @@ export default function AddInvoicePage() {
             return updatedItem;
         }
         return item;
-    });
-    setItems(newItems);
+    }));
   };
 
   const handleNumericItemBlur = (id: number, field: 'quantity' | 'price') => {
-    // Format to pretty display on blur
-    const newItems = items.map(item => {
-      if (item.id === id) {
-        const parsed = parseFormattedNumber(String(item[field]));
-        return { ...item, [field]: formatNumberWithCommas(parsed) };
-      }
-      return item;
-    });
-    setItems(newItems);
+    setItems(items.map(item => item.id === id ? { ...item, [field]: formatNumberWithCommas(parseFormattedNumber(String(item[field]))) } : item));
   };
 
-
-  const handleRemoveItem = (id: number) => {
-    setItems(items.filter(item => item.id !== id));
-  };
+  const handleRemoveItem = (id: number) => setItems(items.filter(item => item.id !== id));
   
   const handlePreview = () => {
-    const finalNumericGrandTotal = parseFormattedNumber(String(grandTotal));
-    const finalNumericDppVat = parseFormattedNumber(String(dppVat));
-    const finalNumericVat12 = parseFormattedNumber(String(vat12));
-    const finalNumericTotal = parseFormattedNumber(String(totalAmount));
-
     const previewData = {
-      id: invoiceId,
-      soNumber,
-      poNumber,
-      customer,
-      date: issueDate ? format(issueDate, 'yyyy-MM-dd') : '',
-      amount: finalNumericTotal,
-      status,
-      printType,
+      id: invoiceId, soNumber, poNumber, customer, date: issueDate ? format(issueDate, 'yyyy-MM-dd') : '',
+      amount: parseFormattedNumber(String(totalAmount)), status, printType,
       items: items.map((item, index) => ({
-        id: item.id || Date.now() + index,
-        no: index + 1,
-        item: item.name,
-        name: item.name,
-        quantity: parseFormattedNumber(String(item.quantity)),
-        unit: item.unit,
-        price: parseFormattedNumber(String(item.price)),
-        amount: item.total,
-        total: item.total
+        id: item.id, no: index + 1, item: item.name, name: item.name,
+        quantity: parseFormattedNumber(String(item.quantity)), unit: item.unit,
+        price: parseFormattedNumber(String(item.price)), total: item.total
       })),
-      subtotal,
-      dppVat: finalNumericDppVat,
-      vat12: finalNumericVat12,
-      negotiation: parseFormattedNumber(String(negotiation)),
-      dpPercent,
-      dpValue: parseFormattedNumber(String(dpValue)),
-      dpPelunasanPercent,
-      pelunasan: parseFormattedNumber(String(pelunasan)),
-      grandTotal: finalNumericGrandTotal,
+      subtotal, dppVat: parseFormattedNumber(String(dppVat)), vat12: parseFormattedNumber(String(vat12)),
+      negotiation: parseFormattedNumber(String(negotiation)), dpPercent, dpValue: parseFormattedNumber(String(dpValue)),
+      dpPelunasanPercent, pelunasan: parseFormattedNumber(String(pelunasan)), grandTotal: parseFormattedNumber(String(grandTotal)),
     };
     sessionStorage.setItem('invoicePreviewData', JSON.stringify(previewData));
     router.push(`/dashboard/invoices/preview/${encodeURIComponent(invoiceId || 'new')}`);
   };
 
 
-  if (isLoading) {
-    return (
-        <main className="flex flex-1 flex-col gap-4 p-4 md:gap-8 md:p-8">
-            <div className="flex items-center gap-4">
-                <Skeleton className="h-7 w-7 rounded-full" />
-                <Skeleton className="h-6 w-32" />
-            </div>
-             <Card className="p-6">
-                 <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-                     <Skeleton className="h-10 w-full" />
-                     <Skeleton className="h-10 w-full" />
-                     <Skeleton className="h-10 w-full" />
-                     <Skeleton className="h-10 w-full" />
-                 </div>
-             </Card>
-        </main>
-    )
-  }
-  
-  const pageTitle = editInvoiceId ? "Edit Invoice" : "Create Invoice";
-  
-  const handleBack = () => {
-    sessionStorage.removeItem(ADD_INVOICE_SESSION_KEY);
-    router.push('/dashboard/invoices');
-  };
-
+  if (isLoading) return <main className="p-8 text-center"><Skeleton className="h-64 w-full" /></main>;
+  const handleBack = () => { sessionStorage.removeItem(ADD_INVOICE_SESSION_KEY); router.push('/dashboard/invoices'); };
 
   return (
     <main className="flex flex-1 flex-col gap-4 p-4 md:gap-8 md:p-8">
       <div className="flex items-center gap-4">
-        <Button variant="outline" size="icon" className="h-7 w-7" onClick={handleBack}>
-            <ChevronLeft className="h-4 w-4" />
-            <span className="sr-only">Back</span>
-        </Button>
-        <h1 className="flex-1 shrink-0 whitespace-nowrap text-xl font-semibold tracking-tight sm:grow-0">
-          {pageTitle}
-        </h1>
+        <Button variant="outline" size="icon" className="h-7 w-7" onClick={handleBack}><ChevronLeft className="h-4 w-4" /></Button>
+        <h1 className="text-xl font-semibold tracking-tight">{editInvoiceId ? "Edit Invoice" : "Create Invoice"}</h1>
       </div>
       <div className="grid gap-4 md:grid-cols-3 lg:grid-cols-7">
         <div className="lg:col-span-5">
           <Card className="p-6">
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-              <div>
-                <label className="text-sm font-medium">Invoice No.</label>
-                <Input value={invoiceId} onChange={e => setInvoiceId(e.target.value)} disabled={!!editInvoiceId || !!invoiceNumberId} />
-              </div>
-              <div>
-                <label className="text-sm font-medium">SO/Sales Order</label>
+              <div><label className="text-sm font-medium">Invoice No.</label><Input value={invoiceId} onChange={e => setInvoiceId(e.target.value)} disabled={!!editInvoiceId || !!invoiceNumberId} /></div>
+              <div><label className="text-sm font-medium">SO/Sales Order</label>
                 <Popover open={soPopoverOpen} onOpenChange={setSoPopoverOpen}>
-                    <PopoverTrigger asChild>
-                        <Button
-                        variant="outline"
-                        role="combobox"
-                        aria-expanded={soPopoverOpen}
-                        className="w-full justify-between"
-                        >
-                        {soNumber
-                            ? uniqueSalesOrders.find((so) => so.toLowerCase() === soNumber.toLowerCase())
-                            : "Search SO..."}
-                        <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                        </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-[200px] p-0">
-                        <Command>
-                            <CommandInput placeholder="Search sales order..." />
-                            <CommandList>
-                                <CommandEmpty>No sales order found.</CommandEmpty>
-                                <CommandGroup>
-                                    {uniqueSalesOrders.map((so) => (
-                                    <CommandItem
-                                        key={so}
-                                        value={so}
-                                        onSelect={(currentValue) => handleSoSelect(currentValue.toUpperCase())}
-                                    >
-                                        <Check
-                                        className={cn(
-                                            "mr-2 h-4 w-4",
-                                            soNumber.toLowerCase() === so.toLowerCase() ? "opacity-100" : "opacity-0"
-                                        )}
-                                        />
-                                        {so}
-                                    </CommandItem>
-                                    ))}
-                                </CommandGroup>
-                            </CommandList>
-                        </Command>
-                    </PopoverContent>
+                    <PopoverTrigger asChild><Button variant="outline" className="w-full justify-between">{soNumber || "Cari SO..."}<ChevronsUpDown className="ml-2 h-4 w-4 opacity-50" /></Button></PopoverTrigger>
+                    <PopoverContent className="w-[200px] p-0"><Command><CommandInput placeholder="Search sales order..." /><CommandList><CommandEmpty>No sales order found.</CommandEmpty><CommandGroup>{uniqueSalesOrders.map((so) => (<CommandItem key={so} value={so} onSelect={(currentValue) => handleSoSelect(currentValue.toUpperCase())}><Check className={cn("mr-2 h-4 w-4", soNumber.toLowerCase() === so.toLowerCase() ? "opacity-100" : "opacity-0")} />{so}</CommandItem>))}</CommandGroup></CommandList></Command></PopoverContent>
                 </Popover>
               </div>
-              <div>
-                <label className="text-sm font-medium">No. PO</label>
-                <Input value={poNumber} onChange={e => setPoNumber(e.target.value)} />
-              </div>
-              <div>
-                <label className="text-sm font-medium">Payment</label>
-                <Input placeholder="e.g. Bank Transfer" />
-              </div>
+              <div><label className="text-sm font-medium">No. PO</label><Input value={poNumber} onChange={e => setPoNumber(e.target.value)} /></div>
+              <div><label className="text-sm font-medium">Payment</label><Input placeholder="e.g. Bank Transfer" /></div>
               <div className="lg:col-span-2">
                  <label className="text-sm font-medium">Bill To</label>
                  <Popover open={customerPopoverOpen} onOpenChange={setCustomerPopoverOpen}>
-                    <PopoverTrigger asChild>
-                        <Button
-                            variant="outline"
-                            role="combobox"
-                            aria-expanded={customerPopoverOpen}
-                            className="w-full justify-between"
-                        >
-                            {customer?.name ?? "Search for a customer..."}
-                            <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                        </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-full p-0">
-                        <Command>
-                            <CommandInput placeholder="Search customer..." />
-                            <CommandList>
-                                <CommandEmpty>No customer found.</CommandEmpty>
-                                <CommandGroup>
-                                    {customerListData?.map((c) => (
-                                    <CommandItem
-                                        key={c.id}
-                                        value={c.name}
-                                        onSelect={(currentValue) => handleCustomerSelect(currentValue)}
-                                    >
-                                        <Check
-                                            className={cn(
-                                                "mr-2 h-4 w-4",
-                                                customer?.name.toLowerCase() === c.name.toLowerCase() ? "opacity-100" : "opacity-0"
-                                            )}
-                                        />
-                                        {c.name}
-                                    </CommandItem>
-                                    ))}
-                                </CommandGroup>
-                            </CommandList>
-                        </Command>
-                    </PopoverContent>
+                    <PopoverTrigger asChild><Button variant="outline" className="w-full justify-between">{customer?.name ?? "Cari Customer..."}<ChevronsUpDown className="ml-2 h-4 w-4 opacity-50" /></Button></PopoverTrigger>
+                    <PopoverContent className="w-full p-0"><Command><CommandInput placeholder="Search customer..." /><CommandList><CommandEmpty>No customer found.</CommandEmpty><CommandGroup>{customerListData?.map((c) => (<CommandItem key={c.id} value={c.name} onSelect={(currentValue) => handleCustomerSelect(currentValue)}><Check className={cn("mr-2 h-4 w-4", customer?.name.toLowerCase() === c.name.toLowerCase() ? "opacity-100" : "opacity-0")} />{c.name}</CommandItem>))}</CommandGroup></CommandList></Command></PopoverContent>
                  </Popover>
-                 {customer && (
-                    <div className="mt-2 p-2 border rounded-md bg-muted text-sm text-muted-foreground">
-                        <p>{customer.address}</p>
-                        <p className="mt-1">{customer.spdAddress}</p>
-                    </div>
-                 )}
+                 {customer && <div className="mt-2 p-2 border rounded-md bg-muted text-sm text-muted-foreground"><p>{customer.address}</p></div>}
               </div>
-              <div>
-                <label className="text-sm font-medium">Issue Date</label>
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <Button
-                      variant={'outline'}
-                      className={cn(
-                        'w-full justify-start text-left font-normal',
-                        !issueDate && 'text-muted-foreground'
-                      )}
-                    >
-                      <CalendarIcon className="mr-2 h-4 w-4" />
-                      {issueDate ? (
-                        format(issueDate, 'dd/MM/yyyy')
-                      ) : (
-                        <span>Pick a date</span>
-                      )}
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0">
-                    <Calendar
-                      mode="single"
-                      selected={issueDate}
-                      onSelect={setIssueDate}
-                      initialFocus
-                    />
-                  </PopoverContent>
-                </Popover>
-              </div>
-              <div>
-                <label className="text-sm font-medium">Due Date</label>
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <Button
-                      variant={'outline'}
-                      className={cn(
-                        'w-full justify-start text-left font-normal',
-                        !dueDate && 'text-muted-foreground'
-                      )}
-                    >
-                      <CalendarIcon className="mr-2 h-4 w-4" />
-                      {dueDate ? (
-                        format(dueDate, 'dd/MM/yyyy')
-                      ) : (
-                        <span>mm/dd/yyyy</span>
-                      )}
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0">
-                    <Calendar
-                      mode="single"
-                      selected={dueDate}
-                      onSelect={setDueDate}
-                      initialFocus
-                    />
-                  </PopoverContent>
-                </Popover>
-              </div>
+              <div><label className="text-sm font-medium">Issue Date</label><Popover><PopoverTrigger asChild><Button variant={'outline'} className={cn('w-full justify-start text-left font-normal', !issueDate && 'text-muted-foreground')}><CalendarIcon className="mr-2 h-4 w-4" />{issueDate ? format(issueDate, 'dd/MM/yyyy') : <span>Pilih Tanggal</span>}</Button></PopoverTrigger><PopoverContent className="w-auto p-0"><Calendar mode="single" selected={issueDate} onSelect={setIssueDate} initialFocus /></PopoverContent></Popover></div>
+              <div><label className="text-sm font-medium">Due Date</label><Popover><PopoverTrigger asChild><Button variant={'outline'} className={cn('w-full justify-start text-left font-normal', !dueDate && 'text-muted-foreground')}><CalendarIcon className="mr-2 h-4 w-4" />{dueDate ? format(dueDate, 'dd/MM/yyyy') : <span>Pilih Tanggal</span>}</Button></PopoverTrigger><PopoverContent className="w-auto p-0"><Calendar mode="single" selected={dueDate} onSelect={setDueDate} initialFocus /></PopoverContent></Popover></div>
             </div>
 
             <div className="mt-6">
               <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead className="w-2/5">Item</TableHead>
-                    <TableHead className="w-[100px]">Qty</TableHead>
-                    <TableHead className="w-[100px]">Unit</TableHead>
-                    <TableHead className="w-[150px]">Price</TableHead>
-                    <TableHead className="w-[150px] text-right">Total</TableHead>
-                    <TableHead className="w-[40px]"></TableHead>
-                  </TableRow>
-                </TableHeader>
+                <TableHeader><TableRow><TableHead className="w-2/5">Item</TableHead><TableHead className="w-[100px]">Qty</TableHead><TableHead className="w-[100px]">Unit</TableHead><TableHead className="w-[150px]">Price</TableHead><TableHead className="w-[150px] text-right">Total</TableHead><TableHead className="w-[40px]"></TableHead></TableRow></TableHeader>
                 <TableBody>
                   {items.map(item => (
                   <TableRow key={item.id}>
                     <TableCell>
                         <Popover open={productPopoverOpen === item.id} onOpenChange={(isOpen) => setProductPopoverOpen(isOpen ? item.id : null)}>
-                            <PopoverTrigger asChild>
-                                <Button
-                                    variant="outline"
-                                    role="combobox"
-                                    className="w-full justify-between font-normal"
-                                >
-                                    {item.name || "Search for a product..."}
-                                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                                </Button>
-                            </PopoverTrigger>
-                            <PopoverContent className="w-[--radix-popover-trigger-width] p-0">
-                                <Command>
-                                    <CommandInput placeholder="Search product..." />
-                                    <CommandList>
-                                        <CommandEmpty>No product found.</CommandEmpty>
-                                        <CommandGroup>
-                                            {productListData?.map((product) => (
-                                                <CommandItem
-                                                    key={product.id}
-                                                    value={product.name}
-                                                    onSelect={() => handleProductSelect(item.id, product)}
-                                                >
-                                                    <Check
-                                                        className={cn(
-                                                            "mr-2 h-4 w-4",
-                                                            item.name.toLowerCase() === product.name.toLowerCase() ? "opacity-100" : "opacity-0"
-                                                        )}
-                                                    />
-                                                    {product.name}
-                                                </CommandItem>
-                                            ))}
-                                        </CommandGroup>
-                                    </CommandList>
-                                </Command>
-                            </PopoverContent>
+                            <PopoverTrigger asChild><Button variant="outline" className="w-full justify-between font-normal">{item.name || "Cari Produk..."}<ChevronsUpDown className="ml-2 h-4 w-4 opacity-50" /></Button></PopoverTrigger>
+                            <PopoverContent className="w-[--radix-popover-trigger-width] p-0"><Command><CommandInput placeholder="Search product..." /><CommandList><CommandEmpty>No product found.</CommandEmpty><CommandGroup>{productListData?.map((product) => (<CommandItem key={product.id} value={product.name} onSelect={() => handleProductSelect(item.id, product)}><Check className={cn("mr-2 h-4 w-4", item.name.toLowerCase() === product.name.toLowerCase() ? "opacity-100" : "opacity-0")} />{product.name}</CommandItem>))}</CommandGroup></CommandList></Command></PopoverContent>
                         </Popover>
                     </TableCell>
-                    <TableCell>
-                      <Input 
-                        type="text" 
-                        value={item.quantity}
-                        onChange={(e) => handleNumericItemChange(item.id, 'quantity', e.target.value)}
-                        onBlur={() => handleNumericItemBlur(item.id, 'quantity')}
-                        className="text-right w-24" 
-                      />
-                    </TableCell>
-                    <TableCell>
-                        <Input 
-                            value={item.unit}
-                            onChange={(e) => handleItemChange(item.id, 'unit', e.target.value)}
-                            className="w-24"
-                        />
-                    </TableCell>
-                    <TableCell>
-                      <Input 
-                        type="text"
-                        placeholder="Rp 0,00"
-                        value={item.price}
-                        onChange={(e) => handleNumericItemChange(item.id, 'price', e.target.value)}
-                        onBlur={() => handleNumericItemBlur(item.id, 'price')}
-                        className="text-right w-36"
-                      />
-                    </TableCell>
+                    <TableCell><Input value={item.quantity} onChange={(e) => handleNumericItemChange(item.id, 'quantity', e.target.value)} onBlur={() => handleNumericItemBlur(item.id, 'quantity')} className="text-right w-24" /></TableCell>
+                    <TableCell><Input value={item.unit} onChange={(e) => handleItemChange(item.id, 'unit', e.target.value)} className="w-24" /></TableCell>
+                    <TableCell><Input value={item.price} onChange={(e) => handleNumericItemChange(item.id, 'price', e.target.value)} onBlur={() => handleNumericItemBlur(item.id, 'price')} className="text-right w-36" /></TableCell>
                     <TableCell className="text-right">Rp {formatNumberWithCommas(item.total)}</TableCell>
-                    <TableCell>
-                      <Button variant="ghost" size="icon" onClick={() => handleRemoveItem(item.id)}>
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </TableCell>
+                    <TableCell><Button variant="ghost" size="icon" onClick={() => handleRemoveItem(item.id)}><Trash2 className="h-4 w-4" /></Button></TableCell>
                   </TableRow>
                   ))}
                 </TableBody>
               </Table>
-              <Button variant="outline" className="mt-4" onClick={handleAddItem}>
-                <Plus className="mr-2 h-4 w-4" /> Add item
-              </Button>
+              <Button variant="outline" className="mt-4" onClick={handleAddItem}><Plus className="mr-2 h-4 w-4" /> Add item</Button>
             </div>
 
             <div className="mt-6 grid grid-cols-2 lg:grid-cols-4 gap-x-12 gap-y-4">
-                <div className="lg:col-start-3 lg:col-span-2">
-                    <div className="flex justify-between items-center py-1">
-                        <span className="text-sm text-muted-foreground">Subtotal:</span>
-                        <span className="text-sm font-medium">Rp {formatNumberWithCommas(subtotal)}</span>
-                    </div>
-                    <div className="flex justify-between items-center py-1">
-                        <span className="text-sm text-muted-foreground">A/Negotiation:</span>
-                        <Input 
-                           className="h-8 w-44 text-right" 
-                           placeholder="e.g. 10.000"
-                           value={negotiation}
-                           onChange={(e) => setNegotiation(e.target.value)}
-                           onBlur={() => handleBlurFormat(setNegotiation, negotiation)}
-                        />
-                    </div>
-                     <div className="flex justify-between items-center py-1">
-                        <span className="text-sm text-muted-foreground">DP (%):</span>
-                        <Input 
-                          className="h-8 w-44 text-right" 
-                          placeholder="e.g. 20"
-                          value={dpPercent}
-                          onChange={(e) => setDpPercent(e.target.value)}
-                        />
-                    </div>
-                     <div className="flex justify-between items-center py-1">
-                        <span className="text-sm text-muted-foreground">DP Value:</span>
-                        <Input 
-                          className="h-8 w-44 text-right" 
-                          placeholder="Override value"
-                          value={dpValue}
-                          onChange={(e) => setDpValue(e.target.value)}
-                          onBlur={() => handleBlurFormat(setDpValue, dpValue)}
-                        />
-                    </div>
-                     <div className="flex justify-between items-center py-1">
-                        <span className="text-sm text-muted-foreground">DP Pelunasan (%):</span>
-                        <Input 
-                          className="h-8 w-44 text-right" 
-                          placeholder="e.g. 10"
-                          value={dpPelunasanPercent}
-                          onChange={(e) => setDpPelunasanPercent(e.target.value)}
-                          />
-                    </div>
-                     <div className="flex justify-between items-center py-1">
-                        <span className="text-sm text-muted-foreground">Pelunasan:</span>
-                         <Input 
-                           className="h-8 w-44 text-right" 
-                           placeholder="e.g. 50.000"
-                           value={pelunasan}
-                           onChange={(e) => setPelunasan(e.target.value)}
-                           onBlur={() => handleBlurFormat(setPelunasan, pelunasan)}
-                           />
-                    </div>
-                     <div className="flex justify-between items-center py-1 font-bold">
-                        <span className="text-sm">Grand Total:</span>
-                        <Input 
-                           className="h-8 w-48 text-right font-bold" 
-                           value={grandTotal}
-                           onChange={handleGrandTotalChange}
-                           onBlur={handleGrandTotalBlur}
-                        />
-                    </div>
-                     <div className="flex justify-between items-center py-1">
-                        <span className="text-sm text-muted-foreground">DPP VAT:</span>
-                        <Input 
-                           className="h-8 w-48 text-right" 
-                           value={dppVat}
-                           onChange={handleDppVatChange}
-                           onBlur={handleDppVatBlur}
-                        />
-                    </div>
-                     <div className="flex justify-between items-center py-1">
-                        <span className="text-sm text-muted-foreground">VAT 12%:</span>
-                        <Input 
-                           className="h-8 w-48 text-right" 
-                           value={vat12}
-                           onChange={handleVat12Change}
-                           onBlur={handleVat12Blur}
-                        />
-                    </div>
-                     <div className="flex justify-between items-center py-2 mt-2 border-t">
-                        <span className="text-base font-bold">Total:</span>
-                        <Input 
-                           className="h-8 w-48 text-right font-bold" 
-                           value={totalAmount}
-                           onChange={handleTotalAmountChange}
-                           onBlur={handleTotalAmountBlur}
-                        />
-                    </div>
+                <div className="lg:col-start-3 lg:col-span-2 space-y-2">
+                    <div className="flex justify-between items-center"><span className="text-sm">Subtotal:</span><span className="text-sm font-medium">Rp {formatNumberWithCommas(subtotal)}</span></div>
+                    <div className="flex justify-between items-center"><span className="text-sm">A/Negotiation:</span><Input className="h-8 w-44 text-right" value={negotiation} onChange={e => setNegotiation(e.target.value)} onBlur={() => handleBlurFormat(setNegotiation, negotiation)} /></div>
+                    <div className="flex justify-between items-center"><span className="text-sm">DP (%):</span><Input className="h-8 w-44 text-right" value={dpPercent} onChange={e => setDpPercent(e.target.value)} /></div>
+                    <div className="flex justify-between items-center"><span className="text-sm">DP Value:</span><Input className="h-8 w-44 text-right" value={dpValue} onChange={e => setDpValue(e.target.value)} onBlur={() => handleBlurFormat(setDpValue, dpValue)} /></div>
+                    <div className="flex justify-between items-center font-bold border-t pt-2"><span className="text-sm">Grand Total:</span><Input className="h-8 w-48 text-right font-bold" value={grandTotal} onChange={handleGrandTotalChange} onBlur={handleGrandTotalBlur} /></div>
+                    <div className="flex justify-between items-center"><span className="text-sm">DPP VAT:</span><Input className="h-8 w-48 text-right" value={dppVat} onChange={handleDppVatChange} onBlur={handleDppVatBlur} /></div>
+                    <div className="flex justify-between items-center"><span className="text-sm">VAT 12%:</span><Input className="h-8 w-48 text-right" value={vat12} onChange={handleVat12Change} onBlur={handleVat12Blur} /></div>
+                    <div className="flex justify-between items-center py-2 mt-2 border-t"><span className="text-base font-bold">Total:</span><Input className="h-8 w-48 text-right font-bold" value={totalAmount} onChange={handleTotalAmountChange} onBlur={handleTotalAmountBlur} /></div>
                 </div>
             </div>
           </Card>
         </div>
         <div className="lg:col-span-2">
-          <Card>
-            <CardContent className="p-4 space-y-4">
-              <div className="flex gap-2">
-                <Button className="flex-1" onClick={() => handleSaveInvoice('sent')}>
-                  <Send className="mr-2 h-4 w-4" /> Send Invoice
-                </Button>
-                <Button variant="outline" size="icon">
-                  <Settings className="h-4 w-4" />
-                </Button>
-              </div>
-                <Button variant="outline" className="w-full" onClick={handlePreview}>
-                    <Eye className="mr-2 h-4 w-4" /> Preview
-                </Button>
-              <Button variant="outline" className="w-full" onClick={() => handleSaveInvoice('draft')}>
-                Save
-              </Button>
-
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Status</label>
-                <Select value={status} onValueChange={(value) => setStatus(value as 'paid' | 'unpaid' | 'sent' | 'draft')}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="draft">Draft</SelectItem>
-                    <SelectItem value="sent">Sent</SelectItem>
-                    <SelectItem value="paid">Paid</SelectItem>
-                    <SelectItem value="unpaid">Unpaid</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Print Type</label>
-                <Select value={printType} onValueChange={(value) => setPrintType(value as 'original' | 'copy')}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="original">Original</SelectItem>
-                    <SelectItem value="copy">Copy</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="mt-4 p-3 rounded-md bg-muted border">
-                <label className="text-xs font-bold text-muted-foreground uppercase">Pembuat Invoice (Otomatis)</label>
-                <p className="text-sm font-medium mt-1">{userProfile?.displayName || user?.displayName || user?.email}</p>
-              </div>
-            </CardContent>
-          </Card>
+          <Card><CardContent className="p-4 space-y-4">
+              <Button className="w-full" onClick={() => handleSaveInvoice('sent')}><Send className="mr-2 h-4 w-4" /> Send Invoice</Button>
+              <Button variant="outline" className="w-full" onClick={handlePreview}><Eye className="mr-2 h-4 w-4" /> Preview</Button>
+              <Button variant="outline" className="w-full" onClick={() => handleSaveInvoice('draft')}>Save Draft</Button>
+              <div className="space-y-2"><label className="text-sm font-medium">Status</label><Select value={status} onValueChange={(v) => setStatus(v as any)}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="draft">Draft</SelectItem><SelectItem value="sent">Sent</SelectItem><SelectItem value="paid">Paid</SelectItem><SelectItem value="unpaid">Unpaid</SelectItem></SelectContent></Select></div>
+              <div className="mt-4 p-3 rounded-md bg-muted border text-xs"><label className="font-bold text-muted-foreground uppercase">Pembuat (Otomatis)</label><p className="font-medium mt-1">{userProfile?.displayName || user?.email}</p></div>
+          </CardContent></Card>
         </div>
       </div>
     </main>

@@ -1,4 +1,3 @@
-
 'use client';
 import {
   SidebarProvider,
@@ -44,6 +43,7 @@ import {
   UserCog,
   ShieldAlert,
   LogOut,
+  BadgeCheck,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -81,7 +81,7 @@ export default function DashboardLayout({
   const firestore = useFirestore();
   const { user, isUserLoading } = useUser();
 
-  // Fetch user profile to get the role and status
+  // Fetch user profile
   const userProfileRef = useMemoFirebase(() => {
     if (!firestore || !user) return null;
     return doc(firestore, 'users', user.uid);
@@ -89,13 +89,17 @@ export default function DashboardLayout({
 
   const { data: userProfile, isLoading: isProfileLoading } = useDoc<UserProfile>(userProfileRef);
 
-  // NOTIFICATION LOGIC: Get pending users for Admin
+  // Super Admin Logic
+  const isSuperAdmin = userProfile?.email === 'fa@gmail.com';
+  const userRole = isSuperAdmin ? 'admin' : (userProfile?.role || 'staff');
+  const isAdmin = userRole === 'admin';
+  const isPending = userProfile?.status === 'pending';
+
+  // Notification for Pending Users
   const pendingUsersQuery = useMemoFirebase(() => {
-      if (!firestore || !userProfile) return null;
-      const isAdmin = userProfile.role === 'admin' || userProfile.email === 'fa@gmail.com';
-      if (!isAdmin) return null;
+      if (!firestore || !isAdmin) return null;
       return query(collection(firestore, 'users'), where('status', '==', 'pending'));
-  }, [firestore, userProfile]);
+  }, [firestore, isAdmin]);
   const { data: pendingUsers } = useCollection<UserProfile>(pendingUsersQuery);
 
   useEffect(() => {
@@ -104,7 +108,6 @@ export default function DashboardLayout({
     }
   }, [user, isUserLoading, router]);
 
-  // Jika akun dinonaktifkan, paksa logout
   useEffect(() => {
     if (userProfile?.status === 'suspended') {
         signOut(auth).then(() => router.push('/login'));
@@ -131,13 +134,6 @@ export default function DashboardLayout({
     );
   }
 
-  // Otoritas fa@gmail.com sebagai Super Admin permanen
-  const isSuperAdmin = userProfile?.email === 'fa@gmail.com';
-  const userRole = isSuperAdmin ? 'admin' : (userProfile?.role || 'staff');
-  const isAdmin = userRole === 'admin';
-  const isPending = userProfile?.status === 'pending';
-
-  // GATEKEEPING VIEW for Pending Users
   if (isPending) {
       return (
         <div className="flex h-screen w-full flex-col items-center justify-center bg-background p-4">
@@ -176,10 +172,12 @@ export default function DashboardLayout({
               </AvatarFallback>
             </Avatar>
             <div className="flex flex-col overflow-hidden">
-              <span className="font-bold text-sm truncate">{userProfile?.displayName || 'User'}</span>
-              <span className="text-[10px] text-muted-foreground uppercase flex items-center gap-1">
-                 {isSuperAdmin && <Badge className="h-4 px-1 text-[8px] bg-red-600">LEADER</Badge>}
-                 {userRole}
+              <span className="font-bold text-sm truncate flex items-center gap-1">
+                {userProfile?.displayName || 'User'}
+                {isSuperAdmin && <BadgeCheck className="h-3 w-3 text-blue-600" />}
+              </span>
+              <span className="text-[10px] text-muted-foreground uppercase font-bold">
+                 {isSuperAdmin ? 'Leader / Admin' : userRole}
               </span>
             </div>
           </div>
@@ -187,26 +185,14 @@ export default function DashboardLayout({
         <SidebarContent>
           <SidebarMenu>
             <SidebarMenuItem>
-              <SidebarMenuButton
-                asChild
-                isActive={pathname === '/dashboard'}
-              >
-                <Link href="/dashboard">
-                  <LayoutDashboard />
-                  Dashboard
-                </Link>
+              <SidebarMenuButton asChild isActive={pathname === '/dashboard'}>
+                <Link href="/dashboard"><LayoutDashboard /> Dashboard</Link>
               </SidebarMenuButton>
             </SidebarMenuItem>
 
             <SidebarMenuItem>
-              <SidebarMenuButton
-                asChild
-                isActive={pathname === '/dashboard/monitoring'}
-              >
-                <Link href="/dashboard/monitoring">
-                  <Eye />
-                  Monitoring
-                </Link>
+              <SidebarMenuButton asChild isActive={pathname === '/dashboard/monitoring'}>
+                <Link href="/dashboard/monitoring"><Eye /> Monitoring</Link>
               </SidebarMenuButton>
             </SidebarMenuItem>
             
@@ -214,52 +200,36 @@ export default function DashboardLayout({
               <SidebarMenuItem>
                 <CollapsibleTrigger asChild>
                     <SidebarMenuButton>
-                      <FileText />
-                      Invoices
+                      <FileText /> Invoices
                       <div className="grow" />
-                      <ChevronDown
-                        className={cn(
-                          'h-4 w-4 transition-transform',
-                          'group-data-[state=open]:rotate-180'
-                        )}
-                      />
+                      <ChevronDown className={cn('h-4 w-4 transition-transform', 'group-data-[state=open]:rotate-180')} />
                     </SidebarMenuButton>
                 </CollapsibleTrigger>
                 <CollapsibleContent asChild>
                   <SidebarMenuSub>
                     <SidebarMenuSubItem>
                       <SidebarMenuSubButton asChild isActive={pathname === '/dashboard/invoices'}>
-                        <Link href="/dashboard/invoices">
-                          Invoice List
-                        </Link>
+                        <Link href="/dashboard/invoices">Invoice List</Link>
                       </SidebarMenuSubButton>
                     </SidebarMenuSubItem>
                     <SidebarMenuSubItem>
                       <SidebarMenuSubButton asChild isActive={pathname.startsWith('/dashboard/invoices/add')}>
-                        <Link href="/dashboard/invoices/add">
-                         Add Invoice
-                        </Link>
+                        <Link href="/dashboard/invoices/add">Add Invoice</Link>
                       </SidebarMenuSubButton>
                     </SidebarMenuSubItem>
                     <SidebarMenuSubItem>
                       <SidebarMenuSubButton asChild isActive={pathname === '/dashboard/invoices/number'}>
-                        <Link href="/dashboard/invoices/number">
-                          Invoice Number
-                        </Link>
+                        <Link href="/dashboard/invoices/number">Invoice Number</Link>
                       </SidebarMenuSubButton>
                     </SidebarMenuSubItem>
                      <SidebarMenuSubItem>
                       <SidebarMenuSubButton asChild isActive={pathname === '/dashboard/invoices/spd'}>
-                        <Link href="/dashboard/invoices/spd">
-                            SPD
-                        </Link>
+                        <Link href="/dashboard/invoices/spd">SPD</Link>
                       </SidebarMenuSubButton>
                     </SidebarMenuSubItem>
                     <SidebarMenuSubItem>
                       <SidebarMenuSubButton asChild isActive={pathname === '/dashboard/invoices/tax'}>
-                        <Link href="/dashboard/invoices/tax">
-                          Tax Invoices
-                        </Link>
+                        <Link href="/dashboard/invoices/tax">Tax Invoices</Link>
                       </SidebarMenuSubButton>
                     </SidebarMenuSubItem>
                   </SidebarMenuSub>
@@ -269,73 +239,58 @@ export default function DashboardLayout({
 
             <SidebarMenuItem>
               <SidebarMenuButton asChild isActive={pathname.startsWith('/dashboard/products')}>
-                <Link href="/dashboard/products">
-                  <Package />
-                  Products
-                </Link>
+                <Link href="/dashboard/products"><Package /> Products</Link>
               </SidebarMenuButton>
             </SidebarMenuItem>
             <SidebarMenuItem>
               <SidebarMenuButton asChild isActive={pathname === '/dashboard/sales-orders'}>
-                <Link href="/dashboard/sales-orders">
-                  <ShoppingCart />
-                  SalesOrders
-                </Link>
+                <Link href="/dashboard/sales-orders"><ShoppingCart /> SalesOrders</Link>
               </SidebarMenuButton>
             </SidebarMenuItem>
             <SidebarMenuItem>
               <SidebarMenuButton asChild isActive={pathname.startsWith('/dashboard/customers')}>
-                <Link href="/dashboard/customers">
-                  <Users />
-                  Customers
-                </Link>
+                <Link href="/dashboard/customers"><Users /> Customers</Link>
               </SidebarMenuButton>
             </SidebarMenuItem>
 
              <SidebarMenuItem>
                 <SidebarMenuButton asChild isActive={pathname.startsWith('/dashboard/sales')}>
-                    <Link href="/dashboard/sales">
-                        <ShoppingCart />
-                        Sales List
-                    </Link>
+                    <Link href="/dashboard/sales"><ShoppingCart /> Sales List</Link>
                 </SidebarMenuButton>
             </SidebarMenuItem>
 
             {isAdmin && (
                <SidebarMenuItem>
                   <SidebarMenuButton asChild isActive={pathname === '/dashboard/sales-management'}>
-                      <Link href="/dashboard/sales-management">
-                          <BarChart />
-                          Sales Management
-                      </Link>
+                      <Link href="/dashboard/sales-management"><BarChart /> Sales Management</Link>
                   </SidebarMenuButton>
               </SidebarMenuItem>
             )}
 
-            {/* Menu User Management HANYA untuk Admin */}
             {isAdmin && (
                <SidebarMenuItem>
                   <SidebarMenuButton asChild isActive={pathname === '/dashboard/users'}>
-                      <Link href="/dashboard/users">
-                          <UserCog />
-                          User Management
-                      </Link>
+                      <Link href="/dashboard/users"><UserCog /> User Management</Link>
                   </SidebarMenuButton>
               </SidebarMenuItem>
             )}
 
              <SidebarMenuItem>
               <SidebarMenuButton asChild isActive={pathname === '/dashboard/calendar'}>
-                <Link href="/dashboard/calendar">
-                  <Calendar />
-                  Calendar
-                </Link>
+                <Link href="/dashboard/calendar"><Calendar /> Calendar</Link>
               </SidebarMenuButton>
             </SidebarMenuItem>
           </SidebarMenu>
         </SidebarContent>
         <SidebarFooter>
-            <Button variant="ghost" className="w-full justify-start" onClick={handleLogout}>
+            <SidebarMenu>
+                <SidebarMenuItem>
+                    <SidebarMenuButton asChild isActive={pathname === '/dashboard/settings'}>
+                        <Link href="/dashboard/settings"><Settings /> Pengaturan</Link>
+                    </SidebarMenuButton>
+                </SidebarMenuItem>
+            </SidebarMenu>
+            <Button variant="ghost" className="w-full justify-start mt-2" onClick={handleLogout}>
                 <LogOut className="mr-2 h-4 w-4" />
                 <span className="grow text-left">Keluar</span>
             </Button>
@@ -347,17 +302,12 @@ export default function DashboardLayout({
             <div className="w-full flex-1">
                <div className="relative">
                   <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-                  <Input
-                    type="search"
-                    placeholder="Cari data Dakota..."
-                    className="w-full appearance-none bg-background pl-8 shadow-none md:w-2/3 lg:w-1/3"
-                  />
+                  <Input type="search" placeholder="Cari data Dakota..." className="w-full appearance-none bg-background pl-8 shadow-none md:w-2/3 lg:w-1/3" />
                 </div>
             </div>
             <div className="flex items-center gap-4">
                 <ThemeToggle />
                 
-                {/* BELL NOTIFICATION SYSTEM */}
                 <Popover>
                     <PopoverTrigger asChild>
                         <Button variant="ghost" size="icon" className="relative">
@@ -371,45 +321,28 @@ export default function DashboardLayout({
                         </Button>
                     </PopoverTrigger>
                     <PopoverContent className="w-80 p-0" align="end">
-                        <div className="p-4 border-b bg-muted/50">
-                            <h3 className="font-bold text-sm">Notifikasi Dakota</h3>
-                        </div>
+                        <div className="p-4 border-b bg-muted/50"><h3 className="font-bold text-sm">Notifikasi Dakota</h3></div>
                         <div className="max-h-[350px] overflow-y-auto">
                             {isAdmin && pendingUsers && pendingUsers.length > 0 ? (
                                 <div className="p-2 space-y-2">
                                     {pendingUsers.map(u => (
-                                        <div 
-                                            key={u.uid} 
-                                            className="p-3 rounded-lg border bg-yellow-50/50 dark:bg-yellow-900/10 hover:bg-yellow-100/50 cursor-pointer transition-colors"
-                                            onClick={() => router.push('/dashboard/users')}
-                                        >
+                                        <div key={u.uid} className="p-3 rounded-lg border bg-yellow-50/50 hover:bg-yellow-100/50 cursor-pointer transition-colors" onClick={() => router.push('/dashboard/users')}>
                                             <p className="text-sm font-semibold">User Baru Mendaftar</p>
-                                            <p className="text-xs text-muted-foreground mt-1">
-                                                <strong>{u.displayName}</strong> ({u.email})
-                                            </p>
-                                            <div className="flex items-center gap-1 text-[10px] text-blue-600 font-bold uppercase mt-2">
-                                                <UserCog className="h-3 w-3" /> Klik untuk aktivasi
-                                            </div>
+                                            <p className="text-xs text-muted-foreground mt-1"><strong>{u.displayName}</strong> ({u.email})</p>
+                                            <div className="flex items-center gap-1 text-[10px] text-blue-600 font-bold uppercase mt-2"><UserCog className="h-3 w-3" /> Klik untuk aktivasi</div>
                                         </div>
                                     ))}
                                 </div>
                             ) : (
                                 <div className="p-8 text-center text-sm text-muted-foreground flex flex-col items-center gap-2">
-                                    <Bell className="h-8 w-8 opacity-20" />
-                                    <p>Tidak ada pemberitahuan baru.</p>
+                                    <Bell className="h-8 w-8 opacity-20" /><p>Tidak ada pemberitahuan baru.</p>
                                 </div>
                             )}
                         </div>
                     </PopoverContent>
                 </Popover>
 
-                <Button variant="ghost" size="icon" asChild>
-                    <Link href="/dashboard">
-                        <LayoutDashboard className="h-5 w-5" />
-                    </Link>
-                </Button>
-                
-                 <DropdownMenu>
+                <DropdownMenu>
                     <DropdownMenuTrigger asChild>
                     <Button variant="ghost" className="relative h-8 w-8 rounded-full border-2 border-muted hover:border-primary transition-all">
                         <Avatar className="h-8 w-8">
@@ -421,24 +354,21 @@ export default function DashboardLayout({
                     <DropdownMenuContent className="w-56" align="end" forceMount>
                     <DropdownMenuLabel className="font-normal">
                         <div className="flex flex-col space-y-1">
-                        <p className="text-sm font-bold leading-none">{userProfile?.displayName || "Pengguna"}</p>
-                        <p className="text-xs leading-none text-muted-foreground truncate">
-                            {user?.email || "Tidak ada email"}
+                        <p className="text-sm font-bold leading-none flex items-center gap-1">
+                          {userProfile?.displayName || "Pengguna"}
+                          {isSuperAdmin && <BadgeCheck className="h-3 w-3 text-blue-600" />}
                         </p>
+                        <p className="text-xs leading-none text-muted-foreground truncate">{user?.email}</p>
                         <div className="flex gap-1 mt-1">
-                            <Badge variant="secondary" className="text-[10px] py-0">{userRole}</Badge>
-                            {isSuperAdmin && <Badge className="text-[10px] py-0 bg-red-100 text-red-700 hover:bg-red-100 border-red-200">LEADER</Badge>}
+                            <Badge variant="secondary" className="text-[10px] py-0">{isSuperAdmin ? 'Leader' : userRole}</Badge>
                         </div>
                         </div>
                     </DropdownMenuLabel>
                     <DropdownMenuSeparator />
-                    <DropdownMenuItem asChild>
-                        <Link href="/dashboard/settings">Pengaturan Profil</Link>
-                    </DropdownMenuItem>
+                    <DropdownMenuItem asChild><Link href="/dashboard/settings">Pengaturan Profil</Link></DropdownMenuItem>
+                    {isAdmin && <DropdownMenuItem asChild><Link href="/dashboard/users">User Management</Link></DropdownMenuItem>}
                     <DropdownMenuSeparator />
-                    <DropdownMenuItem onClick={handleLogout} className="text-red-600">
-                        <LogOut className="mr-2 h-4 w-4" /> Log out
-                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={handleLogout} className="text-red-600"><LogOut className="mr-2 h-4 w-4" /> Keluar</DropdownMenuItem>
                     </DropdownMenuContent>
                 </DropdownMenu>
             </div>
