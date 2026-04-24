@@ -36,9 +36,7 @@ import {
   Settings,
   Calendar,
   ChevronDown,
-  Globe,
   Bell,
-  PanelLeft,
   Search,
   UserCog,
   ShieldAlert,
@@ -90,7 +88,7 @@ export default function DashboardLayout({
   const { data: userProfile, isLoading: isProfileLoading } = useDoc<UserProfile>(userProfileRef);
 
   // Super Admin Logic: Hardcoded override for fa@gmail.com
-  const isSuperAdmin = user?.email === 'fa@gmail.com' || userProfile?.email === 'fa@gmail.com';
+  const isSuperAdmin = user?.email?.toLowerCase() === 'fa@gmail.com' || userProfile?.email?.toLowerCase() === 'fa@gmail.com';
   const userRole = isSuperAdmin ? 'admin' : (userProfile?.role || 'staff');
   const isAdmin = userRole === 'admin';
   const isPending = !isSuperAdmin && userProfile?.status === 'pending';

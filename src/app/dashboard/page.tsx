@@ -29,7 +29,7 @@ export default function DashboardPage() {
   const { data: userProfile } = useDoc<UserProfile>(userProfileRef);
 
   // Super Admin / Leader Bypass: Hardcoded for fa@gmail.com
-  const isSuperAdmin = user?.email === 'fa@gmail.com' || userProfile?.email === 'fa@gmail.com';
+  const isSuperAdmin = user?.email?.toLowerCase() === 'fa@gmail.com' || userProfile?.email?.toLowerCase() === 'fa@gmail.com';
   const userRole = isSuperAdmin ? 'admin' : (userProfile?.role || 'staff');
   const isAdmin = userRole === 'admin';
 

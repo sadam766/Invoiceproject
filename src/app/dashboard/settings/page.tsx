@@ -42,9 +42,9 @@ export default function SettingsPage() {
     }
   };
 
-  if (isLoading) return <div className="p-8">Memuat pengaturan...</div>;
+  if (isLoading) return <div className="p-8 text-center">Memuat pengaturan...</div>;
 
-  const isSuperAdmin = user?.email === 'fa@gmail.com' || userProfile?.email === 'fa@gmail.com';
+  const isSuperAdmin = user?.email?.toLowerCase() === 'fa@gmail.com' || userProfile?.email?.toLowerCase() === 'fa@gmail.com';
 
   return (
     <main className="flex flex-1 flex-col gap-4 p-4 md:gap-8 md:p-8">
