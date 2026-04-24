@@ -56,8 +56,9 @@ import { usePathname, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { ThemeToggle } from '../components/theme-toggle';
 import { cn } from '@/lib/utils';
-import { useAuth, useUser } from '@/firebase';
+import { useAuth, useUser, useFirestore, useDoc, useMemoFirebase } from '@/firebase';
 import { signOut } from 'firebase/auth';
+import { doc } from 'firebase/firestore';
 
 export default function DashboardLayout({
   children,
@@ -67,7 +68,16 @@ export default function DashboardLayout({
   const pathname = usePathname();
   const router = useRouter();
   const auth = useAuth();
+  const firestore = useFirestore();
   const { user, isUserLoading } = useUser();
+
+  // Fetch user profile to get the role
+  const userProfileRef = useMemoFirebase(() => {
+    if (!firestore || !user) return null;
+    return doc(firestore, 'users', user.uid);
+  }, [firestore, user]);
+
+  const { data: userProfile, isLoading: isProfileLoading } = useDoc(userProfileRef);
 
   useEffect(() => {
     if (!isUserLoading && !user) {
@@ -84,14 +94,19 @@ export default function DashboardLayout({
     }
   };
 
-  if (isUserLoading || !user) {
+  if (isUserLoading || isProfileLoading || !user) {
     return (
       <div className="flex h-screen w-full items-center justify-center">
-        Loading...
+        <div className="flex flex-col items-center gap-2">
+           <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
+           <p className="text-sm text-muted-foreground">Memuat Profil...</p>
+        </div>
       </div>
     );
   }
 
+  const userRole = userProfile?.role || 'staff';
+  const isAdmin = userRole === 'admin';
 
   return (
     <SidebarProvider>
@@ -99,13 +114,19 @@ export default function DashboardLayout({
         <SidebarHeader>
           <div className="flex items-center gap-2">
             <Avatar className="w-8 h-8 bg-primary flex items-center justify-center">
-              <span className="font-bold text-primary-foreground">A</span>
+              <span className="font-bold text-primary-foreground">
+                {user?.displayName?.charAt(0).toUpperCase() || 'U'}
+              </span>
             </Avatar>
-            <span className="font-semibold text-lg">Dakota</span>
+            <div className="flex flex-col">
+              <span className="font-semibold text-sm leading-none">Dakota</span>
+              <span className="text-[10px] text-muted-foreground uppercase mt-1">{userRole}</span>
+            </div>
           </div>
         </SidebarHeader>
         <SidebarContent>
           <SidebarMenu>
+            {/* Menu Dashboard hanya untuk Admin atau bisa untuk semua tapi data di dalamnya dibatasi */}
             <SidebarMenuItem>
               <SidebarMenuButton
                 asChild
@@ -117,6 +138,7 @@ export default function DashboardLayout({
                 </Link>
               </SidebarMenuButton>
             </SidebarMenuItem>
+
             <SidebarMenuItem>
               <SidebarMenuButton
                 asChild
@@ -210,22 +232,29 @@ export default function DashboardLayout({
                 </Link>
               </SidebarMenuButton>
             </SidebarMenuItem>
+
+            {/* Menu Sales List bisa dilihat semua */}
              <SidebarMenuItem>
                 <SidebarMenuButton asChild isActive={pathname.startsWith('/dashboard/sales')}>
                     <Link href="/dashboard/sales">
                         <ShoppingCart />
-                        Sales
+                        Sales List
                     </Link>
                 </SidebarMenuButton>
             </SidebarMenuItem>
-             <SidebarMenuItem>
-                <SidebarMenuButton asChild isActive={pathname === '/dashboard/sales-management'}>
-                    <Link href="/dashboard/sales-management">
-                        <BarChart />
-                        Sales Management
-                    </Link>
-                </SidebarMenuButton>
-            </SidebarMenuItem>
+
+            {/* Menu Sales Management HANYA untuk Admin */}
+            {isAdmin && (
+               <SidebarMenuItem>
+                  <SidebarMenuButton asChild isActive={pathname === '/dashboard/sales-management'}>
+                      <Link href="/dashboard/sales-management">
+                          <BarChart />
+                          Sales Management
+                      </Link>
+                  </SidebarMenuButton>
+              </SidebarMenuItem>
+            )}
+
              <SidebarMenuItem>
               <SidebarMenuButton asChild isActive={pathname === '/dashboard/calendar'}>
                 <Link href="/dashboard/calendar">
@@ -243,7 +272,7 @@ export default function DashboardLayout({
           </SidebarMenu>
         </SidebarContent>
         <SidebarFooter>
-            <Button variant="ghost" className="w-full justify-start">
+            <Button variant="ghost" className="w-full justify-start" onClick={() => router.refresh()}>
                 <PanelLeft className="mr-2 h-4 w-4" />
                 <span className="grow">Collapse</span>
                 <span>&#8984;B</span>
@@ -290,6 +319,7 @@ export default function DashboardLayout({
                         <p className="text-xs leading-none text-muted-foreground">
                             {user?.email || "Tidak ada email"}
                         </p>
+                        <Badge variant="secondary" className="w-fit text-[10px] mt-1">{userRole}</Badge>
                         </div>
                     </DropdownMenuLabel>
                     <DropdownMenuSeparator />

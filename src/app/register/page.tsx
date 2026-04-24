@@ -66,13 +66,14 @@ export default function RegisterPage() {
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
       await updateProfile(userCredential.user, { displayName: name });
       
-      // Create user document in Firestore with 'user' role
+      // Default role adalah 'staff'. 
+      // Admin pertama harus diubah manual di Firestore Console atau melalui fitur khusus.
       const userDocRef = doc(firestore, 'users', userCredential.user.uid);
       await setDoc(userDocRef, {
         uid: userCredential.user.uid,
         email: userCredential.user.email,
         displayName: name,
-        role: 'user' // Default role for new users
+        role: 'staff' 
       });
       
       router.push('/dashboard');
@@ -95,14 +96,13 @@ export default function RegisterPage() {
       const result = await signInWithPopup(auth, provider);
       const user = result.user;
       
-      // Create user document in Firestore with 'user' role
       const userDocRef = doc(firestore, 'users', user.uid);
       await setDoc(userDocRef, {
         uid: user.uid,
         email: user.email,
         displayName: user.displayName,
-        role: 'user' // Default role for new users
-      }, { merge: true }); // Use merge to avoid overwriting existing data if user logs in again
+        role: 'staff' 
+      }, { merge: true });
 
       router.push('/dashboard');
     } catch (error: any) {
@@ -143,20 +143,20 @@ export default function RegisterPage() {
           <div className="grid gap-2">
             <div className="flex items-center gap-2 mb-4">
               <Mountain className="h-6 w-6 text-primary" />
-              <span className="text-xl font-semibold">Acme Inc</span>
+              <span className="text-xl font-semibold">Dakota</span>
             </div>
             <h1 className="text-3xl font-bold">Create an Account</h1>
             <p className="text-balance text-muted-foreground">
-              Enter your information to get started.
+              Daftarkan akun operasional Anda.
             </p>
           </div>
           <form onSubmit={handleRegister} className="grid gap-4">
             <div className="grid gap-2">
-              <Label htmlFor="name">Name</Label>
+              <Label htmlFor="name">Nama Lengkap</Label>
               <Input
                 id="name"
                 type="text"
-                placeholder="Enter your full name"
+                placeholder="Masukkan nama lengkap"
                 required
                 value={name}
                 onChange={(e) => setName(e.target.value)}
@@ -167,7 +167,7 @@ export default function RegisterPage() {
               <Input
                 id="email"
                 type="email"
-                placeholder="Enter your mail address"
+                placeholder="email@perusahaan.com"
                 required
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
@@ -180,7 +180,7 @@ export default function RegisterPage() {
               <Input
                 id="password"
                 type={showPassword ? 'text' : 'password'}
-                placeholder="Enter password"
+                placeholder="Masukkan password"
                 required
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
@@ -198,7 +198,7 @@ export default function RegisterPage() {
               </button>
             </div>
             <Button type="submit" className="w-full" disabled={isLoading}>
-              {isLoading ? 'Creating Account...' : 'Create Account'}
+              {isLoading ? 'Mendaftarkan Akun...' : 'Buat Akun'}
             </Button>
           </form>
           <div className="relative my-4">
@@ -207,7 +207,7 @@ export default function RegisterPage() {
             </div>
             <div className="relative flex justify-center text-xs uppercase">
               <span className="bg-background px-2 text-muted-foreground">
-                Or, Sign up with
+                Atau daftar dengan
               </span>
             </div>
           </div>
@@ -218,12 +218,12 @@ export default function RegisterPage() {
             disabled={isLoading}
           >
             <GoogleIcon className="mr-2 h-4 w-4" />
-            Sign up with Google
+            Daftar dengan Google
           </Button>
           <div className="mt-4 text-center text-sm">
-            Already have an account?{' '}
+            Sudah punya akun?{' '}
             <Link href="/login" className="underline text-primary">
-              Log in here
+              Log in di sini
             </Link>
           </div>
         </div>
