@@ -66,14 +66,18 @@ export default function RegisterPage() {
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
       await updateProfile(userCredential.user, { displayName: name });
       
-      // Default role adalah 'staff'. 
-      // Admin pertama harus diubah manual di Firestore Console atau melalui fitur khusus.
       const userDocRef = doc(firestore, 'users', userCredential.user.uid);
       await setDoc(userDocRef, {
         uid: userCredential.user.uid,
         email: userCredential.user.email,
         displayName: name,
-        role: 'staff' 
+        role: 'staff',
+        status: 'pending' // Default status is pending for approval
+      });
+      
+      toast({
+          title: "Pendaftaran Berhasil",
+          description: "Akun Anda telah dibuat. Tunggu persetujuan Admin untuk mengakses dashboard.",
       });
       
       router.push('/dashboard');
@@ -101,7 +105,8 @@ export default function RegisterPage() {
         uid: user.uid,
         email: user.email,
         displayName: user.displayName,
-        role: 'staff' 
+        role: 'staff',
+        status: 'pending' // Default status is pending
       }, { merge: true });
 
       router.push('/dashboard');

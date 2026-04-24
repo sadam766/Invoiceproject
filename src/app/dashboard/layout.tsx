@@ -42,6 +42,8 @@ import {
   PanelLeft,
   Search,
   UserCog,
+  ShieldAlert,
+  LogOut,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -52,15 +54,20 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import {
+    Popover,
+    PopoverContent,
+    PopoverTrigger,
+  } from '@/components/ui/popover';
 import { Badge } from '@/components/ui/badge';
-import React, { useEffect } from 'react';
+import React, { useEffect, useMemo } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { ThemeToggle } from '../components/theme-toggle';
 import { cn } from '@/lib/utils';
-import { useAuth, useUser, useFirestore, useDoc, useMemoFirebase } from '@/firebase';
+import { useAuth, useUser, useFirestore, useDoc, useMemoFirebase, useCollection } from '@/firebase';
 import { signOut } from 'firebase/auth';
-import { doc } from 'firebase/firestore';
+import { doc, query, collection, where } from 'firebase/firestore';
 import type { UserProfile } from '@/app/lib/data';
 
 export default function DashboardLayout({
@@ -74,13 +81,20 @@ export default function DashboardLayout({
   const firestore = useFirestore();
   const { user, isUserLoading } = useUser();
 
-  // Fetch user profile to get the role
+  // Fetch user profile to get the role and status
   const userProfileRef = useMemoFirebase(() => {
     if (!firestore || !user) return null;
     return doc(firestore, 'users', user.uid);
   }, [firestore, user]);
 
   const { data: userProfile, isLoading: isProfileLoading } = useDoc<UserProfile>(userProfileRef);
+
+  // NOTIFICATION LOGIC: Get pending users for Admin
+  const pendingUsersQuery = useMemoFirebase(() => {
+      if (!firestore || userProfile?.role !== 'admin') return null;
+      return query(collection(firestore, 'users'), where('status', '==', 'pending'));
+  }, [firestore, userProfile]);
+  const { data: pendingUsers } = useCollection<UserProfile>(pendingUsersQuery);
 
   useEffect(() => {
     if (!isUserLoading && !user) {
@@ -117,6 +131,34 @@ export default function DashboardLayout({
 
   const userRole = userProfile?.role || 'staff';
   const isAdmin = userRole === 'admin';
+  const isPending = userProfile?.status === 'pending';
+
+  // GATEKEEPING VIEW for Pending Users
+  if (isPending) {
+      return (
+        <div className="flex h-screen w-full flex-col items-center justify-center bg-background p-4">
+            <div className="max-w-md w-full text-center space-y-6">
+                <div className="bg-yellow-100 dark:bg-yellow-900/30 p-4 rounded-full w-20 h-20 flex items-center justify-center mx-auto">
+                    <ShieldAlert className="h-10 w-10 text-yellow-600 dark:text-yellow-500" />
+                </div>
+                <div className="space-y-2">
+                    <h1 className="text-2xl font-bold">Menunggu Persetujuan</h1>
+                    <p className="text-muted-foreground">
+                        Halo <strong>{userProfile?.displayName}</strong>. Akun Anda berhasil dibuat namun saat ini berstatus <strong>Pending</strong>.
+                    </p>
+                    <p className="text-sm text-muted-foreground">
+                        Mohon hubungi Administrator untuk mengaktifkan akses Anda ke sistem.
+                    </p>
+                </div>
+                <div className="pt-4">
+                    <Button variant="outline" className="w-full" onClick={handleLogout}>
+                        <LogOut className="mr-2 h-4 w-4" /> Keluar dari Sistem
+                    </Button>
+                </div>
+            </div>
+        </div>
+      );
+  }
 
   return (
     <SidebarProvider>
@@ -316,12 +358,54 @@ export default function DashboardLayout({
                     <Globe className="h-5 w-5" />
                 </Button>
                 <ThemeToggle />
-                <Button variant="ghost" size="icon">
-                    <LayoutDashboard className="h-5 w-5" />
+                
+                {/* BELL NOTIFICATION SYSTEM */}
+                <Popover>
+                    <PopoverTrigger asChild>
+                        <Button variant="ghost" size="icon" className="relative">
+                            <Bell className="h-5 w-5" />
+                            {isAdmin && pendingUsers && pendingUsers.length > 0 && (
+                                <span className="absolute top-2 right-2.5 flex h-2.5 w-2.5">
+                                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+                                    <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-red-500"></span>
+                                </span>
+                            )}
+                        </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-80 p-0" align="end">
+                        <div className="p-4 border-b">
+                            <h3 className="font-bold text-sm">Notifikasi</h3>
+                        </div>
+                        <div className="max-h-[300px] overflow-y-auto">
+                            {isAdmin && pendingUsers && pendingUsers.length > 0 ? (
+                                <div className="p-2 space-y-1">
+                                    {pendingUsers.map(u => (
+                                        <div 
+                                            key={u.uid} 
+                                            className="p-3 rounded-md hover:bg-muted cursor-pointer transition-colors"
+                                            onClick={() => router.push('/dashboard/users')}
+                                        >
+                                            <p className="text-sm font-medium">Ada user baru mendaftar:</p>
+                                            <p className="text-xs text-muted-foreground mt-0.5">{u.displayName} ({u.email})</p>
+                                            <p className="text-[10px] text-blue-600 font-bold uppercase mt-1">Klik untuk mengatur hak akses</p>
+                                        </div>
+                                    ))}
+                                </div>
+                            ) : (
+                                <div className="p-8 text-center text-sm text-muted-foreground">
+                                    Tidak ada notifikasi baru.
+                                </div>
+                            )}
+                        </div>
+                    </PopoverContent>
+                </Popover>
+
+                <Button variant="ghost" size="icon" asChild>
+                    <Link href="/dashboard">
+                        <LayoutDashboard className="h-5 w-5" />
+                    </Link>
                 </Button>
-                <Button variant="ghost" size="icon">
-                    <Bell className="h-5 w-5" />
-                </Button>
+                
                  <DropdownMenu>
                     <DropdownMenuTrigger asChild>
                     <Button variant="ghost" className="relative h-8 w-8 rounded-full">

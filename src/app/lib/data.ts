@@ -15,7 +15,7 @@ export type UserProfile = {
   email: string;
   displayName: string;
   role: 'admin' | 'staff';
-  status: 'active' | 'suspended';
+  status: 'active' | 'suspended' | 'pending';
 };
 
 export type Product = {
