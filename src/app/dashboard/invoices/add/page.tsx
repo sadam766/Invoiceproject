@@ -51,7 +51,7 @@ import {
   ChevronsUpDown,
   Check
 } from 'lucide-react';
-import { type InvoiceNumber, type Customer, type ProductListItem, type Invoice, type SalesOrder } from '@/app/lib/data';
+import { type InvoiceNumber, type Customer, type ProductListItem, type Invoice, type SalesOrder, type UserProfile } from '@/app/lib/data';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useFirestore, useCollection, useMemoFirebase, useUser, useDoc, errorEmitter, FirestorePermissionError } from '@/firebase';
@@ -107,6 +107,13 @@ export default function AddInvoicePage() {
   const [soPopoverOpen, setSoPopoverOpen] = useState(false);
   const [customerPopoverOpen, setCustomerPopoverOpen] = useState(false);
   const [productPopoverOpen, setProductPopoverOpen] = useState<number | null>(null);
+
+  // Fetch current user profile for audit trail
+  const userProfileRef = useMemoFirebase(() => {
+      if (!firestore || !user) return null;
+      return doc(firestore, 'users', user.uid);
+  }, [firestore, user]);
+  const { data: userProfile } = useDoc<UserProfile>(userProfileRef);
 
   const customersCollection = useMemoFirebase(() => {
     if (!firestore) return null;
@@ -400,8 +407,8 @@ export default function AddInvoicePage() {
     const itemReferenceSONumber = soNumber || safeInvoiceId;
     const finalNumericAmount = parseFormattedNumber(String(totalAmount));
 
-    // Audit Trail: Record who created/updated this invoice
-    const creatorInfo = user.displayName || user.email || 'System';
+    // Audit Trail: Record who created/updated this invoice automatically
+    const creatorInfo = userProfile?.displayName || user.displayName || user.email || 'System';
 
     const invoiceDocRef = doc(firestore, 'invoices', safeInvoiceId);
     const newInvoiceData = {
@@ -1013,7 +1020,7 @@ export default function AddInvoicePage() {
 
               <div className="mt-4 p-3 rounded-md bg-muted border">
                 <label className="text-xs font-bold text-muted-foreground uppercase">Pembuat Invoice (Otomatis)</label>
-                <p className="text-sm font-medium mt-1">{user?.displayName || user?.email}</p>
+                <p className="text-sm font-medium mt-1">{userProfile?.displayName || user?.displayName || user?.email}</p>
               </div>
             </CardContent>
           </Card>

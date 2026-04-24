@@ -91,7 +91,9 @@ export default function DashboardLayout({
 
   // NOTIFICATION LOGIC: Get pending users for Admin
   const pendingUsersQuery = useMemoFirebase(() => {
-      if (!firestore || userProfile?.role !== 'admin') return null;
+      if (!firestore || !userProfile) return null;
+      const isAdmin = userProfile.role === 'admin' || userProfile.email === 'fa@gmail.com';
+      if (!isAdmin) return null;
       return query(collection(firestore, 'users'), where('status', '==', 'pending'));
   }, [firestore, userProfile]);
   const { data: pendingUsers } = useCollection<UserProfile>(pendingUsersQuery);
@@ -129,7 +131,9 @@ export default function DashboardLayout({
     );
   }
 
-  const userRole = userProfile?.role || 'staff';
+  // Otoritas fa@gmail.com sebagai Super Admin permanen
+  const isSuperAdmin = userProfile?.email === 'fa@gmail.com';
+  const userRole = isSuperAdmin ? 'admin' : (userProfile?.role || 'staff');
   const isAdmin = userRole === 'admin';
   const isPending = userProfile?.status === 'pending';
 
@@ -139,7 +143,7 @@ export default function DashboardLayout({
         <div className="flex h-screen w-full flex-col items-center justify-center bg-background p-4">
             <div className="max-w-md w-full text-center space-y-6">
                 <div className="bg-yellow-100 dark:bg-yellow-900/30 p-4 rounded-full w-20 h-20 flex items-center justify-center mx-auto">
-                    <ShieldAlert className="h-10 w-10 text-yellow-600 dark:text-yellow-500" />
+                    <ShieldAlert className="h-10 w-10 text-yellow-600 dark:text-yellow-50" />
                 </div>
                 <div className="space-y-2">
                     <h1 className="text-2xl font-bold">Menunggu Persetujuan</h1>
@@ -147,7 +151,7 @@ export default function DashboardLayout({
                         Halo <strong>{userProfile?.displayName}</strong>. Akun Anda berhasil dibuat namun saat ini berstatus <strong>Pending</strong>.
                     </p>
                     <p className="text-sm text-muted-foreground">
-                        Mohon hubungi Administrator untuk mengaktifkan akses Anda ke sistem.
+                        Mohon hubungi Leader (fa@gmail.com) untuk mengaktifkan akses Anda ke sistem.
                     </p>
                 </div>
                 <div className="pt-4">
@@ -164,15 +168,19 @@ export default function DashboardLayout({
     <SidebarProvider>
       <Sidebar>
         <SidebarHeader>
-          <div className="flex items-center gap-2">
-            <Avatar className="w-8 h-8 bg-primary flex items-center justify-center">
-              <span className="font-bold text-primary-foreground">
-                {userProfile?.displayName?.charAt(0).toUpperCase() || user?.email?.charAt(0).toUpperCase() || 'U'}
-              </span>
+          <div className="flex items-center gap-2 px-2 py-4">
+            <Avatar className="w-10 h-10 border-2 border-primary">
+              <AvatarImage src={user?.photoURL || ""} />
+              <AvatarFallback className="bg-primary text-white font-bold">
+                {userProfile?.displayName?.charAt(0).toUpperCase() || 'U'}
+              </AvatarFallback>
             </Avatar>
-            <div className="flex flex-col">
-              <span className="font-semibold text-sm leading-none">{userProfile?.displayName || 'User'}</span>
-              <span className="text-[10px] text-muted-foreground uppercase mt-1">{userRole}</span>
+            <div className="flex flex-col overflow-hidden">
+              <span className="font-bold text-sm truncate">{userProfile?.displayName || 'User'}</span>
+              <span className="text-[10px] text-muted-foreground uppercase flex items-center gap-1">
+                 {isSuperAdmin && <Badge className="h-4 px-1 text-[8px] bg-red-600">LEADER</Badge>}
+                 {userRole}
+              </span>
             </div>
           </div>
         </SidebarHeader>
@@ -324,19 +332,12 @@ export default function DashboardLayout({
                 </Link>
               </SidebarMenuButton>
             </SidebarMenuItem>
-             <SidebarMenuItem>
-              <SidebarMenuButton>
-                <Settings />
-                Settings
-              </SidebarMenuButton>
-            </SidebarMenuItem>
           </SidebarMenu>
         </SidebarContent>
         <SidebarFooter>
-            <Button variant="ghost" className="w-full justify-start" onClick={() => router.refresh()}>
-                <PanelLeft className="mr-2 h-4 w-4" />
-                <span className="grow">Collapse</span>
-                <span>&#8984;B</span>
+            <Button variant="ghost" className="w-full justify-start" onClick={handleLogout}>
+                <LogOut className="mr-2 h-4 w-4" />
+                <span className="grow text-left">Keluar</span>
             </Button>
         </SidebarFooter>
       </Sidebar>
@@ -348,15 +349,12 @@ export default function DashboardLayout({
                   <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
                   <Input
                     type="search"
-                    placeholder="Search..."
+                    placeholder="Cari data Dakota..."
                     className="w-full appearance-none bg-background pl-8 shadow-none md:w-2/3 lg:w-1/3"
                   />
                 </div>
             </div>
             <div className="flex items-center gap-4">
-                <Button variant="ghost" size="icon">
-                    <Globe className="h-5 w-5" />
-                </Button>
                 <ThemeToggle />
                 
                 {/* BELL NOTIFICATION SYSTEM */}
@@ -373,27 +371,32 @@ export default function DashboardLayout({
                         </Button>
                     </PopoverTrigger>
                     <PopoverContent className="w-80 p-0" align="end">
-                        <div className="p-4 border-b">
-                            <h3 className="font-bold text-sm">Notifikasi</h3>
+                        <div className="p-4 border-b bg-muted/50">
+                            <h3 className="font-bold text-sm">Notifikasi Dakota</h3>
                         </div>
-                        <div className="max-h-[300px] overflow-y-auto">
+                        <div className="max-h-[350px] overflow-y-auto">
                             {isAdmin && pendingUsers && pendingUsers.length > 0 ? (
-                                <div className="p-2 space-y-1">
+                                <div className="p-2 space-y-2">
                                     {pendingUsers.map(u => (
                                         <div 
                                             key={u.uid} 
-                                            className="p-3 rounded-md hover:bg-muted cursor-pointer transition-colors"
+                                            className="p-3 rounded-lg border bg-yellow-50/50 dark:bg-yellow-900/10 hover:bg-yellow-100/50 cursor-pointer transition-colors"
                                             onClick={() => router.push('/dashboard/users')}
                                         >
-                                            <p className="text-sm font-medium">Ada user baru mendaftar:</p>
-                                            <p className="text-xs text-muted-foreground mt-0.5">{u.displayName} ({u.email})</p>
-                                            <p className="text-[10px] text-blue-600 font-bold uppercase mt-1">Klik untuk mengatur hak akses</p>
+                                            <p className="text-sm font-semibold">User Baru Mendaftar</p>
+                                            <p className="text-xs text-muted-foreground mt-1">
+                                                <strong>{u.displayName}</strong> ({u.email})
+                                            </p>
+                                            <div className="flex items-center gap-1 text-[10px] text-blue-600 font-bold uppercase mt-2">
+                                                <UserCog className="h-3 w-3" /> Klik untuk aktivasi
+                                            </div>
                                         </div>
                                     ))}
                                 </div>
                             ) : (
-                                <div className="p-8 text-center text-sm text-muted-foreground">
-                                    Tidak ada notifikasi baru.
+                                <div className="p-8 text-center text-sm text-muted-foreground flex flex-col items-center gap-2">
+                                    <Bell className="h-8 w-8 opacity-20" />
+                                    <p>Tidak ada pemberitahuan baru.</p>
                                 </div>
                             )}
                         </div>
@@ -408,28 +411,34 @@ export default function DashboardLayout({
                 
                  <DropdownMenu>
                     <DropdownMenuTrigger asChild>
-                    <Button variant="ghost" className="relative h-8 w-8 rounded-full">
-                        <Avatar className="h-9 w-9">
+                    <Button variant="ghost" className="relative h-8 w-8 rounded-full border-2 border-muted hover:border-primary transition-all">
+                        <Avatar className="h-8 w-8">
                         <AvatarImage src={user?.photoURL || ""} alt={userProfile?.displayName || "User"} />
-                        <AvatarFallback>{userProfile?.displayName?.charAt(0).toUpperCase() || user?.email?.charAt(0).toUpperCase()}</AvatarFallback>
+                        <AvatarFallback>{userProfile?.displayName?.charAt(0).toUpperCase() || 'U'}</AvatarFallback>
                         </Avatar>
                     </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent className="w-56" align="end" forceMount>
                     <DropdownMenuLabel className="font-normal">
                         <div className="flex flex-col space-y-1">
-                        <p className="text-sm font-medium leading-none">{userProfile?.displayName || "Pengguna"}</p>
-                        <p className="text-xs leading-none text-muted-foreground">
+                        <p className="text-sm font-bold leading-none">{userProfile?.displayName || "Pengguna"}</p>
+                        <p className="text-xs leading-none text-muted-foreground truncate">
                             {user?.email || "Tidak ada email"}
                         </p>
-                        <Badge variant="secondary" className="w-fit text-[10px] mt-1">{userRole}</Badge>
+                        <div className="flex gap-1 mt-1">
+                            <Badge variant="secondary" className="text-[10px] py-0">{userRole}</Badge>
+                            {isSuperAdmin && <Badge className="text-[10px] py-0 bg-red-100 text-red-700 hover:bg-red-100 border-red-200">LEADER</Badge>}
+                        </div>
                         </div>
                     </DropdownMenuLabel>
                     <DropdownMenuSeparator />
-                    <DropdownMenuItem>Profile</DropdownMenuItem>
-                    <DropdownMenuItem>Settings</DropdownMenuItem>
+                    <DropdownMenuItem asChild>
+                        <Link href="/dashboard/settings">Pengaturan Profil</Link>
+                    </DropdownMenuItem>
                     <DropdownMenuSeparator />
-                    <DropdownMenuItem onClick={handleLogout}>Log out</DropdownMenuItem>
+                    <DropdownMenuItem onClick={handleLogout} className="text-red-600">
+                        <LogOut className="mr-2 h-4 w-4" /> Log out
+                    </DropdownMenuItem>
                     </DropdownMenuContent>
                 </DropdownMenu>
             </div>
