@@ -28,8 +28,8 @@ export default function DashboardPage() {
   }, [firestore, user]);
   const { data: userProfile } = useDoc<UserProfile>(userProfileRef);
 
-  // Super Admin / Leader Bypass
-  const isSuperAdmin = userProfile?.email === 'fa@gmail.com';
+  // Super Admin / Leader Bypass: Hardcoded for fa@gmail.com
+  const isSuperAdmin = user?.email === 'fa@gmail.com' || userProfile?.email === 'fa@gmail.com';
   const userRole = isSuperAdmin ? 'admin' : (userProfile?.role || 'staff');
   const isAdmin = userRole === 'admin';
 
@@ -127,8 +127,8 @@ export default function DashboardPage() {
     <main className="flex flex-1 flex-col gap-4 p-4 md:gap-8 md:p-8">
         <div className="flex items-center justify-between">
             <div>
-                <h1 className="text-2xl font-bold tracking-tight">Dashboard</h1>
-                <p className="text-muted-foreground">Halo, {userProfile?.displayName || user?.displayName}. Selamat datang kembali.</p>
+                <h1 className="text-2xl font-bold tracking-tight">Dashboard Dakota</h1>
+                <p className="text-muted-foreground">Halo, {userProfile?.displayName || user?.displayName || user?.email}. Selamat datang di pusat kendali operasional.</p>
             </div>
             <DropdownMenu>
                 <DropdownMenuTrigger asChild>

@@ -18,14 +18,14 @@ export default function UserManagementPage() {
     const { user: currentUser } = useUser();
     const { toast } = useToast();
 
-    // Leader Check
+    // Leader Check: Hardcoded override for fa@gmail.com
     const currentUserProfileRef = useMemoFirebase(() => {
         if (!firestore || !currentUser) return null;
         return doc(firestore, 'users', currentUser.uid);
     }, [firestore, currentUser]);
     const { data: currentUserProfile } = useDoc<UserProfile>(currentUserProfileRef);
     
-    const isSuperAdmin = currentUserProfile?.email === 'fa@gmail.com';
+    const isSuperAdmin = currentUser?.email === 'fa@gmail.com' || currentUserProfile?.email === 'fa@gmail.com';
     const isAdmin = isSuperAdmin || currentUserProfile?.role === 'admin';
 
     const usersCollection = useMemoFirebase(() => {
@@ -36,7 +36,7 @@ export default function UserManagementPage() {
 
     const handleRoleChange = async (targetUserId: string, targetEmail: string, newRole: 'admin' | 'staff') => {
         if (!firestore || !isAdmin) return;
-        if (targetEmail === 'fa@gmail.com' && !isSuperAdmin) {
+        if (targetEmail.toLowerCase() === 'fa@gmail.com') {
             toast({ variant: "destructive", title: "Akses Ditolak", description: "Otoritas Leader Utama tidak dapat diubah." });
             return;
         }
@@ -50,7 +50,7 @@ export default function UserManagementPage() {
 
     const handleStatusChange = async (targetUserId: string, targetEmail: string, newStatus: 'active' | 'suspended' | 'pending') => {
         if (!firestore || !isAdmin) return;
-        if (targetUserId === currentUser?.uid || targetEmail === 'fa@gmail.com') {
+        if (targetUserId === currentUser?.uid || targetEmail.toLowerCase() === 'fa@gmail.com') {
             toast({ variant: "destructive", title: "Dibatalkan", description: "Proteksi Leader/Diri Sendiri aktif." });
             return;
         }
@@ -62,20 +62,20 @@ export default function UserManagementPage() {
         }
     };
 
-    if (!isAdmin && !isLoading) return <div className="p-8 text-center"><ShieldAlert className="h-12 w-12 mx-auto" /><h2>Akses Terbatas</h2></div>;
+    if (!isAdmin && !isLoading) return <div className="p-8 text-center"><ShieldAlert className="h-12 w-12 mx-auto" /><h2>Akses Terbatas</h2><p>Halaman ini hanya untuk Administrator.</p></div>;
 
     return (
       <main className="flex flex-1 flex-col gap-4 p-4 md:gap-8 md:p-8">
         <div className="flex items-center justify-between">
             <div>
                 <h1 className="text-2xl font-bold tracking-tight">Manajemen User</h1>
-                <p className="text-muted-foreground">Kelola persetujuan pendaftaran dan hak akses karyawan.</p>
+                <p className="text-muted-foreground">Kelola pendaftaran karyawan dan tentukan hak akses mereka di sistem Dakota.</p>
             </div>
             {isSuperAdmin && <Badge className="bg-red-600 px-3 py-1 animate-pulse">SUPER ADMIN MODE</Badge>}
         </div>
         
         <Card>
-            <CardHeader className="border-b bg-muted/20"><CardTitle className="text-lg">Karyawan Terdaftar</CardTitle></CardHeader>
+            <CardHeader className="border-b bg-muted/20"><CardTitle className="text-lg">Daftar Karyawan Terdaftar</CardTitle></CardHeader>
             <CardContent className="pt-6">
                 <Table>
                     <TableHeader>
@@ -87,34 +87,40 @@ export default function UserManagementPage() {
                         </TableRow>
                     </TableHeader>
                     <TableBody>
-                        {isLoading && <TableRow><TableCell colSpan={4} className="text-center py-8">Memuat...</TableCell></TableRow>}
+                        {isLoading && <TableRow><TableCell colSpan={4} className="text-center py-8">Memuat data user...</TableCell></TableRow>}
+                        {!isLoading && allUsers?.length === 0 && <TableRow><TableCell colSpan={4} className="text-center py-8">Belum ada user yang mendaftar.</TableCell></TableRow>}
                         {allUsers?.map((u) => {
                             const isSelf = u.uid === currentUser?.uid;
-                            const isTargetLeader = u.email === 'fa@gmail.com';
+                            const isTargetLeader = u.email?.toLowerCase() === 'fa@gmail.com';
                             return (
                                 <TableRow key={u.uid} className={cn(u.status === 'pending' ? 'bg-yellow-50/50' : '', isTargetLeader ? 'border-l-4 border-l-blue-600' : '')}>
                                     <TableCell>
                                         <div className="flex items-center gap-3">
-                                            <Avatar className="h-8 w-8"><AvatarFallback className={isTargetLeader ? 'bg-blue-600 text-white' : ''}>{u.displayName?.charAt(0)}</AvatarFallback></Avatar>
+                                            <Avatar className="h-8 w-8"><AvatarFallback className={isTargetLeader ? 'bg-blue-600 text-white font-bold' : 'font-bold'}>{u.displayName?.charAt(0) || u.email?.charAt(0)}</AvatarFallback></Avatar>
                                             <div className="flex flex-col">
-                                                <div className="flex items-center gap-2"><span className="font-bold">{u.displayName}</span>{isTargetLeader && <BadgeCheck className="h-3 w-3 text-blue-600" />}</div>
+                                                <div className="flex items-center gap-2"><span className="font-bold">{u.displayName || 'No Name'}</span>{isTargetLeader && <BadgeCheck className="h-3 w-3 text-blue-600" />}</div>
                                                 <span className="text-xs text-muted-foreground">{u.email}</span>
                                             </div>
                                         </div>
                                     </TableCell>
                                     <TableCell>
-                                        <Select value={isTargetLeader ? 'admin' : (u.role || 'staff')} onValueChange={(val) => handleRoleChange(u.uid, u.email, val as any)} disabled={isTargetLeader || isSelf || u.status === 'pending'}>
+                                        <Select 
+                                            value={isTargetLeader ? 'admin' : (u.role || 'staff')} 
+                                            onValueChange={(val) => handleRoleChange(u.uid, u.email, val as any)} 
+                                            disabled={isTargetLeader || isSelf || (u.status === 'pending' && !isSuperAdmin)}
+                                        >
                                             <SelectTrigger className="w-32 h-8"><SelectValue /></SelectTrigger>
                                             <SelectContent><SelectItem value="staff">Staff</SelectItem><SelectItem value="admin">Admin</SelectItem></SelectContent>
                                         </Select>
                                     </TableCell>
-                                    <TableCell><Badge variant="outline" className={cn(u.status === 'active' ? 'bg-green-100 text-green-800' : (u.status === 'pending' ? 'bg-yellow-100 text-yellow-800' : 'bg-red-100 text-red-800'))}>{u.status}</Badge></TableCell>
+                                    <TableCell><Badge variant="outline" className={cn(u.status === 'active' ? 'bg-green-100 text-green-800 border-green-200' : (u.status === 'pending' ? 'bg-yellow-100 text-yellow-800 border-yellow-200' : 'bg-red-100 text-red-800 border-red-200'))}>{u.status}</Badge></TableCell>
                                     <TableCell className="text-right">
                                         {u.status === 'pending' ? (
-                                            <Button size="sm" className="bg-green-600 h-8" onClick={() => handleStatusChange(u.uid, u.email, 'active')}><UserPlus className="mr-2 h-4 w-4" /> Aktifkan</Button>
+                                            <Button size="sm" className="bg-green-600 h-8 hover:bg-green-700" onClick={() => handleStatusChange(u.uid, u.email, 'active')}><UserPlus className="mr-2 h-4 w-4" /> Setujui & Aktifkan</Button>
                                         ) : !isSelf && !isTargetLeader && (
                                             <Button variant={u.status === 'suspended' ? 'outline' : 'destructive'} size="sm" className="h-8" onClick={() => handleStatusChange(u.uid, u.email, u.status === 'suspended' ? 'active' : 'suspended')}>
-                                                {u.status === 'suspended' ? <UserCheck className="h-4 w-4" /> : <UserX className="h-4 w-4" />}
+                                                {u.status === 'suspended' ? <UserCheck className="h-4 w-4 mr-2" /> : <UserX className="h-4 w-4 mr-2" />}
+                                                {u.status === 'suspended' ? 'Aktifkan Kembali' : 'Blokir Akun'}
                                             </Button>
                                         )}
                                     </TableCell>

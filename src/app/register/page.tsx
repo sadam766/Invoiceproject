@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -67,17 +66,21 @@ export default function RegisterPage() {
       await updateProfile(userCredential.user, { displayName: name });
       
       const userDocRef = doc(firestore, 'users', userCredential.user.uid);
+      const isLeader = email.toLowerCase() === 'fa@gmail.com';
+
       await setDoc(userDocRef, {
         uid: userCredential.user.uid,
         email: userCredential.user.email,
         displayName: name,
-        role: 'staff',
-        status: 'pending' // Default status is pending for approval
+        role: isLeader ? 'admin' : 'staff',
+        status: isLeader ? 'active' : 'pending' // Leader is auto-active, others pending
       });
       
       toast({
-          title: "Pendaftaran Berhasil",
-          description: "Akun Anda telah dibuat. Tunggu persetujuan Admin untuk mengakses dashboard.",
+          title: isLeader ? "Pendaftaran Leader Berhasil" : "Pendaftaran Berhasil",
+          description: isLeader 
+            ? "Akun Leader Utama telah aktif. Silakan masuk ke Dashboard."
+            : "Akun Anda telah dibuat. Tunggu persetujuan Admin untuk mengakses dashboard.",
       });
       
       router.push('/dashboard');
@@ -98,15 +101,17 @@ export default function RegisterPage() {
     const provider = new GoogleAuthProvider();
     try {
       const result = await signInWithPopup(auth, provider);
-      const user = result.user;
+      const googleUser = result.user;
       
-      const userDocRef = doc(firestore, 'users', user.uid);
+      const userDocRef = doc(firestore, 'users', googleUser.uid);
+      const isLeader = googleUser.email?.toLowerCase() === 'fa@gmail.com';
+
       await setDoc(userDocRef, {
-        uid: user.uid,
-        email: user.email,
-        displayName: user.displayName,
-        role: 'staff',
-        status: 'pending' // Default status is pending
+        uid: googleUser.uid,
+        email: googleUser.email,
+        displayName: googleUser.displayName,
+        role: isLeader ? 'admin' : 'staff',
+        status: isLeader ? 'active' : 'pending'
       }, { merge: true });
 
       router.push('/dashboard');
@@ -126,7 +131,7 @@ export default function RegisterPage() {
   if (isUserLoading || (!isUserLoading && user)) {
     return (
       <div className="flex h-screen w-full items-center justify-center">
-        Loading...
+        Memuat...
       </div>
     );
   }
@@ -152,7 +157,7 @@ export default function RegisterPage() {
             </div>
             <h1 className="text-3xl font-bold">Create an Account</h1>
             <p className="text-balance text-muted-foreground">
-              Daftarkan akun operasional Anda.
+              Daftarkan akun operasional Anda untuk sistem Dakota.
             </p>
           </div>
           <form onSubmit={handleRegister} className="grid gap-4">

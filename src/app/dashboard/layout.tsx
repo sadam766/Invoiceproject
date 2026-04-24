@@ -89,13 +89,13 @@ export default function DashboardLayout({
 
   const { data: userProfile, isLoading: isProfileLoading } = useDoc<UserProfile>(userProfileRef);
 
-  // Super Admin Logic
-  const isSuperAdmin = userProfile?.email === 'fa@gmail.com';
+  // Super Admin Logic: Hardcoded override for fa@gmail.com
+  const isSuperAdmin = user?.email === 'fa@gmail.com' || userProfile?.email === 'fa@gmail.com';
   const userRole = isSuperAdmin ? 'admin' : (userProfile?.role || 'staff');
   const isAdmin = userRole === 'admin';
-  const isPending = userProfile?.status === 'pending';
+  const isPending = !isSuperAdmin && userProfile?.status === 'pending';
 
-  // Notification for Pending Users
+  // Notification for Pending Users (Visible to Admin only)
   const pendingUsersQuery = useMemoFirebase(() => {
       if (!firestore || !isAdmin) return null;
       return query(collection(firestore, 'users'), where('status', '==', 'pending'));
@@ -109,10 +109,10 @@ export default function DashboardLayout({
   }, [user, isUserLoading, router]);
 
   useEffect(() => {
-    if (userProfile?.status === 'suspended') {
+    if (userProfile?.status === 'suspended' && !isSuperAdmin) {
         signOut(auth).then(() => router.push('/login'));
     }
-  }, [userProfile, auth, router]);
+  }, [userProfile, auth, router, isSuperAdmin]);
 
   const handleLogout = async () => {
     try {
@@ -128,7 +128,7 @@ export default function DashboardLayout({
       <div className="flex h-screen w-full items-center justify-center">
         <div className="flex flex-col items-center gap-2">
            <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
-           <p className="text-sm text-muted-foreground">Memuat Profil...</p>
+           <p className="text-sm text-muted-foreground">Memuat Profil Dakota...</p>
         </div>
       </div>
     );
@@ -168,12 +168,12 @@ export default function DashboardLayout({
             <Avatar className="w-10 h-10 border-2 border-primary">
               <AvatarImage src={user?.photoURL || ""} />
               <AvatarFallback className="bg-primary text-white font-bold">
-                {userProfile?.displayName?.charAt(0).toUpperCase() || 'U'}
+                {userProfile?.displayName?.charAt(0).toUpperCase() || user?.email?.charAt(0).toUpperCase() || 'U'}
               </AvatarFallback>
             </Avatar>
             <div className="flex flex-col overflow-hidden">
               <span className="font-bold text-sm truncate flex items-center gap-1">
-                {userProfile?.displayName || 'User'}
+                {userProfile?.displayName || user?.displayName || 'Admin Dakota'}
                 {isSuperAdmin && <BadgeCheck className="h-3 w-3 text-blue-600" />}
               </span>
               <span className="text-[10px] text-muted-foreground uppercase font-bold">
@@ -328,7 +328,7 @@ export default function DashboardLayout({
                                     {pendingUsers.map(u => (
                                         <div key={u.uid} className="p-3 rounded-lg border bg-yellow-50/50 hover:bg-yellow-100/50 cursor-pointer transition-colors" onClick={() => router.push('/dashboard/users')}>
                                             <p className="text-sm font-semibold">User Baru Mendaftar</p>
-                                            <p className="text-xs text-muted-foreground mt-1"><strong>{u.displayName}</strong> ({u.email})</p>
+                                            <p className="text-xs text-muted-foreground mt-1"><strong>{u.displayName || u.email}</strong></p>
                                             <div className="flex items-center gap-1 text-[10px] text-blue-600 font-bold uppercase mt-2"><UserCog className="h-3 w-3" /> Klik untuk aktivasi</div>
                                         </div>
                                     ))}
@@ -347,7 +347,7 @@ export default function DashboardLayout({
                     <Button variant="ghost" className="relative h-8 w-8 rounded-full border-2 border-muted hover:border-primary transition-all">
                         <Avatar className="h-8 w-8">
                         <AvatarImage src={user?.photoURL || ""} alt={userProfile?.displayName || "User"} />
-                        <AvatarFallback>{userProfile?.displayName?.charAt(0).toUpperCase() || 'U'}</AvatarFallback>
+                        <AvatarFallback>{userProfile?.displayName?.charAt(0).toUpperCase() || user?.email?.charAt(0).toUpperCase() || 'U'}</AvatarFallback>
                         </Avatar>
                     </Button>
                     </DropdownMenuTrigger>
@@ -355,7 +355,7 @@ export default function DashboardLayout({
                     <DropdownMenuLabel className="font-normal">
                         <div className="flex flex-col space-y-1">
                         <p className="text-sm font-bold leading-none flex items-center gap-1">
-                          {userProfile?.displayName || "Pengguna"}
+                          {userProfile?.displayName || user?.displayName || "Leader Dakota"}
                           {isSuperAdmin && <BadgeCheck className="h-3 w-3 text-blue-600" />}
                         </p>
                         <p className="text-xs leading-none text-muted-foreground truncate">{user?.email}</p>

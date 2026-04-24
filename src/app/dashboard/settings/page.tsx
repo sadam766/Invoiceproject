@@ -44,40 +44,40 @@ export default function SettingsPage() {
 
   if (isLoading) return <div className="p-8">Memuat pengaturan...</div>;
 
-  const isSuperAdmin = userProfile?.email === 'fa@gmail.com';
+  const isSuperAdmin = user?.email === 'fa@gmail.com' || userProfile?.email === 'fa@gmail.com';
 
   return (
     <main className="flex flex-1 flex-col gap-4 p-4 md:gap-8 md:p-8">
       <div className="max-w-2xl mx-auto w-full space-y-6">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Pengaturan Profil</h1>
-          <p className="text-muted-foreground">Kelola identitas dan keamanan akun Anda.</p>
+          <p className="text-muted-foreground">Kelola identitas dan keamanan akun Dakota Anda.</p>
         </div>
 
         <Card>
           <CardHeader>
             <CardTitle>Identitas Pengguna</CardTitle>
-            <CardDescription>Informasi ini akan muncul pada setiap dokumen yang Anda buat.</CardDescription>
+            <CardDescription>Informasi ini akan muncul pada setiap dokumen/invoice yang Anda kelola.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
             <div className="flex items-center gap-4">
               <Avatar className="h-20 w-20 border-4 border-muted">
                 <AvatarImage src={user?.photoURL || ''} />
-                <AvatarFallback className="text-2xl bg-primary text-white">
-                  {userProfile?.displayName?.charAt(0).toUpperCase()}
+                <AvatarFallback className="text-2xl bg-primary text-white font-bold">
+                  {userProfile?.displayName?.charAt(0).toUpperCase() || user?.email?.charAt(0).toUpperCase()}
                 </AvatarFallback>
               </Avatar>
               <div className="space-y-1">
                 <h3 className="font-bold text-lg flex items-center gap-2">
-                  {userProfile?.displayName}
+                  {userProfile?.displayName || user?.displayName || 'User Dakota'}
                   {isSuperAdmin && <BadgeCheck className="h-5 w-5 text-blue-600 fill-blue-100" />}
                 </h3>
                 <p className="text-sm text-muted-foreground flex items-center gap-1">
-                  <Mail className="h-3 w-3" /> {userProfile?.email}
+                  <Mail className="h-3 w-3" /> {user?.email}
                 </p>
                 <div className="flex gap-2 mt-2">
                    <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-secondary text-secondary-foreground uppercase">
-                    {isSuperAdmin ? 'Leader / Admin' : userProfile?.role}
+                    {isSuperAdmin ? 'Leader / Admin' : (userProfile?.role || 'Staff')}
                    </span>
                 </div>
               </div>
@@ -93,6 +93,7 @@ export default function SettingsPage() {
                     value={displayName} 
                     onChange={(e) => setDisplayName(e.target.value)}
                     className="pl-8"
+                    placeholder="Contoh: Budi Santoso"
                   />
                 </div>
               </div>
@@ -100,7 +101,7 @@ export default function SettingsPage() {
                 <Label htmlFor="email">Alamat Email (Permanen)</Label>
                 <div className="relative">
                   <Mail className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-                  <Input id="email" value={userProfile?.email} disabled className="pl-8 bg-muted" />
+                  <Input id="email" value={user?.email || ''} disabled className="pl-8 bg-muted" />
                 </div>
               </div>
               <Button onClick={handleUpdateProfile} className="w-full md:w-fit">Simpan Perubahan</Button>
@@ -112,12 +113,12 @@ export default function SettingsPage() {
           <Card className="border-blue-200 bg-blue-50/30">
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-blue-900">
-                <Shield className="h-5 w-5" /> Keamanan Leader
+                <Shield className="h-5 w-5" /> Otoritas Leader Utama
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <p className="text-sm text-blue-800">
-                Akun Anda memiliki akses tertinggi dalam sistem. Pastikan untuk selalu logout setelah menggunakan perangkat publik.
+              <p className="text-sm text-blue-800 leading-relaxed">
+                Akun Anda terdaftar sebagai Leader Utama sistem Dakota. Anda memiliki wewenang penuh untuk mengelola daftar karyawan, menyetujui akses pendaftar baru, dan melihat laporan finansial secara utuh.
               </p>
             </CardContent>
           </Card>
