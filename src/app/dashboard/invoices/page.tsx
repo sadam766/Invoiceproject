@@ -22,7 +22,7 @@ import {
   import { Button } from '@/components/ui/button';
   import { Badge } from '@/components/ui/badge';
   import { Checkbox } from '@/components/ui/checkbox';
-  import { type Invoice, type SpdData, type SalesOrder, type Customer } from '@/app/lib/data';
+  import { type Invoice, type SpdData, type SalesOrder, type Customer, type UserProfile } from '@/app/lib/data';
   import { Search, Filter, MoreHorizontal, ArrowUpDown, Plus, Eye, Pencil, Trash2 } from 'lucide-react';
   import { Skeleton } from '@/components/ui/skeleton';
   import {
@@ -33,7 +33,7 @@ import {
   } from '@/components/ui/dropdown-menu';
   import { DeleteConfirmationDialog } from '@/app/components/delete-confirmation-dialog';
   import { useToast } from '@/hooks/use-toast';
-  import { useFirestore, useCollection, useMemoFirebase, useUser, errorEmitter, FirestorePermissionError } from '@/firebase';
+  import { useFirestore, useCollection, useMemoFirebase, useUser, errorEmitter, FirestorePermissionError, useDoc } from '@/firebase';
   import { collection, query, doc, deleteDoc, writeBatch, setDoc } from 'firebase/firestore';
 
 
@@ -47,6 +47,15 @@ import {
     const { user } = useUser();
     const [deleteDialogState, setDeleteDialogState] = useState<{ isOpen: boolean; invoiceId?: string }>({ isOpen: false });
     
+    // Get user profile for roles
+    const userProfileRef = useMemoFirebase(() => {
+        if (!firestore || !user) return null;
+        return doc(firestore, 'users', user.uid);
+    }, [firestore, user]);
+    const { data: userProfile } = useDoc<UserProfile>(userProfileRef);
+    const userRole = userProfile?.role || 'staff';
+    const isAdmin = userRole === 'admin';
+
     const invoicesCollection = useMemoFirebase(() => {
         if (!firestore) return null;
         return query(collection(firestore, 'invoices'));
@@ -93,7 +102,7 @@ import {
     const totalUnpaid = invoices?.filter(item => item.status === 'unpaid' || item.status === 'sent' || item.status === 'draft').reduce((sum, item) => sum + item.amount, 0) || 0;
 
     const handleDeleteConfirm = () => {
-      if (!firestore || !deleteDialogState.invoiceId) return;
+      if (!firestore || !deleteDialogState.invoiceId || !isAdmin) return;
       const safeId = deleteDialogState.invoiceId.replace(/\//g, '_');
       const docRef = doc(firestore, 'invoices', safeId);
       
@@ -113,6 +122,14 @@ import {
     };
 
     const openDeleteDialog = (invoiceId: string) => {
+      if (!isAdmin) {
+        toast({
+            variant: "destructive",
+            title: "Akses Ditolak",
+            description: "Hanya Admin yang diizinkan untuk menghapus invoice."
+        });
+        return;
+      }
       setDeleteDialogState({ isOpen: true, invoiceId: invoiceId });
     };
 
@@ -388,7 +405,7 @@ import {
                                     <TableHead>DATE <ArrowUpDown className="inline-block ml-2 h-4 w-4" /></TableHead>
                                     <TableHead>AMOUNT <ArrowUpDown className="inline-block ml-2 h-4 w-4" /></TableHead>
                                     <TableHead>STATUS <ArrowUpDown className="inline-block ml-2 h-4 w-4" /></TableHead>
-                                    <TableHead>NOMOR SPD <ArrowUpDown className="inline-block ml-2 h-4 w-4" /></TableHead>
+                                    <TableHead>PEMBUAT <ArrowUpDown className="inline-block ml-2 h-4 w-4" /></TableHead>
                                     <TableHead></TableHead>
                                 </TableRow>
                             </TableHeader>
@@ -428,7 +445,9 @@ import {
                                                 {invoice.status}
                                             </Badge>
                                         </TableCell>
-                                        <TableCell>{invoice.spdNumber}</TableCell>
+                                        <TableCell>
+                                            <span className="text-xs text-muted-foreground">{invoice.createdBy || '-'}</span>
+                                        </TableCell>
                                         <TableCell>
                                             <DropdownMenu>
                                                 <DropdownMenuTrigger asChild>
@@ -445,22 +464,25 @@ import {
                                                         <Pencil className="mr-2 h-4 w-4" />
                                                         Edit
                                                     </DropdownMenuItem>
-                                                    <DeleteConfirmationDialog 
-                                                      open={deleteDialogState.isOpen && deleteDialogState.invoiceId === invoice.id}
-                                                      onOpenChange={(open) => setDeleteDialogState({isOpen: open, invoiceId: open ? invoice.id : undefined})}
-                                                      onConfirm={handleDeleteConfirm}
-                                                    >
-                                                        <DropdownMenuItem
-                                                            className="text-destructive focus:text-destructive focus:bg-destructive/10"
-                                                            onSelect={(e) => {
-                                                              e.preventDefault();
-                                                              openDeleteDialog(invoice.id);
-                                                            }}
-                                                          >
-                                                          <Trash2 className="mr-2 h-4 w-4" />
-                                                          Hapus
-                                                        </DropdownMenuItem>
-                                                    </DeleteConfirmationDialog>
+                                                    
+                                                    {isAdmin && (
+                                                      <DeleteConfirmationDialog 
+                                                        open={deleteDialogState.isOpen && deleteDialogState.invoiceId === invoice.id}
+                                                        onOpenChange={(open) => setDeleteDialogState({isOpen: open, invoiceId: open ? invoice.id : undefined})}
+                                                        onConfirm={handleDeleteConfirm}
+                                                      >
+                                                          <DropdownMenuItem
+                                                              className="text-destructive focus:text-destructive focus:bg-destructive/10"
+                                                              onSelect={(e) => {
+                                                                e.preventDefault();
+                                                                openDeleteDialog(invoice.id);
+                                                              }}
+                                                            >
+                                                            <Trash2 className="mr-2 h-4 w-4" />
+                                                            Hapus
+                                                          </DropdownMenuItem>
+                                                      </DeleteConfirmationDialog>
+                                                    )}
                                                 </DropdownMenuContent>
                                             </DropdownMenu>
                                         </TableCell>

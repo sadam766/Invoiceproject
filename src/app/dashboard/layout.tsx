@@ -1,3 +1,4 @@
+
 'use client';
 import {
   SidebarProvider,
@@ -40,6 +41,7 @@ import {
   Bell,
   PanelLeft,
   Search,
+  UserCog,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -59,6 +61,7 @@ import { cn } from '@/lib/utils';
 import { useAuth, useUser, useFirestore, useDoc, useMemoFirebase } from '@/firebase';
 import { signOut } from 'firebase/auth';
 import { doc } from 'firebase/firestore';
+import type { UserProfile } from '@/app/lib/data';
 
 export default function DashboardLayout({
   children,
@@ -77,13 +80,20 @@ export default function DashboardLayout({
     return doc(firestore, 'users', user.uid);
   }, [firestore, user]);
 
-  const { data: userProfile, isLoading: isProfileLoading } = useDoc(userProfileRef);
+  const { data: userProfile, isLoading: isProfileLoading } = useDoc<UserProfile>(userProfileRef);
 
   useEffect(() => {
     if (!isUserLoading && !user) {
       router.push('/login');
     }
   }, [user, isUserLoading, router]);
+
+  // Jika akun dinonaktifkan, paksa logout
+  useEffect(() => {
+    if (userProfile?.status === 'suspended') {
+        signOut(auth).then(() => router.push('/login'));
+    }
+  }, [userProfile, auth, router]);
 
   const handleLogout = async () => {
     try {
@@ -115,18 +125,17 @@ export default function DashboardLayout({
           <div className="flex items-center gap-2">
             <Avatar className="w-8 h-8 bg-primary flex items-center justify-center">
               <span className="font-bold text-primary-foreground">
-                {user?.displayName?.charAt(0).toUpperCase() || 'U'}
+                {userProfile?.displayName?.charAt(0).toUpperCase() || user?.email?.charAt(0).toUpperCase() || 'U'}
               </span>
             </Avatar>
             <div className="flex flex-col">
-              <span className="font-semibold text-sm leading-none">Dakota</span>
+              <span className="font-semibold text-sm leading-none">{userProfile?.displayName || 'User'}</span>
               <span className="text-[10px] text-muted-foreground uppercase mt-1">{userRole}</span>
             </div>
           </div>
         </SidebarHeader>
         <SidebarContent>
           <SidebarMenu>
-            {/* Menu Dashboard hanya untuk Admin atau bisa untuk semua tapi data di dalamnya dibatasi */}
             <SidebarMenuItem>
               <SidebarMenuButton
                 asChild
@@ -233,7 +242,6 @@ export default function DashboardLayout({
               </SidebarMenuButton>
             </SidebarMenuItem>
 
-            {/* Menu Sales List bisa dilihat semua */}
              <SidebarMenuItem>
                 <SidebarMenuButton asChild isActive={pathname.startsWith('/dashboard/sales')}>
                     <Link href="/dashboard/sales">
@@ -243,13 +251,24 @@ export default function DashboardLayout({
                 </SidebarMenuButton>
             </SidebarMenuItem>
 
-            {/* Menu Sales Management HANYA untuk Admin */}
             {isAdmin && (
                <SidebarMenuItem>
                   <SidebarMenuButton asChild isActive={pathname === '/dashboard/sales-management'}>
                       <Link href="/dashboard/sales-management">
                           <BarChart />
                           Sales Management
+                      </Link>
+                  </SidebarMenuButton>
+              </SidebarMenuItem>
+            )}
+
+            {/* Menu User Management HANYA untuk Admin */}
+            {isAdmin && (
+               <SidebarMenuItem>
+                  <SidebarMenuButton asChild isActive={pathname === '/dashboard/users'}>
+                      <Link href="/dashboard/users">
+                          <UserCog />
+                          User Management
                       </Link>
                   </SidebarMenuButton>
               </SidebarMenuItem>
@@ -307,15 +326,15 @@ export default function DashboardLayout({
                     <DropdownMenuTrigger asChild>
                     <Button variant="ghost" className="relative h-8 w-8 rounded-full">
                         <Avatar className="h-9 w-9">
-                        <AvatarImage src={user?.photoURL || "https://i.pravatar.cc/150?u=a042581f4e29026704d"} alt={user?.displayName || "User"} />
-                        <AvatarFallback>{user?.email?.charAt(0).toUpperCase()}</AvatarFallback>
+                        <AvatarImage src={user?.photoURL || ""} alt={userProfile?.displayName || "User"} />
+                        <AvatarFallback>{userProfile?.displayName?.charAt(0).toUpperCase() || user?.email?.charAt(0).toUpperCase()}</AvatarFallback>
                         </Avatar>
                     </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent className="w-56" align="end" forceMount>
                     <DropdownMenuLabel className="font-normal">
                         <div className="flex flex-col space-y-1">
-                        <p className="text-sm font-medium leading-none">{user?.displayName || "Pengguna"}</p>
+                        <p className="text-sm font-medium leading-none">{userProfile?.displayName || "Pengguna"}</p>
                         <p className="text-xs leading-none text-muted-foreground">
                             {user?.email || "Tidak ada email"}
                         </p>

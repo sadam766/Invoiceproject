@@ -10,6 +10,14 @@ export type Kpi = {
   icon: LucideIcon;
 };
 
+export type UserProfile = {
+  uid: string;
+  email: string;
+  displayName: string;
+  role: 'admin' | 'staff';
+  status: 'active' | 'suspended';
+};
+
 export type Product = {
   name: string;
   image: ImagePlaceholder;
@@ -90,6 +98,7 @@ export type Invoice = {
   status: 'paid' | 'unpaid' | 'sent' | 'draft';
   spdNumber: string;
   ownerId?: string;
+  createdBy?: string; // Audit Trail: Nama/Email pembuat
 };
 
 export type InvoiceNumber = {

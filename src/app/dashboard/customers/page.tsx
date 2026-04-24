@@ -1,3 +1,4 @@
+
 'use client';
 import { useState, useMemo, useRef } from 'react';
 import {
@@ -14,13 +15,13 @@ import {
   } from '@/components/ui/table';
   import { Input } from '@/components/ui/input';
   import { Button } from '@/components/ui/button';
-  import type { Customer } from '@/app/lib/data';
+  import type { Customer, UserProfile } from '@/app/lib/data';
   import { Search, Upload, Download, Trash2 } from 'lucide-react';
   import { AddCustomerDialog } from './_components/add-customer-dialog';
   import { DeleteConfirmationDialog } from '@/app/components/delete-confirmation-dialog';
   import { useToast } from '@/hooks/use-toast';
   import { exportToExcel, generateExcelTemplate, importFromExcel } from '@/lib/utils';
-  import { useFirestore, useUser, useCollection, useMemoFirebase, errorEmitter, FirestorePermissionError } from '@/firebase';
+  import { useFirestore, useUser, useCollection, useMemoFirebase, errorEmitter, FirestorePermissionError, useDoc } from '@/firebase';
   import { collection, doc, setDoc, deleteDoc, writeBatch, query } from 'firebase/firestore';
 
   export default function CustomerListPage() {
@@ -33,6 +34,13 @@ import {
     const { toast } = useToast();
     const [deleteDialogState, setDeleteDialogState] = useState<{ isOpen: boolean; customerId?: string }>({ isOpen: false });
 
+    // Role check
+    const userProfileRef = useMemoFirebase(() => {
+        if (!firestore || !user) return null;
+        return doc(firestore, 'users', user.uid);
+    }, [firestore, user]);
+    const { data: userProfile } = useDoc<UserProfile>(userProfileRef);
+    const isAdmin = userProfile?.role === 'admin';
 
     const customersCollection = useMemoFirebase(() => {
         if (!firestore) return null;
@@ -64,7 +72,7 @@ import {
     };
 
     const handleDeleteConfirm = () => {
-        if (!firestore || !deleteDialogState.customerId) return;
+        if (!firestore || !deleteDialogState.customerId || !isAdmin) return;
         const docRef = doc(firestore, 'customers', deleteDialogState.customerId);
         deleteDoc(docRef)
             .then(() => {
@@ -82,6 +90,10 @@ import {
     };
 
     const openDeleteDialog = (customerId: string) => {
+        if (!isAdmin) {
+            toast({ variant: "destructive", title: "Akses Ditolak", description: "Hanya Admin yang boleh menghapus data pelanggan." });
+            return;
+        }
         setDeleteDialogState({ isOpen: true, customerId: customerId });
     };
 
@@ -247,15 +259,18 @@ import {
                                     <TableCell>
                                     <div className="flex gap-2">
                                         <Button variant="link" className="p-0 h-auto" onClick={() => handleEdit(customer)}>Edit</Button>
-                                        <DeleteConfirmationDialog 
-                                            open={deleteDialogState.isOpen && deleteDialogState.customerId === customer.id}
-                                            onOpenChange={(open) => setDeleteDialogState({isOpen: open, customerId: open ? customer.id : undefined})}
-                                            onConfirm={handleDeleteConfirm}
-                                        >
-                                            <Button variant="link" className="p-0 h-auto text-destructive" onClick={(e) => { e.stopPropagation(); openDeleteDialog(customer.id!); }}>
-                                                Hapus
-                                            </Button>
-                                        </DeleteConfirmationDialog>
+                                        
+                                        {isAdmin && (
+                                            <DeleteConfirmationDialog 
+                                                open={deleteDialogState.isOpen && deleteDialogState.customerId === customer.id}
+                                                onOpenChange={(open) => setDeleteDialogState({isOpen: open, customerId: open ? customer.id : undefined})}
+                                                onConfirm={handleDeleteConfirm}
+                                            >
+                                                <Button variant="link" className="p-0 h-auto text-destructive" onClick={(e) => { e.stopPropagation(); openDeleteDialog(customer.id!); }}>
+                                                    Hapus
+                                                </Button>
+                                            </DeleteConfirmationDialog>
+                                        )}
                                     </div>
                                     </TableCell>
                                 </TableRow>
@@ -271,4 +286,3 @@ import {
       </main>
     );
   }
-    

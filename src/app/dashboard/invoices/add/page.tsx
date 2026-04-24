@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useEffect, useState, useMemo } from 'react';
@@ -399,6 +400,9 @@ export default function AddInvoicePage() {
     const itemReferenceSONumber = soNumber || safeInvoiceId;
     const finalNumericAmount = parseFormattedNumber(String(totalAmount));
 
+    // Audit Trail: Record who created/updated this invoice
+    const creatorInfo = user.displayName || user.email || 'System';
+
     const invoiceDocRef = doc(firestore, 'invoices', safeInvoiceId);
     const newInvoiceData = {
         id: invoiceId,
@@ -410,6 +414,7 @@ export default function AddInvoicePage() {
         status: invoiceStatus,
         spdNumber: invoiceToEditData?.spdNumber || '-',
         ownerId: user.uid,
+        createdBy: invoiceToEditData?.createdBy || creatorInfo, // Don't overwrite original creator if editing
     };
     batch.set(invoiceDocRef, newInvoiceData, { merge: true });
 
@@ -1006,9 +1011,9 @@ export default function AddInvoicePage() {
                 </Select>
               </div>
 
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Pembuat Invoice</label>
-                <Input placeholder="Nama pembuat" />
+              <div className="mt-4 p-3 rounded-md bg-muted border">
+                <label className="text-xs font-bold text-muted-foreground uppercase">Pembuat Invoice (Otomatis)</label>
+                <p className="text-sm font-medium mt-1">{user?.displayName || user?.email}</p>
               </div>
             </CardContent>
           </Card>
