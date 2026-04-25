@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   Card,
@@ -28,12 +28,11 @@ import {
   Clock,
   ArrowUpRight,
   User,
-  MoreVertical,
   CheckCircle2,
   Truck,
   PackageCheck,
   AlertTriangle,
-  Layers
+  BarChart3
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -45,15 +44,16 @@ import {
   ChartTooltip,
   ChartTooltipContent,
 } from '@/components/ui/chart';
-import { Bar, BarChart, XAxis, YAxis, CartesianGrid, Cell } from 'recharts';
+import { Bar, BarChart, XAxis, YAxis, CartesianGrid, Cell, ResponsiveContainer } from 'recharts';
 import { useFirestore, useUser, useCollection, useMemoFirebase, useDoc } from '@/firebase';
 import { collection, query, doc } from 'firebase/firestore';
 import { type SalesListItem, type Invoice, type TaxInvoice, type UserProfile, type SpdData } from '@/app/lib/data';
-import { format, isSameDay, parseISO } from 'date-fns';
+import { format, isSameDay, parseISO, isWithinInterval, startOfToday, subDays, eachDayOfInterval } from 'date-fns';
+import { DateRangePicker } from '../components/date-range-picker';
 
-const performanceChartConfig = {
-  value: {
-    label: "Total Sales",
+const activityChartConfig = {
+  count: {
+    label: "Invoices",
     color: "hsl(var(--primary))",
   },
 } satisfies ChartConfig;
@@ -63,6 +63,10 @@ export default function DashboardPage() {
   const { user } = useUser();
   const firestore = useFirestore();
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date());
+  const [dateRange, setDateRange] = useState<{ from: Date; to: Date }>({
+    from: startOfToday(),
+    to: startOfToday(),
+  });
 
   // Data Fetching
   const userProfileRef = useMemoFirebase(() => {
@@ -95,358 +99,220 @@ export default function DashboardPage() {
   }, [firestore]);
   const { data: spdList } = useCollection<SpdData>(spdsCollection);
 
-  // LOGIC: Calculations
+  // LOGIC: Filtered Data based on Date Picker
+  const filteredInvoices = useMemo(() => {
+    if (!invoiceList) return [];
+    return invoiceList.filter(inv => {
+        const invDate = parseISO(inv.date);
+        return isWithinInterval(invDate, { start: dateRange.from, end: dateRange.to });
+    });
+  }, [invoiceList, dateRange]);
+
+  // LOGIC: Today's Milestones (Always Today for this widget)
+  const todayMilestones = useMemo(() => {
+    if (!invoiceList) return [];
+    const today = startOfToday();
+    return [...invoiceList]
+      .filter(i => isSameDay(parseISO(i.date), today))
+      .sort((a, b) => b.id.localeCompare(a.id))
+      .slice(0, 5);
+  }, [invoiceList]);
+
+  // LOGIC: Chart Data (Last 7 Days)
+  const chartData = useMemo(() => {
+    if (!invoiceList) return [];
+    const last7Days = eachDayOfInterval({
+        start: subDays(new Date(), 6),
+        end: new Date(),
+    });
+
+    return last7Days.map(day => {
+        const count = invoiceList.filter(inv => isSameDay(parseISO(inv.date), day)).length;
+        return {
+            day: format(day, 'EEE'),
+            count: count,
+        };
+    });
+  }, [invoiceList]);
+
   const stats = useMemo(() => {
-    if (!invoiceList || !salesList) return { outstanding: 0, realization: 0, target: 0, taxPending: 0 };
+    if (!filteredInvoices || !salesList) return { outstanding: 0, realization: 0, target: 0, taxPending: 0 };
     
-    const outstanding = invoiceList
+    const outstanding = filteredInvoices
       .filter(i => i.status !== 'paid')
       .reduce((sum, i) => sum + i.amount, 0);
     
-    const realization = invoiceList
+    const realization = filteredInvoices
       .filter(i => i.status === 'paid')
       .reduce((sum, i) => sum + i.amount, 0);
     
     const target = salesList.reduce((sum, s) => sum + s.amount, 0);
     
-    const taxPending = invoiceList.filter(inv => 
+    const taxPending = filteredInvoices.filter(inv => 
       !taxList?.some(t => t.invoiceNumber === inv.id)
     ).length;
 
     return { outstanding, realization, target, taxPending };
-  }, [invoiceList, salesList, taxList]);
+  }, [filteredInvoices, salesList, taxList]);
 
   const logisticStats = useMemo(() => {
-    const pendingShipment = invoiceList?.filter(inv => inv.status === 'sent' && !inv.spdNumber).length || 0;
+    const pendingShipment = filteredInvoices.filter(inv => inv.status === 'sent' && !inv.spdNumber).length;
     const inTransit = spdList?.filter(s => s.status === 'in_delivery').length || 0;
-    const deliveryIssues = spdList?.filter(s => s.status === 'rejected').length || 0;
-    return { pendingShipment, inTransit, deliveryIssues };
-  }, [invoiceList, spdList]);
-
-  const salesPerformanceData = useMemo(() => {
-    if (!salesList) return [];
-    const perfMap: Record<string, number> = {};
-    salesList.forEach(s => {
-      perfMap[s.sales] = (perfMap[s.sales] || 0) + s.amount;
-    });
-    return Object.entries(perfMap)
-      .map(([name, value]) => ({ name, value }))
-      .sort((a, b) => b.value - a.value);
-  }, [salesList]);
-
-  const topPending = useMemo(() => {
-    if (!invoiceList) return [];
-    return [...invoiceList]
-      .filter(i => i.status !== 'paid')
-      .sort((a, b) => b.amount - a.amount)
-      .slice(0, 5);
-  }, [invoiceList]);
-
-  const pipeline = useMemo(() => {
-    if (!invoiceList) return { proforma: 0, official: 0, tax: 0 };
-    return {
-      proforma: invoiceList.filter(i => i.id.startsWith('KW')).length,
-      official: invoiceList.filter(i => i.id.startsWith('SAR')).length,
-      tax: taxList?.length || 0
-    };
-  }, [invoiceList, taxList]);
-
-  const dayEvents = useMemo(() => {
-    if (!invoiceList || !selectedDate) return [];
-    return invoiceList.filter(inv => {
-        const d = inv.dueDate ? parseISO(inv.dueDate) : null;
-        return d && isSameDay(d, selectedDate);
-    });
-  }, [invoiceList, selectedDate]);
-
-  const progressPercent = stats.target > 0 ? (stats.realization / stats.target) * 100 : 0;
+    return { pendingShipment, inTransit };
+  }, [filteredInvoices, spdList]);
 
   return (
     <main className="flex flex-1 flex-col gap-4 p-4 md:gap-8 md:p-8 max-w-[1600px] mx-auto">
-      {/* Header: Global Filter & Welcome */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold tracking-tight uppercase font-black">Dakota Command Center</h1>
-          <p className="text-muted-foreground font-medium">Monitor real-time Dakota Sales, Invoicing, and Taxation.</p>
-        </div>
-        <div className="flex items-center gap-2">
-            <Badge variant="outline" className="bg-background px-3 py-1 text-xs">
-                Data Updated: {new Date().toLocaleTimeString()}
+          <p className="text-muted-foreground font-medium flex items-center gap-2">
+            Global overview of Dakota business performance. 
+            <Badge variant="secondary" className="bg-primary/10 text-primary text-[10px] font-black uppercase">
+                {format(dateRange.from, 'dd/MM')} - {format(dateRange.to, 'dd/MM/yy')}
             </Badge>
-            <Button variant="secondary" size="sm" onClick={() => router.refresh()}>
-                <TrendingUp className="mr-2 h-4 w-4" /> Global Overview
-            </Button>
+          </p>
         </div>
+        <DateRangePicker onRangeChange={setDateRange} />
       </div>
 
-      {/* Row 1: Financial Health Stats */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-        <Card className="cursor-pointer hover:bg-muted/10 transition-colors border-l-4 border-l-red-500" onClick={() => router.push('/dashboard/invoices')}>
+        <Card className="border-l-4 border-l-red-500 shadow-sm">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-bold uppercase tracking-wider text-muted-foreground">Total Piutang (Outstanding)</CardTitle>
+            <CardTitle className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Total Outstanding</CardTitle>
             <Wallet className="h-4 w-4 text-red-500" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">Rp {stats.outstanding.toLocaleString('id-ID')}</div>
-            <p className="text-xs text-muted-foreground mt-1 flex items-center gap-1">
-                <AlertCircle className="h-3 w-3 text-red-500" /> Segera lakukan penagihan
-            </p>
+            <div className="text-2xl font-black">Rp {stats.outstanding.toLocaleString('id-ID')}</div>
+            <p className="text-[10px] text-muted-foreground mt-1 font-bold">Piutang belum tertagih di periode ini.</p>
           </CardContent>
         </Card>
 
-        <Card className="cursor-pointer hover:bg-muted/10 transition-colors border-l-4 border-l-blue-500" onClick={() => router.push('/dashboard/sales-management')}>
+        <Card className="border-l-4 border-l-blue-500 shadow-sm">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-bold uppercase tracking-wider text-muted-foreground">Target vs Realisasi</CardTitle>
+            <CardTitle className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Realisasi (Paid)</CardTitle>
             <CheckCircle2 className="h-4 w-4 text-blue-500" />
           </CardHeader>
-          <CardContent className="space-y-3">
-            <div className="text-2xl font-bold">Rp {stats.realization.toLocaleString('id-ID')}</div>
-            <div className="space-y-1">
-                <div className="flex justify-between text-[10px] font-bold">
-                    <span>PROGRESS: {progressPercent.toFixed(1)}%</span>
-                    <span>TARGET: Rp {stats.target.toLocaleString('id-ID')}</span>
-                </div>
-                <Progress value={progressPercent} className="h-1.5" />
-            </div>
+          <CardContent>
+            <div className="text-2xl font-black">Rp {stats.realization.toLocaleString('id-ID')}</div>
+            <p className="text-[10px] text-muted-foreground mt-1 font-bold">Dana masuk terverifikasi.</p>
           </CardContent>
         </Card>
 
-        <Card className="cursor-pointer hover:bg-muted/10 transition-colors border-l-4 border-l-teal-500" onClick={() => router.push('/dashboard/invoices/tax')}>
+        <Card className="border-l-4 border-l-teal-500 shadow-sm">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-bold uppercase tracking-wider text-muted-foreground">Pajak Menunggu Lapor</CardTitle>
+            <CardTitle className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Pajak Pending</CardTitle>
             <ReceiptText className="h-4 w-4 text-teal-500" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{stats.taxPending} Invoice</div>
-            <p className="text-xs text-muted-foreground mt-1 flex items-center gap-1">
-                <ArrowRight className="h-3 w-3" /> Klik untuk proses e-Faktur
-            </p>
+            <div className="text-2xl font-black">{stats.taxPending} <span className="text-xs font-normal">Docs</span></div>
+            <p className="text-[10px] text-muted-foreground mt-1 font-bold">Menunggu input Nomor Faktur Pajak.</p>
           </CardContent>
         </Card>
       </div>
 
-      {/* Row 2: Logistic Status (New) */}
-      <div className="grid gap-4 md:grid-cols-3">
-        <Card className="bg-indigo-50/20 border-indigo-100 cursor-pointer hover:bg-indigo-50/40 transition-all" onClick={() => router.push('/dashboard/invoices/spd')}>
-           <CardHeader className="pb-2">
-              <CardTitle className="text-[10px] font-black uppercase text-indigo-600 flex items-center gap-2 tracking-widest">
-                <PackageCheck className="h-3.5 w-3.5" /> Logistic Status: Pending Delivery
-              </CardTitle>
-           </CardHeader>
-           <CardContent>
-              <div className="text-2xl font-bold">{logisticStats.pendingShipment} <span className="text-xs font-normal text-muted-foreground">Invoices</span></div>
-              <p className="text-[10px] text-muted-foreground mt-1 font-bold">Siap dijadwalkan ke rute kurir hari ini.</p>
-           </CardContent>
-        </Card>
-        <Card className="bg-amber-50/20 border-amber-100 cursor-pointer hover:bg-amber-50/40 transition-all" onClick={() => router.push('/dashboard/invoices/spd')}>
-           <CardHeader className="pb-2">
-              <CardTitle className="text-[10px] font-black uppercase text-amber-600 flex items-center gap-2 tracking-widest">
-                <Truck className="h-3.5 w-3.5" /> In Transit (Dispatched)
-              </CardTitle>
-           </CardHeader>
-           <CardContent>
-              <div className="text-2xl font-bold">{logisticStats.inTransit} <span className="text-xs font-normal text-muted-foreground">Active SPDs</span></div>
-              <p className="text-[10px] text-muted-foreground mt-1 font-bold">Dokumen sedang dibawa oleh kurir ke customer.</p>
-           </CardContent>
-        </Card>
-        <Card className="bg-rose-50/20 border-rose-100 cursor-pointer hover:bg-rose-50/40 transition-all" onClick={() => router.push('/dashboard/invoices/spd')}>
-           <CardHeader className="pb-2">
-              <CardTitle className="text-[10px] font-black uppercase text-rose-600 flex items-center gap-2 tracking-widest">
-                <AlertTriangle className="h-3.5 w-3.5" /> Delivery Issues / Rejected
-              </CardTitle>
-           </CardHeader>
-           <CardContent>
-              <div className="text-2xl font-bold">{logisticStats.deliveryIssues} <span className="text-xs font-normal text-muted-foreground">Alerts</span></div>
-              <p className="text-[10px] text-muted-foreground mt-1 font-bold">Invoice dikembalikan oleh customer (perlu cek ulang).</p>
-           </CardContent>
-        </Card>
-      </div>
-
-      {/* Row 3: Pipeline & Mini Calendar */}
       <div className="grid gap-4 lg:grid-cols-7">
-        <Card className="lg:col-span-4">
-          <CardHeader>
-            <CardTitle className="text-base font-bold">Billing Pipeline Progres</CardTitle>
-            <CardDescription>Alur dokumen dari penagihan awal hingga perpajakan.</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="relative flex justify-between items-center py-6 px-4">
-                {/* Connector Lines */}
-                <div className="absolute top-1/2 left-0 w-full h-0.5 bg-muted -translate-y-1/2 z-0" />
-                
-                {/* Step 1: Proforma */}
-                <div className="relative z-10 flex flex-col items-center gap-2">
-                    <div className="bg-primary text-white p-3 rounded-full shadow-lg">
-                        <Clock className="h-5 w-5" />
-                    </div>
-                    <span className="text-xs font-bold uppercase">Proforma (KW)</span>
-                    <Badge variant="secondary" className="font-mono">{pipeline.proforma}</Badge>
-                </div>
-
-                <div className="relative z-10 flex flex-col items-center gap-2">
-                    <div className="bg-blue-600 text-white p-3 rounded-full shadow-lg">
-                        <ArrowUpRight className="h-5 w-5" />
-                    </div>
-                    <span className="text-xs font-bold uppercase">Official (SAR)</span>
-                    <Badge variant="secondary" className="font-mono">{pipeline.official}</Badge>
-                </div>
-
-                <div className="relative z-10 flex flex-col items-center gap-2">
-                    <div className="bg-teal-600 text-white p-3 rounded-full shadow-lg">
-                        <ReceiptText className="h-5 w-5" />
-                    </div>
-                    <span className="text-xs font-bold uppercase">Faktur Pajak</span>
-                    <Badge variant="secondary" className="font-mono">{pipeline.tax}</Badge>
+        <Card className="lg:col-span-4 shadow-md">
+          <CardHeader className="border-b bg-muted/5">
+            <div className="flex items-center justify-between">
+                <div>
+                    <CardTitle className="text-sm font-black uppercase flex items-center gap-2 tracking-tighter">
+                        <BarChart3 className="h-4 w-4 text-primary" /> Daily Activity Chart
+                    </CardTitle>
+                    <CardDescription className="text-[10px] font-bold">Volume penerbitan invoice 7 hari terakhir.</CardDescription>
                 </div>
             </div>
-
-            <div className="mt-6 border-t pt-4">
-                <h4 className="text-xs font-bold text-muted-foreground uppercase mb-3">Tindakan Cepat:</h4>
-                <div className="flex flex-wrap gap-2">
-                    <Button variant="outline" size="sm" className="h-8 text-[10px]" onClick={() => router.push('/dashboard/invoices/add')}>
-                        Tarik Faktur Baru
-                    </Button>
-                    <Button variant="outline" size="sm" className="h-8 text-[10px]" onClick={() => router.push('/dashboard/invoices/tax')}>
-                        Input Seri Pajak
-                    </Button>
-                </div>
+          </CardHeader>
+          <CardContent className="pt-6">
+            <div className="h-[250px] w-full">
+              <ChartContainer config={activityChartConfig}>
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={chartData}>
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                    <XAxis 
+                        dataKey="day" 
+                        axisLine={false} 
+                        tickLine={false} 
+                        style={{ fontSize: '10px', fontWeight: 'bold' }}
+                    />
+                    <YAxis axisLine={false} tickLine={false} style={{ fontSize: '10px' }} />
+                    <ChartTooltip content={<ChartTooltipContent />} />
+                    <Bar 
+                        dataKey="count" 
+                        fill="hsl(var(--primary))" 
+                        radius={[4, 4, 0, 0]} 
+                        barSize={30}
+                    />
+                  </BarChart>
+                </ResponsiveContainer>
+              </ChartContainer>
             </div>
           </CardContent>
         </Card>
 
-        <Card className="lg:col-span-3">
-            <CardHeader className="pb-0">
-                <CardTitle className="text-base font-bold flex items-center gap-2">
-                    <CalendarIcon className="h-4 w-4 text-primary" /> Penjadwalan Billing
+        <Card className="lg:col-span-3 shadow-md">
+            <CardHeader className="border-b bg-muted/5">
+                <CardTitle className="text-sm font-black uppercase flex items-center gap-2 tracking-tighter">
+                    <Clock className="h-4 w-4 text-orange-500" /> Today's Milestones
                 </CardTitle>
+                <CardDescription className="text-[10px] font-bold">Invoice terbaru yang diterbitkan hari ini.</CardDescription>
             </CardHeader>
             <CardContent className="p-0">
-                <div className="flex flex-col sm:flex-row h-full">
-                    <div className="p-4 border-r">
-                        <Calendar 
-                            mode="single"
-                            selected={selectedDate}
-                            onSelect={setSelectedDate}
-                            className="rounded-md"
-                        />
-                    </div>
-                    <div className="flex-1 p-4 bg-muted/5">
-                        <h4 className="text-xs font-bold uppercase text-muted-foreground mb-3">
-                            Jadwal: {selectedDate ? format(selectedDate, 'dd MMM') : 'Hari Ini'}
-                        </h4>
-                        <div className="space-y-2 max-h-[220px] overflow-y-auto">
-                            {dayEvents.length > 0 ? dayEvents.map(ev => (
-                                <div key={ev.id} className="p-2 border rounded bg-background text-[10px] shadow-sm hover:shadow-md transition-all cursor-pointer" onClick={() => router.push('/dashboard/invoices')}>
-                                    <div className="flex justify-between font-bold">
-                                        <span className="truncate max-w-[80px]">{ev.customer}</span>
-                                        <span>Rp {ev.amount.toLocaleString('id-ID')}</span>
-                                    </div>
-                                    <div className="text-muted-foreground mt-1">{ev.id}</div>
-                                </div>
-                            )) : (
-                                <div className="text-center py-10 opacity-30">
-                                    <Clock className="h-8 w-8 mx-auto mb-2" />
-                                    <p className="text-[10px]">Tidak ada jadwal</p>
-                                </div>
-                            )}
+                <div className="divide-y">
+                    {todayMilestones.length > 0 ? todayMilestones.map(inv => (
+                        <div key={inv.id} className="p-4 hover:bg-muted/30 transition-colors flex items-center justify-between group">
+                            <div className="flex flex-col gap-0.5">
+                                <span className="text-xs font-black text-primary group-hover:underline cursor-pointer" onClick={() => router.push('/dashboard/invoices')}>
+                                    {inv.id}
+                                </span>
+                                <span className="text-[10px] font-bold uppercase truncate max-w-[150px]">{inv.customer}</span>
+                            </div>
+                            <div className="text-right">
+                                <p className="text-xs font-black">Rp {inv.amount.toLocaleString('id-ID')}</p>
+                                <Badge variant="outline" className="text-[8px] h-3.5 px-1 font-black uppercase">{inv.status}</Badge>
+                            </div>
                         </div>
-                    </div>
+                    )) : (
+                        <div className="py-20 text-center text-muted-foreground opacity-30 flex flex-col items-center gap-2">
+                            <PackageCheck className="h-10 w-10" />
+                            <p className="text-xs font-bold">Belum ada aktivitas hari ini.</p>
+                        </div>
+                    )}
                 </div>
+                {todayMilestones.length > 0 && (
+                    <div className="p-3 border-t bg-muted/10 text-center">
+                        <Button variant="ghost" size="sm" className="text-[10px] font-black uppercase h-7" onClick={() => router.push('/dashboard/invoices')}>
+                            View All Invoices <ArrowRight className="ml-1 h-3 w-3" />
+                        </Button>
+                    </div>
+                )}
             </CardContent>
         </Card>
       </div>
 
-      {/* Row 4: Pending Payments & Performance */}
-      <div className="grid gap-4 lg:grid-cols-7">
-        <Card className="lg:col-span-4">
-          <CardHeader className="flex flex-row items-center justify-between">
-            <div>
-                <CardTitle className="text-base font-bold text-red-600 uppercase flex items-center gap-2">
-                    <AlertCircle className="h-4 w-4" /> Top 5 Pending Payments
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+         <Card className="bg-indigo-50/20 border-indigo-100">
+            <CardHeader className="pb-2">
+                <CardTitle className="text-[10px] font-black uppercase text-indigo-700 flex items-center gap-2 tracking-widest">
+                    <Truck className="h-4 w-4" /> Logistic Readiness
                 </CardTitle>
-                <CardDescription>Daftar customer dengan tunggakan terbesar saat ini.</CardDescription>
-            </div>
-            <Button variant="ghost" size="sm" onClick={() => router.push('/dashboard/sales-management')}>View All</Button>
-          </CardHeader>
-          <CardContent>
-            <Table>
-                <TableHeader>
-                    <TableRow>
-                        <TableHead>CUSTOMER</TableHead>
-                        <TableHead>DUE DATE</TableHead>
-                        <TableHead className="text-right">AMOUNT</TableHead>
-                        <TableHead></TableHead>
-                    </TableRow>
-                </TableHeader>
-                <TableBody>
-                    {topPending.map((inv) => (
-                        <TableRow key={inv.id}>
-                            <TableCell className="font-bold py-3">
-                                {inv.customer}
-                                <p className="text-[10px] font-normal text-muted-foreground">{inv.id}</p>
-                            </TableCell>
-                            <TableCell className="text-xs">
-                                {inv.dueDate ? format(parseISO(inv.dueDate), 'dd/MM/yyyy') : '-'}
-                            </TableCell>
-                            <TableCell className="text-right font-black text-red-600 text-xs">
-                                Rp {inv.amount.toLocaleString('id-ID')}
-                            </TableCell>
-                            <TableCell className="text-right">
-                                <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => router.push('/dashboard/invoices')}>
-                                    <ArrowRight className="h-3 w-3" />
-                                </Button>
-                            </TableCell>
-                        </TableRow>
-                    ))}
-                    {topPending.length === 0 && (
-                        <TableRow><TableCell colSpan={4} className="text-center py-8 opacity-40 italic">Semua tagihan terbayar lunas.</TableCell></TableRow>
-                    )}
-                </TableBody>
-            </Table>
-          </CardContent>
-        </Card>
-
-        <Card className="lg:col-span-3">
-            <CardHeader>
-                <CardTitle className="text-base font-bold">Kontribusi Sales</CardTitle>
-                <CardDescription>Berdasarkan total nilai PO yang didaftarkan.</CardDescription>
             </CardHeader>
             <CardContent>
-                <div className="h-[300px] w-full">
-                    <ChartContainer config={performanceChartConfig}>
-                        <BarChart data={salesPerformanceData} layout="vertical">
-                            <CartesianGrid strokeDasharray="3 3" horizontal={true} vertical={false} />
-                            <XAxis type="number" hide />
-                            <YAxis 
-                                dataKey="name" 
-                                type="category" 
-                                axisLine={false} 
-                                tickLine={false} 
-                                width={80}
-                                style={{ fontSize: '10px', fontWeight: 'bold' }}
-                            />
-                            <ChartTooltip content={<ChartTooltipContent />} />
-                            <Bar dataKey="value" radius={[0, 4, 4, 0]}>
-                                {salesPerformanceData.map((entry, index) => (
-                                    <Cell key={`cell-${index}`} fill={`hsl(var(--primary) / ${1 - (index * 0.15)})`} />
-                                ))}
-                            </Bar>
-                        </BarChart>
-                    </ChartContainer>
-                </div>
-                <div className="mt-4 space-y-2">
-                    {salesPerformanceData.slice(0, 3).map((s, i) => (
-                        <div key={i} className="flex items-center justify-between text-xs">
-                            <div className="flex items-center gap-2">
-                                <User className="h-3 w-3 text-muted-foreground" />
-                                <span className="font-bold">{s.name}</span>
-                            </div>
-                            <span className="text-muted-foreground">Rp {s.value.toLocaleString('id-ID')}</span>
-                        </div>
-                    ))}
-                </div>
+                <div className="text-2xl font-black">{logisticStats.pendingShipment} <span className="text-xs font-normal">Ready to Ship</span></div>
+                <Progress value={(logisticStats.pendingShipment / (filteredInvoices.length || 1)) * 100} className="h-1.5 mt-3" />
             </CardContent>
-        </Card>
+         </Card>
+         <Card className="bg-amber-50/20 border-amber-100">
+            <CardHeader className="pb-2">
+                <CardTitle className="text-[10px] font-black uppercase text-amber-700 flex items-center gap-2 tracking-widest">
+                    <AlertTriangle className="h-4 w-4" /> Aging Documents
+                </CardTitle>
+            </CardHeader>
+            <CardContent>
+                <div className="text-2xl font-black">{logisticStats.inTransit} <span className="text-xs font-normal">On Delivery</span></div>
+                <p className="text-[10px] text-muted-foreground mt-2 font-medium italic">Dokumen fisik sedang dibawa kurir.</p>
+            </CardContent>
+         </Card>
       </div>
     </main>
   );

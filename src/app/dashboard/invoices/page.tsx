@@ -23,7 +23,7 @@ import {
   import { Badge } from '@/components/ui/badge';
   import { Checkbox } from '@/components/ui/checkbox';
   import { type Invoice, type SpdData, type SalesOrder, type Customer, type UserProfile } from '@/app/lib/data';
-  import { Search, Filter, MoreHorizontal, ArrowUpDown, Plus, Eye, Pencil, Trash2, CreditCard, Download, Truck, CheckCircle2 } from 'lucide-react';
+  import { Search, Filter, MoreHorizontal, ArrowUpDown, Plus, Eye, Pencil, Trash2, CreditCard, Download, Truck, CheckCircle2, FileSpreadsheet } from 'lucide-react';
   import { Skeleton } from '@/components/ui/skeleton';
   import {
     DropdownMenu,
@@ -36,6 +36,8 @@ import {
   import { useFirestore, useCollection, useMemoFirebase, useUser, errorEmitter, FirestorePermissionError, useDoc } from '@/firebase';
   import { collection, query, doc, deleteDoc, writeBatch, setDoc } from 'firebase/firestore';
   import { exportToExcel, cn } from '@/lib/utils';
+  import { DateRangePicker } from '@/app/components/date-range-picker';
+  import { isWithinInterval, parseISO, startOfToday, format } from 'date-fns';
 
 
   export default function InvoiceListPage() {
@@ -43,6 +45,10 @@ import {
     const [activeTab, setActiveTab] = useState('all');
     const [searchQuery, setSearchQuery] = useState('');
     const [selectedInvoices, setSelectedInvoices] = useState<Set<string>>(new Set());
+    const [dateRange, setDateRange] = useState<{ from: Date; to: Date }>({
+        from: startOfToday(),
+        to: startOfToday(),
+    });
     const { toast } = useToast();
     const firestore = useFirestore();
     const { user } = useUser();
@@ -66,8 +72,16 @@ import {
     const filteredInvoices = useMemo(() => {
         if (!invoices) return [];
         let filtered = invoices;
+
+        // 1. Filter by Date Range
+        filtered = filtered.filter(inv => {
+            const invDate = parseISO(inv.date);
+            return isWithinInterval(invDate, { start: dateRange.from, end: dateRange.to });
+        });
+
+        // 2. Filter by Tab
         if (activeTab !== 'all') {
-            filtered = invoices.filter(i => {
+            filtered = filtered.filter(i => {
                 if (activeTab === 'paid') return i.status === 'paid';
                 if (activeTab === 'received') return i.status === 'received';
                 if (activeTab === 'unpaid') return i.status !== 'paid' && i.status !== 'received';
@@ -75,6 +89,7 @@ import {
             });
         }
 
+        // 3. Filter by Search Query
         if (searchQuery) {
             filtered = filtered.filter(invoice => 
                 Object.values(invoice).some(value => 
@@ -84,20 +99,13 @@ import {
         }
 
         return filtered;
-    }, [invoices, activeTab, searchQuery]);
+    }, [invoices, activeTab, searchQuery, dateRange]);
 
     const handleCreateSpdFromSelected = () => {
         if (selectedInvoices.size === 0) return;
-        
-        // Simpan invoice yang dipilih ke session storage untuk diambil di menu SPD
         const selectedList = filteredInvoices.filter(inv => selectedInvoices.has(inv.id));
         sessionStorage.setItem('preselectedSpdInvoices', JSON.stringify(selectedList));
-        
-        toast({
-            title: "Siap Melakukan Pengiriman",
-            description: `${selectedInvoices.size} Invoice telah disiapkan. Mengalihkan ke menu SPD...`
-        });
-        
+        toast({ title: "Siap Melakukan Pengiriman", description: `${selectedInvoices.size} Invoice telah disiapkan.` });
         router.push('/dashboard/invoices/spd');
     };
 
@@ -132,7 +140,7 @@ import {
 
     const openDeleteDialog = (invoiceId: string) => {
       if (!isSuperAdmin) {
-        toast({ variant: "destructive", title: "Akses Ditolak", description: "Hanya Leader yang diizinkan menghapus data secara permanen." });
+        toast({ variant: "destructive", title: "Akses Ditolak", description: "Hanya Leader yang diizinkan menghapus data." });
         return;
       }
       setDeleteDialogState({ isOpen: true, invoiceId: invoiceId, isBulk: false });
@@ -140,24 +148,22 @@ import {
 
     return (
       <main className="flex flex-1 flex-col gap-4 p-4 md:gap-8 md:p-8">
-        <div className="flex justify-between items-center">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
             <div>
                 <h1 className="text-2xl font-black tracking-tighter uppercase">Invoice List</h1>
-                <p className="text-muted-foreground font-medium">Kelola penagihan dan pantau jadwal pengiriman dokumen fisik.</p>
+                <p className="text-muted-foreground font-medium flex items-center gap-2">
+                    Ditemukan {filteredInvoices.length} Data 
+                    <span className="text-[10px] font-black bg-primary/10 text-primary px-2 py-0.5 rounded">
+                        Periode: {format(dateRange.from, 'dd/MM')} - {format(dateRange.to, 'dd/MM/yy')}
+                    </span>
+                </p>
             </div>
             <div className="flex items-center gap-2">
-                {selectedInvoices.size > 0 && (
-                    <Button variant="secondary" size="sm" onClick={handleCreateSpdFromSelected} className="bg-indigo-50 border-indigo-200 text-indigo-700 hover:bg-indigo-100 font-bold">
-                        <Truck className="mr-2 h-4 w-4" /> Create SPD ({selectedInvoices.size})
-                    </Button>
-                )}
-                {isSuperAdmin && selectedInvoices.size > 0 && (
-                    <Button variant="destructive" size="sm" onClick={() => setDeleteDialogState({ isOpen: true, isBulk: true })} className="font-bold">
-                        <Trash2 className="mr-2 h-4 w-4" /> Leader Delete
-                    </Button>
-                )}
-                <Button variant="outline" size="sm" onClick={() => exportToExcel(filteredInvoices, 'invoices')} className="font-bold"><Download className="mr-2 h-4 w-4" /> Export</Button>
-                <Link href="/dashboard/invoices/add" passHref><Button size="sm" className="font-bold"><Plus className="mr-2 h-4 w-4"/> New Invoice</Button></Link>
+                <DateRangePicker onRangeChange={setDateRange} />
+                <Button variant="outline" size="sm" onClick={() => exportToExcel(filteredInvoices, `Invoice-Laporan-${format(dateRange.from, 'yyyyMMdd')}`)} className="font-bold h-9">
+                    <FileSpreadsheet className="mr-2 h-4 w-4 text-green-600" /> Export
+                </Button>
+                <Link href="/dashboard/invoices/add" passHref><Button size="sm" className="font-bold h-9"><Plus className="mr-2 h-4 w-4"/> New Invoice</Button></Link>
             </div>
         </div>
 
@@ -166,10 +172,10 @@ import {
                 <Tabs defaultValue="all" value={activeTab} onValueChange={setActiveTab}>
                     <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
                         <TabsList className="bg-muted/50 p-1">
-                            <TabsTrigger value="all" className="text-xs font-bold uppercase">Semua ({invoices?.length || 0})</TabsTrigger>
-                            <TabsTrigger value="paid" className="text-xs font-bold uppercase px-4">Lunas</TabsTrigger>
-                            <TabsTrigger value="received" className="text-xs font-bold uppercase px-4">Diterima PT</TabsTrigger>
-                            <TabsTrigger value="unpaid" className="text-xs font-bold uppercase px-4">Draft/Sent</TabsTrigger>
+                            <TabsTrigger value="all" className="text-xs font-bold uppercase">Semua ({filteredInvoices.length})</TabsTrigger>
+                            <TabsTrigger value="paid" className="text-xs font-bold uppercase px-4 text-emerald-600">Lunas</TabsTrigger>
+                            <TabsTrigger value="received" className="text-xs font-bold uppercase px-4 text-blue-600">Diterima PT</TabsTrigger>
+                            <TabsTrigger value="unpaid" className="text-xs font-bold uppercase px-4 text-red-600">Draft/Sent</TabsTrigger>
                         </TabsList>
                         <div className="relative w-full sm:w-64">
                             <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
@@ -182,7 +188,7 @@ import {
                             <TableHeader className="bg-muted/30">
                                 <TableRow>
                                     <TableHead className="w-[40px]"><Checkbox onCheckedChange={(c) => c ? setSelectedInvoices(new Set(filteredInvoices.map(i => i.id))) : setSelectedInvoices(new Set())} /></TableHead>
-                                    <TableHead className="text-[10px] font-black uppercase tracking-widest">Invoice & SPD Info</TableHead>
+                                    <TableHead className="text-[10px] font-black uppercase tracking-widest">Invoice Info</TableHead>
                                     <TableHead className="text-[10px] font-black uppercase tracking-widest">Customer</TableHead>
                                     <TableHead className="text-[10px] font-black uppercase tracking-widest">Date</TableHead>
                                     <TableHead className="text-[10px] font-black uppercase tracking-widest">Amount</TableHead>
@@ -203,7 +209,7 @@ import {
                                                         <Truck className="h-2.5 w-2.5" /> {invoice.spdNumber}
                                                     </div>
                                                 ) : (
-                                                    <span className="text-[9px] font-bold text-muted-foreground uppercase opacity-50 tracking-tighter">Not Picked (Gudang)</span>
+                                                    <span className="text-[9px] font-bold text-muted-foreground uppercase opacity-50 tracking-tighter">Ready to Ship</span>
                                                 )}
                                             </div>
                                         </TableCell>
@@ -222,9 +228,7 @@ import {
                                                     invoice.status === 'paid' ? "bg-emerald-50 text-emerald-700 border-emerald-100" : ""
                                                 )}
                                             >
-                                                {invoice.status === 'received' ? (
-                                                    <span className="flex items-center gap-1"><CheckCircle2 className="h-2.5 w-2.5" /> RECEIVED</span>
-                                                ) : invoice.status}
+                                                {invoice.status}
                                             </Badge>
                                         </TableCell>
                                         <TableCell className="text-right">
@@ -247,6 +251,14 @@ import {
                 </Tabs>
             </CardContent>
         </Card>
+
+        {selectedInvoices.size > 0 && (
+            <div className="fixed bottom-6 right-6 z-50">
+                <Button size="lg" onClick={handleCreateSpdFromSelected} className="bg-indigo-600 hover:bg-indigo-700 shadow-2xl rounded-full px-8 py-6 font-black uppercase tracking-widest animate-in slide-in-from-bottom-4">
+                    <Truck className="mr-3 h-5 w-5" /> Buat SPD ({selectedInvoices.size} Invoice)
+                </Button>
+            </div>
+        )}
 
         <DeleteConfirmationDialog 
             open={deleteDialogState.isOpen} 
