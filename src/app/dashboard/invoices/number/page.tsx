@@ -1,3 +1,4 @@
+
 'use client';
 import { useState, useRef, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
@@ -21,8 +22,8 @@ import {
   } from '@/components/ui/dropdown-menu';
   import { Input } from '@/components/ui/input';
   import { Button } from '@/components/ui/button';
-  import { type InvoiceNumber } from '@/app/lib/data';
-  import { Search, Upload, Download, Filter, MoreHorizontal, Edit, Trash2 } from 'lucide-react';
+  import { type InvoiceNumber, type Invoice } from '@/app/lib/data';
+  import { Search, Upload, Download, Filter, MoreHorizontal, Edit, Trash2, Lock } from 'lucide-react';
   import { AddInvoiceNumberDialog } from './_components/add-invoice-number-dialog';
   import { DeleteConfirmationDialog } from '@/app/components/delete-confirmation-dialog';
   import { Skeleton } from '@/components/ui/skeleton';
@@ -51,14 +52,20 @@ import {
     }, [firestore]);
     const { data: invoices, isLoading } = useCollection<InvoiceNumber>(invoiceNumbersCollection);
 
+    // Fetch Invoice List untuk pengecekan relasi/status (Sequential Guard)
+    const invoicesCollection = useMemoFirebase(() => {
+        if (!firestore) return null;
+        return query(collection(firestore, 'invoices'));
+    }, [firestore]);
+    const { data: linkedInvoices } = useCollection<Invoice>(invoicesCollection);
+
     const filteredInvoices = useMemo(() => {
         if (!invoices) return [];
         
-        // Sorting berdasarkan angka di dalam string format baru
         const sortedInvoices = [...invoices].sort((a, b) => {
             const getNum = (id: string) => {
-                const matchSAR = id.match(/SAR_2601(\d+)A/);
-                const matchKW = id.match(/^(\d{4})$/);
+                const matchSAR = id.match(/SAR_\d{2}01(\d+)A/);
+                const matchKW = id.match(/KW[\/_](\d+)[\/_]KEU[\/_]\d{4}/);
                 if (matchSAR) return parseInt(matchSAR[1], 10);
                 if (matchKW) return parseInt(matchKW[1], 10);
                 return 0;
@@ -86,13 +93,31 @@ import {
         setIsDialogOpen(true);
     };
 
+    /**
+     * Proteksi Penghapusan:
+     * Menjamin nomor faktur yang sudah dikirim (Sent) tidak bisa dihapus permanen.
+     */
     const handleDeleteConfirm = () => {
         if (!firestore || !deleteDialogState.invoiceId) return;
+
+        // Cek apakah nomor sudah ada di Invoice List (Sent/Draft)
+        const isLinked = linkedInvoices?.some(inv => inv.id === deleteDialogState.invoiceId);
+        
+        if (isLinked) {
+            toast({
+                variant: "destructive",
+                title: "Aksi Ditolak",
+                description: "Nomor ini sudah digunakan dalam Invoice List dan tidak dapat dihapus untuk menjaga urutan audit.",
+            });
+            setDeleteDialogState({ isOpen: false, invoiceId: undefined });
+            return;
+        }
+
         const safeId = deleteDialogState.invoiceId.replace(/\//g, '_');
         const docRef = doc(firestore, 'invoiceNumbers', safeId);
         deleteDoc(docRef)
             .then(() => {
-                toast({ title: 'Invoice Number Deleted' });
+                toast({ title: 'Nomor Faktur Berhasil Dihapus' });
                 setDeleteDialogState({ isOpen: false, invoiceId: undefined });
             })
             .catch(async (serverError) => {
@@ -112,9 +137,6 @@ import {
     const handleSave = (invoice: Omit<InvoiceNumber, 'id' | 'ownerId'> & {id: string}, action: 'save' | 'create') => {
       if (!firestore || !user) return;
       const { id, ...invoiceData } = invoice;
-      
-      // ID sekarang disimpan apa adanya (bisa mengandung _ atau /)
-      // Namun untuk path Firestore kita ganti / menjadi _ agar aman
       const safePathId = id.replace(/\//g, '_');
       
       const docRef = doc(firestore, 'invoiceNumbers', safePathId);
@@ -188,18 +210,11 @@ import {
             description: `${data.length} records imported successfully.`,
           });
         } catch (error: any) {
-          console.error("Error importing file:", error);
-           const permissionError = new FirestorePermissionError({
+           errorEmitter.emit('permission-error', new FirestorePermissionError({
               path: 'invoiceNumbers',
-              operation: 'create', // Batch write is treated as multiple creates
+              operation: 'create',
               requestResourceData: 'Batch import data',
-          });
-          errorEmitter.emit('permission-error', permissionError);
-          toast({
-            variant: "destructive",
-            title: "Error",
-            description: error.message || "Failed to import the Excel file.",
-          });
+          }));
         }
       }
     };
@@ -209,7 +224,7 @@ import {
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Daftar Nomor Faktur</h1>
           <p className="text-muted-foreground">
-            Kelola semua nomor faktur Anda.
+            Kelola dan proteksi urutan nomor faktur Anda.
           </p>
         </div>
         
@@ -229,9 +244,8 @@ import {
                     <div className="flex items-center gap-2">
                        <input type="file" ref={fileInputRef} onChange={handleFileChange} className="hidden" accept=".xlsx, .xls" />
                        <Button variant="outline" onClick={handleImportClick}><Upload className="mr-2 h-4 w-4"/> Impor</Button>
-                       <Button variant="outline" onClick={handleDownloadTemplate}><Download className="mr-2 h-4 w-4"/> Download Template</Button>
+                       <Button variant="outline" onClick={handleDownloadTemplate}><Download className="mr-2 h-4 w-4"/> Template</Button>
                        <Button variant="outline" onClick={handleExport}><Download className="mr-2 h-4 w-4"/> Ekspor</Button>
-                       <Button variant="outline"><Filter className="mr-2 h-4 w-4"/> Filter Duplikat</Button>
                        <AddInvoiceNumberDialog
                         isOpen={isDialogOpen}
                         onOpenChange={handleDialogStateChange}
@@ -268,46 +282,61 @@ import {
                                     </TableRow>
                                 ))
                             ) : (
-                                filteredInvoices?.map((invoice) => (
-                                    <TableRow key={invoice.id}>
-                                        <TableCell className="font-medium">{invoice.id}</TableCell>
-                                        <TableCell>{invoice.customer}</TableCell>
-                                        <TableCell>{invoice.salesOrder}</TableCell>
-                                        <TableCell>{invoice.date}</TableCell>
-                                        <TableCell>Rp {invoice.amount.toLocaleString('id-ID')},00</TableCell>
-                                        <TableCell className="text-right">
-                                            <DropdownMenu>
-                                                <DropdownMenuTrigger asChild>
-                                                    <Button variant="ghost" size="icon">
-                                                        <MoreHorizontal className="h-4 w-4" />
-                                                    </Button>
-                                                </DropdownMenuTrigger>
-                                                <DropdownMenuContent align="end">
-                                                    <DropdownMenuItem onClick={() => handleEdit(invoice)}>
-                                                        <Edit className="mr-2 h-4 w-4" />
-                                                        Edit
-                                                    </DropdownMenuItem>
-                                                    <DeleteConfirmationDialog 
-                                                      open={deleteDialogState.isOpen && deleteDialogState.invoiceId === invoice.id}
-                                                      onOpenChange={(open) => setDeleteDialogState({isOpen: open, invoiceId: open ? invoice.id : undefined})}
-                                                      onConfirm={handleDeleteConfirm}
-                                                    >
-                                                        <DropdownMenuItem
-                                                            className="text-destructive focus:text-destructive focus:bg-destructive/10"
-                                                            onSelect={(e) => {
-                                                              e.preventDefault();
-                                                              openDeleteDialog(invoice.id);
-                                                            }}
-                                                          >
-                                                          <Trash2 className="mr-2 h-4 w-4" />
-                                                          Hapus
+                                filteredInvoices?.map((invoice) => {
+                                    const isLinked = linkedInvoices?.some(inv => inv.id === invoice.id);
+                                    return (
+                                        <TableRow key={invoice.id} className={isLinked ? "bg-muted/30" : ""}>
+                                            <TableCell className="font-medium">
+                                                <div className="flex items-center gap-2">
+                                                    {invoice.id}
+                                                    {isLinked && <Lock className="h-3 w-3 text-muted-foreground" title="Locked by Audit" />}
+                                                </div>
+                                            </TableCell>
+                                            <TableCell>{invoice.customer}</TableCell>
+                                            <TableCell>{invoice.salesOrder}</TableCell>
+                                            <TableCell>{invoice.date}</TableCell>
+                                            <TableCell>Rp {invoice.amount.toLocaleString('id-ID')},00</TableCell>
+                                            <TableCell className="text-right">
+                                                <DropdownMenu>
+                                                    <DropdownMenuTrigger asChild>
+                                                        <Button variant="ghost" size="icon">
+                                                            <MoreHorizontal className="h-4 w-4" />
+                                                        </Button>
+                                                    </DropdownMenuTrigger>
+                                                    <DropdownMenuContent align="end">
+                                                        <DropdownMenuItem onClick={() => handleEdit(invoice)}>
+                                                            <Edit className="mr-2 h-4 w-4" />
+                                                            Edit
                                                         </DropdownMenuItem>
-                                                    </DeleteConfirmationDialog>
-                                                </DropdownMenuContent>
-                                            </DropdownMenu>
-                                        </TableCell>
-                                    </TableRow>
-                                ))
+                                                        <DeleteConfirmationDialog 
+                                                            open={deleteDialogState.isOpen && deleteDialogState.invoiceId === invoice.id}
+                                                            onOpenChange={(open) => setDeleteDialogState({isOpen: open, invoiceId: open ? invoice.id : undefined})}
+                                                            onConfirm={handleDeleteConfirm}
+                                                        >
+                                                            <DropdownMenuItem
+                                                                className={cn(
+                                                                    "text-destructive focus:text-destructive focus:bg-destructive/10",
+                                                                    isLinked && "opacity-50 cursor-not-allowed"
+                                                                )}
+                                                                onSelect={(e) => {
+                                                                    e.preventDefault();
+                                                                    if (isLinked) {
+                                                                        toast({ variant: "destructive", title: "Data Terkunci", description: "Nomor ini sudah digunakan dalam Invoice List." });
+                                                                        return;
+                                                                    }
+                                                                    openDeleteDialog(invoice.id);
+                                                                }}
+                                                            >
+                                                                <Trash2 className="mr-2 h-4 w-4" />
+                                                                {isLinked ? 'Hapus (Terkunci)' : 'Hapus'}
+                                                            </DropdownMenuItem>
+                                                        </DeleteConfirmationDialog>
+                                                    </DropdownMenuContent>
+                                                </DropdownMenu>
+                                            </TableCell>
+                                        </TableRow>
+                                    );
+                                })
                             )}
                         </TableBody>
                     </Table>

@@ -29,7 +29,7 @@ import {
 import { Calendar } from '@/components/ui/calendar';
 import { cn, formatNumberWithCommas, parseFormattedNumber } from '@/lib/utils';
 import { format } from 'date-fns';
-import type { InvoiceNumber, Customer, SalesOrder } from '@/app/lib/data';
+import type { InvoiceNumber, Customer, SalesOrder, Invoice } from '@/app/lib/data';
 import { useToast } from '@/hooks/use-toast';
 import { useFirestore, useCollection, useMemoFirebase, useUser } from '@/firebase';
 import { collection, query } from 'firebase/firestore';
@@ -80,14 +80,21 @@ export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceDa
   }, [firestore]);
   const { data: salesOrderListData } = useCollection<SalesOrder>(salesOrdersCollection);
 
+  const invoicesCollection = useMemoFirebase(() => {
+    if (!firestore) return null;
+    return query(collection(firestore, 'invoices'));
+  }, [firestore]);
+  const { data: existingInvoices } = useCollection<Invoice>(invoicesCollection);
+
   const uniqueSalesOrders = useMemo(() => {
     if (!salesOrderListData) return [];
     return Array.from(new Set(salesOrderListData.map(item => item.soNumber)))
   },[salesOrderListData]);
 
   /**
-   * Menggenerate nomor urut berikutnya berdasarkan tahun berjalan.
-   * Reset ke 001 setiap awal tahun baru.
+   * Logika "Next Number" Berbasis Database:
+   * Mengambil referensi dari nilai tertinggi di invoiceNumbers DAN invoices
+   * untuk mencegah adanya nomor yang melompat (gap).
    */
   const generateNextNumber = (type: 'sar' | 'kw', startFrom: string = '') => {
     let currentMax = 0;
@@ -95,37 +102,35 @@ export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceDa
     const currentYearShort = format(now, 'yy');
     const currentYearLong = format(now, 'yyyy');
     
-    if (allInvoiceNumbers) {
-        allInvoiceNumbers.forEach(inv => {
-            const id = inv.id || '';
-            let match;
-            if (type === 'sar') {
-                // Mencari angka setelah SAR_[YY]01...
-                const pattern = new RegExp(`SAR_${currentYearShort}01(\\d+)A`);
-                match = id.match(pattern);
-            } else {
-                // Mencari angka di tengah KW/[XXXX]/KEU/[YYYY]
-                const pattern = new RegExp(`KW[\\/_](\\d+)[\\/_]KEU[\\/_]${currentYearLong}`);
-                match = id.match(pattern);
-            }
+    // Gabungkan ID dari kedua koleksi untuk validasi urutan absolut
+    const allIds = [
+        ...(allInvoiceNumbers?.map(inv => inv.id) || []),
+        ...(existingInvoices?.map(inv => inv.id) || [])
+    ];
 
-            if (match && match[1]) {
-                const num = parseInt(match[1], 10);
-                if (num > currentMax) currentMax = num;
-            }
-        });
-    }
+    allIds.forEach(id => {
+        let match;
+        if (type === 'sar') {
+            const pattern = new RegExp(`SAR_${currentYearShort}01(\\d+)A`);
+            match = id.match(pattern);
+        } else {
+            const pattern = new RegExp(`KW[\\/_](\\d+)[\\/_]KEU[\\/_]${currentYearLong}`);
+            match = id.match(pattern);
+        }
+
+        if (match && match[1]) {
+            const num = parseInt(match[1], 10);
+            if (num > currentMax) currentMax = num;
+        }
+    });
 
     const userStart = parseInt(startFrom, 10);
     const baseNumber = !isNaN(userStart) ? Math.max(currentMax, userStart - 1) : currentMax;
-    
     const nextNum = baseNumber + 1;
 
-    if (type === 'sar') {
-        return nextNum.toString().padStart(3, '0');
-    } else {
-        return nextNum.toString().padStart(4, '0');
-    }
+    return type === 'sar' 
+        ? nextNum.toString().padStart(3, '0') 
+        : nextNum.toString().padStart(4, '0');
   };
   
   const setupForAddMode = (type: 'sar' | 'kw', startVal: string = '') => {
@@ -138,7 +143,7 @@ export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceDa
       setPrefix(`SAR_${currentYearShort}01`);
       setSuffix('A');
       setMainNumber(nextNumStr);
-    } else { // kw
+    } else {
       setPrefix('KW/');
       setSuffix(`/KEU/${currentYearLong}`);
       setMainNumber(nextNumStr);
@@ -248,13 +253,11 @@ export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceDa
   };
   
   const handleAmountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    // Memungkinkan input angka, titik, dan koma secara bebas untuk fleksibilitas manual
     const value = e.target.value.replace(/[^\d.,]/g, '');
     setAmount(value);
   };
 
   const handleBlurAmount = () => {
-    // Format saat blur untuk kerapihan tanpa mengunci saat mengetik
     const numeric = parseFormattedNumber(amount);
     if (!isNaN(numeric) && amount !== '') {
         setAmount(formatNumberWithCommas(numeric));
@@ -263,22 +266,23 @@ export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceDa
 
   const handleSave = (action: 'save' | 'create') => {
     if (!mainNumber) {
-        toast({
-            variant: "destructive",
-            title: "Validation Error",
-            description: "Nomor urut tidak boleh kosong.",
-        });
+        toast({ variant: "destructive", title: "Validation Error", description: "Nomor urut tidak boleh kosong." });
         return;
     }
     
     const finalInvoiceNumber = fullInvoiceNumber;
+    
+    // Pengecekan Duplikasi Ketat: Cek di Daftar Nomor Faktur DAN Invoice List
+    const existsInNumberList = allInvoiceNumbers?.some(inv => inv.id === finalInvoiceNumber);
+    const existsInInvoiceList = existingInvoices?.some(inv => inv.id === finalInvoiceNumber);
+    
     const isChangingId = invoiceData && invoiceData.id !== finalInvoiceNumber;
     
-    if ((!invoiceData || isChangingId) && allInvoiceNumbers?.some(inv => inv.id === finalInvoiceNumber)) {
+    if ((!invoiceData || isChangingId) && (existsInNumberList || existsInInvoiceList)) {
       toast({
         variant: "destructive",
-        title: "Duplicate Invoice Number",
-        description: `Invoice number "${finalInvoiceNumber}" already exists.`,
+        title: "Nomor Faktur Duplikat",
+        description: `Nomor "${finalInvoiceNumber}" sudah terdaftar dalam sistem, harap gunakan nomor lain.`,
       });
       return; 
     }
