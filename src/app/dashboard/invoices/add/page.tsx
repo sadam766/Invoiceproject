@@ -30,31 +30,24 @@ import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { cn, formatNumberWithCommas, parseFormattedNumber } from '@/lib/utils';
-import { format, addDays, isBefore, parseISO, startOfToday } from 'date-fns';
+import { format, addDays } from 'date-fns';
 import {
   ChevronLeft,
   Plus,
   Send,
   History,
-  AlertTriangle,
   ShieldCheck,
   Banknote,
   ReceiptText,
+  AlertTriangle,
+  Info,
+  PackageCheck,
 } from 'lucide-react';
-import { type Invoice, type SalesOrder, type UserProfile, type SalesListItem, type Customer } from '@/app/lib/data';
+import { type Invoice, type SalesOrder, type UserProfile, type SalesListItem, type Customer, type InvoiceItem } from '@/app/lib/data';
 import { useToast } from '@/hooks/use-toast';
 import { useFirestore, useCollection, useMemoFirebase, useUser, useDoc, errorEmitter, FirestorePermissionError } from '@/firebase';
-import { collection, query, doc, setDoc, arrayUnion } from 'firebase/firestore';
+import { collection, query, doc, setDoc, arrayUnion, where } from 'firebase/firestore';
 import { Badge } from '@/components/ui/badge';
-
-type InvoiceItem = {
-    id: number;
-    name: string;
-    quantity: number | string;
-    unit: string;
-    price: number | string;
-    total: number;
-};
 
 export default function AddInvoicePage() {
   const router = useRouter();
@@ -78,15 +71,21 @@ export default function AddInvoicePage() {
   const [items, setItems] = useState<InvoiceItem[]>([]);
   const [isFinalized, setIsFinalized] = useState(false);
   const [isPaid, setIsPaid] = useState(false);
+  const [isDpInvoice, setIsDpInvoice] = useState(false);
 
   // --- CALCULATION STATES ---
   const [subtotal, setSubtotal] = useState(0);
   const [negotiationValue, setNegotiationValue] = useState<string | number>('');
   const [negotiationMode, setNegotiationMode] = useState<'percent' | 'nominal'>('nominal');
+  
   const [dpValue, setDpValue] = useState<string | number>('');
   const [dpMode, setDpMode] = useState<'percent' | 'nominal'>('nominal');
+  
   const [retentionValue, setRetentionValue] = useState<string | number>('');
   const [retentionMode, setRetentionMode] = useState<'percent' | 'nominal'>('nominal');
+
+  const [dpDeductionValue, setDpDeductionValue] = useState<string | number>('');
+  const [dpDeductionMode, setDpDeductionMode] = useState<'percent' | 'nominal'>('nominal');
 
   const [isTaxManual, setIsTaxManual] = useState(false);
   const [dppVat, setDppVat] = useState<string | number>(0);
@@ -110,12 +109,44 @@ export default function AddInvoicePage() {
   const customersCollection = useMemoFirebase(() => firestore ? query(collection(firestore, 'customers')) : null, [firestore]);
   const { data: customerListData } = useCollection<Customer>(customersCollection);
 
+  // --- LOGIC: PARTIAL INVOICING TRACKING ---
+  const poRelatedInvoices = useMemo(() => {
+    if (!allInvoices || !poNumber) return [];
+    return allInvoices.filter(inv => inv.poNumber === poNumber && inv.status !== 'cancelled' && inv.id !== invoiceId);
+  }, [allInvoices, poNumber, invoiceId]);
+
+  const dpBalance = useMemo(() => {
+    const totalDpInvoiced = poRelatedInvoices.filter(inv => inv.isDpInvoice).reduce((sum, inv) => sum + inv.amount, 0);
+    const totalDpDeducted = poRelatedInvoices.reduce((sum, inv) => sum + (inv.dpDeduction || 0), 0);
+    return totalDpInvoiced - totalDpDeducted;
+  }, [poRelatedInvoices]);
+
+  const itemTracking = useMemo(() => {
+    if (!poNumber || !allSoItems) return {};
+    const tracking: Record<string, { poQty: number; invoiced: number }> = {};
+    
+    // Total from SO
+    allSoItems.filter(so => so.poNumber === poNumber).forEach(item => {
+        tracking[item.productName] = { poQty: item.quantity, invoiced: 0 };
+    });
+
+    // Sum from all previous invoices
+    poRelatedInvoices.forEach(inv => {
+        inv.items?.forEach(item => {
+            if (tracking[item.name]) {
+                tracking[item.name].invoiced += item.quantity;
+            }
+        });
+    });
+
+    return tracking;
+  }, [poNumber, allSoItems, poRelatedInvoices]);
+
   // --- LOGIC: AUTO-GENERATE INVOICE NUMBER ---
   useEffect(() => {
     if (!editInvoiceId && allInvoices && !invoiceId) {
         const now = new Date();
         const year = now.getFullYear();
-        // Count existing for the year to increment
         const count = allInvoices.filter(inv => inv.id.includes(year.toString())).length + 1;
         setInvoiceId(`KW/${count.toString().padStart(4, '0')}/KEU/${year}`);
     }
@@ -123,14 +154,13 @@ export default function AddInvoicePage() {
 
   // --- LOGIC: INITIAL LOAD FROM PO ---
   useEffect(() => {
-    if (poNumberParam && allSales && allSoItems && customerListData) {
+    if (poNumberParam && allSales && allSoItems && customerListData && Object.keys(itemTracking).length > 0) {
         const foundSale = allSales.find(s => s.poNumber === poNumberParam);
         if (foundSale) {
             setPoNumber(foundSale.poNumber);
             setSoNumber(foundSale.soNumber || '');
             setCustomerName(foundSale.customer);
             
-            // Auto-fetch default address
             const cust = customerListData.find(c => c.name === foundSale.customer);
             if (cust) {
                 const defAddr = cust.addresses?.find(a => a.isDefault) || cust.addresses?.[0];
@@ -138,19 +168,22 @@ export default function AddInvoicePage() {
                 setBillingNpwp(defAddr?.npwp || '');
             }
 
-            // Auto-load items
-            const relatedItems = allSoItems.filter(item => item.poNumber === poNumberParam || item.soNumber === foundSale.soNumber);
-            setItems(relatedItems.map((item, idx) => ({
-                id: idx,
-                name: item.productName,
-                quantity: item.quantity,
-                unit: item.unit,
-                price: item.price,
-                total: item.quantity * item.price
-            })));
+            const relatedItems = allSoItems.filter(item => item.poNumber === poNumberParam);
+            setItems(relatedItems.map((item, idx) => {
+                const track = itemTracking[item.productName] || { poQty: item.quantity, invoiced: 0 };
+                const remaining = Math.max(0, track.poQty - track.invoiced);
+                return {
+                    id: idx.toString(),
+                    name: item.productName,
+                    quantity: remaining,
+                    unit: item.unit,
+                    price: item.price,
+                    total: remaining * item.price
+                };
+            }));
         }
     }
-  }, [poNumberParam, allSales, allSoItems, customerListData]);
+  }, [poNumberParam, allSales, allSoItems, customerListData, itemTracking]);
 
   // --- LOGIC: EDIT MODE ---
   useEffect(() => {
@@ -166,16 +199,19 @@ export default function AddInvoicePage() {
             setIssueDate(found.date ? new Date(found.date) : new Date());
             setIsFinalized(found.status === 'finalized');
             setIsPaid(found.status === 'paid');
+            setIsDpInvoice(!!found.isDpInvoice);
             setNegotiationValue(found.negotiation || '');
             setDpValue(found.dpValue || '');
             setRetentionValue(found.retention || '');
+            setDpDeductionValue(found.dpDeduction || '');
+            setItems(found.items || []);
         }
     }
   }, [editInvoiceId, allInvoices]);
 
   // --- LOGIC: CALCULATIONS ---
   useEffect(() => {
-    const currentSubtotal = items.reduce((acc, item) => acc + (parseFormattedNumber(item.quantity) * parseFormattedNumber(item.price)), 0);
+    const currentSubtotal = items.reduce((acc, item) => acc + (item.quantity * item.price), 0);
     setSubtotal(currentSubtotal);
   
     const negInputVal = parseFormattedNumber(String(negotiationValue));
@@ -189,6 +225,9 @@ export default function AddInvoicePage() {
     const retInputVal = parseFormattedNumber(String(retentionValue));
     const retNominal = retentionMode === 'percent' ? (baseAfterNeg * (retInputVal / 100)) : retInputVal;
 
+    const dpDedInputVal = parseFormattedNumber(String(dpDeductionValue));
+    const dpDedNominal = dpDeductionMode === 'percent' ? (baseAfterNeg * (dpDedInputVal / 100)) : dpDedInputVal;
+
     if (!isTaxManual) {
         const calculatedDpp = baseAfterNeg;
         const calculatedVat = calculatedDpp * 0.12;
@@ -198,12 +237,28 @@ export default function AddInvoicePage() {
 
     const currentDpp = parseFormattedNumber(String(dppVat));
     const currentVat = parseFormattedNumber(String(vat12));
-    setTotalAmount(formatNumberWithCommas(currentDpp + currentVat - dpNominal - retNominal));
-  }, [items, negotiationValue, negotiationMode, dpValue, dpMode, retentionValue, retentionMode, isTaxManual, dppVat, vat12]);
+    
+    // Formula: (Subtotal + Tax) - DP Alokasi - Retensi. 
+    // Jika isDpInvoice = true, maka tagihannya adalah nilai DP itu sendiri.
+    const grand = isDpInvoice ? dpNominal : (currentDpp + currentVat - dpDedNominal - retNominal);
+    setTotalAmount(formatNumberWithCommas(grand));
+  }, [items, negotiationValue, negotiationMode, dpValue, dpMode, retentionValue, retentionMode, dpDeductionValue, dpDeductionMode, isTaxManual, dppVat, vat12, isDpInvoice]);
 
   const handleSaveInvoice = async (invoiceStatus: any = 'sent') => {
     if (!firestore || !user || !invoiceId || !customerName) {
         toast({ variant: "destructive", title: "Gagal Simpan", description: "Nomor Invoice dan Customer wajib ada." });
+        return;
+    }
+
+    // Item Validation
+    const invalidItem = items.find(item => {
+        const track = itemTracking[item.name];
+        if (!track) return false;
+        return item.quantity > (track.poQty - track.invoiced);
+    });
+
+    if (invalidItem && !isDpInvoice) {
+        toast({ variant: "destructive", title: "Validasi Gagal", description: `Jumlah ${invalidItem.name} melebihi sisa PO.` });
         return;
     }
 
@@ -224,9 +279,12 @@ export default function AddInvoicePage() {
         dueDate: format(dueDate, 'yyyy-MM-dd'),
         amount: parseFormattedNumber(String(totalAmount)),
         status: invoiceStatus,
+        isDpInvoice: isDpInvoice,
         negotiation: parseFormattedNumber(String(negotiationValue)),
         dpValue: parseFormattedNumber(String(dpValue)),
+        dpDeduction: parseFormattedNumber(String(dpDeductionValue)),
         retention: parseFormattedNumber(String(retentionValue)),
+        items: items,
         lastUpdatedAt: timestamp,
         lastUpdatedBy: updater,
         revisionLogs: arrayUnion({
@@ -264,7 +322,15 @@ export default function AddInvoicePage() {
             </Button>
             <div>
                 <h1 className="text-2xl font-black tracking-tight uppercase">Invoice Constructor</h1>
-                <p className="text-muted-foreground text-xs font-bold uppercase tracking-widest">Pembuatan invoice otomatis berbasis PO/SO.</p>
+                <p className="text-muted-foreground text-xs font-bold uppercase tracking-widest">Partial Billing & DP Tracking Active.</p>
+            </div>
+        </div>
+        <div className="flex items-center gap-3 bg-indigo-50 px-4 py-2 rounded-xl border border-indigo-100">
+            <div className="flex items-center gap-2">
+                <Label className="text-[10px] font-black uppercase text-indigo-700">Mode Tagihan:</Label>
+                <Badge variant={isDpInvoice ? "default" : "outline"} className={cn("text-[9px] uppercase cursor-pointer", isDpInvoice ? "bg-indigo-600" : "text-indigo-600 border-indigo-200")} onClick={() => setIsDpInvoice(!isDpInvoice)}>
+                   {isDpInvoice ? "Down Payment (DP)" : "Tagihan Barang / Progress"}
+                </Badge>
             </div>
         </div>
       </div>
@@ -307,33 +373,58 @@ export default function AddInvoicePage() {
             </CardContent>
           </Card>
 
-          <Card className={cn("shadow-sm border-none ring-1 ring-border", isLocked && "opacity-60 pointer-events-none")}>
-            <CardHeader className="bg-muted/30 border-b py-4"><CardTitle className="text-sm font-black uppercase">Item Penagihan (Sync SO)</CardTitle></CardHeader>
+          <Card className={cn("shadow-sm border-none ring-1 ring-border", isLocked && "opacity-60 pointer-events-none", isDpInvoice && "opacity-40 grayscale pointer-events-none")}>
+            <CardHeader className="bg-muted/30 border-b py-4">
+                <div className="flex justify-between items-center">
+                    <CardTitle className="text-sm font-black uppercase">Item Progress Tracking</CardTitle>
+                    {isDpInvoice && <Badge variant="secondary" className="text-[8px] uppercase">Disabled in DP Mode</Badge>}
+                </div>
+            </CardHeader>
             <CardContent className="p-0">
                 <Table>
                     <TableHeader className="bg-muted/50">
                         <TableRow>
                             <TableHead className="text-[10px] font-black uppercase py-2">Nama Produk / Jasa</TableHead>
-                            <TableHead className="w-[80px] text-center text-[10px] font-black uppercase py-2">Qty</TableHead>
-                            <TableHead className="w-[140px] text-right text-[10px] font-black uppercase py-2">Harga Satuan</TableHead>
+                            <TableHead className="w-[80px] text-center text-[10px] font-black uppercase py-2">Qty PO</TableHead>
+                            <TableHead className="w-[80px] text-center text-[10px] font-black uppercase py-2">Invoiced</TableHead>
+                            <TableHead className="w-[100px] text-center text-[10px] font-black uppercase py-2">Now Billing</TableHead>
                             <TableHead className="w-[140px] text-right text-[10px] font-black uppercase py-2">Total</TableHead>
                         </TableRow>
                     </TableHeader>
                     <TableBody>
                         {items.length === 0 ? (
-                            <TableRow><TableCell colSpan={4} className="text-center py-10 text-muted-foreground italic">Belum ada item SO terdeteksi.</TableCell></TableRow>
-                        ) : items.map(item => (
-                            <TableRow key={item.id}>
-                                <TableCell><Input value={item.name} onChange={e => setItems(items.map(it => it.id === item.id ? { ...it, name: e.target.value } : it))} className="h-9 text-xs font-bold" /></TableCell>
-                                <TableCell><Input value={item.quantity} onChange={e => setItems(items.map(it => it.id === item.id ? { ...it, quantity: e.target.value, total: parseFormattedNumber(e.target.value) * parseFormattedNumber(String(it.price)) } : it))} className="text-center text-xs h-9 font-bold" /></TableCell>
-                                <TableCell><Input value={item.price} onChange={e => setItems(items.map(it => it.id === item.id ? { ...it, price: e.target.value, total: parseFormattedNumber(String(it.quantity)) * parseFormattedNumber(e.target.value) } : it))} className="text-right text-xs h-9 font-bold" /></TableCell>
-                                <TableCell className="text-right font-black text-xs text-slate-800">Rp {formatNumberWithCommas(item.total)}</TableCell>
-                            </TableRow>
-                        ))}
+                            <TableRow><TableCell colSpan={5} className="text-center py-10 text-muted-foreground italic">Belum ada item SO terdeteksi.</TableCell></TableRow>
+                        ) : items.map(item => {
+                            const track = itemTracking[item.name] || { poQty: item.quantity, invoiced: 0 };
+                            const remaining = track.poQty - track.invoiced;
+                            const isOver = item.quantity > remaining;
+
+                            return (
+                                <TableRow key={item.id}>
+                                    <TableCell><Input value={item.name} onChange={e => setItems(items.map(it => it.id === item.id ? { ...it, name: e.target.value } : it))} className="h-9 text-xs font-bold" /></TableCell>
+                                    <TableCell className="text-center text-[10px] font-bold text-muted-foreground">{track.poQty}</TableCell>
+                                    <TableCell className="text-center text-[10px] font-bold text-blue-600">{track.invoiced}</TableCell>
+                                    <TableCell>
+                                        <div className="space-y-1">
+                                            <Input 
+                                                value={item.quantity} 
+                                                onChange={e => {
+                                                    const val = parseFormattedNumber(e.target.value);
+                                                    setItems(items.map(it => it.id === item.id ? { ...it, quantity: val, total: val * it.price } : it));
+                                                }} 
+                                                className={cn("text-center text-xs h-9 font-black", isOver ? "border-red-500 bg-red-50 text-red-700" : "bg-blue-50/50")} 
+                                            />
+                                            {isOver && <p className="text-[8px] text-red-600 font-bold text-center uppercase tracking-tighter">Over Limit!</p>}
+                                        </div>
+                                    </TableCell>
+                                    <TableCell className="text-right font-black text-xs text-slate-800">Rp {formatNumberWithCommas(item.total)}</TableCell>
+                                </TableRow>
+                            );
+                        })}
                     </TableBody>
                 </Table>
                 <div className="p-4 bg-muted/10 border-t">
-                    <Button variant="outline" size="sm" onClick={() => setItems([...items, { id: Date.now(), name: '', quantity: 1, unit: 'm', price: 0, total: 0 }])} className="border-dashed h-8 text-[10px] font-bold">
+                    <Button variant="outline" size="sm" onClick={() => setItems([...items, { id: Date.now().toString(), name: '', quantity: 1, unit: 'm', price: 0, total: 0 }])} className="border-dashed h-8 text-[10px] font-bold">
                         <Plus className="mr-2 h-3 w-3" /> TAMBAH BARIS MANUAL
                     </Button>
                 </div>
@@ -368,15 +459,43 @@ export default function AddInvoicePage() {
                     <Input value={negotiationValue} onChange={e => setNegotiationValue(e.target.value)} className="h-8 text-right font-black text-red-600 border-red-100 bg-red-50/30" placeholder="0" />
                 </div>
 
+                {isDpInvoice ? (
+                    <div className="space-y-2 bg-indigo-50/50 p-3 rounded-xl border border-indigo-100">
+                        <div className="flex justify-between items-center">
+                            <Label className="text-[10px] font-black uppercase text-indigo-700">Tagihan Down Payment</Label>
+                            <Select value={dpMode} onValueChange={(v: any) => setDpMode(v)}>
+                                <SelectTrigger className="h-6 w-16 text-[9px] font-black uppercase"><SelectValue /></SelectTrigger>
+                                <SelectContent><SelectItem value="nominal">IDR</SelectItem><SelectItem value="percent">%</SelectItem></SelectContent>
+                            </Select>
+                        </div>
+                        <Input value={dpValue} onChange={e => setDpValue(e.target.value)} className="h-8 text-right font-black border-indigo-200" placeholder="0" />
+                        <p className="text-[8px] text-indigo-600 font-bold uppercase mt-1 italic">*Menghitung porsi pembayaran dimuka.</p>
+                    </div>
+                ) : (
+                    <div className="space-y-2 bg-emerald-50/30 p-3 rounded-xl border border-emerald-100">
+                        <div className="flex justify-between items-center">
+                            <div className="flex flex-col">
+                                <Label className="text-[10px] font-black uppercase text-emerald-700">Deduction from DP</Label>
+                                <span className="text-[8px] font-bold text-emerald-600">Saldo: Rp {formatNumberWithCommas(dpBalance)}</span>
+                            </div>
+                            <Select value={dpDeductionMode} onValueChange={(v: any) => setDpDeductionMode(v)}>
+                                <SelectTrigger className="h-6 w-16 text-[9px] font-black uppercase"><SelectValue /></SelectTrigger>
+                                <SelectContent><SelectItem value="nominal">IDR</SelectItem><SelectItem value="percent">%</SelectItem></SelectContent>
+                            </Select>
+                        </div>
+                        <Input value={dpDeductionValue} onChange={e => setDpDeductionValue(e.target.value)} className="h-8 text-right font-black border-emerald-200 text-emerald-700" placeholder="0" />
+                    </div>
+                )}
+
                 <div className="space-y-2">
                     <div className="flex justify-between items-center">
-                        <Label className="text-[10px] font-black uppercase text-slate-800">Down Payment (DP)</Label>
-                        <Select value={dpMode} onValueChange={(v: any) => setDpMode(v)}>
+                        <Label className="text-[10px] font-black uppercase text-slate-800">Retention (Safety)</Label>
+                        <Select value={retentionMode} onValueChange={(v: any) => setRetentionMode(v)}>
                             <SelectTrigger className="h-6 w-16 text-[9px] font-black uppercase"><SelectValue /></SelectTrigger>
                             <SelectContent><SelectItem value="nominal">IDR</SelectItem><SelectItem value="percent">%</SelectItem></SelectContent>
                         </Select>
                     </div>
-                    <Input value={dpValue} onChange={e => setDpValue(e.target.value)} className="h-8 text-right font-black border-slate-200" placeholder="0" />
+                    <Input value={retentionValue} onChange={e => setRetentionValue(e.target.value)} className="h-8 text-right font-black border-slate-200" placeholder="0" />
                 </div>
               </div>
 
@@ -417,8 +536,20 @@ export default function AddInvoicePage() {
             </CardContent>
           </Card>
           
-          <div className="p-4 bg-muted/30 rounded-lg border border-dashed text-center">
-             <p className="text-[10px] text-muted-foreground font-bold uppercase tracking-tighter">Preview PDF tersedia setelah simpan.</p>
+          <div className="p-4 bg-muted/30 rounded-lg border border-dashed text-center space-y-2">
+             <p className="text-[10px] text-muted-foreground font-bold uppercase tracking-tighter flex items-center justify-center gap-1">
+                <Info className="h-3 w-3" /> Info Penagihan PO Ini:
+             </p>
+             <div className="grid grid-cols-2 gap-2 text-[8px] font-black uppercase">
+                <div className="bg-white p-1 rounded shadow-sm border border-slate-100">
+                    <p className="text-muted-foreground">Invoiced</p>
+                    <p className="text-indigo-600">{Object.values(itemTracking).reduce((s, t) => s + t.invoiced, 0)} Units</p>
+                </div>
+                <div className="bg-white p-1 rounded shadow-sm border border-slate-100">
+                    <p className="text-muted-foreground">Balance DP</p>
+                    <p className="text-emerald-600">Rp {formatNumberWithCommas(dpBalance)}</p>
+                </div>
+             </div>
           </div>
         </div>
       </div>

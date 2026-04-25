@@ -26,6 +26,15 @@ export type PaymentRecord = {
     notes?: string;
 };
 
+export type InvoiceItem = {
+    id: string | number;
+    name: string;
+    quantity: number;
+    unit: string;
+    price: number;
+    total: number;
+};
+
 export type Invoice = {
   id: string;
   soNumber: string;
@@ -48,9 +57,12 @@ export type Invoice = {
   sjNumbers?: string[]; 
   negotiation?: number;
   negotiationMode?: 'percent' | 'nominal';
-  dpValue?: number;
+  dpValue?: number; // Nilai DP yang ditagih (Jika ini Invoice DP)
+  dpDeduction?: number; // Nilai DP yang dipotong (Jika ini Invoice Barang)
   retention?: number;
   payments?: PaymentRecord[];
+  items?: InvoiceItem[];
+  isDpInvoice?: boolean;
 };
 
 export type InvoiceNumber = {
