@@ -11,7 +11,7 @@ import { useFirestore, useUser, useCollection, useMemoFirebase, useDoc } from '@
 import { collection, doc, updateDoc, query } from 'firebase/firestore';
 import { type UserProfile } from '@/app/lib/data';
 import { useToast } from '@/hooks/use-toast';
-import { ShieldAlert, UserX, UserCheck, UserPlus, BadgeCheck, MailPlus } from 'lucide-react';
+import { ShieldAlert, UserX, UserCheck, UserPlus, BadgeCheck, MailPlus, Eye } from 'lucide-react';
 import { cn } from '@/lib/utils';
   
 export default function UserManagementPage() {
@@ -182,4 +182,4 @@ export default function UserManagementPage() {
         </Card>
       </main>
     );
-  }
+}
