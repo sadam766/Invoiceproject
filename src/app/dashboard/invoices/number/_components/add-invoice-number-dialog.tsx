@@ -51,7 +51,6 @@ export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceDa
   const [invoiceType, setInvoiceType] = useState<'sar' | 'kw'>('kw');
   const [isAutoNumber, setIsAutoNumber] = useState(true);
   
-  // Starting point set by user (only the numeric part)
   const [startingNumber, setStartingNumber] = useState<string>('');
   
   const [prefix, setPrefix] = useState('');
@@ -86,23 +85,27 @@ export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceDa
   },[salesOrderListData]);
 
   /**
-   * Menggenerate nomor urut berikutnya berdasarkan data yang ada di database 
-   * dan input 'Mulai Dari' yang diberikan user.
+   * Menggenerate nomor urut berikutnya berdasarkan tahun berjalan.
+   * Reset ke 001 setiap awal tahun baru.
    */
   const generateNextNumber = (type: 'sar' | 'kw', startFrom: string = '') => {
     let currentMax = 0;
+    const now = new Date();
+    const currentYearShort = format(now, 'yy');
+    const currentYearLong = format(now, 'yyyy');
     
     if (allInvoiceNumbers) {
         allInvoiceNumbers.forEach(inv => {
             const id = inv.id || '';
             let match;
             if (type === 'sar') {
-                // Mencari angka di tengah SAR_2601[XXX]A
-                match = id.match(/SAR_2601(\d+)A/);
+                // Mencari angka setelah SAR_[YY]01...
+                const pattern = new RegExp(`SAR_${currentYearShort}01(\\d+)A`);
+                match = id.match(pattern);
             } else {
-                // Mencari angka di tengah KW/[XXXX]/KEU/2026
-                // Mencocokkan format asli atau format yang sudah disanitasi (dengan underscore)
-                match = id.match(/KW[\/_](\d+)[\/_]KEU[\/_]2026/);
+                // Mencari angka di tengah KW/[XXXX]/KEU/[YYYY]
+                const pattern = new RegExp(`KW[\\/_](\\d+)[\\/_]KEU[\\/_]${currentYearLong}`);
+                match = id.match(pattern);
             }
 
             if (match && match[1]) {
@@ -112,13 +115,11 @@ export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceDa
         });
     }
 
-    // Jika user menentukan titik mulai, bandingkan dengan max yang ada
     const userStart = parseInt(startFrom, 10);
     const baseNumber = !isNaN(userStart) ? Math.max(currentMax, userStart - 1) : currentMax;
     
     const nextNum = baseNumber + 1;
 
-    // Padding sesuai tipe
     if (type === 'sar') {
         return nextNum.toString().padStart(3, '0');
     } else {
@@ -128,23 +129,25 @@ export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceDa
   
   const setupForAddMode = (type: 'sar' | 'kw', startVal: string = '') => {
     const nextNumStr = generateNextNumber(type, startVal);
+    const now = new Date();
+    const currentYearShort = format(now, 'yy');
+    const currentYearLong = format(now, 'yyyy');
+
     if (type === 'sar') {
-      setPrefix('SAR_2601');
+      setPrefix(`SAR_${currentYearShort}01`);
       setSuffix('A');
       setMainNumber(nextNumStr);
     } else { // kw
       setPrefix('KW/');
-      setSuffix('/KEU/2026');
+      setSuffix(`/KEU/${currentYearLong}`);
       setMainNumber(nextNumStr);
     }
   };
 
   const handleManualSetup = (invoice: InvoiceNumber) => {
     const id = invoice.id;
-    // Deteksi SAR
-    const sarMatch = id.match(/^(SAR_2601)(\d+)(A)$/);
-    // Deteksi KW (mendukung / atau _)
-    const kwMatch = id.match(/^(KW[\/_])(\d+)([\/_]KEU[\/_]2026)$/);
+    const sarMatch = id.match(/^(SAR_\d{2}01)(\d+)(A)$/);
+    const kwMatch = id.match(/^(KW[\/_])(\d+)([\/_]KEU[\/_]\d{4})$/);
 
     if (sarMatch) {
         setInvoiceType('sar');
@@ -157,10 +160,9 @@ export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceDa
         setMainNumber(kwMatch[2]);
         setSuffix(kwMatch[3]);
     } else {
-        // Fallback jika tidak sesuai format
         setInvoiceType('kw');
         setPrefix('KW/');
-        setSuffix('/KEU/2026');
+        setSuffix(`/KEU/${format(new Date(), 'yyyy')}`);
         setMainNumber(id);
     }
     
@@ -198,7 +200,6 @@ export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceDa
       }
   }, [isOpen, invoiceData]);
 
-  // Update main number whenever startingNumber or type changes in Auto mode
   useEffect(() => {
       if (isAutoNumber && !invoiceData && isOpen) {
           setupForAddMode(invoiceType, startingNumber);
@@ -338,7 +339,7 @@ export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceDa
                         <Label htmlFor="mulai-dari" className="text-xs font-normal text-muted-foreground whitespace-nowrap">Mulai Dari:</Label>
                         <Input 
                             id="mulai-dari"
-                            placeholder={invoiceType === 'sar' ? "045" : "0120"}
+                            placeholder={invoiceType === 'sar' ? "001" : "0001"}
                             className="h-7 w-24 text-xs"
                             value={startingNumber}
                             onChange={(e) => setStartingNumber(e.target.value)}
