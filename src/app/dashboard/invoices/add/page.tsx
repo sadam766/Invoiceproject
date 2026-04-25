@@ -32,7 +32,7 @@ import {
     CommandInput,
     CommandItem,
     CommandList,
-  } from '@/command';
+  } from '@/components/ui/command';
 import {
     Select,
     SelectContent,
