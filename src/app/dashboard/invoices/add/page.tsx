@@ -42,6 +42,7 @@ import {
   AlertTriangle,
   Info,
   PackageCheck,
+  Cpu,
 } from 'lucide-react';
 import { type Invoice, type SalesOrder, type UserProfile, type SalesListItem, type Customer, type InvoiceItem } from '@/app/lib/data';
 import { useToast } from '@/hooks/use-toast';
@@ -61,6 +62,7 @@ export default function AddInvoicePage() {
   
   // --- FORM STATES ---
   const [invoiceId, setInvoiceId] = useState('');
+  const [erpInvoiceId, setErpInvoiceId] = useState('');
   const [soNumber, setSoNumber] = useState('');
   const [poNumber, setPoNumber] = useState('');
   const [customerName, setCustomerName] = useState('');
@@ -125,12 +127,10 @@ export default function AddInvoicePage() {
     if (!poNumber || !allSoItems) return {};
     const tracking: Record<string, { poQty: number; invoiced: number }> = {};
     
-    // Total from SO
     allSoItems.filter(so => so.poNumber === poNumber).forEach(item => {
         tracking[item.productName] = { poQty: item.quantity, invoiced: 0 };
     });
 
-    // Sum from all previous invoices
     poRelatedInvoices.forEach(inv => {
         inv.items?.forEach(item => {
             if (tracking[item.name]) {
@@ -142,15 +142,29 @@ export default function AddInvoicePage() {
     return tracking;
   }, [poNumber, allSoItems, poRelatedInvoices]);
 
-  // --- LOGIC: AUTO-GENERATE INVOICE NUMBER ---
+  // --- LOGIC: AUTO-GENERATE DUAL NUMBERS ---
   useEffect(() => {
     if (!editInvoiceId && allInvoices && !invoiceId) {
         const now = new Date();
-        const year = now.getFullYear();
-        const count = allInvoices.filter(inv => inv.id.includes(year.toString())).length + 1;
-        setInvoiceId(`KW/${count.toString().padStart(4, '0')}/KEU/${year}`);
+        const yy = format(now, 'yy');
+        
+        // Filter by prefix
+        const prefix = isDpInvoice ? 'KW' : 'SAR';
+        const currentYearDocs = allInvoices.filter(inv => {
+            if (isDpInvoice) return inv.id.startsWith('KW/') && inv.id.includes(`/${yy}`);
+            return inv.id.startsWith(`SAR/${yy}`);
+        });
+
+        const sequence = currentYearDocs.length + 1;
+        const seqStr = sequence.toString().padStart(isDpInvoice ? 4 : 2, '0');
+
+        if (isDpInvoice) {
+            setInvoiceId(`KW/${seqStr}/KEU/20${yy}`);
+        } else {
+            setInvoiceId(`SAR/${yy}${seqStr}A`);
+        }
     }
-  }, [allInvoices, editInvoiceId, invoiceId]);
+  }, [allInvoices, editInvoiceId, invoiceId, isDpInvoice]);
 
   // --- LOGIC: INITIAL LOAD FROM PO ---
   useEffect(() => {
@@ -191,6 +205,7 @@ export default function AddInvoicePage() {
         const found = allInvoices.find(inv => inv.id.replace(/\//g, '_') === editInvoiceId);
         if (found) {
             setInvoiceId(found.id);
+            setErpInvoiceId(found.erpInvoiceId || '');
             setSoNumber(found.soNumber);
             setPoNumber(found.poNumber);
             setCustomerName(found.customer);
@@ -238,8 +253,6 @@ export default function AddInvoicePage() {
     const currentDpp = parseFormattedNumber(String(dppVat));
     const currentVat = parseFormattedNumber(String(vat12));
     
-    // Formula: (Subtotal + Tax) - DP Alokasi - Retensi. 
-    // Jika isDpInvoice = true, maka tagihannya adalah nilai DP itu sendiri.
     const grand = isDpInvoice ? dpNominal : (currentDpp + currentVat - dpDedNominal - retNominal);
     setTotalAmount(formatNumberWithCommas(grand));
   }, [items, negotiationValue, negotiationMode, dpValue, dpMode, retentionValue, retentionMode, dpDeductionValue, dpDeductionMode, isTaxManual, dppVat, vat12, isDpInvoice]);
@@ -247,18 +260,6 @@ export default function AddInvoicePage() {
   const handleSaveInvoice = async (invoiceStatus: any = 'sent') => {
     if (!firestore || !user || !invoiceId || !customerName) {
         toast({ variant: "destructive", title: "Gagal Simpan", description: "Nomor Invoice dan Customer wajib ada." });
-        return;
-    }
-
-    // Item Validation
-    const invalidItem = items.find(item => {
-        const track = itemTracking[item.name];
-        if (!track) return false;
-        return item.quantity > (track.poQty - track.invoiced);
-    });
-
-    if (invalidItem && !isDpInvoice) {
-        toast({ variant: "destructive", title: "Validasi Gagal", description: `Jumlah ${invalidItem.name} melebihi sisa PO.` });
         return;
     }
 
@@ -270,6 +271,7 @@ export default function AddInvoicePage() {
 
     const dataToSave: any = {
         id: invoiceId,
+        erpInvoiceId: erpInvoiceId,
         soNumber: soNumber,
         poNumber: poNumber,
         customer: customerName,
@@ -322,29 +324,20 @@ export default function AddInvoicePage() {
             </Button>
             <div>
                 <h1 className="text-2xl font-black tracking-tight uppercase">Invoice Constructor</h1>
-                <p className="text-muted-foreground text-xs font-bold uppercase tracking-widest">Partial Billing & DP Tracking Active.</p>
+                <p className="text-muted-foreground text-xs font-bold uppercase tracking-widest">Dual-Numbering & ERP Reconciliation Active.</p>
             </div>
         </div>
         <div className="flex items-center gap-3 bg-indigo-50 px-4 py-2 rounded-xl border border-indigo-100">
             <div className="flex items-center gap-2">
                 <Label className="text-[10px] font-black uppercase text-indigo-700">Mode Tagihan:</Label>
-                <Badge variant={isDpInvoice ? "default" : "outline"} className={cn("text-[9px] uppercase cursor-pointer", isDpInvoice ? "bg-indigo-600" : "text-indigo-600 border-indigo-200")} onClick={() => setIsDpInvoice(!isDpInvoice)}>
+                <Badge variant={isDpInvoice ? "default" : "outline"} className={cn("text-[9px] uppercase cursor-pointer", isDpInvoice ? "bg-indigo-600" : "text-indigo-600 border-indigo-200")} onClick={() => { setIsDpInvoice(!isDpInvoice); setInvoiceId(''); }}>
                    {isDpInvoice ? "Down Payment (DP)" : "Tagihan Barang / Progress"}
                 </Badge>
             </div>
         </div>
       </div>
 
-      {isPaid && (
-          <Alert className="bg-emerald-50 border-emerald-200 text-emerald-800">
-              <Banknote className="h-4 w-4 text-emerald-600" />
-              <AlertTitle className="font-black uppercase text-[10px]">Dokumen Lunas</AlertTitle>
-              <AlertDescription className="text-xs">Invoice ini sudah dilunasi dan terkunci untuk audit.</AlertDescription>
-          </Alert>
-      )}
-
       <div className="grid gap-6 lg:grid-cols-7 items-start">
-        {/* LEFT COLUMN: PRIMARY DATA */}
         <div className="lg:col-span-5 space-y-6">
           <Card className={cn("shadow-sm border-none ring-1 ring-border", isLocked && "opacity-60 pointer-events-none")}>
             <CardHeader className="bg-muted/30 border-b py-4">
@@ -352,23 +345,37 @@ export default function AddInvoicePage() {
                     <ReceiptText className="h-4 w-4 text-primary" /> Identitas Penagihan
                 </CardTitle>
             </CardHeader>
-            <CardContent className="p-6 grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-              <div className="space-y-2">
-                  <Label className="text-[10px] font-black uppercase text-muted-foreground">No. Invoice (Auto)</Label>
-                  <Input value={invoiceId} onChange={e => setInvoiceId(e.target.value)} className="font-black text-indigo-700 bg-indigo-50/30" disabled={!!editInvoiceId} />
-              </div>
-              <div className="space-y-2">
-                  <Label className="text-[10px] font-black uppercase text-muted-foreground">Customer</Label>
-                  <Input value={customerName} disabled className="font-bold uppercase" />
-              </div>
-              <div className="space-y-2">
-                  <Label className="text-[10px] font-black uppercase text-muted-foreground">Referensi PO</Label>
-                  <Input value={poNumber} disabled className="font-mono" />
-              </div>
-              <div className="lg:col-span-3 space-y-2">
-                  <Label className="text-[10px] font-black uppercase text-muted-foreground">Alamat Penagihan & NPWP</Label>
-                  <Input value={billingAddress} onChange={e => setBillingAddress(e.target.value)} className="font-medium" placeholder="Alamat lengkap..." />
-                  <Input value={billingNpwp} onChange={e => setBillingNpwp(e.target.value)} className="font-mono text-xs mt-2" placeholder="NPWP..." />
+            <CardContent className="p-6">
+              <div className="grid gap-6 md:grid-cols-2">
+                  <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                          <Label className="text-[10px] font-black uppercase text-muted-foreground">No. Invoice (Manual)</Label>
+                          <Input value={invoiceId} onChange={e => setInvoiceId(e.target.value)} className="font-black text-indigo-700 bg-indigo-50/30" placeholder="SAR/..." />
+                      </div>
+                      <div className="space-y-2">
+                          <Label className="text-[10px] font-black uppercase text-muted-foreground flex items-center gap-1">
+                              ERP Reference <Cpu className="h-2.5 w-2.5" />
+                          </Label>
+                          <Input value={erpInvoiceId} onChange={e => setErpInvoiceId(e.target.value)} className="font-mono text-xs border-indigo-200" placeholder="ERPSAR/..." />
+                      </div>
+                  </div>
+                  <div className="space-y-2">
+                      <Label className="text-[10px] font-black uppercase text-muted-foreground">Customer</Label>
+                      <Input value={customerName} disabled className="font-bold uppercase" />
+                  </div>
+                  <div className="space-y-2">
+                      <Label className="text-[10px] font-black uppercase text-muted-foreground">Referensi PO</Label>
+                      <Input value={poNumber} disabled className="font-mono" />
+                  </div>
+                  <div className="space-y-2">
+                      <Label className="text-[10px] font-black uppercase text-muted-foreground">No. SO Produksi</Label>
+                      <Input value={soNumber} disabled className="font-mono" />
+                  </div>
+                  <div className="md:col-span-2 space-y-2">
+                      <Label className="text-[10px] font-black uppercase text-muted-foreground">Alamat Penagihan & NPWP</Label>
+                      <Input value={billingAddress} onChange={e => setBillingAddress(e.target.value)} className="font-medium" placeholder="Alamat lengkap..." />
+                      <Input value={billingNpwp} onChange={e => setBillingNpwp(e.target.value)} className="font-mono text-xs mt-2" placeholder="NPWP..." />
+                  </div>
               </div>
             </CardContent>
           </Card>
@@ -432,7 +439,6 @@ export default function AddInvoicePage() {
           </Card>
         </div>
 
-        {/* RIGHT COLUMN: FINANCIAL SUMMARY */}
         <div className="lg:col-span-2 space-y-6 sticky top-24">
           <Card className={cn("shadow-md border-none ring-1 ring-primary/20", isLocked && "opacity-80 pointer-events-none")}>
             <CardHeader className="bg-primary/5 py-4 border-b">
@@ -469,7 +475,6 @@ export default function AddInvoicePage() {
                             </Select>
                         </div>
                         <Input value={dpValue} onChange={e => setDpValue(e.target.value)} className="h-8 text-right font-black border-indigo-200" placeholder="0" />
-                        <p className="text-[8px] text-indigo-600 font-bold uppercase mt-1 italic">*Menghitung porsi pembayaran dimuka.</p>
                     </div>
                 ) : (
                     <div className="space-y-2 bg-emerald-50/30 p-3 rounded-xl border border-emerald-100">
@@ -535,22 +540,6 @@ export default function AddInvoicePage() {
               </div>
             </CardContent>
           </Card>
-          
-          <div className="p-4 bg-muted/30 rounded-lg border border-dashed text-center space-y-2">
-             <p className="text-[10px] text-muted-foreground font-bold uppercase tracking-tighter flex items-center justify-center gap-1">
-                <Info className="h-3 w-3" /> Info Penagihan PO Ini:
-             </p>
-             <div className="grid grid-cols-2 gap-2 text-[8px] font-black uppercase">
-                <div className="bg-white p-1 rounded shadow-sm border border-slate-100">
-                    <p className="text-muted-foreground">Invoiced</p>
-                    <p className="text-indigo-600">{Object.values(itemTracking).reduce((s, t) => s + t.invoiced, 0)} Units</p>
-                </div>
-                <div className="bg-white p-1 rounded shadow-sm border border-slate-100">
-                    <p className="text-muted-foreground">Balance DP</p>
-                    <p className="text-emerald-600">Rp {formatNumberWithCommas(dpBalance)}</p>
-                </div>
-             </div>
-          </div>
         </div>
       </div>
     </main>

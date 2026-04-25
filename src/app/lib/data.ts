@@ -36,7 +36,8 @@ export type InvoiceItem = {
 };
 
 export type Invoice = {
-  id: string;
+  id: string; // Manual Invoice Number (Primary Display)
+  erpInvoiceId?: string; // ERP Reference ID (Secondary ID)
   soNumber: string;
   poNumber: string;
   customer: string;

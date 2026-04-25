@@ -2,7 +2,7 @@
 'use client';
 import React, { useRef, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Download, Upload, ArrowLeft } from 'lucide-react';
+import { Download, Upload, ArrowLeft, Cpu } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { exportToExcel, parseFormattedNumber } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
@@ -21,6 +21,7 @@ interface Item {
 
 interface InvoiceData {
     id: string;
+    erpInvoiceId?: string;
     items: Item[];
     customer: {
         name: string;
@@ -112,6 +113,7 @@ const InvoicePreviewPage = () => {
         const displayInvoiceId = invoiceData.id.replace(/_/g, '/');
         const dataToExport = invoiceData.items.map(item => ({
             'Invoice ID': displayInvoiceId,
+            'ERP Reference': invoiceData.erpInvoiceId || '-',
             'Customer': invoiceData.customer.name,
             'Branch Address': invoiceData.customer.address,
             'SO Number': invoiceData.soNumber,
@@ -132,6 +134,7 @@ const InvoicePreviewPage = () => {
 
     const {
         id: invoiceId,
+        erpInvoiceId,
         items,
         customer,
         date,
@@ -155,9 +158,7 @@ const InvoicePreviewPage = () => {
     );
     const totalPages = itemChunks.length;
     
-    // grandTotal in this context is the cumulative goods value (after negotiation)
     const totalRp = parseFormattedNumber(dppVat) + parseFormattedNumber(vat12);
-
     const invoiceTitle = invoiceId.startsWith('KW') ? 'PROFORMA INVOICE' : 'INVOICE/OFFICIAL RECEIPT';
 
     return (
@@ -187,6 +188,9 @@ const InvoicePreviewPage = () => {
                                 <div className="w-full text-center mb-1 leading-none">
                                     <p className="font-bold uppercase text-xs tracking-tighter mb-0.5">{invoiceTitle}</p>
                                     <p className="font-bold uppercase text-xs">{displayInvoiceId}</p>
+                                    {erpInvoiceId && (
+                                        <p className="text-[8px] font-mono font-bold text-gray-500 uppercase mt-1">ERP REF: {erpInvoiceId}</p>
+                                    )}
                                 </div>
                                 <div className='flex justify-between items-start mt-4'>
                                     <div className='w-[45%]'>
@@ -350,6 +354,9 @@ const InvoicePreviewPage = () => {
                                                 <div className="flex-grow"></div>
                                                 <div className='border-b border-black w-24 mx-auto mb-1 mt-20'></div>
                                                 <p className="font-semibold">Finance</p>
+                                                {erpInvoiceId && (
+                                                    <p className="text-[7px] text-gray-400 mt-2 font-mono uppercase">System Ref: {erpInvoiceId}</p>
+                                                )}
                                             </div>
                                         </div>
                                     </div>

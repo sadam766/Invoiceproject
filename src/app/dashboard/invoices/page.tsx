@@ -30,7 +30,7 @@ import {
   import { Label } from '@/components/ui/label';
   import { Textarea } from '@/components/ui/textarea';
   import { type Invoice, type UserProfile } from '@/app/lib/data';
-  import { Search, MoreHorizontal, Eye, Pencil, Download, Truck, FileSpreadsheet, XCircle, ShieldCheck, Layers } from 'lucide-react';
+  import { Search, MoreHorizontal, Eye, Pencil, Download, Truck, FileSpreadsheet, XCircle, ShieldCheck, Layers, Cpu } from 'lucide-react';
   import { Skeleton } from '@/components/ui/skeleton';
   import {
     DropdownMenu,
@@ -83,13 +83,11 @@ import {
         if (!invoices) return [];
         let filtered = invoices;
 
-        // 1. Filter by Date Range
         filtered = filtered.filter(inv => {
             const invDate = parseISO(inv.date);
             return isWithinInterval(invDate, { start: dateRange.from, end: dateRange.to });
         });
 
-        // 2. Filter by Tab
         if (activeTab !== 'all') {
             filtered = filtered.filter(i => {
                 if (activeTab === 'paid') return i.status === 'paid';
@@ -100,12 +98,12 @@ import {
             });
         }
 
-        // 3. Filter by Search Query
         if (searchQuery) {
             filtered = filtered.filter(invoice => 
-                Object.values(invoice).some(value => 
-                    String(value).toLowerCase().includes(searchQuery.toLowerCase())
-                )
+                String(invoice.id).toLowerCase().includes(searchQuery.toLowerCase()) ||
+                String(invoice.erpInvoiceId || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+                String(invoice.customer).toLowerCase().includes(searchQuery.toLowerCase()) ||
+                String(invoice.poNumber).toLowerCase().includes(searchQuery.toLowerCase())
             );
         }
 
@@ -206,7 +204,7 @@ import {
                         </TabsList>
                         <div className="relative w-full sm:w-64">
                             <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-                            <Input placeholder="Cari invoice, customer..." className="pl-8 h-9 bg-muted/20 border-none font-medium" value={searchQuery} onChange={e => setSearchQuery(e.target.value)} />
+                            <Input placeholder="Cari No. SAR, ERP, Customer..." className="pl-8 h-9 bg-muted/20 border-none font-medium" value={searchQuery} onChange={e => setSearchQuery(e.target.value)} />
                         </div>
                     </div>
 
@@ -215,8 +213,8 @@ import {
                             <TableHeader className="bg-muted/30">
                                 <TableRow>
                                     <TableHead className="w-[40px]"><Checkbox onCheckedChange={(c) => c ? setSelectedInvoices(new Set(filteredInvoices.map(i => i.id))) : setSelectedInvoices(new Set())} /></TableHead>
-                                    <TableHead className="text-[10px] font-black uppercase tracking-widest">Invoice Info</TableHead>
-                                    <TableHead className="text-[10px] font-black uppercase tracking-widest">Customer</TableHead>
+                                    <TableHead className="text-[10px] font-black uppercase tracking-widest">Invoice Numbers</TableHead>
+                                    <TableHead className="text-[10px] font-black uppercase tracking-widest">Customer & PO</TableHead>
                                     <TableHead className="text-[10px] font-black uppercase tracking-widest">SPD INFO</TableHead>
                                     <TableHead className="text-[10px] font-black uppercase tracking-widest">Amount</TableHead>
                                     <TableHead className="text-[10px] font-black uppercase tracking-widest">Status</TableHead>
@@ -231,6 +229,11 @@ import {
                                         <TableCell>
                                             <div className="flex flex-col gap-0.5">
                                                 <span className={cn("font-black text-xs", invoice.status === 'cancelled' ? "line-through" : "text-indigo-700")}>{invoice.id}</span>
+                                                {invoice.erpInvoiceId && (
+                                                    <span className="text-[9px] font-mono font-bold text-muted-foreground flex items-center gap-1">
+                                                        <Cpu className="h-2 w-2" /> {invoice.erpInvoiceId}
+                                                    </span>
+                                                )}
                                                 <span className="text-[9px] font-bold text-muted-foreground">{invoice.date}</span>
                                             </div>
                                         </TableCell>
@@ -297,7 +300,6 @@ import {
             </div>
         )}
 
-        {/* Void Dialog */}
         <Dialog open={voidDialogOpen} onOpenChange={setVoidDialogOpen}>
             <DialogContent className="sm:max-w-[400px]">
                 <DialogHeader>
