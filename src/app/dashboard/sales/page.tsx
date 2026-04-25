@@ -26,10 +26,12 @@ import {
     DialogContent, 
     DialogHeader, 
     DialogTitle, 
-    DialogFooter 
+    DialogFooter,
+    DialogDescription 
   } from '@/components/ui/dialog';
+  import { Textarea } from '@/components/ui/textarea';
   import { type SalesListItem, type UserProfile, type Invoice } from '@/app/lib/data';
-  import { Search, MoreHorizontal, Upload, Download, Eye, Edit, Trash2, FileSpreadsheet, RefreshCw, UserCheck } from 'lucide-react';
+  import { Search, MoreHorizontal, Upload, Download, Eye, Edit, Trash2, FileSpreadsheet, RefreshCw, UserCheck, XCircle } from 'lucide-react';
   import { AddSaleDialog } from './_components/add-sale-dialog';
   import { useToast } from '@/hooks/use-toast';
   import { DeleteConfirmationDialog } from '@/app/components/delete-confirmation-dialog';
@@ -50,6 +52,11 @@ import {
     const [searchQuery, setSearchQuery] = useState('');
     const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
     const [deleteDialogState, setDeleteDialogState] = useState<{ isOpen: boolean; poNumber?: string; isBulk?: boolean }>({ isOpen: false });
+
+    // Void State
+    const [voidDialogOpen, setVoidDialogOpen] = useState(false);
+    const [voidReason, setVoidReason] = useState('');
+    const [targetPoId, setTargetPoId] = useState<string | null>(null);
 
     // SO Update State
     const [soUpdateState, setSoUpdateState] = useState<{ isOpen: boolean; poNumber?: string; currentSo?: string }>({ isOpen: false });
@@ -85,11 +92,12 @@ import {
             s.customer.toLowerCase().includes(searchQuery.toLowerCase()) ||
             s.sales.toLowerCase().includes(searchQuery.toLowerCase())
         ).map(sale => {
-            // Calculate dynamic status
-            const relatedInvoices = invoices.filter(inv => inv.poNumber === sale.poNumber);
+            if (sale.status === 'Cancelled') return sale;
+            
+            const relatedInvoices = invoices.filter(inv => inv.poNumber === sale.poNumber && inv.status !== 'cancelled');
             const totalPaid = relatedInvoices.filter(inv => inv.status === 'paid').reduce((sum, inv) => sum + inv.amount, 0);
             
-            let status: 'Waiting' | 'Partial' | 'Paid' = 'Waiting';
+            let status: any = 'Waiting';
             if (totalPaid >= sale.amount && sale.amount > 0) status = 'Paid';
             else if (totalPaid > 0) status = 'Partial';
 
@@ -97,37 +105,29 @@ import {
         });
     }, [sales, invoices, searchQuery]);
 
-    const handleSelectRow = (id: string) => {
-        const next = new Set(selectedIds);
-        if (next.has(id)) next.delete(id);
-        else next.add(id);
-        setSelectedIds(next);
-    };
-
-    const handleDeleteConfirm = async () => {
-        if (!firestore || !isAdmin) return;
-
-        if (deleteDialogState.isBulk) {
-            const batch = writeBatch(firestore);
-            selectedIds.forEach(id => {
-                batch.delete(doc(firestore, 'sales', id));
+    const handleVoidPo = async () => {
+        if (!firestore || !targetPoId || !voidReason || !user) return;
+        const docRef = doc(firestore, 'sales', targetPoId);
+        
+        try {
+            await updateDoc(docRef, { 
+                status: 'Cancelled', 
+                voidReason: voidReason,
+                lastUpdatedAt: new Date().toISOString(),
+                lastUpdatedBy: userProfile?.displayName || user.email || 'System'
             });
-            await batch.commit();
-            toast({ title: `${selectedIds.size} data dihapus` });
-            setSelectedIds(new Set());
-        } else if (deleteDialogState.poNumber) {
-            const docRef = doc(firestore, 'sales', deleteDialogState.poNumber);
-            await deleteDoc(docRef);
-            toast({ title: "Data Berhasil Dihapus" });
+            toast({ title: "PO Dibatalkan (Void)", description: `PO ${targetPoId} ditandai sebagai Batal.` });
+            setVoidDialogOpen(false);
+            setVoidReason('');
+        } catch (e) {
+            toast({ variant: 'destructive', title: "Error" });
         }
-        setDeleteDialogState({ isOpen: false });
     };
 
     const handleUpdateSo = async () => {
         if (!firestore || !soUpdateState.poNumber) return;
         const docRef = doc(firestore, 'sales', soUpdateState.poNumber);
         
-        // Batch update for all invoices linked to this PO
         const batch = writeBatch(firestore);
         batch.update(docRef, { soNumber: tempSo });
 
@@ -138,24 +138,12 @@ import {
         });
 
         await batch.commit();
-        toast({ title: "SO Number Updated", description: "Nomor SO telah sinkron dengan semua invoice terkait." });
+        toast({ title: "SO Number Updated" });
         setSoUpdateState({ isOpen: false });
     };
 
     const handleSaveSale = (saleData: Omit<SalesListItem, 'ownerId'>) => {
         if (!firestore || !user) return;
-
-        // ANTI-DUPLICATE CHECK
-        const existing = sales?.find(s => s.poNumber.toLowerCase() === saleData.poNumber.toLowerCase());
-        if (existing && !editingSale) {
-            toast({ 
-                variant: "destructive", 
-                title: "Nomor PO Duplikat", 
-                description: `Nomor PO ini sudah terdaftar oleh ${existing.createdBy || 'User lain'}. Anda tidak dapat menginput ulang.` 
-            });
-            return;
-        }
-
         const docRef = doc(firestore, 'sales', saleData.poNumber);
         const dataToSave = { 
             ...saleData, 
@@ -165,7 +153,7 @@ import {
 
         setDoc(docRef, dataToSave, { merge: true })
             .then(() => {
-                toast({ title: editingSale ? "Berhasil Diperbarui" : "Berhasil Terdaftar" });
+                toast({ title: "PO Berhasil Disimpan" });
                 setIsDialogOpen(false);
             })
             .catch(err => {
@@ -180,11 +168,9 @@ import {
         <div className="flex justify-between items-center">
             <div>
                 <h1 className="text-2xl font-bold tracking-tight">Sales List (Registrasi PO)</h1>
-                <p className="text-muted-foreground">Daftarkan PO Customer dan kelola status transaksinya dalam satu database terpusat.</p>
+                <p className="text-muted-foreground">Kelola PO Customer dan pantau real-time integritas data.</p>
             </div>
             <div className="flex items-center gap-2">
-                <input type="file" ref={fileInputRef} className="hidden" accept=".xlsx, .xls" />
-                <Button variant="outline" onClick={() => generateExcelTemplate(['poNumber', 'customer', 'sales', 'soNumber', 'amount'], 'template_po')}><FileSpreadsheet className="mr-2 h-4 w-4"/> Template</Button>
                 <Button variant="outline" onClick={() => exportToExcel(filteredSales, 'daftar_po')}><Download className="mr-2 h-4 w-4"/> Export</Button>
                 <AddSaleDialog 
                     isOpen={isDialogOpen}
@@ -201,72 +187,59 @@ import {
                 <div className="flex justify-between items-center mb-4">
                     <div className="relative w-1/3">
                         <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-                        <Input placeholder="Cari PO, Customer, atau Sales..." className="pl-8" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} />
+                        <Input placeholder="Cari PO, Customer..." className="pl-8" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} />
                     </div>
-                    {selectedIds.size > 0 && isAdmin && (
-                        <Button variant="destructive" size="sm" onClick={() => setDeleteDialogState({ isOpen: true, isBulk: true })}>
-                            <Trash2 className="mr-2 h-4 w-4" /> Hapus Terpilih ({selectedIds.size})
-                        </Button>
-                    )}
                 </div>
                 
                 <div className="rounded-md border overflow-hidden">
                     <Table>
                         <TableHeader>
                             <TableRow>
-                                <TableHead className="w-[40px]">
-                                    <Checkbox onCheckedChange={(checked) => setSelectedIds(checked ? new Set(filteredSales.map(s => s.poNumber)) : new Set())} />
-                                </TableHead>
+                                <TableHead className="w-[40px]"><Checkbox onCheckedChange={(checked) => setSelectedIds(checked ? new Set(filteredSales.map(s => s.poNumber)) : new Set())} /></TableHead>
                                 <TableHead>PO NUMBER</TableHead>
                                 <TableHead>CUSTOMER</TableHead>
                                 <TableHead>SO NUMBER</TableHead>
                                 <TableHead>AMOUNT</TableHead>
                                 <TableHead>STATUS</TableHead>
-                                <TableHead>INPUT BY</TableHead>
                                 <TableHead className="text-right">AKSI</TableHead>
                             </TableRow>
                         </TableHeader>
                         <TableBody>
-                            {(isSalesLoading || isInvoicesLoading) ? (
-                                <TableRow><TableCell colSpan={8} className="text-center py-8">Memuat data...</TableCell></TableRow>
+                            {isLoading ? (
+                                <TableRow><TableCell colSpan={7} className="text-center py-8">Memuat...</TableCell></TableRow>
                             ) : filteredSales.map((sale) => (
-                                <TableRow key={sale.poNumber} className={selectedIds.has(sale.poNumber) ? "bg-muted/50" : ""}>
-                                    <TableCell>
-                                        <Checkbox checked={selectedIds.has(sale.poNumber)} onCheckedChange={() => handleSelectRow(sale.poNumber)} />
-                                    </TableCell>
+                                <TableRow key={sale.poNumber} className={cn(selectedIds.has(sale.poNumber) ? "bg-muted/50" : "", sale.status === 'Cancelled' && "opacity-40 grayscale")}>
+                                    <TableCell><Checkbox checked={selectedIds.has(sale.poNumber)} onCheckedChange={() => setSelectedIds(prev => { const n = new Set(prev); n.has(sale.poNumber) ? n.delete(sale.poNumber) : n.add(sale.poNumber); return n; })} /></TableCell>
                                     <TableCell className="font-bold">{sale.poNumber}</TableCell>
                                     <TableCell>{sale.customer}</TableCell>
                                     <TableCell>
                                         <div className="flex items-center gap-2">
                                             <span className={sale.soNumber ? "font-medium" : "italic text-muted-foreground"}>{sale.soNumber || 'Waiting SO'}</span>
-                                            <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => { setTempSo(sale.soNumber || ''); setSoUpdateState({ isOpen: true, poNumber: sale.poNumber, currentSo: sale.soNumber }); }}>
-                                                <RefreshCw className="h-3 w-3" />
-                                            </Button>
+                                            {sale.status !== 'Cancelled' && (
+                                                <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => { setTempSo(sale.soNumber || ''); setSoUpdateState({ isOpen: true, poNumber: sale.poNumber }); }}>
+                                                    <RefreshCw className="h-3 w-3" />
+                                                </Button>
+                                            )}
                                         </div>
                                     </TableCell>
                                     <TableCell>Rp {sale.amount.toLocaleString('id-ID')}</TableCell>
                                     <TableCell>
                                         <Badge className={cn(
                                             sale.status === 'Paid' ? 'bg-green-100 text-green-800' : 
-                                            sale.status === 'Partial' ? 'bg-yellow-100 text-yellow-800' : 'bg-gray-100 text-gray-800'
+                                            sale.status === 'Cancelled' ? 'bg-red-100 text-red-800' : 'bg-gray-100 text-gray-800'
                                         )}>
                                             {sale.status}
                                         </Badge>
-                                    </TableCell>
-                                    <TableCell>
-                                        <div className="flex items-center gap-1.5 text-[10px] font-bold text-muted-foreground uppercase">
-                                            <UserCheck className="h-3 w-3" /> {sale.createdBy || 'Unknown'}
-                                        </div>
                                     </TableCell>
                                     <TableCell className="text-right">
                                         <DropdownMenu>
                                             <DropdownMenuTrigger asChild><Button variant="ghost" size="icon"><MoreHorizontal className="h-4 w-4" /></Button></DropdownMenuTrigger>
                                             <DropdownMenuContent align="end">
-                                                <DropdownMenuItem onClick={() => { sessionStorage.setItem('activePoPreview', sale.poNumber); router.push('/dashboard/sales-management'); }}><Eye className="mr-2 h-4 w-4" /> Buka Buku Piutang</DropdownMenuItem>
-                                                {isAdmin && (
+                                                <DropdownMenuItem onClick={() => { sessionStorage.setItem('activePoPreview', sale.poNumber); router.push('/dashboard/sales-management'); }}><Eye className="mr-2 h-4 w-4" /> Monitoring Piutang</DropdownMenuItem>
+                                                {isAdmin && sale.status !== 'Cancelled' && (
                                                     <>
                                                         <DropdownMenuItem onClick={() => { setEditingSale(sale); setIsDialogOpen(true); }}><Edit className="mr-2 h-4 w-4" /> Edit PO</DropdownMenuItem>
-                                                        <DropdownMenuItem className="text-destructive" onClick={() => setDeleteDialogState({ isOpen: true, poNumber: sale.poNumber, isBulk: false })}><Trash2 className="mr-2 h-4 w-4" /> Hapus</DropdownMenuItem>
+                                                        <DropdownMenuItem className="text-destructive font-bold" onClick={() => { setTargetPoId(sale.poNumber); setVoidDialogOpen(true); }}><XCircle className="mr-2 h-4 w-4" /> Void / Cancel</DropdownMenuItem>
                                                     </>
                                                 )}
                                             </DropdownMenuContent>
@@ -280,31 +253,32 @@ import {
             </CardContent>
         </Card>
 
-        {/* Update SO Modal */}
-        <Dialog open={soUpdateState.isOpen} onOpenChange={(o) => setSoUpdateState(prev => ({...prev, isOpen: o}))}>
+        {/* Void Dialog */}
+        <Dialog open={voidDialogOpen} onOpenChange={setVoidDialogOpen}>
             <DialogContent className="sm:max-w-[400px]">
                 <DialogHeader>
-                    <DialogTitle>Update SO Number</DialogTitle>
-                    <p className="text-sm text-muted-foreground">Hubungkan PO <b>{soUpdateState.poNumber}</b> ke nomor SO produksi.</p>
+                    <DialogTitle>Membatalkan PO (Void)</DialogTitle>
+                    <DialogDescription>Nomor PO ini akan ditandai Batal dan tidak akan muncul di penagihan baru.</DialogDescription>
                 </DialogHeader>
-                <div className="py-4">
-                    <Label>Nomor Sales Order (SO)</Label>
-                    <Input value={tempSo} onChange={e => setTempSo(e.target.value)} placeholder="Contoh: SO-12345" className="mt-2" />
+                <div className="py-4 space-y-2">
+                    <Label className="text-xs font-bold uppercase">Alasan Pembatalan</Label>
+                    <Textarea value={voidReason} onChange={(e) => setVoidReason(e.target.value)} placeholder="Contoh: Kesalahan input rute, Customer ganti vendor..." />
                 </div>
                 <DialogFooter>
-                    <Button variant="outline" onClick={() => setSoUpdateState(prev => ({...prev, isOpen: false}))}>Batal</Button>
-                    <Button onClick={handleUpdateSo}>Update & Sinkron</Button>
+                    <Button variant="outline" onClick={() => setVoidDialogOpen(false)}>Batal</Button>
+                    <Button variant="destructive" onClick={handleVoidPo} disabled={!voidReason}>SIMPAN VOID</Button>
                 </DialogFooter>
             </DialogContent>
         </Dialog>
 
-        <DeleteConfirmationDialog 
-            open={deleteDialogState.isOpen} 
-            onOpenChange={(open) => setDeleteDialogState(prev => ({...prev, isOpen: open}))} 
-            onConfirm={handleDeleteConfirm}
-        >
-            <div className="hidden" />
-        </DeleteConfirmationDialog>
+        {/* SO Update Modal */}
+        <Dialog open={soUpdateState.isOpen} onOpenChange={(o) => setSoUpdateState(prev => ({...prev, isOpen: o}))}>
+            <DialogContent className="sm:max-w-[400px]">
+                <DialogHeader><DialogTitle>Sinkronisasi Nomor SO</DialogTitle></DialogHeader>
+                <div className="py-4"><Input value={tempSo} onChange={e => setTempSo(e.target.value)} placeholder="Contoh: SO-12345" /></div>
+                <DialogFooter><Button onClick={handleUpdateSo}>Update & Sinkron</Button></DialogFooter>
+            </DialogContent>
+        </Dialog>
       </main>
     );
   }

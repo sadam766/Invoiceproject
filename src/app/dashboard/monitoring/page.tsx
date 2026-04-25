@@ -36,7 +36,8 @@ import {
   Download,
   FileSpreadsheet,
   TrendingUp,
-  Banknote
+  Banknote,
+  XCircle
 } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -103,7 +104,7 @@ export default function SalesMonitoringPage() {
       const linkedSo = soList?.find(so => so.poNumber === sale.poNumber)?.soNumber || sale.soNumber || '';
       
       const relatedInvoices = invoiceList
-        .filter(inv => inv.poNumber === sale.poNumber)
+        .filter(inv => inv.poNumber === sale.poNumber && inv.status !== 'cancelled')
         .map(inv => ({
           ...inv,
           taxInfo: taxList?.find(t => t.invoiceNumber === inv.id)
@@ -127,13 +128,9 @@ export default function SalesMonitoringPage() {
           if (aging > 5) isSpdLate = true;
       }
 
-      // Check if any activity happened in the selected date range
-      // For this "Daily Hub", we focus on Invoices created in range
       const invoicesInRange = relatedInvoices.filter(inv => 
         isWithinInterval(parseISO(inv.date), { start: dateRange.from, end: dateRange.to })
       );
-
-      const hasActivityInRange = invoicesInRange.length > 0;
 
       return {
         poNumber: sale.poNumber,
@@ -148,24 +145,20 @@ export default function SalesMonitoringPage() {
         isSpdLate,
         isWaitingProduction: !linkedSo,
         hasInvoices: relatedInvoices.length > 0,
-        invoicesInRange, // Help for summary
+        invoicesInRange,
         latestInvoiceDate: relatedInvoices.sort((a,b) => b.date.localeCompare(a.date))[0]?.date
       };
     }).filter(item => {
-        // Filter by date range (show items that had an invoice in this range)
-        const dateMatch = item.invoices.some(inv => 
-            isWithinInterval(parseISO(inv.date), { start: dateRange.from, end: dateRange.to })
-        );
+        if (activeTab === 'cancelled') return false; // Handled differently if needed
         
-        // Filter by search query
+        const dateMatch = item.invoicesInRange!.length > 0;
         const searchMatch = item.poNumber.toLowerCase().includes(searchQuery.toLowerCase()) ||
                             item.customer.toLowerCase().includes(searchQuery.toLowerCase());
 
         return dateMatch && searchMatch;
     });
-  }, [salesList, soList, invoiceList, taxList, spdList, searchQuery, dateRange]);
+  }, [salesList, soList, invoiceList, taxList, spdList, searchQuery, dateRange, activeTab]);
 
-  // 3. Quick Summary Calculations (Specifically for the Date Range)
   const quickSummary = useMemo(() => {
     const invoicesCreated = trackedData.reduce((sum, item) => sum + item.invoicesInRange!.length, 0);
     const totalValue = trackedData.reduce((sum, item) => 
@@ -176,7 +169,6 @@ export default function SalesMonitoringPage() {
     return { invoicesCreated, totalValue, taxPending };
   }, [trackedData]);
 
-  // 4. Tab Filtering
   const filteredData = useMemo(() => {
     if (activeTab === 'pajak') return trackedData.filter(d => d.invoicesInRange!.some(i => !i.taxInfo));
     if (activeTab === 'piutang') return trackedData.filter(d => d.totalPaid < d.poAmount);
@@ -195,7 +187,6 @@ export default function SalesMonitoringPage() {
         'Status': d.totalPaid >= d.poAmount ? 'Lunas' : 'Piutang'
     }));
     exportToExcel(dataToExport, `Dakota-Monitoring-${format(dateRange.from, 'yyyyMMdd')}`);
-    toast({ title: "Export Berhasil", description: `Data periode ${format(dateRange.from, 'dd/MM')} - ${format(dateRange.to, 'dd/MM')} telah diunduh.` });
   };
 
   return (
@@ -206,49 +197,30 @@ export default function SalesMonitoringPage() {
           <p className="text-muted-foreground font-medium flex items-center gap-2">
             Pusat pelacakan dokumen harian. 
             <span className="text-[10px] font-black bg-primary/10 text-primary px-2 py-0.5 rounded">
-                Ditemukan {trackedData.length} Data
+                Range: {format(dateRange.from, 'dd MMM')} - {format(dateRange.to, 'dd MMM')}
             </span>
           </p>
         </div>
         <div className="flex items-center gap-2">
             <Button variant="outline" size="sm" onClick={handleExport} className="h-9 font-bold text-[11px] uppercase tracking-wider">
-                <FileSpreadsheet className="mr-2 h-4 w-4 text-green-600" /> Export Excel
+                <FileSpreadsheet className="mr-2 h-4 w-4 text-green-600" /> Export Filtered
             </Button>
             <DateRangePicker onRangeChange={setDateRange} />
         </div>
       </div>
 
-      {/* Quick Summary Section */}
       <div className="grid gap-4 md:grid-cols-3">
         <Card className="bg-primary/5 border-primary/20 shadow-sm border-t-4 border-t-primary">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-[10px] font-black uppercase text-primary flex items-center gap-2 tracking-widest">
-              <TrendingUp className="h-3.5 w-3.5" /> Invoices Created
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-black">{quickSummary.invoicesCreated} <span className="text-xs font-normal text-muted-foreground">Documents</span></div>
-          </CardContent>
+          <CardHeader className="pb-2"><CardTitle className="text-[10px] font-black uppercase text-primary">Invoices Created</CardTitle></CardHeader>
+          <CardContent><div className="text-2xl font-black">{quickSummary.invoicesCreated} <span className="text-xs font-normal">Docs</span></div></CardContent>
         </Card>
         <Card className="bg-emerald-50/50 border-emerald-200 shadow-sm border-t-4 border-t-emerald-500">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-[10px] font-black uppercase text-emerald-700 flex items-center gap-2 tracking-widest">
-              <Banknote className="h-3.5 w-3.5" /> Total Value (Period)
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-black">Rp {quickSummary.totalValue.toLocaleString('id-ID')}</div>
-          </CardContent>
+          <CardHeader className="pb-2"><CardTitle className="text-[10px] font-black uppercase text-emerald-700">Total Value</CardTitle></CardHeader>
+          <CardContent><div className="text-2xl font-black">Rp {quickSummary.totalValue.toLocaleString('id-ID')}</div></CardContent>
         </Card>
         <Card className="bg-red-50/50 border-red-200 shadow-sm border-t-4 border-t-red-500">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-[10px] font-black uppercase text-red-700 flex items-center gap-2 tracking-widest">
-              <ReceiptText className="h-3.5 w-3.5" /> Pajak Pending
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-black">{quickSummary.taxPending} <span className="text-xs font-normal text-muted-foreground">Invoices Need Serial</span></div>
-          </CardContent>
+          <CardHeader className="pb-2"><CardTitle className="text-[10px] font-black uppercase text-red-700">Pajak Pending</CardTitle></CardHeader>
+          <CardContent><div className="text-2xl font-black">{quickSummary.taxPending} <span className="text-xs font-normal">Serial Missing</span></div></CardContent>
         </Card>
       </div>
 
@@ -258,100 +230,86 @@ export default function SalesMonitoringPage() {
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
               <div className="relative w-full md:w-1/3">
                 <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-                <Input
-                  placeholder="Cari No. PO, Customer..."
-                  className="pl-8 bg-muted/20 border-none shadow-none font-medium"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                />
+                <Input placeholder="Cari No. PO, Customer..." className="pl-8 bg-muted/20 border-none font-medium" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} />
               </div>
               <TabsList className="bg-muted/50 p-1">
-                <TabsTrigger value="all" className="text-xs font-bold uppercase px-4">Semua ({trackedData.length})</TabsTrigger>
+                <TabsTrigger value="all" className="text-xs font-bold uppercase px-4">Semua</TabsTrigger>
                 <TabsTrigger value="pajak" className="text-xs font-bold uppercase px-4 text-red-600">Pajak Pending</TabsTrigger>
-                <TabsTrigger value="piutang" className="text-xs font-bold uppercase px-4">Ada Piutang</TabsTrigger>
+                <TabsTrigger value="piutang" className="text-xs font-bold uppercase px-4">Piutang Aktif</TabsTrigger>
               </TabsList>
             </div>
 
-            <TabsContent value={activeTab}>
-              <div className="rounded-xl border overflow-hidden">
+            <div className="rounded-xl border overflow-hidden">
                 <Table>
-                  <TableHeader className="bg-muted/50">
+                    <TableHeader className="bg-muted/50">
                     <TableRow>
-                      <TableHead className="w-[200px] text-[10px] font-black uppercase tracking-widest py-4">PO & Customer</TableHead>
-                      <TableHead className="w-[150px] text-[10px] font-black uppercase tracking-widest py-4 text-center">SO Produksi</TableHead>
-                      <TableHead className="text-[10px] font-black uppercase tracking-widest py-4">Penagihan & SPD</TableHead>
-                      <TableHead className="w-[200px] text-[10px] font-black uppercase tracking-widest py-4">Status Bayar</TableHead>
-                      <TableHead className="text-right py-4"></TableHead>
+                        <TableHead className="text-[10px] font-black uppercase tracking-widest py-4">PO & Customer</TableHead>
+                        <TableHead className="text-[10px] font-black uppercase tracking-widest py-4 text-center">SO Produksi</TableHead>
+                        <TableHead className="text-[10px] font-black uppercase tracking-widest py-4">Penagihan & SPD</TableHead>
+                        <TableHead className="w-[200px] text-[10px] font-black uppercase tracking-widest py-4">Kesehatan Bayar</TableHead>
+                        <TableHead className="text-right py-4"></TableHead>
                     </TableRow>
-                  </TableHeader>
-                  <TableBody>
+                    </TableHeader>
+                    <TableBody>
                     {isLoading ? (
-                      <TableRow><TableCell colSpan={5} className="text-center py-20 animate-pulse font-bold text-muted-foreground">Mengsinkronkan Data Harian...</TableCell></TableRow>
+                        <TableRow><TableCell colSpan={5} className="text-center py-20 font-bold text-muted-foreground">Sinkronisasi...</TableCell></TableRow>
                     ) : filteredData.map((item) => (
-                      <TableRow key={item.poNumber} className="hover:bg-muted/5 transition-colors border-b last:border-0">
+                        <TableRow key={item.poNumber} className="hover:bg-muted/5 border-b last:border-0">
                         <TableCell className="py-4">
-                          <div className="flex flex-col gap-1">
+                            <div className="flex flex-col gap-1">
                             <span className="font-black text-sm text-slate-800">{item.poNumber}</span>
                             <span className="text-[10px] font-bold uppercase text-muted-foreground">{item.customer}</span>
-                          </div>
+                            </div>
                         </TableCell>
                         <TableCell className="text-center py-4">
-                          {item.soNumber ? (
-                            <Badge variant="outline" className="font-mono bg-blue-50 border-blue-200 text-blue-700 px-3 font-bold">
-                              {item.soNumber}
+                            {item.soNumber ? (
+                            <Badge variant="outline" className="font-mono bg-blue-50 text-blue-700 font-bold">
+                                {item.soNumber}
                             </Badge>
-                          ) : (
+                            ) : (
                             <Badge variant="secondary" className="text-[9px] opacity-50">NO SO</Badge>
-                          )}
+                            )}
                         </TableCell>
                         <TableCell className="py-4">
-                          <div className="space-y-3">
                             <div className="flex flex-wrap gap-2">
                                 {item.invoicesInRange!.map(inv => (
                                     <div key={inv.id} className="flex flex-col gap-1 bg-white border p-2 rounded-lg shadow-sm">
                                         <div className="flex items-center gap-2">
                                             <span className="text-[10px] font-black text-primary">{inv.id}</span>
-                                            {!inv.taxInfo && <AlertCircle className="h-3 w-3 text-red-500" title="Pajak Belum Input" />}
+                                            {!inv.taxInfo && <AlertCircle className="h-3 w-3 text-red-500" />}
                                         </div>
                                         <div className="flex items-center gap-1.5">
-                                            <Badge variant={inv.status === 'paid' ? 'outline' : 'secondary'} className="text-[8px] h-3.5 px-1 font-black">
-                                                {inv.status.toUpperCase()}
-                                            </Badge>
+                                            <Badge variant="outline" className="text-[8px] h-3.5 px-1 font-black">{inv.status}</Badge>
                                             {inv.spdNumber && <Truck className="h-2.5 w-2.5 text-indigo-600" />}
                                         </div>
                                     </div>
                                 ))}
                             </div>
-                          </div>
                         </TableCell>
                         <TableCell className="py-4">
-                          <div className="space-y-2">
-                             <div className="flex justify-between text-[10px] font-black uppercase tracking-tighter">
+                            <div className="space-y-2">
+                                <div className="flex justify-between text-[10px] font-black uppercase tracking-tighter">
                                 <span>{((item.totalPaid / item.poAmount) * 100 || 0).toFixed(0)}%</span>
                                 <span className={item.totalPaid < item.poAmount ? "text-red-600" : "text-emerald-600"}>
-                                  Rp {(item.poAmount - item.totalPaid).toLocaleString('id-ID')}
+                                    Sisa: Rp {(item.poAmount - item.totalPaid).toLocaleString('id-ID')}
                                 </span>
-                             </div>
-                             <Progress value={(item.totalPaid / item.poAmount) * 100 || 0} className="h-2" />
-                          </div>
+                                </div>
+                                <Progress value={(item.totalPaid / item.poAmount) * 100 || 0} className="h-2" />
+                            </div>
                         </TableCell>
                         <TableCell className="text-right py-4">
-                          <Button variant="ghost" size="icon" className="h-9 w-9 rounded-full" onClick={() => {
-                            sessionStorage.setItem('activePoPreview', item.poNumber);
-                            router.push('/dashboard/sales-management');
-                          }}>
+                            <Button variant="ghost" size="icon" className="rounded-full" onClick={() => {
+                                sessionStorage.setItem('activePoPreview', item.poNumber);
+                                router.push('/dashboard/sales-management');
+                            }}>
                             <Eye className="h-5 w-5 text-slate-600" />
-                          </Button>
+                            </Button>
                         </TableCell>
-                      </TableRow>
+                        </TableRow>
                     ))}
-                    {filteredData.length === 0 && !isLoading && (
-                      <TableRow><TableCell colSpan={5} className="text-center py-20 text-muted-foreground font-bold italic">Tidak ada data penagihan di periode ini.</TableCell></TableRow>
-                    )}
-                  </TableBody>
+                    </TableBody>
                 </Table>
-              </div>
-            </TabsContent>
+            </div>
           </Tabs>
         </CardContent>
       </Card>

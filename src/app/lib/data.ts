@@ -33,6 +33,12 @@ export type Sale = {
   status: 'Paid' | 'Unpaid';
 };
 
+export type RevisionLog = {
+    updatedBy: string;
+    updatedAt: string;
+    action: string;
+};
+
 export type Invoice = {
   id: string;
   soNumber: string;
@@ -43,11 +49,15 @@ export type Invoice = {
   date: string; // Issue Date
   dueDate?: string; // Due Date
   amount: number;
-  status: 'paid' | 'unpaid' | 'sent' | 'draft' | 'received';
+  status: 'paid' | 'unpaid' | 'sent' | 'draft' | 'received' | 'cancelled' | 'finalized';
+  voidReason?: string;
   spdNumber?: string;
   paymentMethod?: string;
   ownerId?: string;
   createdBy?: string;
+  lastUpdatedBy?: string;
+  lastUpdatedAt?: string;
+  revisionLogs?: RevisionLog[];
   virtualAccounts?: VirtualAccount[];
   sjNumbers?: string[]; // List of Delivery Note numbers
   negotiation?: number;
@@ -126,7 +136,8 @@ export type SalesListItem = {
   sales: string;
   poNumber: string;
   amount: number;
-  status: 'Paid' | 'Unpaid' | 'Waiting' | 'Partial';
+  status: 'Paid' | 'Unpaid' | 'Waiting' | 'Partial' | 'Cancelled';
+  voidReason?: string;
   paidDate?: string;
   ownerId?: string;
   createdBy?: string;
@@ -145,7 +156,8 @@ export type SpdData = {
     date: string;
     courier: string;
     invoices: SpdInvoiceEntry[];
-    status: 'in_delivery' | 'received' | 'rejected';
+    status: 'in_delivery' | 'received' | 'rejected' | 'cancelled';
+    voidReason?: string;
     ownerId?: string;
     createdBy?: string;
 };
