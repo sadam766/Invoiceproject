@@ -370,7 +370,7 @@ import {
                                             <span className="text-[9px] font-black uppercase text-muted-foreground/60 leading-none tracking-widest">PO Number</span>
                                             <div className="flex items-center gap-2">
                                                 <CardTitle className="text-sm font-black text-slate-800">{item.poNumber}</CardTitle>
-                                                {(item.paidOffline || 0) > 0 && <Badge className="text-[7px] h-3.5 bg-blue-500 font-black uppercase">Migrasi</Badge>}
+                                                {(item.paidOffline || 0) > 0 && <Badge className="text-[7px] h-3.5 bg-blue-50 font-black uppercase">Migrasi</Badge>}
                                             </div>
                                         </div>
                                         <Badge className={cn(
@@ -408,7 +408,7 @@ import {
                                                     className={cn(
                                                         "p-1.5 rounded-lg border text-center text-[9px] font-black transition-all cursor-pointer",
                                                         selectedInvoiceIds.has(inv.id) ? "bg-primary text-white border-primary shadow-sm" : 
-                                                        inv.status === 'paid' ? "bg-emerald-50 text-emerald-700 border-emerald-100 opacity-60" : "bg-white text-slate-500 hover:border-primary"
+                                                        inv.status === 'paid' ? "bg-emerald-50 text-emerald-700 border-emerald-200 opacity-60" : "bg-white text-slate-500 hover:border-primary"
                                                     )}
                                                 >
                                                     {inv.id.split('/').pop()}
