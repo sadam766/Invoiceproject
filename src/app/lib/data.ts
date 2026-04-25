@@ -147,6 +147,7 @@ export type SalesListItem = {
   sales: string;
   poNumber: string;
   amount: number;
+  paidOffline?: number; // Adjustment for legacy system payments
   status: 'Paid' | 'Unpaid' | 'Waiting' | 'Partial' | 'Cancelled';
   voidReason?: string;
   paidDate?: string;

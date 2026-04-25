@@ -38,7 +38,8 @@ import {
   TrendingUp,
   Banknote,
   XCircle,
-  ShieldCheck
+  ShieldCheck,
+  History
 } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -55,6 +56,7 @@ type GlobalTrackRecord = {
   customer: string;
   sales: string;
   poAmount: number;
+  paidOffline: number;
   soNumber: string;
   invoices: (Invoice & { taxInfo?: TaxInvoice })[];
   spdInfo?: SpdData;
@@ -116,10 +118,12 @@ export default function SalesMonitoringPage() {
         s.invoices.some(si => relatedInvoices.some(ri => ri.id === si.invoiceId))
       );
 
-      const totalPaid = relatedInvoices.reduce((sum, inv) => {
+      // Total Paid = Legacy Offline + New System Payments
+      const systemPaid = relatedInvoices.reduce((sum, inv) => {
           const paidOnInv = inv.payments?.reduce((s, p) => s + p.amount, 0) || (inv.status === 'paid' ? inv.amount : 0);
           return sum + paidOnInv;
       }, 0);
+      const totalPaid = (sale.paidOffline || 0) + systemPaid;
 
       const isOverdue = relatedInvoices.some(inv => 
         inv.status !== 'paid' && inv.dueDate && isBefore(parseISO(inv.dueDate), today)
@@ -140,6 +144,7 @@ export default function SalesMonitoringPage() {
         customer: sale.customer,
         sales: sale.sales,
         poAmount: sale.amount,
+        paidOffline: sale.paidOffline || 0,
         soNumber: linkedSo,
         invoices: relatedInvoices,
         spdInfo: spdForPo,
@@ -154,10 +159,15 @@ export default function SalesMonitoringPage() {
     }).filter(item => {
         if (activeTab === 'cancelled') return false; 
         
-        const dateMatch = (item.invoicesInRange?.length || 0) > 0;
+        // If searching or in Piutang tab, show migration data regardless of current date range if needed
+        // But default view is by Date Range of Invoices
+        const dateMatch = (item.invoicesInRange?.length || 0) > 0 || (activeTab === 'all' && item.paidOffline > 0 && searchQuery);
         const searchMatch = item.poNumber.toLowerCase().includes(searchQuery.toLowerCase()) ||
                             item.customer.toLowerCase().includes(searchQuery.toLowerCase());
 
+        // For "Today" monitoring, we usually want to see activity. 
+        // But for Migration records with NO new invoices yet, they only show up if searched.
+        if (searchQuery) return searchMatch;
         return dateMatch && searchMatch;
     });
   }, [salesList, soList, invoiceList, taxList, spdList, searchQuery, dateRange, activeTab]);
@@ -184,6 +194,8 @@ export default function SalesMonitoringPage() {
         'Customer': d.customer,
         'Sales': d.sales,
         'PO Amount': d.poAmount,
+        'Paid System Lama': d.paidOffline,
+        'Paid System Baru': d.totalPaid - d.paidOffline,
         'Total Paid': d.totalPaid,
         'Outstanding': d.poAmount - d.totalPaid,
         'Latest Inv Date': d.latestInvoiceDate,
@@ -260,8 +272,11 @@ export default function SalesMonitoringPage() {
                         <TableRow key={item.poNumber} className="hover:bg-muted/5 border-b last:border-0">
                         <TableCell className="py-4">
                             <div className="flex flex-col gap-1">
-                            <span className="font-black text-sm text-slate-800">{item.poNumber}</span>
-                            <span className="text-[10px] font-bold uppercase text-muted-foreground">{item.customer}</span>
+                                <div className="flex items-center gap-2">
+                                    <span className="font-black text-sm text-slate-800">{item.poNumber}</span>
+                                    {item.paidOffline > 0 && <Badge className="text-[7px] h-3.5 bg-blue-500 font-black uppercase">Legacy</Badge>}
+                                </div>
+                                <span className="text-[10px] font-bold uppercase text-muted-foreground">{item.customer}</span>
                             </div>
                         </TableCell>
                         <TableCell className="text-center py-4">
@@ -275,6 +290,11 @@ export default function SalesMonitoringPage() {
                         </TableCell>
                         <TableCell className="py-4">
                             <div className="flex flex-wrap gap-2">
+                                {item.paidOffline > 0 && (
+                                    <div className="flex items-center gap-1 bg-indigo-50 text-indigo-700 border-indigo-200 border px-2 py-1 rounded-md text-[8px] font-black opacity-80 shadow-sm">
+                                        <History className="h-2.5 w-2.5" /> LEGACY
+                                    </div>
+                                )}
                                 {(item.invoicesInRange || []).map(inv => (
                                     <div key={inv.id} className="flex flex-col gap-1 bg-white border p-2 rounded-lg shadow-sm">
                                         <div className="flex items-center gap-2">

@@ -43,7 +43,8 @@ import {
     ReceiptText,
     Scale,
     Wallet,
-    BadgeCheck
+    BadgeCheck,
+    History
   } from 'lucide-react';
   import { type SalesListItem, type Invoice, type TaxInvoice, type UserProfile } from '@/app/lib/data';
   import { useFirestore, useUser, useCollection, useMemoFirebase, useDoc } from '@/firebase';
@@ -121,11 +122,13 @@ import {
                 return { ...inv, taxInfo: tax };
             });
 
-            const paid = related.filter(inv => inv.status === 'paid').reduce((sum, inv) => sum + inv.amount, 0);
+            // Logic: Total Paid = System Paid Invoices + Legacy Paid Offline
+            const systemPaid = related.filter(inv => inv.status === 'paid').reduce((sum, inv) => sum + inv.amount, 0);
+            const totalPaid = (sale.paidOffline || 0) + systemPaid;
             
             let status: any = 'Waiting';
-            if (paid >= sale.amount && sale.amount > 0) status = 'Paid';
-            else if (paid > 0) status = 'Partial';
+            if (totalPaid >= sale.amount && sale.amount > 0) status = 'Paid';
+            else if (totalPaid > 0) status = 'Partial';
 
             const latestInv = [...related].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())[0];
             const latestTax = related.find(r => r.taxInfo)?.taxInfo?.taxInvoiceNumber;
@@ -134,8 +137,8 @@ import {
                 ...sale,
                 status,
                 relatedInvoices: related,
-                totalPaid: paid,
-                outstanding: sale.amount - paid,
+                totalPaid,
+                outstanding: sale.amount - totalPaid,
                 latestInvoiceDate: latestInv?.date,
                 latestTaxNumber: latestTax
             };
@@ -182,10 +185,6 @@ import {
             const safeId = inv.id.replace(/\//g, '_');
             const invRef = doc(firestore, 'invoices', safeId);
             
-            // For collective payment, we usually apply the specific portion if split, 
-            // but for MVP, let's assume full settlement for the selected invoices 
-            // OR distributed if multiple.
-            
             // Logic: Mark as Paid
             batch.update(invRef, {
                 status: 'paid',
@@ -194,7 +193,7 @@ import {
                     {
                         id: doc(collection(firestore, 'dummy')).id,
                         date: paymentData.date,
-                        amount: inv.amount, // Set to full inv amount for collective verification
+                        amount: inv.amount, 
                         reference: paymentData.reference,
                         method: paymentData.method,
                         recordedBy: recorder
@@ -295,15 +294,23 @@ import {
                                 {mergedData.length === 0 ? (
                                     <TableRow><TableCell colSpan={6} className="text-center py-20 text-muted-foreground italic">Tidak ada piutang aktif.</TableCell></TableRow>
                                 ) : mergedData.map((item) => (
-                                    <TableRow key={item.poNumber} className="hover:bg-muted/5 border-b last:border-0">
+                                    <TableRow key={item.poNumber} className={cn("hover:bg-muted/5 border-b last:border-0", (item.paidOffline || 0) > 0 && "bg-blue-50/10")}>
                                         <TableCell className="py-4">
                                             <div className="flex flex-col gap-1">
-                                                <span className="font-black text-sm text-slate-800">{item.poNumber}</span>
+                                                <div className="flex items-center gap-2">
+                                                    <span className="font-black text-sm text-slate-800">{item.poNumber}</span>
+                                                    {(item.paidOffline || 0) > 0 && <Badge variant="outline" className="text-[8px] h-3.5 bg-blue-50 text-blue-700 font-black uppercase">Legacy</Badge>}
+                                                </div>
                                                 <span className="text-[10px] font-bold uppercase text-muted-foreground truncate max-w-[200px]">{item.customer}</span>
                                             </div>
                                         </TableCell>
                                         <TableCell className="py-4">
                                             <div className="flex flex-wrap gap-1.5">
+                                                {(item.paidOffline || 0) > 0 && (
+                                                    <div className="flex items-center gap-1 bg-indigo-50 text-indigo-700 border-indigo-200 border px-2 py-1 rounded-md text-[9px] font-black opacity-80" title="Saldo Migrasi Sistem Lama">
+                                                        <History className="h-2.5 w-2.5" /> OPENING
+                                                    </div>
+                                                )}
                                                 {item.relatedInvoices.map(inv => (
                                                     <div 
                                                         key={inv.id} 
@@ -361,7 +368,10 @@ import {
                                     <div className="flex justify-between items-start">
                                         <div className="space-y-1">
                                             <span className="text-[9px] font-black uppercase text-muted-foreground/60 leading-none tracking-widest">PO Number</span>
-                                            <CardTitle className="text-sm font-black text-slate-800">{item.poNumber}</CardTitle>
+                                            <div className="flex items-center gap-2">
+                                                <CardTitle className="text-sm font-black text-slate-800">{item.poNumber}</CardTitle>
+                                                {(item.paidOffline || 0) > 0 && <Badge className="text-[7px] h-3.5 bg-blue-500 font-black uppercase">Migrasi</Badge>}
+                                            </div>
                                         </div>
                                         <Badge className={cn(
                                             "text-[8px] font-black uppercase",
@@ -386,6 +396,11 @@ import {
                                             <ReceiptText className="h-3 w-3" /> Linked Invoices
                                         </p>
                                         <div className="grid grid-cols-2 gap-2">
+                                            {(item.paidOffline || 0) > 0 && (
+                                                <div className="bg-indigo-50 text-indigo-700 border-indigo-100 border p-1.5 rounded-lg text-center text-[9px] font-black opacity-80 flex items-center justify-center gap-1">
+                                                    <History className="h-2.5 w-2.5" /> OPENING
+                                                </div>
+                                            )}
                                             {item.relatedInvoices.slice(0, 4).map(inv => (
                                                 <div 
                                                     key={inv.id} 

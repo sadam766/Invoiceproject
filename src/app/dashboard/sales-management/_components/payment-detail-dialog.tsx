@@ -17,7 +17,7 @@ import {
 import { Badge } from '@/components/ui/badge';
 import type { SalesListItem, Invoice, TaxInvoice } from '@/app/lib/data';
 import { cn } from '@/lib/utils';
-import { History, CreditCard, ExternalLink, ReceiptText, Calendar, CheckCircle2, Wallet, Banknote, AlertCircle } from 'lucide-react';
+import { History, CreditCard, ExternalLink, ReceiptText, Calendar, CheckCircle2, Wallet, Banknote, AlertCircle, RefreshCw } from 'lucide-react';
 import Link from 'next/link';
 
 type ExtendedInvoice = Invoice & {
@@ -34,7 +34,8 @@ type PaymentDetailDialogProps = {
 export function PaymentDetailDialog({ isOpen, onOpenChange, sale, invoices }: PaymentDetailDialogProps) {
   if (!sale) return null;
 
-  const totalPaid = invoices.filter(i => i.status === 'paid').reduce((sum, i) => sum + i.amount, 0);
+  const systemPaid = invoices.filter(i => i.status === 'paid').reduce((sum, i) => sum + i.amount, 0);
+  const totalPaid = (sale.paidOffline || 0) + systemPaid;
   const outstanding = sale.amount - totalPaid;
 
   return (
@@ -47,7 +48,10 @@ export function PaymentDetailDialog({ isOpen, onOpenChange, sale, invoices }: Pa
                     <History className="h-6 w-6 text-primary" />
                     Buku Piutang & Pembayaran
                 </DialogTitle>
-                <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest">Nomor PO: {sale.poNumber} | Customer: {sale.customer}</p>
+                <div className="flex items-center gap-3">
+                    <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest">Nomor PO: {sale.poNumber} | Customer: {sale.customer}</p>
+                    {(sale.paidOffline || 0) > 0 && <Badge className="bg-blue-600 text-[8px] h-4 uppercase font-black">Legacy Migration PO</Badge>}
+                </div>
             </div>
           </div>
           
@@ -57,7 +61,7 @@ export function PaymentDetailDialog({ isOpen, onOpenChange, sale, invoices }: Pa
                 <p className="text-lg font-black text-slate-800">Rp {sale.amount.toLocaleString('id-ID')}</p>
              </div>
              <div className="p-4 bg-emerald-50 rounded-xl border-2 border-emerald-100 shadow-sm">
-                <p className="text-[10px] uppercase font-black text-emerald-600 tracking-widest mb-1">Sudah Dibayar</p>
+                <p className="text-[10px] uppercase font-black text-emerald-600 tracking-widest mb-1">Total Sudah Bayar</p>
                 <div className="flex items-center gap-2">
                     <p className="text-lg font-black text-emerald-700">Rp {totalPaid.toLocaleString('id-ID')}</p>
                     <CheckCircle2 className="h-4 w-4 text-emerald-500" />
@@ -74,11 +78,30 @@ export function PaymentDetailDialog({ isOpen, onOpenChange, sale, invoices }: Pa
         </DialogHeader>
 
         <div className="flex-1 overflow-auto p-6 space-y-8">
+            {/* MIGRATION ADJUSTMENT SECTION */}
+            {(sale.paidOffline || 0) > 0 && (
+                <div className="space-y-4">
+                    <h3 className="text-xs font-black uppercase tracking-widest flex items-center gap-2 text-blue-600">
+                        <RefreshCw className="h-4 w-4" /> Migration Adjustment
+                    </h3>
+                    <div className="p-4 bg-blue-50/50 rounded-xl border-2 border-blue-100 border-dashed flex justify-between items-center">
+                        <div className="space-y-1">
+                            <p className="text-xs font-black text-blue-800 uppercase">Saldo Terbayar Sistem Lama (Legacy)</p>
+                            <p className="text-[10px] text-blue-600 font-medium">Pembayaran ini diakui secara manual sebagai saldo awal penagihan baru.</p>
+                        </div>
+                        <div className="text-right">
+                            <p className="text-lg font-black text-blue-700">Rp {sale.paidOffline?.toLocaleString('id-ID')}</p>
+                            <span className="text-[9px] font-bold text-blue-500 uppercase tracking-tighter">Verified Migration</span>
+                        </div>
+                    </div>
+                </div>
+            )}
+
             {/* INVOICE SECTION */}
             <div className="space-y-4">
                 <div className="flex items-center justify-between">
                     <h3 className="text-xs font-black uppercase tracking-widest flex items-center gap-2 text-slate-500">
-                        <ReceiptText className="h-4 w-4" /> Daftar Penagihan Terbit
+                        <ReceiptText className="h-4 w-4" /> Daftar Penagihan Terbit (Sistem Baru)
                     </h3>
                     <Badge variant="outline" className="text-[9px] font-black">{invoices.length} Dokumen</Badge>
                 </div>
@@ -97,7 +120,7 @@ export function PaymentDetailDialog({ isOpen, onOpenChange, sale, invoices }: Pa
                         </TableHeader>
                         <TableBody>
                             {invoices.length === 0 ? (
-                                <TableRow><TableCell colSpan={6} className="text-center py-12 text-muted-foreground font-medium italic">Belum ada invoice untuk PO ini.</TableCell></TableRow>
+                                <TableRow><TableCell colSpan={6} className="text-center py-12 text-muted-foreground font-medium italic">Belum ada invoice sistem baru untuk PO ini.</TableCell></TableRow>
                             ) : (
                                 invoices.map((inv) => {
                                     const isProforma = inv.id.startsWith('KW');
@@ -155,7 +178,7 @@ export function PaymentDetailDialog({ isOpen, onOpenChange, sale, invoices }: Pa
             {/* PAYMENT HISTORY SECTION */}
             <div className="space-y-4">
                 <h3 className="text-xs font-black uppercase tracking-widest flex items-center gap-2 text-slate-500">
-                    <Wallet className="h-4 w-4" /> Riwayat Transaksi Kas
+                    <Wallet className="h-4 w-4" /> Riwayat Transaksi Kas (Sistem Baru)
                 </h3>
                 <div className="grid gap-3">
                     {invoices.some(inv => inv.payments && inv.payments.length > 0) ? (
@@ -178,7 +201,7 @@ export function PaymentDetailDialog({ isOpen, onOpenChange, sale, invoices }: Pa
                     ) : (
                         <div className="py-12 border-2 border-dashed rounded-xl flex flex-col items-center justify-center opacity-30 text-center">
                             <Wallet className="h-10 w-10 mb-2" />
-                            <p className="text-xs font-black uppercase tracking-tighter">Belum ada dana masuk terverifikasi.</p>
+                            <p className="text-xs font-black uppercase tracking-tighter">Belum ada dana masuk sistem baru.</p>
                         </div>
                     )}
                 </div>
@@ -188,10 +211,10 @@ export function PaymentDetailDialog({ isOpen, onOpenChange, sale, invoices }: Pa
         <div className="p-4 bg-blue-50 border-t-2 border-blue-100 flex items-start gap-3">
             <CreditCard className="h-4 w-4 text-blue-600 mt-0.5" />
             <div className="space-y-1">
-                <p className="text-[9px] font-black uppercase text-blue-700 tracking-widest">Catatan Finansial Digital:</p>
+                <p className="text-[9px] font-black uppercase text-blue-700 tracking-widest">Catatan Migrasi & Pelunasan:</p>
                 <p className="text-[10px] text-blue-900/70 leading-relaxed font-medium">
-                    Setiap pembayaran yang dicatat akan secara otomatis mengurangi saldo piutang di Dashboard Utama dan Monitoring Monitoring Global. 
-                    Invoice yang sudah lunas sepenuhnya akan dikunci dari pengeditan data barang.
+                    Sistem akan menghitung sisa piutang dengan memprioritaskan saldo migrasi sistem lama terlebih dahulu. 
+                    Pastikan nominal 'Opening Balance' sudah sesuai dengan saldo penutupan buku tahun lalu agar laporan akhir tahun Dakota akurat.
                 </p>
             </div>
         </div>

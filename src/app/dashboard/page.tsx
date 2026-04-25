@@ -136,30 +136,42 @@ export default function DashboardPage() {
   }, [invoiceList]);
 
   const stats = useMemo(() => {
-    if (!filteredInvoices || !salesList) return { outstanding: 0, realization: 0, target: 0, taxPending: 0 };
+    if (!salesList) return { outstanding: 0, realization: 0, target: 0, taxPending: 0 };
     
-    const outstanding = filteredInvoices
+    // Invoices are the primary source for current period outstanding
+    const currentOutstanding = filteredInvoices
       .filter(i => i.status !== 'paid' && i.status !== 'cancelled')
       .reduce((sum, i) => {
-          // If status is partial, we should subtract already paid amounts
           const paidAmount = i.payments?.reduce((s, p) => s + p.amount, 0) || 0;
           return sum + (i.amount - paidAmount);
       }, 0);
     
-    const realization = filteredInvoices
+    // Realization = System Paid Invoices + Paid Offline of active POs
+    const systemRealization = filteredInvoices
       .filter(i => i.status !== 'cancelled')
       .reduce((sum, i) => {
           const paidAmount = i.payments?.reduce((s, p) => s + p.amount, 0) || 0;
           return sum + paidAmount;
       }, 0);
+
+    // Filter active sales in this period (Legacy POs with adjustments count as realized)
+    const activeSales = salesList.filter(s => s.status !== 'Cancelled');
+    const target = activeSales.reduce((sum, s) => sum + s.amount, 0);
     
-    const target = salesList.filter(s => s.status !== 'Cancelled').reduce((sum, s) => sum + s.amount, 0);
+    // Add Legacy payments to realization if they fall within the filtered period POs
+    // (Simplified: showing current period invoice performance + legacy adjustments for context)
+    const legacyPaid = activeSales.reduce((sum, s) => sum + (s.paidOffline || 0), 0);
     
     const taxPending = filteredInvoices.filter(inv => 
       inv.status !== 'cancelled' && !taxList?.some(t => t.invoiceNumber === inv.id)
     ).length;
 
-    return { outstanding, realization, target, taxPending };
+    return { 
+        outstanding: currentOutstanding, 
+        realization: systemRealization + legacyPaid, 
+        target, 
+        taxPending 
+    };
   }, [filteredInvoices, salesList, taxList]);
 
   const logisticStats = useMemo(() => {
@@ -202,7 +214,7 @@ export default function DashboardPage() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-black">Rp {stats.realization.toLocaleString('id-ID')}</div>
-            <p className="text-[10px] text-muted-foreground mt-1 font-bold">Dana masuk terverifikasi.</p>
+            <p className="text-[10px] text-muted-foreground mt-1 font-bold">Dana masuk (Termasuk Saldo Migrasi).</p>
           </CardContent>
         </Card>
 

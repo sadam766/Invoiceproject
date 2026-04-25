@@ -25,7 +25,7 @@ import {
     PopoverContent,
     PopoverTrigger,
 } from '@/components/ui/popover';
-import { Plus, Check, ChevronsUpDown } from 'lucide-react';
+import { Plus, Check, ChevronsUpDown, Info } from 'lucide-react';
 import type { SalesListItem, Customer, UserProfile } from '@/app/lib/data';
 import { useState, useEffect, useMemo } from 'react';
 import { formatNumberWithCommas, parseFormattedNumber, cn } from '@/lib/utils';
@@ -47,6 +47,7 @@ export function AddSaleDialog({ isOpen, onOpenChange, onSave, saleData, onAddCli
     const [sales, setSales] = useState('');
     const [soNumber, setSoNumber] = useState('');
     const [amount, setAmount] = useState<number | string>('');
+    const [paidOffline, setPaidOffline] = useState<number | string>('');
     
     const [customerPopoverOpen, setCustomerPopoverOpen] = useState(false);
     const [salesPopoverOpen, setSalesPopoverOpen] = useState(false);
@@ -71,12 +72,14 @@ export function AddSaleDialog({ isOpen, onOpenChange, onSave, saleData, onAddCli
             setSales(saleData.sales);
             setSoNumber(saleData.soNumber || '');
             setAmount(formatNumberWithCommas(saleData.amount));
+            setPaidOffline(formatNumberWithCommas(saleData.paidOffline || 0));
         } else if (!isOpen) {
             setPoNumber('');
             setCustomer('');
             setSales('');
             setSoNumber('');
             setAmount('');
+            setPaidOffline('');
         }
     }, [saleData, isOpen]);
     
@@ -88,14 +91,25 @@ export function AddSaleDialog({ isOpen, onOpenChange, onSave, saleData, onAddCli
         }
     };
 
+    const handlePaidOfflineChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const value = e.target.value;
+        const parsedValue = parseFormattedNumber(value);
+        if (!isNaN(parsedValue) || value === '') {
+            setPaidOffline(value === '' ? '' : formatNumberWithCommas(parsedValue));
+        }
+    };
+
     const handleSave = () => {
         const numericAmount = typeof amount === 'string' ? parseFormattedNumber(amount) : amount;
+        const numericPaidOffline = typeof paidOffline === 'string' ? parseFormattedNumber(paidOffline) : paidOffline;
+        
         onSave({
             poNumber,
             customer,
             sales,
             soNumber,
             amount: numericAmount,
+            paidOffline: numericPaidOffline,
             status: saleData?.status || 'Unpaid',
         });
         onOpenChange(false);
@@ -108,7 +122,7 @@ export function AddSaleDialog({ isOpen, onOpenChange, onSave, saleData, onAddCli
           <Plus className="mr-2 h-4 w-4" /> Register New PO
         </Button>
       </DialogTrigger>
-      <DialogContent className="sm:max-w-[450px]">
+      <DialogContent className="sm:max-w-[500px]">
         <DialogHeader>
           <DialogTitle>{saleData ? "Edit PO Data" : "Register Incoming PO"}</DialogTitle>
           <DialogDescription>
@@ -117,7 +131,7 @@ export function AddSaleDialog({ isOpen, onOpenChange, onSave, saleData, onAddCli
         </DialogHeader>
         <div className="grid gap-4 py-4">
           <div className="grid gap-2">
-            <Label htmlFor="po-number">Nomor PO Customer <span className="text-red-500">*</span></Label>
+            <Label htmlFor="po-number" className="font-bold">Nomor PO Customer <span className="text-red-500">*</span></Label>
             <Input id="po-number" value={poNumber} onChange={e => setPoNumber(e.target.value)} placeholder="Contoh: PO/2024/001" disabled={!!saleData} />
           </div>
 
@@ -179,12 +193,31 @@ export function AddSaleDialog({ isOpen, onOpenChange, onSave, saleData, onAddCli
 
           <div className="grid grid-cols-2 gap-4">
               <div className="grid gap-2">
-                <Label htmlFor="amount">Nilai PO (Total)</Label>
+                <Label htmlFor="amount" className="font-bold">Total Nilai PO</Label>
                 <Input id="amount" value={amount} onChange={handleAmountChange} placeholder="Rp 0" />
               </div>
               <div className="grid gap-2">
-                <Label htmlFor="so-number">No. SO (Jika ada)</Label>
+                <Label htmlFor="so-number">No. SO Produksi</Label>
                 <Input id="so-number" value={soNumber} onChange={e => setSoNumber(e.target.value)} placeholder="Waiting SO" />
+              </div>
+          </div>
+
+          <div className="bg-blue-50/50 p-4 rounded-xl border border-blue-100 space-y-3">
+              <div className="flex items-center gap-2 text-blue-800 font-bold text-xs uppercase tracking-widest">
+                  <Info className="h-4 w-4" /> Migration Adjustment
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="paid-offline" className="text-[10px] uppercase font-black text-blue-700">Saldo Terbayar (Sistem Lama)</Label>
+                <Input 
+                    id="paid-offline" 
+                    value={paidOffline} 
+                    onChange={handlePaidOfflineChange} 
+                    placeholder="Rp 0" 
+                    className="border-blue-200 focus-visible:ring-blue-500 bg-white"
+                />
+                <p className="text-[9px] text-blue-600 leading-tight italic">
+                    Masukkan total uang yang sudah masuk di sistem lama agar piutang di sistem baru sinkron.
+                </p>
               </div>
           </div>
         </div>
