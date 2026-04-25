@@ -1,4 +1,3 @@
-
 'use client';
 import { useState, useEffect, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
@@ -91,18 +90,12 @@ export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceDa
     return Array.from(new Set(salesOrderListData.map(item => item.soNumber)))
   },[salesOrderListData]);
 
-  /**
-   * Logika "Next Number" Berbasis Database:
-   * Mengambil referensi dari nilai tertinggi di invoiceNumbers DAN invoices
-   * untuk mencegah adanya nomor yang melompat (gap).
-   */
   const generateNextNumber = (type: 'sar' | 'kw', startFrom: string = '') => {
     let currentMax = 0;
     const now = new Date();
     const currentYearShort = format(now, 'yy');
     const currentYearLong = format(now, 'yyyy');
     
-    // Gabungkan ID dari kedua koleksi untuk validasi urutan absolut
     const allIds = [
         ...(allInvoiceNumbers?.map(inv => inv.id) || []),
         ...(existingInvoices?.map(inv => inv.id) || [])
@@ -226,7 +219,8 @@ export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceDa
   }
 
   const handleSalesOrderSelect = (currentValue: string) => {
-    const newSalesOrder = currentValue === salesOrder ? '' : currentValue;
+    const cleanSo = currentValue.split('|')[0];
+    const newSalesOrder = cleanSo === salesOrder ? '' : cleanSo;
     setSalesOrder(newSalesOrder);
 
     if (newSalesOrder && salesOrderListData) {
@@ -272,7 +266,6 @@ export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceDa
     
     const finalInvoiceNumber = fullInvoiceNumber;
     
-    // Pengecekan Duplikasi Ketat: Cek di Daftar Nomor Faktur DAN Invoice List
     const existsInNumberList = allInvoiceNumbers?.some(inv => inv.id === finalInvoiceNumber);
     const existsInInvoiceList = existingInvoices?.some(inv => inv.id === finalInvoiceNumber);
     
@@ -390,16 +383,16 @@ export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceDa
                     <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                     </Button>
                 </PopoverTrigger>
-                <PopoverContent className="w-[375px] p-0">
+                <PopoverContent className="w-[375px] p-0 shadow-xl border border-muted overflow-hidden">
                     <Command>
                     <CommandInput placeholder="Search sales order..." />
                     <CommandList>
-                      <CommandEmpty>No sales order found.</CommandEmpty>
+                      <CommandEmpty />
                       <CommandGroup>
                           {uniqueSalesOrders.map((so) => (
                           <CommandItem
                               key={so}
-                              value={so}
+                              value={`${so}|${so}`}
                               onSelect={handleSalesOrderSelect}
                           >
                               <Check
@@ -434,28 +427,33 @@ export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceDa
                     <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                     </Button>
                 </PopoverTrigger>
-                <PopoverContent className="w-[375px] p-0">
+                <PopoverContent className="w-[400px] p-0 shadow-xl border border-muted" align="start">
                     <Command>
                     <CommandInput placeholder="Search customer..." />
                      <CommandList>
-                        <CommandEmpty>No customer found.</CommandEmpty>
+                        <CommandEmpty />
                         <CommandGroup>
                             {customerListData?.map((c) => (
                             <CommandItem
                                 key={c.id}
-                                value={c.name}
-                                onSelect={(currentValue) => {
-                                    setCustomer(currentValue.toLowerCase() === customer.toLowerCase() ? "" : c.name);
+                                value={`${c.name}|${c.id}`}
+                                onSelect={(v) => {
+                                    const [name] = v.split('|');
+                                    setCustomer(name === customer ? "" : name);
                                     setCustomerPopoverOpen(false);
                                 }}
+                                className="flex flex-col items-start gap-1"
                             >
-                                <Check
-                                className={cn(
-                                    "mr-2 h-4 w-4",
-                                    customer.toLowerCase() === c.name.toLowerCase() ? "opacity-100" : "opacity-0"
-                                )}
-                                />
-                                {c.name}
+                                <div className="flex items-center gap-2">
+                                  <Check
+                                    className={cn(
+                                        "h-4 w-4",
+                                        customer.toLowerCase() === c.name.toLowerCase() ? "opacity-100" : "opacity-0"
+                                    )}
+                                  />
+                                  <span className="font-bold">{c.name}</span>
+                                </div>
+                                <p className="text-[10px] text-muted-foreground ml-6 truncate w-full">{c.address}</p>
                             </CommandItem>
                             ))}
                         </CommandGroup>

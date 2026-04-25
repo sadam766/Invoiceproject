@@ -47,14 +47,12 @@ import {
     const { user } = useUser();
     const [deleteDialogState, setDeleteDialogState] = useState<{ isOpen: boolean; invoiceId?: string; isBulk?: boolean }>({ isOpen: false });
     
-    // Get user profile for roles
     const userProfileRef = useMemoFirebase(() => {
         if (!firestore || !user) return null;
         return doc(firestore, 'users', user.uid);
     }, [firestore, user]);
     const { data: userProfile } = useDoc<UserProfile>(userProfileRef);
 
-    // Leader / Super Admin Bypass
     const isSuperAdmin = user?.email?.toLowerCase() === 'fa@gmail.com' || userProfile?.email?.toLowerCase() === 'fa@gmail.com';
     const userRole = isSuperAdmin ? 'admin' : (userProfile?.role || 'staff');
     const isAdmin = userRole === 'admin';
@@ -159,7 +157,7 @@ import {
             total: so.quantity * so.price, amount: so.quantity * so.price
         }));
         const subtotal = invoiceItems.reduce((sum, item) => sum + item.total, 0);
-        const grandTotal = subtotal; // Simplified for basic lookup
+        const grandTotal = subtotal; 
         const dppVat = grandTotal / 1.12;
         const vat12 = dppVat * 0.12;
 
@@ -258,7 +256,7 @@ import {
                         <TabsTrigger value="paid">Paid <Badge variant="secondary" className="ml-2">{invoices?.filter(i => i.status === 'paid').length || 0}</Badge></TabsTrigger>
                         <TabsTrigger value="unpaid">Unpaid <Badge variant="secondary" className="ml-2">{invoices?.filter(i => i.status !== 'paid').length || 0}</Badge></TabsTrigger>
                     </TabsList>
-                    <div className="relative w-64"><Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" /><Input placeholder="Search" className="pl-8" value={searchQuery} onChange={e => setSearchQuery(e.target.value)} /></div>
+                    <div className="relative w-64"><Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" /><Input placeholder="Search invoice, customer, or status..." className="pl-8" value={searchQuery} onChange={e => setSearchQuery(e.target.value)} /></div>
                     </div>
                     <TabsContent value={activeTab}>
                         <div className="mt-4 w-full overflow-auto">
@@ -307,6 +305,9 @@ import {
                                         </TableCell>
                                     </TableRow>
                                 ))}
+                                {!isLoading && filteredInvoices.length === 0 && (
+                                    <TableRow><TableCell colSpan={9} className="text-center py-8 text-muted-foreground font-medium">Data tidak ditemukan.</TableCell></TableRow>
+                                )}
                             </TableBody>
                             </Table>
                         </div>

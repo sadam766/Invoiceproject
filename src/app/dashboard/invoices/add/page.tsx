@@ -83,7 +83,6 @@ export default function AddInvoicePage() {
   const [poNumber, setPoNumber] = useState('');
   const [customer, setCustomer] = useState<Customer | undefined>(undefined);
 
-  // Default Issue Date to 25/04/2026 per instruction
   const [issueDate, setIssueDate] = useState<Date | undefined>(new Date('2026-04-25'));
   const [dueDate, setDueDate] = useState<Date | undefined>();
   const [status, setStatus] = useState<'paid' | 'unpaid' | 'sent' | 'draft'>('draft');
@@ -92,7 +91,6 @@ export default function AddInvoicePage() {
   const [items, setItems] = useState<InvoiceItem[]>([]);
   const [subtotal, setSubtotal] = useState(0);
   const [negotiation, setNegotiation] = useState<number | string>(0);
-  const [dpPercent, setDpPercent] = useState<string | number>('');
   const [dpValue, setDpValue] = useState<string | number>('');
   const [pelunasan, setPelunasan] = useState<string | number>('');
 
@@ -101,7 +99,6 @@ export default function AddInvoicePage() {
   const [vat12, setVat12] = useState<string | number>(0);
   const [totalAmount, setTotalAmount] = useState<string | number>(0);
 
-  // Virtual Account States
   const [isVaActive, setIsVaActive] = useState(false);
   const [selectedVaId, setSelectedVaId] = useState<string>('');
   const [paymentMethodText, setPaymentMethodMethodText] = useState('Bank Transfer');
@@ -189,7 +186,6 @@ export default function AddInvoicePage() {
             setPrintType(savedState.printType || 'original');
             setItems(savedState.items || []);
             setNegotiation(savedState.negotiation || 0);
-            setDpPercent(savedState.dpPercent || '');
             setDpValue(savedState.dpValue || '');
             setPelunasan(savedState.pelunasan || '');
             setGrandTotal(savedState.grandTotal || 0);
@@ -207,10 +203,10 @@ export default function AddInvoicePage() {
   useEffect(() => {
     if (!isLoading) {
       sessionStorage.setItem(ADD_INVOICE_SESSION_KEY, JSON.stringify({
-        invoiceId, soNumber, poNumber, customer, issueDate: issueDate?.toISOString(), dueDate: dueDate?.toISOString(), status, printType, items, negotiation, dpPercent, dpValue, pelunasan, grandTotal, dppVat, vat12, totalAmount, isVaActive, selectedVaId
+        invoiceId, soNumber, poNumber, customer, issueDate: issueDate?.toISOString(), dueDate: dueDate?.toISOString(), status, printType, items, negotiation, dpValue, pelunasan, grandTotal, dppVat, vat12, totalAmount, isVaActive, selectedVaId
       }));
     }
-  }, [invoiceId, soNumber, poNumber, customer, issueDate, dueDate, status, printType, items, negotiation, dpPercent, dpValue, pelunasan, grandTotal, dppVat, vat12, totalAmount, isVaActive, selectedVaId, isLoading]);
+  }, [invoiceId, soNumber, poNumber, customer, issueDate, dueDate, status, printType, items, negotiation, dpValue, pelunasan, grandTotal, dppVat, vat12, totalAmount, isVaActive, selectedVaId, isLoading]);
 
 
   useEffect(() => {
@@ -247,9 +243,10 @@ export default function AddInvoicePage() {
   }, [invoiceToEditData, customerListData, salesOrderListData]);
   
   const handleSoSelect = (selectedSo: string) => {
-    setSoNumber(selectedSo);
+    const cleanSo = selectedSo.split('|')[0];
+    setSoNumber(cleanSo);
     if (salesOrderListData) {
-        const soItems = salesOrderListData.filter(so => so.soNumber === selectedSo);
+        const soItems = salesOrderListData.filter(so => so.soNumber === cleanSo);
         if (soItems.length > 0) {
             setItems(soItems.map((item, index) => ({
                 id: Date.now() + index,
@@ -265,8 +262,9 @@ export default function AddInvoicePage() {
     setSoPopoverOpen(false);
   }
 
-  const handleCustomerSelect = (customerName: string) => {
-    setCustomer(customerListData?.find(c => c.name.toLowerCase() === customerName.toLowerCase()));
+  const handleCustomerSelect = (value: string) => {
+    const [name] = value.split('|');
+    setCustomer(customerListData?.find(c => c.name.toLowerCase() === name.toLowerCase()));
     setCustomerPopoverOpen(false);
   }
 
@@ -276,14 +274,7 @@ export default function AddInvoicePage() {
   
     const numericNegotiation = parseFormattedNumber(String(negotiation));
     const base = currentSubtotal - numericNegotiation;
-  
-    const numericDpPercent = parseFloat(String(dpPercent)) || 0;
-    let numericDpValue = parseFormattedNumber(String(dpValue));
-    if (numericDpPercent > 0 && (dpValue === '' || dpValue === 0)) {
-      numericDpValue = base * (numericDpPercent / 100);
-      setDpValue(formatNumberWithCommas(numericDpValue));
-    }
-  
+    const numericDpValue = parseFormattedNumber(String(dpValue));
     const numericPelunasan = parseFormattedNumber(String(pelunasan));
     const currentGrandTotal = base - numericDpValue - numericPelunasan;
     
@@ -293,7 +284,7 @@ export default function AddInvoicePage() {
     const currentVat = currentDpp * 0.12;
     setVat12(formatNumberWithCommas(currentVat));
     setTotalAmount(formatNumberWithCommas(currentGrandTotal + currentVat));
-  }, [items, negotiation, dpPercent, dpValue, pelunasan]);
+  }, [items, negotiation, dpValue, pelunasan]);
 
   const handleBlurFormat = (setter: React.Dispatch<React.SetStateAction<string | number>>, value: string | number) => {
     setter(formatNumberWithCommas(String(value)));
@@ -326,7 +317,6 @@ export default function AddInvoicePage() {
     };
     batch.set(invoiceDocRef, newInvoiceData, { merge: true });
 
-    // Sync Amount with invoiceNumbers collection
     const invoiceNumberRef = doc(firestore, 'invoiceNumbers', safeInvoiceId);
     batch.set(invoiceNumberRef, { amount: finalAmountValue }, { merge: true });
 
@@ -392,7 +382,7 @@ export default function AddInvoicePage() {
               <div><label className="text-sm font-medium">SO/Sales Order</label>
                 <Popover open={soPopoverOpen} onOpenChange={setSoPopoverOpen}>
                     <PopoverTrigger asChild><Button variant="outline" className="w-full justify-between">{soNumber || "Cari SO..."}<ChevronsUpDown className="ml-2 h-4 w-4 opacity-50" /></Button></PopoverTrigger>
-                    <PopoverContent className="w-[200px] p-0"><Command><CommandInput placeholder="Search SO..." /><CommandList><CommandEmpty>No SO found.</CommandEmpty><CommandGroup>{uniqueSalesOrders.map((so) => (<CommandItem key={so} value={so} onSelect={(v) => handleSoSelect(v.toUpperCase())}><Check className={cn("mr-2 h-4 w-4", soNumber.toLowerCase() === so.toLowerCase() ? "opacity-100" : "opacity-0")} />{so}</CommandItem>))}</CommandGroup></CommandList></Command></PopoverContent>
+                    <PopoverContent className="w-[200px] p-0 shadow-xl border border-muted"><Command><CommandInput placeholder="Search SO..." /><CommandList><CommandEmpty /><CommandGroup>{uniqueSalesOrders.map((so) => (<CommandItem key={so} value={so} onSelect={handleSoSelect}><Check className={cn("mr-2 h-4 w-4", soNumber.toLowerCase() === so.toLowerCase() ? "opacity-100" : "opacity-0")} />{so}</CommandItem>))}</CommandGroup></CommandList></Command></PopoverContent>
                 </Popover>
               </div>
               <div><label className="text-sm font-medium">No. PO</label><Input value={poNumber} onChange={e => setPoNumber(e.target.value)} /></div>
@@ -401,7 +391,7 @@ export default function AddInvoicePage() {
                  <label className="text-sm font-medium">Bill To</label>
                  <Popover open={customerPopoverOpen} onOpenChange={setCustomerPopoverOpen}>
                     <PopoverTrigger asChild><Button variant="outline" className="w-full justify-between">{customer?.name ?? "Cari Customer..."}<ChevronsUpDown className="ml-2 h-4 w-4 opacity-50" /></Button></PopoverTrigger>
-                    <PopoverContent className="w-full p-0"><Command><CommandInput placeholder="Search customer..." /><CommandList><CommandGroup>{customerListData?.map((c) => (<CommandItem key={c.id} value={c.name} onSelect={(v) => handleCustomerSelect(v)}><Check className={cn("mr-2 h-4 w-4", customer?.name.toLowerCase() === c.name.toLowerCase() ? "opacity-100" : "opacity-0")} />{c.name}</CommandItem>))}</CommandGroup></CommandList></Command></PopoverContent>
+                    <PopoverContent className="w-[400px] p-0 shadow-xl border border-muted" align="start"><Command><CommandInput placeholder="Search customer..." /><CommandList><CommandEmpty /><CommandGroup>{customerListData?.map((c) => (<CommandItem key={c.id} value={`${c.name}|${c.id}`} onSelect={handleCustomerSelect} className="flex flex-col items-start gap-1"><div className="flex items-center gap-2"><Check className={cn("h-4 w-4", customer?.name.toLowerCase() === c.name.toLowerCase() ? "opacity-100" : "opacity-0")} /><span className="font-bold">{c.name}</span></div><p className="text-[10px] text-muted-foreground ml-6 truncate w-full">{c.address}</p></CommandItem>))}</CommandGroup></CommandList></Command></PopoverContent>
                  </Popover>
                  {customer && <div className="mt-2 p-2 border rounded-md bg-muted text-sm text-muted-foreground"><p>{customer.address}</p></div>}
               </div>
@@ -435,9 +425,9 @@ export default function AddInvoicePage() {
                             <PopoverContent className="w-[--radix-popover-trigger-width] p-0 shadow-xl border border-muted overflow-hidden">
                               <Command>
                                 <CommandInput placeholder="Search product..." />
-                                <CommandList className="max-h-[300px] overflow-y-auto">
-                                  <CommandEmpty>No product found.</CommandEmpty>
-                                  <CommandGroup className="pb-4">
+                                <CommandList className="max-h-[300px] overflow-y-auto pb-4">
+                                  <CommandEmpty />
+                                  <CommandGroup>
                                     {productListData?.map((p) => (
                                       <CommandItem 
                                         key={p.id} 
