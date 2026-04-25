@@ -1,4 +1,3 @@
-
 'use client';
 import { Button } from '@/components/ui/button';
 import {
@@ -40,9 +39,10 @@ type AddSpdDialogProps = {
   onSave: (data: SpdData) => void;
   spdData?: SpdData;
   onAddClick: () => void;
+  initialPreselectedInvoices?: SpdInvoiceEntry[];
 };
 
-export function AddSpdDialog({ isOpen, onOpenChange, onSave, spdData, onAddClick }: AddSpdDialogProps) {
+export function AddSpdDialog({ isOpen, onOpenChange, onSave, spdData, onAddClick, initialPreselectedInvoices }: AddSpdDialogProps) {
   const firestore = useFirestore();
   
   const [spdId, setSpdId] = useState('');
@@ -72,7 +72,8 @@ export function AddSpdDialog({ isOpen, onOpenChange, onSave, spdData, onAddClick
       return allSentInvoices.filter(inv => {
           const isNotAssigned = !inv.spdNumber || (spdData && inv.spdNumber === spdData.id);
           const matchesSearch = inv.id.toLowerCase().includes(searchInvoice.toLowerCase()) || 
-                                inv.customer.toLowerCase().includes(searchInvoice.toLowerCase());
+                                inv.customer.toLowerCase().includes(searchInvoice.toLowerCase()) ||
+                                (inv.sjNumbers && inv.sjNumbers.some(s => s.toLowerCase().includes(searchInvoice.toLowerCase())));
           return isNotAssigned && matchesSearch;
       });
   }, [allSentInvoices, searchInvoice, spdData]);
@@ -90,6 +91,18 @@ export function AddSpdDialog({ isOpen, onOpenChange, onSave, spdData, onAddClick
           if (inv.sjNumbers) initialSjs[inv.invoiceId] = inv.sjNumbers.join(', ');
       });
       setLocalSjAdditions(initialSjs);
+    } else if (isOpen && initialPreselectedInvoices) {
+        const now = new Date();
+        setSpdId(`SPD/${format(now, 'yyyy/MM')}/${Math.floor(100 + Math.random() * 900)}`);
+        setDate(format(now, 'yyyy-MM-dd'));
+        setSelectedInvoices(initialPreselectedInvoices);
+        
+        // Sync pre-selected SJs
+        const initialSjs: Record<string, string> = {};
+        initialPreselectedInvoices.forEach(inv => {
+            if (inv.sjNumbers) initialSjs[inv.invoiceId] = inv.sjNumbers.join(', ');
+        });
+        setLocalSjAdditions(initialSjs);
     } else if (!isOpen) {
       const now = new Date();
       setSpdId(`SPD/${format(now, 'yyyy/MM')}/${Math.floor(100 + Math.random() * 900)}`);
@@ -99,7 +112,7 @@ export function AddSpdDialog({ isOpen, onOpenChange, onSave, spdData, onAddClick
       setSearchInvoice('');
       setLocalSjAdditions({});
     }
-  }, [spdData, isOpen]);
+  }, [spdData, isOpen, initialPreselectedInvoices]);
 
   const toggleInvoice = (inv: Invoice) => {
     const exists = selectedInvoices.find(si => si.invoiceId === inv.id);
@@ -229,7 +242,7 @@ export function AddSpdDialog({ isOpen, onOpenChange, onSave, spdData, onAddClick
                 <div className="relative">
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                     <Input 
-                        placeholder="Cari Nomor Invoice, Customer, atau No. SJ..." 
+                        placeholder="Cari Customer, No. Invoice, atau No. SJ..." 
                         className="pl-10 h-11 shadow-none border-none focus-visible:ring-0 text-sm"
                         value={searchInvoice}
                         onChange={e => setSearchInvoice(e.target.value)}

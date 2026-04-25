@@ -1,6 +1,5 @@
-
 'use client';
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import {
     Card,
@@ -20,7 +19,7 @@ import {
     Eye, 
     Edit, 
     Trash2, 
-    MoreVertical,
+    MoreVertical, 
     Calendar as CalendarIcon,
     Layers,
     FileCheck
@@ -37,7 +36,7 @@ import {
     DropdownMenuItem, 
     DropdownMenuTrigger 
   } from '@/components/ui/dropdown-menu';
-  import type { SpdData } from '@/app/lib/data';
+  import type { SpdData, Invoice, SpdInvoiceEntry } from '@/app/lib/data';
   
   export default function SpdPage() {
     const firestore = useFirestore();
@@ -50,11 +49,36 @@ import {
     const [searchQuery, setSearchQuery] = useState('');
     const [deleteDialogState, setDeleteDialogState] = useState<{ isOpen: boolean; spdId?: string }>({ isOpen: false });
 
+    // State for pre-selected invoices from shortcut
+    const [initialPreselected, setInitialPreselected] = useState<SpdInvoiceEntry[] | undefined>(undefined);
+
     const spdsCollection = useMemoFirebase(() => {
         if (!firestore) return null;
         return query(collection(firestore, 'spds'));
     }, [firestore]);
     const { data: spds, isLoading } = useCollection<SpdData>(spdsCollection);
+
+    // Effect to check for pre-selected invoices from Invoice List shortcut
+    useEffect(() => {
+        const data = sessionStorage.getItem('preselectedSpdInvoices');
+        if (data) {
+            try {
+                const invoices = JSON.parse(data) as Invoice[];
+                const entries: SpdInvoiceEntry[] = invoices.map(inv => ({
+                    invoiceId: inv.id,
+                    customer: inv.customer,
+                    address: inv.billingAddress,
+                    status: 'pending',
+                    sjNumbers: inv.sjNumbers || []
+                }));
+                setInitialPreselected(entries);
+                setIsDialogOpen(true);
+                sessionStorage.removeItem('preselectedSpdInvoices');
+            } catch (e) {
+                console.error("Failed to parse preselected invoices", e);
+            }
+        }
+    }, []);
 
     const filteredData = useMemo(() => {
         if (!spds) return [];
@@ -67,11 +91,13 @@ import {
 
     const handleAdd = () => {
       setEditingSpd(undefined);
+      setInitialPreselected(undefined);
       setIsDialogOpen(true);
     };
 
     const handleEdit = (spdItem: SpdData) => {
         setEditingSpd(spdItem);
+        setInitialPreselected(undefined);
         setIsDialogOpen(true);
     }
     
@@ -113,9 +139,13 @@ import {
         batch.set(spdRef, { ...newItem, ownerId: user.uid }, { merge: true });
 
         await batch.commit();
-        toast({ title: editingSpd ? "SPD Berhasil Diperbarui" : "SPD Berhasil Diterbitkan" });
+        toast({ 
+            title: editingSpd ? "SPD Berhasil Diperbarui" : "SPD Berhasil Diterbitkan",
+            description: `${newItem.invoices.length} Invoice telah berhasil ditambahkan ke SPD Nomor ${newItem.id}`
+        });
         setIsDialogOpen(false);
         setEditingSpd(undefined);
+        setInitialPreselected(undefined);
     };
 
     const handleUpdateStatus = async (spd: SpdData, newStatus: SpdData['status']) => {
@@ -144,6 +174,7 @@ import {
                 onSave={handleSave}
                 spdData={editingSpd}
                 onAddClick={handleAdd}
+                initialPreselectedInvoices={initialPreselected}
             />
         </div>
         
@@ -192,7 +223,7 @@ import {
                                 <div className="space-y-1">
                                     <CardTitle className="text-sm font-black font-mono text-indigo-700 tracking-tighter">{spd.id}</CardTitle>
                                     <div className="flex items-center gap-1.5 text-[10px] font-bold text-muted-foreground">
-                                        <CalendarIcon className="h-3 w-3" /> {format(new Date(spd.date), 'dd MMM yyyy')}
+                                        <CalendarIcon className="h-3 w-3" /> {spd.date}
                                     </div>
                                 </div>
                                 <Badge variant="outline" className={cn("text-[9px] font-black uppercase px-2 py-0.5 rounded-full border-2", Conf.color)}>

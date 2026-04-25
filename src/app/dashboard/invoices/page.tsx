@@ -1,4 +1,3 @@
-
 'use client';
 import Link from 'next/link';
 import { useState, useMemo } from 'react';
@@ -23,7 +22,7 @@ import {
   import { Badge } from '@/components/ui/badge';
   import { Checkbox } from '@/components/ui/checkbox';
   import { type Invoice, type SpdData, type SalesOrder, type Customer, type UserProfile } from '@/app/lib/data';
-  import { Search, Filter, MoreHorizontal, ArrowUpDown, Plus, Eye, Pencil, Trash2, CreditCard, Download } from 'lucide-react';
+  import { Search, Filter, MoreHorizontal, ArrowUpDown, Plus, Eye, Pencil, Trash2, CreditCard, Download, Truck } from 'lucide-react';
   import { Skeleton } from '@/components/ui/skeleton';
   import {
     DropdownMenu,
@@ -63,19 +62,6 @@ import {
     }, [firestore]);
     const { data: invoices, isLoading } = useCollection<Invoice>(invoicesCollection);
     
-    const customersCollection = useMemoFirebase(() => {
-        if (!firestore) return null;
-        return query(collection(firestore, 'customers'));
-    }, [firestore]);
-    const { data: customerListData } = useCollection<Customer>(customersCollection);
-
-    const salesOrdersCollection = useMemoFirebase(() => {
-        if (!firestore) return null;
-        return query(collection(firestore, 'salesOrders'));
-    }, [firestore]);
-    const { data: salesOrderListData } = useCollection<SalesOrder>(salesOrdersCollection);
-
-
     const filteredInvoices = useMemo(() => {
         if (!invoices) return [];
         let filtered = invoices;
@@ -98,7 +84,20 @@ import {
         return filtered;
     }, [invoices, activeTab, searchQuery]);
 
-    const totalFiltered = filteredInvoices?.reduce((sum, item) => sum + item.amount, 0) || 0;
+    const handleCreateSpdFromSelected = () => {
+        if (selectedInvoices.size === 0) return;
+        
+        // Simpan invoice yang dipilih ke session storage untuk diambil di menu SPD
+        const selectedList = filteredInvoices.filter(inv => selectedInvoices.has(inv.id));
+        sessionStorage.setItem('preselectedSpdInvoices', JSON.stringify(selectedList));
+        
+        toast({
+            title: "Siap Melakukan Pengiriman",
+            description: `${selectedInvoices.size} Invoice telah disiapkan. Mengalihkan ke menu SPD...`
+        });
+        
+        router.push('/dashboard/invoices/spd');
+    };
 
     const handleDeleteConfirm = async () => {
       if (!firestore || !isSuperAdmin) return;
@@ -140,11 +139,19 @@ import {
     return (
       <main className="flex flex-1 flex-col gap-4 p-4 md:gap-8 md:p-8">
         <div className="flex justify-between items-center">
-            <h1 className="text-2xl font-bold tracking-tight">Invoice List</h1>
+            <div>
+                <h1 className="text-2xl font-bold tracking-tight">Invoice List</h1>
+                <p className="text-muted-foreground">Kelola penagihan dan pantau jadwal pengiriman dokumen fisik.</p>
+            </div>
             <div className="flex items-center gap-2">
+                {selectedInvoices.size > 0 && (
+                    <Button variant="secondary" size="sm" onClick={handleCreateSpdFromSelected} className="bg-indigo-50 border-indigo-200 text-indigo-700 hover:bg-indigo-100">
+                        <Truck className="mr-2 h-4 w-4" /> Create SPD ({selectedInvoices.size})
+                    </Button>
+                )}
                 {isSuperAdmin && selectedInvoices.size > 0 && (
                     <Button variant="destructive" size="sm" onClick={() => setDeleteDialogState({ isOpen: true, isBulk: true })}>
-                        <Trash2 className="mr-2 h-4 w-4" /> Leader Delete ({selectedInvoices.size})
+                        <Trash2 className="mr-2 h-4 w-4" /> Leader Delete
                     </Button>
                 )}
                 <Button variant="outline" size="sm" onClick={() => exportToExcel(filteredInvoices, 'invoices')}><Download className="mr-2 h-4 w-4" /> Export</Button>
@@ -155,24 +162,24 @@ import {
         <Card>
             <CardContent className="pt-6">
                 <Tabs defaultValue="all" value={activeTab} onValueChange={setActiveTab}>
-                    <div className="flex justify-between items-center mb-6">
+                    <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
                         <TabsList>
                             <TabsTrigger value="all">Semua ({invoices?.length || 0})</TabsTrigger>
                             <TabsTrigger value="paid">Lunas</TabsTrigger>
                             <TabsTrigger value="unpaid">Belum Bayar</TabsTrigger>
                         </TabsList>
-                        <div className="relative w-64">
+                        <div className="relative w-full sm:w-64">
                             <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-                            <Input placeholder="Cari invoice..." className="pl-8 h-9" value={searchQuery} onChange={e => setSearchQuery(e.target.value)} />
+                            <Input placeholder="Cari invoice, customer, PO..." className="pl-8 h-9" value={searchQuery} onChange={e => setSearchQuery(e.target.value)} />
                         </div>
                     </div>
 
                     <div className="rounded-md border overflow-hidden">
                         <Table>
-                            <TableHeader>
+                            <TableHeader className="bg-muted/30">
                                 <TableRow>
                                     <TableHead className="w-[40px]"><Checkbox onCheckedChange={(c) => c ? setSelectedInvoices(new Set(filteredInvoices.map(i => i.id))) : setSelectedInvoices(new Set())} /></TableHead>
-                                    <TableHead>INVOICE</TableHead>
+                                    <TableHead>INVOICE & SPD INFO</TableHead>
                                     <TableHead>CUSTOMER</TableHead>
                                     <TableHead>DATE</TableHead>
                                     <TableHead>AMOUNT</TableHead>
@@ -185,8 +192,22 @@ import {
                                     filteredInvoices.map((invoice) => (
                                     <TableRow key={invoice.id}>
                                         <TableCell><Checkbox checked={selectedInvoices.has(invoice.id)} onCheckedChange={() => setSelectedInvoices(prev => { const n = new Set(prev); n.has(invoice.id) ? n.delete(invoice.id) : n.add(invoice.id); return n; })} /></TableCell>
-                                        <TableCell className="font-bold text-xs">{invoice.id}</TableCell>
-                                        <TableCell className="text-xs">{invoice.customer}</TableCell>
+                                        <TableCell>
+                                            <div className="flex flex-col gap-1">
+                                                <span className="font-bold text-xs">{invoice.id}</span>
+                                                {invoice.spdNumber ? (
+                                                    <div className="flex items-center gap-1 text-[9px] font-black text-indigo-600 bg-indigo-50 px-1.5 py-0.5 rounded w-fit">
+                                                        <Truck className="h-2.5 w-2.5" /> {invoice.spdNumber}
+                                                    </div>
+                                                ) : (
+                                                    <span className="text-[9px] font-bold text-muted-foreground uppercase opacity-50">Not Picked</span>
+                                                )}
+                                            </div>
+                                        </TableCell>
+                                        <TableCell className="text-xs">
+                                            <div className="font-medium">{invoice.customer}</div>
+                                            <div className="text-[10px] text-muted-foreground truncate max-w-[150px]">{invoice.billingAddress}</div>
+                                        </TableCell>
                                         <TableCell className="text-xs">{invoice.date}</TableCell>
                                         <TableCell className="text-xs font-bold">Rp {invoice.amount.toLocaleString('id-ID')}</TableCell>
                                         <TableCell><Badge variant={invoice.status === 'paid' ? 'outline' : 'destructive'} className="text-[9px] uppercase">{invoice.status}</Badge></TableCell>
