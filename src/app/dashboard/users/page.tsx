@@ -1,3 +1,4 @@
+
 'use client';
 import { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -10,7 +11,7 @@ import { useFirestore, useUser, useCollection, useMemoFirebase, useDoc } from '@
 import { collection, doc, updateDoc, query } from 'firebase/firestore';
 import { type UserProfile } from '@/app/lib/data';
 import { useToast } from '@/hooks/use-toast';
-import { ShieldAlert, UserX, UserCheck, UserPlus, BadgeCheck } from 'lucide-react';
+import { ShieldAlert, UserX, UserCheck, UserPlus, BadgeCheck, MailPlus } from 'lucide-react';
 import { cn } from '@/lib/utils';
   
 export default function UserManagementPage() {
@@ -25,8 +26,7 @@ export default function UserManagementPage() {
     }, [firestore, currentUser]);
     const { data: currentUserProfile } = useDoc<UserProfile>(currentUserProfileRef);
     
-    const isSuperAdmin = currentUser?.email === 'fa@gmail.com' || currentUserProfile?.email === 'fa@gmail.com';
-    const isAdmin = isSuperAdmin || currentUserProfile?.role === 'admin';
+    const isSuperAdmin = currentUser?.email?.toLowerCase() === 'fa@gmail.com' || currentUserProfile?.email?.toLowerCase() === 'fa@gmail.com';
 
     const usersCollection = useMemoFirebase(() => {
         if (!firestore) return null;
@@ -35,7 +35,7 @@ export default function UserManagementPage() {
     const { data: allUsers, isLoading } = useCollection<UserProfile>(usersCollection);
 
     const handleRoleChange = async (targetUserId: string, targetEmail: string, newRole: 'admin' | 'staff') => {
-        if (!firestore || !isAdmin) return;
+        if (!firestore || !isSuperAdmin) return;
         if (targetEmail.toLowerCase() === 'fa@gmail.com') {
             toast({ variant: "destructive", title: "Akses Ditolak", description: "Otoritas Leader Utama tidak dapat diubah." });
             return;
@@ -49,7 +49,7 @@ export default function UserManagementPage() {
     };
 
     const handleStatusChange = async (targetUserId: string, targetEmail: string, newStatus: 'active' | 'suspended' | 'pending') => {
-        if (!firestore || !isAdmin) return;
+        if (!firestore || !isSuperAdmin) return;
         if (targetUserId === currentUser?.uid || targetEmail.toLowerCase() === 'fa@gmail.com') {
             toast({ variant: "destructive", title: "Dibatalkan", description: "Proteksi Leader/Diri Sendiri aktif." });
             return;
@@ -62,28 +62,43 @@ export default function UserManagementPage() {
         }
     };
 
-    if (!isAdmin && !isLoading) return <div className="p-8 text-center flex flex-col items-center gap-4"><ShieldAlert className="h-12 w-12 text-destructive" /><div><h2 className="text-xl font-bold">Akses Terbatas</h2><p className="text-muted-foreground">Halaman ini hanya dapat diakses oleh Administrator.</p></div></div>;
+    if (!isSuperAdmin && !isLoading) return (
+        <div className="p-8 text-center flex flex-col items-center gap-4">
+            <ShieldAlert className="h-12 w-12 text-destructive" />
+            <div>
+                <h2 className="text-xl font-bold">Akses Terbatas</h2>
+                <p className="text-muted-foreground">Halaman ini hanya dapat diakses oleh Leader Utama (fa@gmail.com).</p>
+            </div>
+        </div>
+    );
 
     return (
       <main className="flex flex-1 flex-col gap-4 p-4 md:gap-8 md:p-8">
         <div className="flex items-center justify-between">
             <div>
-                <h1 className="text-2xl font-bold tracking-tight">Manajemen User</h1>
-                <p className="text-muted-foreground">Kelola pendaftaran karyawan dan tentukan hak akses mereka di sistem Dakota.</p>
+                <h1 className="text-2xl font-bold tracking-tight">User Management (Leader Only)</h1>
+                <p className="text-muted-foreground">Kelola hak akses karyawan dan aktifkan akun pendaftar baru.</p>
             </div>
-            {isSuperAdmin && <Badge className="bg-red-600 px-3 py-1 animate-pulse">SUPER ADMIN MODE</Badge>}
+            <div className="flex gap-2">
+                <Button variant="outline" className="h-9">
+                    <MailPlus className="mr-2 h-4 w-4" /> Invite Staff
+                </Button>
+                <Badge className="bg-red-600 px-3 py-1 animate-pulse">Otoritas Leader Aktif</Badge>
+            </div>
         </div>
         
         <Card>
-            <CardHeader className="border-b bg-muted/20"><CardTitle className="text-lg">Daftar Karyawan Terdaftar</CardTitle></CardHeader>
+            <CardHeader className="border-b bg-muted/20">
+                <CardTitle className="text-lg">Daftar Pengguna Sistem</CardTitle>
+            </CardHeader>
             <CardContent className="pt-6">
                 <Table>
                     <TableHeader>
                         <TableRow>
                             <TableHead>KARYAWAN</TableHead>
-                            <TableHead>HAK AKSES</TableHead>
-                            <TableHead>STATUS</TableHead>
-                            <TableHead className="text-right">TINDAKAN</TableHead>
+                            <TableHead>HAK AKSES (ROLE)</TableHead>
+                            <TableHead>STATUS AKUN</TableHead>
+                            <TableHead className="text-right">AKSI KONTROL</TableHead>
                         </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -96,10 +111,17 @@ export default function UserManagementPage() {
                                 <TableRow key={u.uid} className={cn(u.status === 'pending' ? 'bg-yellow-50/50' : '', isTargetLeader ? 'border-l-4 border-l-blue-600' : '')}>
                                     <TableCell>
                                         <div className="flex items-center gap-3">
-                                            <Avatar className="h-8 w-8"><AvatarFallback className={isTargetLeader ? 'bg-blue-600 text-white font-bold' : 'font-bold'}>{u.displayName?.charAt(0).toUpperCase() || u.email?.charAt(0).toUpperCase()}</AvatarFallback></Avatar>
+                                            <Avatar className="h-9 w-9 border">
+                                                <AvatarFallback className={isTargetLeader ? 'bg-blue-600 text-white font-bold' : 'font-bold'}>
+                                                    {u.displayName?.charAt(0).toUpperCase() || u.email?.charAt(0).toUpperCase()}
+                                                </AvatarFallback>
+                                            </Avatar>
                                             <div className="flex flex-col">
-                                                <div className="flex items-center gap-2"><span className="font-bold">{u.displayName || 'No Name'}</span>{isTargetLeader && <BadgeCheck className="h-3 w-3 text-blue-600" />}</div>
-                                                <span className="text-xs text-muted-foreground">{u.email}</span>
+                                                <div className="flex items-center gap-2">
+                                                    <span className="font-bold text-sm">{u.displayName || 'No Name'}</span>
+                                                    {isTargetLeader && <BadgeCheck className="h-3 w-3 text-blue-600" />}
+                                                </div>
+                                                <span className="text-[10px] text-muted-foreground">{u.email}</span>
                                             </div>
                                         </div>
                                     </TableCell>
@@ -107,37 +129,55 @@ export default function UserManagementPage() {
                                         <Select 
                                             value={isTargetLeader ? 'admin' : (u.role || 'staff')} 
                                             onValueChange={(val) => handleRoleChange(u.uid, u.email, val as any)} 
-                                            disabled={isTargetLeader || isSelf || (u.status === 'pending' && !isSuperAdmin)}
+                                            disabled={isTargetLeader || isSelf}
                                         >
-                                            <SelectTrigger className="w-32 h-8"><SelectValue /></SelectTrigger>
-                                            <SelectContent><SelectItem value="staff">Staff</SelectItem><SelectItem value="admin">Admin</SelectItem></SelectContent>
+                                            <SelectTrigger className="w-32 h-8 text-xs">
+                                                <SelectValue />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                <SelectItem value="staff">Staf Biasa</SelectItem>
+                                                <SelectItem value="admin">Administrator</SelectItem>
+                                            </SelectContent>
                                         </Select>
                                     </TableCell>
                                     <TableCell>
                                         <Badge variant="outline" className={cn(
-                                            u.status === 'active' ? 'bg-green-100 text-green-800 border-green-200' : 
-                                            (u.status === 'pending' ? 'bg-yellow-100 text-yellow-800 border-yellow-200' : 'bg-red-100 text-red-800 border-red-200')
+                                            "text-[10px] uppercase font-bold",
+                                            u.status === 'active' ? 'bg-green-50 text-green-700 border-green-200' : 
+                                            (u.status === 'pending' ? 'bg-yellow-50 text-yellow-700 border-yellow-200' : 'bg-red-50 text-red-700 border-red-200')
                                         )}>
-                                            {u.status?.toUpperCase() || 'UNKNOWN'}
+                                            {u.status || 'pending'}
                                         </Badge>
                                     </TableCell>
                                     <TableCell className="text-right">
-                                        {u.status === 'pending' ? (
-                                            <Button size="sm" className="bg-green-600 h-8 hover:bg-green-700" onClick={() => handleStatusChange(u.uid, u.email, 'active')}>
-                                                <UserPlus className="mr-2 h-4 w-4" /> Setujui & Aktifkan
-                                            </Button>
-                                        ) : !isSelf && !isTargetLeader && (
-                                            <Button variant={u.status === 'suspended' ? 'outline' : 'destructive'} size="sm" className="h-8" onClick={() => handleStatusChange(u.uid, u.email, u.status === 'suspended' ? 'active' : 'suspended')}>
-                                                {u.status === 'suspended' ? <UserCheck className="h-4 w-4 mr-2" /> : <UserX className="h-4 w-4 mr-2" />}
-                                                {u.status === 'suspended' ? 'Aktifkan Kembali' : 'Blokir Akun'}
-                                            </Button>
-                                        )}
+                                        <div className="flex justify-end gap-2">
+                                            {u.status === 'pending' ? (
+                                                <Button size="sm" className="bg-green-600 h-8 hover:bg-green-700 text-xs" onClick={() => handleStatusChange(u.uid, u.email, 'active')}>
+                                                    <UserPlus className="mr-2 h-3 w-3" /> Aktifkan User
+                                                </Button>
+                                            ) : !isSelf && !isTargetLeader && (
+                                                <Button variant={u.status === 'suspended' ? 'outline' : 'destructive'} size="sm" className="h-8 text-xs" onClick={() => handleStatusChange(u.uid, u.email, u.status === 'suspended' ? 'active' : 'suspended')}>
+                                                    {u.status === 'suspended' ? <UserCheck className="h-3 w-3 mr-2" /> : <UserX className="h-3 w-3 mr-2" />}
+                                                    {u.status === 'suspended' ? 'Restore' : 'Freeze'}
+                                                </Button>
+                                            )}
+                                        </div>
                                     </TableCell>
                                 </TableRow>
                             );
                         })}
                     </TableBody>
                 </Table>
+            </CardContent>
+        </Card>
+
+        {/* Activity Hub Mini - Visible only to Leader */}
+        <Card className="border-dashed">
+            <CardHeader><CardTitle className="text-sm font-bold uppercase text-muted-foreground flex items-center gap-2"><Eye className="h-4 w-4" /> Activity Monitor</CardTitle></CardHeader>
+            <CardContent>
+                <div className="text-[10px] text-muted-foreground italic py-4 text-center">
+                    Fitur Activity Log (Audit Trail) sedang dalam tahap sinkronisasi data...
+                </div>
             </CardContent>
         </Card>
       </main>

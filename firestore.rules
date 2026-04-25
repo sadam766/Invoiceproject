@@ -1,73 +1,110 @@
 
 /**
  * @file Firestore Security Rules
- * @description Aturan ini mengizinkan semua pengguna yang login untuk membaca dan menulis 
- *              semua data operasional guna memfasilitasi kolaborasi tim dan mencegah 
- *              terjadinya duplikasi data sesuai permintaan transparansi pengguna.
+ * @description Implementasi hierarki hak akses Dakota: Leader, Admin, dan Staff.
+ *              Leader (fa@gmail.com) memiliki otoritas penuh.
  */
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // Fungsi pembantu untuk mengecek apakah user sudah login
+    // --- FUNGSI PEMBANTU ---
+    
     function isSignedIn() {
       return request.auth != null;
     }
 
-    // Fungsi pembantu untuk mengecek kepemilikan (untuk profil user)
-    function isOwner(userId) {
-      return request.auth.uid == userId;
+    function getUserData() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
     }
 
+    // Role Checks
+    function isLeader() {
+      return request.auth.token.email == 'fa@gmail.com' || getUserData().role == 'admin' && request.auth.token.email == 'fa@gmail.com';
+    }
+
+    function isAdmin() {
+      return isLeader() || getUserData().role == 'admin';
+    }
+    
+    function isStaff() {
+      return isSignedIn() && getUserData().status == 'active';
+    }
+
+    // --- ATURAN KOLEKSI ---
+
     /**
-     * @description Profil Pengguna.
-     * Hanya pemilik akun yang bisa mengubah data profilnya sendiri.
+     * Manajemen Profil User
+     * Hanya Leader yang bisa mengelola semua user.
+     * User biasa hanya bisa baca profil sendiri.
      */
     match /users/{userId} {
       allow read: if isSignedIn();
-      allow write: if isOwner(userId);
+      allow create: if isSignedIn();
+      allow update, delete: if isLeader() || (request.auth.uid == userId && request.resource.data.role == resource.data.role);
     }
 
     /**
-     * @description Koleksi Data Bersama (Kolaboratif).
-     * Semua pengguna yang sudah login diizinkan untuk melihat, menambah, mengubah, 
-     * dan menghapus data di koleksi berikut agar transparansi data terjaga.
+     * Data Operasional (Products, Customers, Sales, SO, Invoices, VA)
+     * Create/Read/Update: Admin & Staff (Active)
+     * Delete: Hanya Leader
      */
-    
-    match /products/{productId} {
-      allow read, list, create, update, delete: if isSignedIn();
+    match /products/{id} {
+      allow read, list: if isStaff();
+      allow create, update: if isAdmin();
+      allow delete: if isLeader();
     }
 
-    match /salesOrders/{orderId} {
-      allow read, list, create, update, delete: if isSignedIn();
+    match /customers/{id} {
+      allow read, list: if isStaff();
+      allow create, update: if isAdmin();
+      allow delete: if isLeader();
+    }
+    
+    match /sales/{id} {
+      allow read, list: if isStaff();
+      allow create, update: if isAdmin();
+      allow delete: if isLeader();
     }
 
-    match /customers/{customerId} {
-      allow read, list, create, update, delete: if isSignedIn();
-    }
-    
-    match /invoiceNumbers/{invoiceNumberId} {
-      allow read, list, create, update, delete: if isSignedIn();
-    }
-    
-    match /invoices/{invoiceId} {
-      allow read, list, create, update, delete: if isSignedIn();
-    }
-    
-    match /spds/{spdId} {
-      allow read, list, create, update, delete: if isSignedIn();
-    }
-    
-    match /taxInvoices/{taxInvoiceId} {
-      allow read, list, create, update, delete: if isSignedIn();
-    }
-    
-    match /sales/{saleId} {
-      allow read, list, create, update, delete: if isSignedIn();
+    match /salesOrders/{id} {
+      allow read, list: if isStaff();
+      allow create, update: if isAdmin();
+      allow delete: if isLeader();
     }
 
-    match /virtualAccounts/{vaId} {
-      allow read, list, create, update, delete: if isSignedIn();
+    match /invoices/{id} {
+      allow read, list: if isStaff();
+      allow create, update: if isAdmin();
+      allow delete: if isLeader();
+    }
+
+    match /invoiceNumbers/{id} {
+      allow read, list: if isStaff();
+      allow create, update: if isAdmin();
+      allow delete: if isLeader();
+    }
+
+    match /virtualAccounts/{id} {
+      allow read, list: if isStaff();
+      allow create, update: if isAdmin();
+      allow delete: if isLeader();
+    }
+
+    /**
+     * Modul Pajak (Tax Invoices) & SPD
+     * Hanya Admin & Leader yang bisa akses.
+     */
+    match /taxInvoices/{id} {
+      allow read, list: if isAdmin();
+      allow create, update: if isAdmin();
+      allow delete: if isLeader();
+    }
+
+    match /spds/{id} {
+      allow read, list: if isAdmin();
+      allow create, update: if isAdmin();
+      allow delete: if isLeader();
     }
   }
 }

@@ -89,8 +89,8 @@ export default function DashboardLayout({
   const { data: userProfile, isLoading: isProfileLoading } = useDoc<UserProfile>(userProfileRef);
 
   const isSuperAdmin = user?.email?.toLowerCase() === 'fa@gmail.com' || userProfile?.email?.toLowerCase() === 'fa@gmail.com';
-  const userRole = isSuperAdmin ? 'admin' : (userProfile?.role || 'staff');
-  const isAdmin = userRole === 'admin';
+  const userRole = isSuperAdmin ? 'Leader' : (userProfile?.role === 'admin' ? 'Admin' : 'Staf');
+  const isAdmin = isSuperAdmin || userProfile?.role === 'admin';
   const isPending = !isSuperAdmin && userProfile?.status === 'pending';
 
   // Alerts Monitoring for Bell
@@ -107,9 +107,9 @@ export default function DashboardLayout({
   const { data: allSales } = useCollection<SalesListItem>(salesQuery);
 
   const pendingUsersQuery = useMemoFirebase(() => {
-      if (!firestore || !isAdmin) return null;
+      if (!firestore || !isSuperAdmin) return null;
       return query(collection(firestore, 'users'), where('status', '==', 'pending'));
-  }, [firestore, isAdmin]);
+  }, [firestore, isSuperAdmin]);
   const { data: pendingUsers } = useCollection<UserProfile>(pendingUsersQuery);
 
   const overdueInvoices = useMemo(() => {
@@ -195,7 +195,7 @@ export default function DashboardLayout({
                 {isSuperAdmin && <BadgeCheck className="h-3 w-3 text-blue-600" />}
               </span>
               <span className="text-[10px] text-muted-foreground uppercase font-bold">
-                 {isSuperAdmin ? 'Leader / Admin' : userRole}
+                 {userRole}
               </span>
             </div>
           </div>
@@ -250,11 +250,14 @@ export default function DashboardLayout({
                         <Link href="/dashboard/invoices/spd">SPD</Link>
                       </SidebarMenuSubButton>
                     </SidebarMenuSubItem>
-                    <SidebarMenuSubItem>
-                      <SidebarMenuSubButton asChild isActive={pathname === '/dashboard/invoices/tax'}>
-                        <Link href="/dashboard/invoices/tax">Tax Invoices</Link>
-                      </SidebarMenuSubButton>
-                    </SidebarMenuSubItem>
+                    {/* Faktur Pajak disembunyikan untuk Staff Biasa */}
+                    {isAdmin && (
+                        <SidebarMenuSubItem>
+                          <SidebarMenuSubButton asChild isActive={pathname === '/dashboard/invoices/tax'}>
+                            <Link href="/dashboard/invoices/tax">Tax Invoices</Link>
+                          </SidebarMenuSubButton>
+                        </SidebarMenuSubItem>
+                    )}
                   </SidebarMenuSub>
                 </CollapsibleContent>
               </SidebarMenuItem>
@@ -282,6 +285,7 @@ export default function DashboardLayout({
                 </SidebarMenuButton>
             </SidebarMenuItem>
 
+            {/* Sales Management & User Management HANYA UNTUK Leader/Admin */}
             {isAdmin && (
                <SidebarMenuItem>
                   <SidebarMenuButton asChild isActive={pathname === '/dashboard/sales-management'} tooltip="Sales Management">
@@ -290,7 +294,7 @@ export default function DashboardLayout({
               </SidebarMenuItem>
             )}
 
-            {isAdmin && (
+            {isSuperAdmin && (
                <SidebarMenuItem>
                   <SidebarMenuButton asChild isActive={pathname === '/dashboard/users'} tooltip="User Management">
                       <Link href="/dashboard/users"><UserCog /> <span>User Management</span></Link>
@@ -307,11 +311,14 @@ export default function DashboardLayout({
         </SidebarContent>
         <SidebarFooter>
             <SidebarMenu>
-                <SidebarMenuItem>
-                    <SidebarMenuButton asChild isActive={pathname === '/dashboard/settings'} tooltip="Pengaturan">
-                        <Link href="/dashboard/settings"><Settings /> <span>Pengaturan</span></Link>
-                    </SidebarMenuButton>
-                </SidebarMenuItem>
+                {/* Menu Pengaturan disembunyikan untuk Staff */}
+                {isAdmin && (
+                    <SidebarMenuItem>
+                        <SidebarMenuButton asChild isActive={pathname === '/dashboard/settings'} tooltip="Pengaturan">
+                            <Link href="/dashboard/settings"><Settings /> <span>Pengaturan</span></Link>
+                        </SidebarMenuButton>
+                    </SidebarMenuItem>
+                )}
             </SidebarMenu>
             <Button variant="ghost" className="w-full justify-start mt-2 group-data-[collapsible=icon]:px-0 group-data-[collapsible=icon]:justify-center" onClick={handleLogout}>
                 <LogOut className="mr-2 h-4 w-4 shrink-0" />
@@ -335,7 +342,7 @@ export default function DashboardLayout({
                     <PopoverTrigger asChild>
                         <Button variant="ghost" size="icon" className="relative">
                             <Bell className="h-5 w-5" />
-                            {(overdueInvoices.length > 0 || emptyPoValue.length > 0 || (isAdmin && pendingUsers && pendingUsers.length > 0)) && (
+                            {(overdueInvoices.length > 0 || emptyPoValue.length > 0 || (isSuperAdmin && pendingUsers && pendingUsers.length > 0)) && (
                                 <span className="absolute top-2 right-2.5 flex h-2.5 w-2.5">
                                     <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
                                     <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-red-500"></span>
@@ -359,14 +366,14 @@ export default function DashboardLayout({
                                         <p className="text-xs text-yellow-600 mt-1">PO: {po.poNumber} belum ada nilainya.</p>
                                     </div>
                                 ))}
-                                {isAdmin && pendingUsers && pendingUsers.map(u => (
+                                {isSuperAdmin && pendingUsers && pendingUsers.map(u => (
                                     <div key={u.uid} className="p-3 rounded-lg border bg-blue-50/50 hover:bg-blue-100/50 cursor-pointer transition-colors" onClick={() => router.push('/dashboard/users')}>
                                         <p className="text-sm font-semibold">User Baru Mendaftar</p>
                                         <p className="text-xs text-muted-foreground mt-1"><strong>{u.displayName || u.email}</strong></p>
                                         <div className="flex items-center gap-1 text-[10px] text-blue-600 font-bold uppercase mt-2"><UserCog className="h-3 w-3" /> Klik untuk aktivasi</div>
                                     </div>
                                 ))}
-                                {overdueInvoices.length === 0 && emptyPoValue.length === 0 && (!isAdmin || (pendingUsers && pendingUsers.length === 0)) && (
+                                {overdueInvoices.length === 0 && emptyPoValue.length === 0 && (!isSuperAdmin || (pendingUsers && pendingUsers.length === 0)) && (
                                     <div className="p-8 text-center text-sm text-muted-foreground flex flex-col items-center gap-2">
                                         <Bell className="h-8 w-8 opacity-20" /><p>Tidak ada pemberitahuan baru.</p>
                                     </div>
@@ -394,13 +401,13 @@ export default function DashboardLayout({
                         </p>
                         <p className="text-xs leading-none text-muted-foreground truncate">{user?.email}</p>
                         <div className="flex gap-1 mt-1">
-                            <Badge variant="secondary" className="text-[10px] py-0">{isSuperAdmin ? 'Leader' : userRole}</Badge>
+                            <Badge variant="secondary" className="text-[10px] py-0">{userRole}</Badge>
                         </div>
                         </div>
                     </DropdownMenuLabel>
                     <DropdownMenuSeparator />
                     <DropdownMenuItem asChild><Link href="/dashboard/settings">Pengaturan Profil</Link></DropdownMenuItem>
-                    {isAdmin && <DropdownMenuItem asChild><Link href="/dashboard/users">User Management</Link></DropdownMenuItem>}
+                    {isSuperAdmin && <DropdownMenuItem asChild><Link href="/dashboard/users">User Management</Link></DropdownMenuItem>}
                     <DropdownMenuSeparator />
                     <DropdownMenuItem onClick={handleLogout} className="text-red-600"><LogOut className="mr-2 h-4 w-4" /> Keluar</DropdownMenuItem>
                     </DropdownMenuContent>
