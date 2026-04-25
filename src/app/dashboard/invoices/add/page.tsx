@@ -32,7 +32,7 @@ import {
     CommandInput,
     CommandItem,
     CommandList,
-  } from '@/components/ui/command';
+  } from '@/command';
 import {
     Select,
     SelectContent,
@@ -57,6 +57,7 @@ import {
   History,
   MapPin,
   Building,
+  FileText,
 } from 'lucide-react';
 import { type InvoiceNumber, type Customer, type ProductListItem, type Invoice, type SalesOrder, type UserProfile, type VirtualAccount, type CustomerAddress } from '@/app/lib/data';
 import { useToast } from '@/hooks/use-toast';
@@ -89,6 +90,7 @@ export default function AddInvoicePage() {
   const [invoiceId, setInvoiceId] = useState('');
   const [soNumber, setSoNumber] = useState('');
   const [poNumber, setPoNumber] = useState('');
+  const [sjInput, setSjInput] = useState(''); // New: Raw input for SJ numbers
   const [customer, setCustomer] = useState<Customer | undefined>(undefined);
   
   // Address selection state
@@ -225,6 +227,7 @@ export default function AddInvoicePage() {
         setSoNumber(invoiceToEditData.soNumber);
         setPoNumber(invoiceToEditData.poNumber);
         setStatus(invoiceToEditData.status);
+        setSjInput(invoiceToEditData.sjNumbers?.join(', ') || '');
         const found = customerListData?.find(c => c.name === invoiceToEditData.customer);
         setCustomer(found);
         
@@ -340,6 +343,9 @@ export default function AddInvoicePage() {
     const safeInvoiceId = invoiceId.replace(/\//g, '_');
     const finalAmountValue = parseFormattedNumber(String(totalAmount));
 
+    // Parse SJ numbers
+    const sjList = sjInput.split(',').map(s => s.trim()).filter(s => s !== '');
+
     const invoiceDocRef = doc(firestore, 'invoices', safeInvoiceId);
     batch.set(invoiceDocRef, {
         id: invoiceId,
@@ -353,6 +359,7 @@ export default function AddInvoicePage() {
         amount: finalAmountValue,
         status: invoiceStatus,
         paymentMethod: paymentMethodText,
+        sjNumbers: sjList, // Save SJ List
         ownerId: user.uid,
         createdBy: user.email,
     }, { merge: true });
@@ -377,12 +384,14 @@ export default function AddInvoicePage() {
         toast({ variant: "destructive", title: "Alamat Wajib Dipilih" });
         return;
     }
+    const sjList = sjInput.split(',').map(s => s.trim()).filter(s => s !== '');
     const selectedVa = isVaActive ? availableVAs.find(va => va.id === selectedVaId) : undefined;
     const previewData = {
       id: invoiceId, soNumber, poNumber, customer: { name: customer?.name, address: selectedAddress.address, npwp: selectedAddress.npwp }, 
       date: issueDate ? format(issueDate, 'yyyy-MM-dd') : '',
       dueDate: dueDate ? format(dueDate, 'yyyy-MM-dd') : '',
       amount: parseFormattedNumber(String(totalAmount)), status, printType,
+      sjNumbers: sjList,
       items: items.map((item, index) => ({
         id: item.id, no: index + 1, item: item.name, name: item.name,
         quantity: parseFormattedNumber(String(item.quantity)), unit: item.unit,
@@ -457,6 +466,18 @@ export default function AddInvoicePage() {
                     </SelectContent>
                  </Select>
               </div>
+            </div>
+
+            {/* SJ Numbers Input */}
+            <div className="mt-4">
+              <label className="text-sm font-black uppercase text-muted-foreground flex items-center gap-2"><FileText className="h-4 w-4" /> Nomor Surat Jalan (SJ)</label>
+              <Input 
+                value={sjInput} 
+                onChange={e => setSjInput(e.target.value)} 
+                placeholder="Contoh: SJ-001, SJ-002 (Pisahkan dengan koma)" 
+                className="mt-1 bg-muted/20 border-primary/20"
+              />
+              <p className="text-[10px] text-muted-foreground mt-1 italic">Input nomor SJ agar otomatis muncul di modul SPD Digital Dispatch.</p>
             </div>
 
             {/* Inline New Address Form */}

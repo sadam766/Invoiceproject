@@ -4,11 +4,11 @@
 import { useEffect, useState, useRef, useMemo } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, Printer, Download, MapPin, Phone, UserCheck, Layers, FileText, Globe } from 'lucide-react';
+import { ArrowLeft, Printer, Download, MapPin, Phone, UserCheck, Layers, FileText, Globe, Truck, Info } from 'lucide-react';
 import { type SpdData, type Invoice } from '@/app/lib/data';
 import { format } from 'date-fns';
 import { id as indonesiaLocale } from 'date-fns/locale';
-import { useFirestore, useCollection, useMemoFirebase } from '@/firebase';
+import { useFirestore, useCollection, useMemoFirebase, useUser } from '@/firebase';
 import { collection, query } from 'firebase/firestore';
 import html2pdf from 'html2pdf.js';
 
@@ -17,6 +17,7 @@ export default function SpdPreviewPage() {
     const params = useParams();
     const { id } = params;
     const firestore = useFirestore();
+    const { user } = useUser();
     const [spdItem, setSpdItem] = useState<SpdData | null>(null);
     const printRef = useRef<HTMLDivElement>(null);
 
@@ -41,7 +42,7 @@ export default function SpdPreviewPage() {
         }
     }, [allSpds, id]);
 
-    // Grouping invoices by Address to assist the courier and recepient
+    // Grouping invoices by Address
     const groupedByAddress = useMemo(() => {
         if (!spdItem) return {};
         return spdItem.invoices.reduce((acc, inv) => {
@@ -57,7 +58,7 @@ export default function SpdPreviewPage() {
         if (!element || !spdItem) return;
         const opt = {
           margin: [5, 5, 5, 5],
-          filename: `SPD-Summary-${spdItem.id.replace(/\//g, '_')}.pdf`,
+          filename: `SPD-Dispatch-${spdItem.id.replace(/\//g, '_')}.pdf`,
           image: { type: 'jpeg', quality: 0.98 },
           html2canvas: { scale: 3, useCORS: true },
           jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
@@ -107,7 +108,7 @@ export default function SpdPreviewPage() {
                         </div>
                     </div>
 
-                    {/* Meta Info: Courier & Load */}
+                    {/* Meta Info */}
                     <div className="grid grid-cols-3 gap-6 mb-10">
                         <div className="bg-slate-50 p-4 rounded-lg border border-slate-200">
                             <p className="text-[9px] font-black uppercase text-slate-400 mb-1 tracking-widest text-center">Kurir / Expedition</p>
@@ -120,19 +121,19 @@ export default function SpdPreviewPage() {
                             <p className="text-[9px] font-black uppercase text-slate-400 mb-1 tracking-widest text-center">Total Load</p>
                             <div className="flex items-center justify-center gap-2 text-indigo-700">
                                 <Layers className="h-5 w-5" />
-                                <span className="font-black text-sm uppercase">{spdItem.invoices.length} Dokumen</span>
+                                <span className="font-black text-sm uppercase">{spdItem.invoices.length} Invoice</span>
                             </div>
                         </div>
                         <div className="bg-indigo-600 p-4 rounded-lg text-white shadow-md flex flex-col items-center justify-center">
-                            <p className="text-[9px] font-black uppercase opacity-70 mb-1 tracking-widest">Digital ID</p>
-                            <span className="font-mono text-[10px] font-bold">CRC-{Math.random().toString(36).substring(7).toUpperCase()}</span>
+                            <p className="text-[9px] font-black uppercase opacity-70 mb-1 tracking-widest">Verification ID</p>
+                            <span className="font-mono text-[10px] font-bold">DIS-{Math.random().toString(36).substring(7).toUpperCase()}</span>
                         </div>
                     </div>
 
-                    {/* Consolidated Table Section */}
+                    {/* Table Section */}
                     <div className="space-y-10">
-                        <p className="text-[10px] font-black uppercase text-slate-400 border-b pb-2 tracking-widest mb-4">
-                            Batch Picking Detail & Acknowledgement
+                        <p className="text-[10px] font-black uppercase text-slate-400 border-b pb-2 tracking-widest mb-4 flex items-center gap-2">
+                           <FileText className="h-3 w-3" /> Batch Dispatch Detail (Invoice & Multi Surat Jalan)
                         </p>
                         
                         {Object.entries(groupedByAddress).map(([address, invoices], groupIdx) => (
@@ -140,7 +141,7 @@ export default function SpdPreviewPage() {
                                 <div className="flex items-start gap-3 bg-indigo-50/50 p-3 rounded-lg border border-indigo-100 ring-1 ring-indigo-50">
                                     <MapPin className="h-5 w-5 mt-0.5 text-indigo-600" />
                                     <div className="flex-1">
-                                        <p className="text-[9px] font-black uppercase text-indigo-600/70 tracking-widest">Destination Hub / Cabang:</p>
+                                        <p className="text-[9px] font-black uppercase text-indigo-600/70 tracking-widest">Lokasi Penagihan:</p>
                                         <p className="text-sm font-black leading-tight text-slate-800">{address}</p>
                                     </div>
                                 </div>
@@ -150,8 +151,8 @@ export default function SpdPreviewPage() {
                                         <tr className="bg-slate-100 text-slate-600">
                                             <th className="p-3 text-center border w-[5%] font-black uppercase text-[9px]">No</th>
                                             <th className="p-3 text-left border w-[22%] font-black uppercase text-[9px]">No. Invoice</th>
+                                            <th className="p-3 text-left border w-[25%] font-black uppercase text-[9px]">No. Surat Jalan (SJ)</th>
                                             <th className="p-3 text-left border font-black uppercase text-[9px]">Customer Name</th>
-                                            <th className="p-3 text-left border w-[20%] font-black uppercase text-[9px]">PO Reference</th>
                                             <th className="p-3 text-center border w-[18%] font-black uppercase text-[9px]">Signature / Stamp</th>
                                         </tr>
                                     </thead>
@@ -159,11 +160,21 @@ export default function SpdPreviewPage() {
                                         {invoices.map((inv, invIdx) => {
                                             const fullData = allInvoices?.find(fi => fi.id === inv.invoiceId);
                                             return (
-                                                <tr key={invIdx} className="hover:bg-slate-50 transition-colors h-14">
+                                                <tr key={invIdx} className="hover:bg-slate-50 transition-colors h-16">
                                                     <td className="p-3 text-center border font-bold text-slate-500">{invIdx + 1}</td>
                                                     <td className="p-3 font-mono font-black border text-indigo-700 bg-indigo-50/20">{inv.invoiceId}</td>
+                                                    <td className="p-3 font-mono border text-slate-600 bg-slate-50/20">
+                                                        {inv.sjNumbers && inv.sjNumbers.length > 0 ? (
+                                                            <div className="flex flex-wrap gap-1">
+                                                                {inv.sjNumbers.map((sj, i) => (
+                                                                    <span key={i} className="bg-white border px-1.5 py-0.5 rounded text-[10px]">{sj}</span>
+                                                                ))}
+                                                            </div>
+                                                        ) : (
+                                                            <span className="text-[9px] italic text-rose-500 font-bold">Tanpa SJ</span>
+                                                        )}
+                                                    </td>
                                                     <td className="p-3 font-black uppercase border text-slate-800">{inv.customer}</td>
-                                                    <td className="p-3 border font-medium text-slate-600">{fullData?.poNumber || '-'}</td>
                                                     <td className="p-3 border relative overflow-hidden group">
                                                         <div className="absolute inset-0 flex items-center justify-center opacity-5 pointer-events-none group-hover:scale-110 transition-transform">
                                                             <UserCheck className="h-10 w-10" />
@@ -179,7 +190,7 @@ export default function SpdPreviewPage() {
                         ))}
                     </div>
 
-                    {/* Legal/Footer: Signatures */}
+                    {/* Signatures */}
                     <div className="mt-auto pt-20">
                         <div className="grid grid-cols-3 text-center text-[11px] font-bold">
                             <div className="space-y-20">
@@ -203,13 +214,12 @@ export default function SpdPreviewPage() {
                             <p className="font-black uppercase mb-2 flex items-center gap-2">
                                 <Info className="h-4 w-4" /> Syarat & Ketentuan Penyerahan Dokumen:
                             </p>
-                            <p>1. Dokumen yang tercantum di atas bersifat sah dan mengikat untuk keperluan audit penagihan PT. Jembo Cable Company Tbk.</p>
-                            <p>2. Penerima wajib memastikan kelengkapan nomor seri faktur pajak dan invoice sebelum menandatangani SPD ini.</p>
-                            <p>3. SPD Summary ini adalah bukti digital yang terverifikasi dalam sistem ERP Dakota. Salinan fisik hanya berlaku dengan stempel basah.</p>
+                            <p>1. Penerima wajib memastikan nomor invoice dan nomor surat jalan fisik sesuai dengan daftar di atas sebelum menandatangani SPD ini.</p>
+                            <p>2. SPD Summary ini adalah bukti digital yang sah dalam sistem ERP Dakota. Salinan fisik hanya berlaku dengan stempel basah asli.</p>
                         </div>
 
                         <div className="mt-8 text-center text-[8px] font-bold text-slate-400 uppercase tracking-[0.3em]">
-                            Generated by Dakota Digital Dispatch System - {format(new Date(), 'yyyy-MM-dd HH:mm:ss')}
+                            Generated by Dakota Digital Dispatch - {format(new Date(), 'yyyy-MM-dd HH:mm:ss')}
                         </div>
                     </div>
                 </div>
@@ -223,7 +233,6 @@ export default function SpdPreviewPage() {
                     .shadow-2xl, .shadow-md, .shadow-sm { box-shadow: none !important; border: 1px solid #eee !important; }
                     .max-w-4xl { max-width: 100% !important; margin: 0 !important; width: 100% !important; }
                     .p-4, .p-10 { padding: 5mm !important; }
-                    .border-slate-200 { border-color: #ddd !important; }
                 }
             `}</style>
         </main>
