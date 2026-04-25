@@ -435,11 +435,18 @@ export default function AddInvoicePage() {
                             <PopoverContent className="w-[--radix-popover-trigger-width] p-0 shadow-xl border border-muted overflow-hidden">
                               <Command>
                                 <CommandInput placeholder="Search product..." />
-                                <CommandList>
+                                <CommandList className="max-h-[300px] overflow-y-auto">
                                   <CommandEmpty>No product found.</CommandEmpty>
-                                  <CommandGroup>
+                                  <CommandGroup className="pb-4">
                                     {productListData?.map((p) => (
-                                      <CommandItem key={p.id} value={p.name} onSelect={() => { setItems(items.map(it => it.id === item.id ? { ...it, name: p.name, unit: p.unit, price: p.price, total: parseFormattedNumber(String(it.quantity)) * p.price } : it)); setProductPopoverOpen(null); }}>
+                                      <CommandItem 
+                                        key={p.id} 
+                                        value={`${p.name}|${p.id}`} 
+                                        onSelect={() => { 
+                                          setItems(items.map(it => it.id === item.id ? { ...it, name: p.name, unit: p.unit, price: p.price, total: parseFormattedNumber(String(it.quantity)) * p.price } : it)); 
+                                          setProductPopoverOpen(null); 
+                                        }}
+                                      >
                                         {p.name}
                                       </CommandItem>
                                     ))}
