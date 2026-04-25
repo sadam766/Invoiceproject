@@ -22,8 +22,9 @@ import {
   } from '@/components/ui/select';
   import { Input } from '@/components/ui/input';
   import { Button } from '@/components/ui/button';
+  import { Checkbox } from '@/components/ui/checkbox';
   import type { ProductListItem, UserProfile } from '@/app/lib/data';
-  import { Search, Upload, Download, Trash2 } from 'lucide-react';
+  import { Search, Upload, Download, Trash2, Edit, FileSpreadsheet } from 'lucide-react';
   import { AddProductDialog } from './_components/add-product-dialog';
   import { DeleteConfirmationDialog } from '@/app/components/delete-confirmation-dialog';
   import { useToast } from '@/hooks/use-toast';
@@ -34,13 +35,15 @@ import {
   export default function ProductListPage() {
     const firestore = useFirestore();
     const { user } = useUser();
+    const { toast } = useToast();
+    const fileInputRef = useRef<HTMLInputElement>(null);
+
     const [editingProduct, setEditingProduct] = useState<ProductListItem | undefined>(undefined);
     const [isDialogOpen, setIsDialogOpen] = useState(false);
     const [searchQuery, setSearchQuery] = useState('');
     const [categoryFilter, setCategoryFilter] = useState('all');
-    const fileInputRef = useRef<HTMLInputElement>(null);
-    const { toast } = useToast();
-    const [deleteDialogState, setDeleteDialogState] = useState<{ isOpen: boolean; productId?: string }>({ isOpen: false });
+    const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+    const [deleteDialogState, setDeleteDialogState] = useState<{ isOpen: boolean; productId?: string; isBulk?: boolean }>({ isOpen: false });
 
     // Role check
     const userProfileRef = useMemoFirebase(() => {
@@ -48,7 +51,9 @@ import {
         return doc(firestore, 'users', user.uid);
     }, [firestore, user]);
     const { data: userProfile } = useDoc<UserProfile>(userProfileRef);
-    const isAdmin = userProfile?.role === 'admin';
+    
+    const isSuperAdmin = user?.email?.toLowerCase() === 'fa@gmail.com' || userProfile?.email?.toLowerCase() === 'fa@gmail.com';
+    const isAdmin = isSuperAdmin || userProfile?.role === 'admin';
 
     const productsCollection = useMemoFirebase(() => {
         if (!firestore) return null;
@@ -72,6 +77,17 @@ import {
         return filtered;
     }, [products, searchQuery, categoryFilter]);
 
+    const handleSelectAll = (checked: boolean) => {
+        if (checked) setSelectedIds(new Set(filteredProducts.map(p => p.id!)));
+        else setSelectedIds(new Set());
+    };
+
+    const handleSelectRow = (id: string) => {
+        const next = new Set(selectedIds);
+        if (next.has(id)) next.delete(id);
+        else next.add(id);
+        setSelectedIds(next);
+    };
 
     const handleAddClick = () => {
       setEditingProduct(undefined);
@@ -83,30 +99,31 @@ import {
         setIsDialogOpen(true);
     };
 
-    const handleDeleteConfirm = () => {
-        if (!firestore || !deleteDialogState.productId || !isAdmin) return;
-        const docRef = doc(firestore, 'products', deleteDialogState.productId);
-        deleteDoc(docRef)
-          .then(() => {
-            toast({ title: 'Product deleted' });
-            setDeleteDialogState({ isOpen: false, productId: undefined });
-          })
-          .catch(async (serverError) => {
-            const permissionError = new FirestorePermissionError({
-              path: docRef.path,
-              operation: 'delete',
+    const handleDeleteConfirm = async () => {
+        if (!firestore || !isAdmin) return;
+
+        if (deleteDialogState.isBulk) {
+            const batch = writeBatch(firestore);
+            selectedIds.forEach(id => {
+                batch.delete(doc(firestore, 'products', id));
             });
-            errorEmitter.emit('permission-error', permissionError);
-            setDeleteDialogState({ isOpen: false, productId: undefined });
-          });
+            await batch.commit();
+            toast({ title: `${selectedIds.size} produk dihapus` });
+            setSelectedIds(new Set());
+        } else if (deleteDialogState.productId) {
+            const docRef = doc(firestore, 'products', deleteDialogState.productId);
+            await deleteDoc(docRef);
+            toast({ title: 'Produk dihapus' });
+        }
+        setDeleteDialogState({ isOpen: false });
     };
     
     const openDeleteDialog = (productId: string) => {
         if (!isAdmin) {
-            toast({ variant: "destructive", title: "Akses Ditolak", description: "Hanya Admin yang boleh menghapus data master." });
+            toast({ variant: "destructive", title: "Akses Ditolak", description: "Hanya Admin yang boleh menghapus data." });
             return;
         }
-        setDeleteDialogState({ isOpen: true, productId: productId });
+        setDeleteDialogState({ isOpen: true, productId, isBulk: false });
     };
 
     const handleSave = (product: Omit<ProductListItem, 'id'> & { id?: string }) => {
@@ -140,29 +157,20 @@ import {
             });
     };
 
-    const handleDialogStateChange = (open: boolean) => {
-      setIsDialogOpen(open);
-      if (!open) {
-        setEditingProduct(undefined);
-      }
-    }
-    
-    const handleDownloadTemplate = () => {
-        const headers = ['name', 'category', 'quantity', 'unit', 'price'];
-        generateExcelTemplate(headers, 'product_template');
-        toast({ title: "Template Downloaded", description: "Product template has been downloaded." });
-    };
-
     const handleExport = () => {
-        if (products) {
-            exportToExcel(products, 'products');
-            toast({ title: "Export Successful", description: "Product data has been exported to Excel." });
-        }
+        const dataToExport = selectedIds.size > 0 
+            ? filteredProducts.filter(p => selectedIds.has(p.id!))
+            : filteredProducts;
+        
+        exportToExcel(dataToExport, 'products');
+        toast({ title: "Export Berhasil", description: `${dataToExport.length} produk diekspor.` });
     };
 
-    const handleImportClick = () => {
-        fileInputRef.current?.click();
+    const handleDownloadTemplate = () => {
+        generateExcelTemplate(['name', 'category', 'quantity', 'unit', 'price'], 'product_template');
     };
+
+    const handleImportClick = () => fileInputRef.current?.click();
 
     const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
         const file = event.target.files?.[0];
@@ -170,25 +178,14 @@ import {
             try {
                 const data = await importFromExcel(file) as Omit<ProductListItem, 'id'|'ownerId'>[];
                 const batch = writeBatch(firestore);
-
-                data.forEach(productData => {
+                data.forEach(item => {
                     const newDocRef = doc(collection(firestore, 'products'));
-                    batch.set(newDocRef, { ...productData, id: newDocRef.id, ownerId: user.uid });
+                    batch.set(newDocRef, { ...item, id: newDocRef.id, ownerId: user.uid });
                 });
-
                 await batch.commit();
-
-                toast({
-                    title: "Import Successful",
-                    description: `${data.length} products imported successfully.`,
-                });
+                toast({ title: "Import Berhasil", description: `${data.length} produk ditambahkan.` });
             } catch (error) {
-                console.error("Error importing file:", error);
-                toast({
-                    variant: "destructive",
-                    title: "Import Error",
-                    description: "Failed to import the Excel file. Please check the file format.",
-                });
+                toast({ variant: "destructive", title: "Import Gagal" });
             }
         }
     };
@@ -196,92 +193,101 @@ import {
 
     return (
       <main className="flex flex-1 flex-col gap-4 p-4 md:gap-8 md:p-8">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight">Product List</h1>
-          <p className="text-muted-foreground">
-            Manage your products inventory.
-          </p>
+        <div className="flex justify-between items-center">
+          <div>
+            <h1 className="text-2xl font-bold tracking-tight">Product List</h1>
+            <p className="text-muted-foreground">Manage your products inventory.</p>
+          </div>
+          <div className="flex items-center gap-2">
+            <input type="file" ref={fileInputRef} onChange={handleFileChange} className="hidden" accept=".xlsx, .xls" />
+            <Button variant="outline" onClick={handleImportClick}><Upload className="mr-2 h-4 w-4"/> Import</Button>
+            <Button variant="outline" onClick={handleDownloadTemplate}><FileSpreadsheet className="mr-2 h-4 w-4"/> Template</Button>
+            <Button variant="outline" onClick={handleExport}><Download className="mr-2 h-4 w-4"/> Export</Button>
+            <AddProductDialog
+                isOpen={isDialogOpen}
+                onOpenChange={setIsDialogOpen}
+                onSave={handleSave}
+                productData={editingProduct}
+                onAddClick={handleAddClick}
+            />
+          </div>
         </div>
         
         <Card>
             <CardContent className="pt-6">
                 <div className="flex justify-between items-center mb-4">
-                    <div className="relative w-1/3">
-                        <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-                        <Input 
-                            type="search" 
-                            placeholder="Search products..." 
-                            className="pl-8" 
-                            value={searchQuery}
-                            onChange={(e) => setSearchQuery(e.target.value)}
-                        />
-                    </div>
                     <div className="flex items-center gap-2">
-                       <Select value={categoryFilter} onValueChange={setCategoryFilter}>
-                          <SelectTrigger className="w-[180px]">
-                            <SelectValue placeholder="All Categories" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="all">All Categories</SelectItem>
-                            <SelectItem value="kabel">Kabel</SelectItem>
-                            <SelectItem value="aksesoris">Aksesoris</SelectItem>
-                          </SelectContent>
+                        <div className="relative w-64">
+                            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                            <Input placeholder="Cari produk..." className="pl-8" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} />
+                        </div>
+                        <Select value={categoryFilter} onValueChange={setCategoryFilter}>
+                            <SelectTrigger className="w-[160px]">
+                                <SelectValue placeholder="Semua Kategori" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="all">Semua Kategori</SelectItem>
+                                <SelectItem value="kabel">Kabel</SelectItem>
+                                <SelectItem value="aksesoris">Aksesoris</SelectItem>
+                            </SelectContent>
                         </Select>
-                       <input type="file" ref={fileInputRef} onChange={handleFileChange} className="hidden" accept=".xlsx, .xls" />
-                       <Button variant="outline" onClick={handleImportClick}><Upload className="mr-2 h-4 w-4"/> Import</Button>
-                       <Button variant="outline" onClick={handleDownloadTemplate}><Download className="mr-2 h-4 w-4"/> Download Template</Button>
-                       <Button variant="outline" onClick={handleExport}><Download className="mr-2 h-4 w-4"/> Export</Button>
-                       <AddProductDialog
-                          isOpen={isDialogOpen}
-                          onOpenChange={handleDialogStateChange}
-                          onSave={handleSave}
-                          productData={editingProduct}
-                          onAddClick={handleAddClick}
-                       />
                     </div>
+                    {selectedIds.size > 0 && isAdmin && (
+                        <Button variant="destructive" size="sm" onClick={() => setDeleteDialogState({ isOpen: true, isBulk: true })}>
+                            <Trash2 className="mr-2 h-4 w-4" /> Hapus Terpilih ({selectedIds.size})
+                        </Button>
+                    )}
                 </div>
 
-                <div className="w-full overflow-auto">
+                <div className="rounded-md border overflow-hidden">
                     <Table>
                         <TableHeader>
                             <TableRow>
+                                <TableHead className="w-[40px]">
+                                    <Checkbox 
+                                        checked={filteredProducts.length > 0 && selectedIds.size === filteredProducts.length}
+                                        onCheckedChange={handleSelectAll}
+                                    />
+                                </TableHead>
                                 <TableHead>PRODUCT</TableHead>
                                 <TableHead>CATEGORY</TableHead>
                                 <TableHead>QUANTITY</TableHead>
                                 <TableHead>SATUAN</TableHead>
                                 <TableHead>PRICE</TableHead>
-                                <TableHead>TINDAKAN</TableHead>
+                                <TableHead className="text-right">TINDAKAN</TableHead>
                             </TableRow>
                         </TableHeader>
                         <TableBody>
-                            {isLoading && (
-                                <TableRow>
-                                    <TableCell colSpan={6} className="text-center">Loading products...</TableCell>
-                                </TableRow>
-                            )}
-                            {!isLoading && filteredProducts?.map((product) => (
-                                <TableRow key={product.id}>
+                            {isLoading ? (
+                                <TableRow><TableCell colSpan={7} className="text-center py-8">Memuat data...</TableCell></TableRow>
+                            ) : filteredProducts?.map((product) => (
+                                <TableRow key={product.id} className={selectedIds.has(product.id!) ? "bg-muted/50" : ""}>
+                                    <TableCell>
+                                        <Checkbox 
+                                            checked={selectedIds.has(product.id!)} 
+                                            onCheckedChange={() => handleSelectRow(product.id!)}
+                                        />
+                                    </TableCell>
                                     <TableCell className="font-medium">{product.name}</TableCell>
                                     <TableCell>{product.category}</TableCell>
                                     <TableCell>{product.quantity} units</TableCell>
                                     <TableCell>{product.unit}</TableCell>
                                     <TableCell>Rp {product.price.toLocaleString('id-ID')},00</TableCell>
-                                    <TableCell>
-                                        <div className="flex gap-2">
-                                            <Button variant="link" className="p-0 h-auto" onClick={() => handleEdit(product)}>Edit</Button>
-                                            
-                                            {isAdmin && (
+                                    <TableCell className="text-right">
+                                        {isAdmin && (
+                                            <div className="flex justify-end gap-1">
+                                                <Button variant="ghost" size="icon" onClick={() => handleEdit(product)}><Edit className="h-4 w-4" /></Button>
                                                 <DeleteConfirmationDialog 
                                                     open={deleteDialogState.isOpen && deleteDialogState.productId === product.id}
-                                                    onOpenChange={(open) => setDeleteDialogState({isOpen: open, productId: open ? product.id : undefined})}
+                                                    onOpenChange={(open) => setDeleteDialogState(prev => ({...prev, isOpen: open, productId: open ? product.id : undefined, isBulk: false}))}
                                                     onConfirm={handleDeleteConfirm}
                                                 >
-                                                    <Button variant="link" className="p-0 h-auto text-destructive" onClick={(e) => { e.stopPropagation(); openDeleteDialog(product.id!); }}>
-                                                        Hapus
+                                                    <Button variant="ghost" size="icon" className="text-destructive" onClick={(e) => { e.stopPropagation(); openDeleteDialog(product.id!); }}>
+                                                        <Trash2 className="h-4 w-4" />
                                                     </Button>
                                                 </DeleteConfirmationDialog>
-                                            )}
-                                        </div>
+                                            </div>
+                                        )}
                                     </TableCell>
                                 </TableRow>
                             ))}
@@ -289,10 +295,18 @@ import {
                     </Table>
                 </div>
                 <div className="text-sm text-muted-foreground mt-4">
-                    Showing 1 to {filteredProducts?.length || 0} of {products?.length || 0} entries
+                    Menampilkan {filteredProducts?.length || 0} dari {products?.length || 0} entri
                 </div>
             </CardContent>
         </Card>
+
+        <DeleteConfirmationDialog 
+            open={deleteDialogState.isOpen && deleteDialogState.isBulk} 
+            onOpenChange={(open) => setDeleteDialogState(prev => ({...prev, isOpen: open}))} 
+            onConfirm={handleDeleteConfirm}
+        >
+            <span />
+        </DeleteConfirmationDialog>
       </main>
     );
   }

@@ -276,7 +276,7 @@ const InvoicePreviewPage = () => {
                                                 <span className="text-right">VAT 12%:</span>
                                                 <span className="text-right">{formatCurrency(vat12)}</span>
                                             </div>
-                                            <div className="grid grid-cols-[1fr_auto] gap-x-3 font-bold border-t border-black mt-1 pt-1">
+                                            <div className="grid grid-cols-[1fr_auto] gap-x-3 font-normal">
                                                 <span className="text-right">Total Rp:</span>
                                                 <span className="text-right">{formatCurrency(totalRp)}</span>
                                             </div>

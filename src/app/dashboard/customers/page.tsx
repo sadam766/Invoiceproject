@@ -15,8 +15,9 @@ import {
   } from '@/components/ui/table';
   import { Input } from '@/components/ui/input';
   import { Button } from '@/components/ui/button';
+  import { Checkbox } from '@/components/ui/checkbox';
   import type { Customer, UserProfile } from '@/app/lib/data';
-  import { Search, Upload, Download, Trash2 } from 'lucide-react';
+  import { Search, Upload, Download, Trash2, Edit, FileSpreadsheet } from 'lucide-react';
   import { AddCustomerDialog } from './_components/add-customer-dialog';
   import { DeleteConfirmationDialog } from '@/app/components/delete-confirmation-dialog';
   import { useToast } from '@/hooks/use-toast';
@@ -27,12 +28,14 @@ import {
   export default function CustomerListPage() {
     const firestore = useFirestore();
     const { user } = useUser();
+    const { toast } = useToast();
+    const fileInputRef = useRef<HTMLInputElement>(null);
+
     const [editingCustomer, setEditingCustomer] = useState<Customer | undefined>(undefined);
     const [isDialogOpen, setIsDialogOpen] = useState(false);
     const [searchQuery, setSearchQuery] = useState('');
-    const fileInputRef = useRef<HTMLInputElement>(null);
-    const { toast } = useToast();
-    const [deleteDialogState, setDeleteDialogState] = useState<{ isOpen: boolean; customerId?: string }>({ isOpen: false });
+    const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+    const [deleteDialogState, setDeleteDialogState] = useState<{ isOpen: boolean; customerId?: string; isBulk?: boolean }>({ isOpen: false });
 
     // Role check
     const userProfileRef = useMemoFirebase(() => {
@@ -40,7 +43,9 @@ import {
         return doc(firestore, 'users', user.uid);
     }, [firestore, user]);
     const { data: userProfile } = useDoc<UserProfile>(userProfileRef);
-    const isAdmin = userProfile?.role === 'admin';
+    
+    const isSuperAdmin = user?.email?.toLowerCase() === 'fa@gmail.com' || userProfile?.email?.toLowerCase() === 'fa@gmail.com';
+    const isAdmin = isSuperAdmin || userProfile?.role === 'admin';
 
     const customersCollection = useMemoFirebase(() => {
         if (!firestore) return null;
@@ -51,15 +56,25 @@ import {
 
     const filteredCustomers = useMemo(() => {
         if (!customers) return [];
-        if (!searchQuery) {
-          return customers;
-        }
+        if (!searchQuery) return customers;
         return customers.filter((customer) =>
           Object.values(customer).some((value) =>
             String(value).toLowerCase().includes(searchQuery.toLowerCase())
           )
         );
       }, [customers, searchQuery]);
+
+    const handleSelectAll = (checked: boolean) => {
+        if (checked) setSelectedIds(new Set(filteredCustomers.map(c => c.id!)));
+        else setSelectedIds(new Set());
+    };
+
+    const handleSelectRow = (id: string) => {
+        const next = new Set(selectedIds);
+        if (next.has(id)) next.delete(id);
+        else next.add(id);
+        setSelectedIds(next);
+    };
 
     const handleAddClick = () => {
       setEditingCustomer(undefined);
@@ -71,97 +86,67 @@ import {
         setIsDialogOpen(true);
     };
 
-    const handleDeleteConfirm = () => {
-        if (!firestore || !deleteDialogState.customerId || !isAdmin) return;
-        const docRef = doc(firestore, 'customers', deleteDialogState.customerId);
-        deleteDoc(docRef)
-            .then(() => {
-                toast({ title: 'Customer deleted' });
-                setDeleteDialogState({ isOpen: false, customerId: undefined });
-            })
-            .catch(async (serverError) => {
-                const permissionError = new FirestorePermissionError({
-                    path: docRef.path,
-                    operation: 'delete',
-                });
-                errorEmitter.emit('permission-error', permissionError);
-                setDeleteDialogState({ isOpen: false, customerId: undefined });
+    const handleDeleteConfirm = async () => {
+        if (!firestore || !isAdmin) return;
+
+        if (deleteDialogState.isBulk) {
+            const batch = writeBatch(firestore);
+            selectedIds.forEach(id => {
+                batch.delete(doc(firestore, 'customers', id));
             });
+            await batch.commit();
+            toast({ title: `${selectedIds.size} pelanggan dihapus` });
+            setSelectedIds(new Set());
+        } else if (deleteDialogState.customerId) {
+            const docRef = doc(firestore, 'customers', deleteDialogState.customerId);
+            await deleteDoc(docRef);
+            toast({ title: 'Pelanggan dihapus' });
+        }
+        setDeleteDialogState({ isOpen: false });
     };
 
     const openDeleteDialog = (customerId: string) => {
         if (!isAdmin) {
-            toast({ variant: "destructive", title: "Akses Ditolak", description: "Hanya Admin yang boleh menghapus data pelanggan." });
+            toast({ variant: "destructive", title: "Akses Ditolak", description: "Hanya Admin yang boleh menghapus data." });
             return;
         }
-        setDeleteDialogState({ isOpen: true, customerId: customerId });
+        setDeleteDialogState({ isOpen: true, customerId, isBulk: false });
     };
 
     const handleSave = (customer: Omit<Customer, 'id' | 'ownerId'> & { id?: string }) => {
         if (!firestore || !user) return;
         
-        const isNewCustomer = !customer.id && !editingCustomer?.id;
-        let customerId = customer.id || editingCustomer?.id;
-        if (isNewCustomer) {
-            customerId = doc(collection(firestore, 'customers')).id;
-        }
-
-        if (!customerId) {
-            console.error("Customer ID is missing.");
-            toast({
-                variant: 'destructive',
-                title: 'Error',
-                description: 'Could not save customer due to missing ID.'
-            });
-            return;
-        }
-
-
+        const isNewCustomer = !customer.id;
+        const customerId = customer.id || doc(collection(firestore, 'customers')).id;
         const docRef = doc(firestore, 'customers', customerId);
         const dataToSave = { ...customer, id: customerId, ownerId: user.uid };
         
-        setDoc(docRef, dataToSave, { merge: !isNewCustomer })
+        setDoc(docRef, dataToSave, { merge: true })
             .then(() => {
-                toast({
-                    title: editingCustomer ? 'Customer Updated' : 'Customer Added',
-                    description: `Customer ${customer.name} has been saved.`,
-                });
+                toast({ title: editingCustomer ? 'Customer Updated' : 'Customer Added' });
                 setIsDialogOpen(false);
-                setEditingCustomer(undefined);
             })
             .catch(async (serverError) => {
-                 const permissionError = new FirestorePermissionError({
-                    path: docRef.path,
-                    operation: isNewCustomer ? 'create' : 'update',
-                    requestResourceData: dataToSave,
-                });
-                errorEmitter.emit('permission-error', permissionError);
+                errorEmitter.emit('permission-error', new FirestorePermissionError({
+                    path: docRef.path, operation: isNewCustomer ? 'create' : 'update', requestResourceData: dataToSave,
+                }));
             });
       };
 
-    const handleDialogStateChange = (open: boolean) => {
-      setIsDialogOpen(open);
-      if (!open) {
-        setEditingCustomer(undefined);
-      }
-    }
+    const handleExport = () => {
+        const dataToExport = selectedIds.size > 0 
+            ? filteredCustomers.filter(c => selectedIds.has(c.id!))
+            : filteredCustomers;
+        
+        exportToExcel(dataToExport, 'customers');
+        toast({ title: "Export Berhasil", description: `${dataToExport.length} pelanggan diekspor.` });
+    };
 
     const handleDownloadTemplate = () => {
-        const headers = ['name', 'address', 'spdAddress'];
-        generateExcelTemplate(headers, 'customer_template');
-        toast({ title: "Template Downloaded", description: "Customer template has been downloaded." });
+        generateExcelTemplate(['name', 'address', 'spdAddress'], 'customer_template');
     };
 
-    const handleExport = () => {
-        if (customers) {
-            exportToExcel(customers, 'customers');
-            toast({ title: "Export Successful", description: "Customer data has been exported to Excel." });
-        }
-    };
-
-    const handleImportClick = () => {
-        fileInputRef.current?.click();
-    };
+    const handleImportClick = () => fileInputRef.current?.click();
 
     const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
         const file = event.target.files?.[0];
@@ -169,109 +154,99 @@ import {
             try {
                 const data = await importFromExcel(file) as Omit<Customer, 'id' | 'ownerId'>[];
                 const batch = writeBatch(firestore);
-    
-                data.forEach(customerData => {
+                data.forEach(item => {
                     const newDocRef = doc(collection(firestore, 'customers'));
-                    const fullData = { ...customerData, id: newDocRef.id, ownerId: user.uid };
-                    batch.set(newDocRef, fullData);
+                    batch.set(newDocRef, { ...item, id: newDocRef.id, ownerId: user.uid });
                 });
-    
                 await batch.commit();
-                
-                toast({
-                    title: "Import Successful",
-                    description: `${data.length} customers imported successfully.`,
-                });
+                toast({ title: "Import Berhasil", description: `${data.length} pelanggan ditambahkan.` });
             } catch (error) {
-                 const permissionError = new FirestorePermissionError({
-                    path: 'customers', // Path for batch write can be generalized
-                    operation: 'create', // Assuming import is a create operation
-                    requestResourceData: 'Batch customer import',
-                });
-                errorEmitter.emit('permission-error', permissionError);
-                toast({
-                    variant: "destructive",
-                    title: "Import Error",
-                    description: "Failed to import customers. Please check the file format and permissions.",
-                });
+                toast({ variant: "destructive", title: "Gagal Import" });
             }
         }
     };
     
     return (
       <main className="flex flex-1 flex-col gap-4 p-4 md:gap-8 md:p-8">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight">Customer List</h1>
-          <p className="text-muted-foreground">
-            Manage your customer base.
-          </p>
+        <div className="flex justify-between items-center">
+            <div>
+                <h1 className="text-2xl font-bold tracking-tight">Customer List</h1>
+                <p className="text-muted-foreground">Manage your customer base.</p>
+            </div>
+            <div className="flex items-center gap-2">
+                <input type="file" ref={fileInputRef} onChange={handleFileChange} className="hidden" accept=".xlsx, .xls" />
+                <Button variant="outline" onClick={handleImportClick}><Upload className="mr-2 h-4 w-4"/> Import</Button>
+                <Button variant="outline" onClick={handleDownloadTemplate}><FileSpreadsheet className="mr-2 h-4 w-4"/> Template</Button>
+                <Button variant="outline" onClick={handleExport}><Download className="mr-2 h-4 w-4"/> Export</Button>
+                <AddCustomerDialog
+                    isOpen={isDialogOpen}
+                    onOpenChange={setIsDialogOpen}
+                    onSave={handleSave}
+                    customerData={editingCustomer}
+                    onAddClick={handleAddClick}
+                />
+            </div>
         </div>
         
         <Card>
             <CardContent className="pt-6">
                 <div className="flex justify-between items-center mb-4">
-                    <div className="relative w-1/3">
+                    <div className="relative w-64">
                         <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-                        <Input 
-                            type="search" 
-                            placeholder="Search Customer" 
-                            className="pl-8" 
-                            value={searchQuery}
-                            onChange={(e) => setSearchQuery(e.target.value)}
-                        />
+                        <Input placeholder="Cari pelanggan..." className="pl-8" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} />
                     </div>
-                    <div className="flex items-center gap-2">
-                       <input type="file" ref={fileInputRef} onChange={handleFileChange} className="hidden" accept=".xlsx, .xls" />
-                       <Button variant="outline" onClick={handleImportClick}><Upload className="mr-2 h-4 w-4"/> Import</Button>
-                       <Button variant="outline" onClick={handleDownloadTemplate}><Download className="mr-2 h-4 w-4"/> Download Template</Button>
-                       <Button variant="outline" onClick={handleExport}><Download className="mr-2 h-4 w-4"/> Export</Button>
-                       <AddCustomerDialog
-                         isOpen={isDialogOpen}
-                         onOpenChange={handleDialogStateChange}
-                         onSave={handleSave}
-                         customerData={editingCustomer}
-                         onAddClick={handleAddClick}
-                       />
-                    </div>
+                    {selectedIds.size > 0 && isAdmin && (
+                        <Button variant="destructive" size="sm" onClick={() => setDeleteDialogState({ isOpen: true, isBulk: true })}>
+                            <Trash2 className="mr-2 h-4 w-4" /> Hapus Terpilih ({selectedIds.size})
+                        </Button>
+                    )}
                 </div>
 
-                <div className="w-full overflow-auto">
+                <div className="rounded-md border overflow-hidden">
                     <Table>
                         <TableHeader>
                             <TableRow>
+                                <TableHead className="w-[40px]">
+                                    <Checkbox 
+                                        checked={filteredCustomers.length > 0 && selectedIds.size === filteredCustomers.length}
+                                        onCheckedChange={handleSelectAll}
+                                    />
+                                </TableHead>
                                 <TableHead>CUSTOMER</TableHead>
                                 <TableHead>ALAMAT</TableHead>
                                 <TableHead>ALAMAT SPD</TableHead>
-                                <TableHead>TINDAKAN</TableHead>
+                                <TableHead className="text-right">TINDAKAN</TableHead>
                             </TableRow>
                         </TableHeader>
                         <TableBody>
-                            {isLoading && (
-                                <TableRow>
-                                    <TableCell colSpan={4} className="text-center">Loading customers...</TableCell>
-                                </TableRow>
-                            )}
-                            {!isLoading && filteredCustomers?.map((customer) => (
-                                <TableRow key={customer.id}>
+                            {isLoading ? (
+                                <TableRow><TableCell colSpan={5} className="text-center py-8">Memuat data...</TableCell></TableRow>
+                            ) : filteredCustomers?.map((customer) => (
+                                <TableRow key={customer.id} className={selectedIds.has(customer.id!) ? "bg-muted/50" : ""}>
+                                    <TableCell>
+                                        <Checkbox 
+                                            checked={selectedIds.has(customer.id!)} 
+                                            onCheckedChange={() => handleSelectRow(customer.id!)}
+                                        />
+                                    </TableCell>
                                     <TableCell className="font-medium">{customer.name}</TableCell>
                                     <TableCell>{customer.address}</TableCell>
                                     <TableCell>{customer.spdAddress}</TableCell>
-                                    <TableCell>
-                                    <div className="flex gap-2">
-                                        <Button variant="link" className="p-0 h-auto" onClick={() => handleEdit(customer)}>Edit</Button>
-                                        
+                                    <TableCell className="text-right">
                                         {isAdmin && (
-                                            <DeleteConfirmationDialog 
-                                                open={deleteDialogState.isOpen && deleteDialogState.customerId === customer.id}
-                                                onOpenChange={(open) => setDeleteDialogState({isOpen: open, customerId: open ? customer.id : undefined})}
-                                                onConfirm={handleDeleteConfirm}
-                                            >
-                                                <Button variant="link" className="p-0 h-auto text-destructive" onClick={(e) => { e.stopPropagation(); openDeleteDialog(customer.id!); }}>
-                                                    Hapus
-                                                </Button>
-                                            </DeleteConfirmationDialog>
+                                            <div className="flex justify-end gap-1">
+                                                <Button variant="ghost" size="icon" onClick={() => handleEdit(customer)}><Edit className="h-4 w-4" /></Button>
+                                                <DeleteConfirmationDialog 
+                                                    open={deleteDialogState.isOpen && deleteDialogState.customerId === customer.id}
+                                                    onOpenChange={(open) => setDeleteDialogState(prev => ({...prev, isOpen: open, customerId: open ? customer.id : undefined, isBulk: false}))}
+                                                    onConfirm={handleDeleteConfirm}
+                                                >
+                                                    <Button variant="ghost" size="icon" className="text-destructive" onClick={(e) => { e.stopPropagation(); openDeleteDialog(customer.id!); }}>
+                                                        <Trash2 className="h-4 w-4" />
+                                                    </Button>
+                                                </DeleteConfirmationDialog>
+                                            </div>
                                         )}
-                                    </div>
                                     </TableCell>
                                 </TableRow>
                             ))}
@@ -279,10 +254,18 @@ import {
                     </Table>
                 </div>
                 <div className="text-sm text-muted-foreground mt-4">
-                    Showing 1 to {filteredCustomers?.length || 0} of {customers?.length || 0} entries
+                    Menampilkan {filteredCustomers?.length || 0} dari {customers?.length || 0} entri
                 </div>
             </CardContent>
         </Card>
+
+        <DeleteConfirmationDialog 
+            open={deleteDialogState.isOpen && deleteDialogState.isBulk} 
+            onOpenChange={(open) => setDeleteDialogState(prev => ({...prev, isOpen: open}))} 
+            onConfirm={handleDeleteConfirm}
+        >
+            <span />
+        </DeleteConfirmationDialog>
       </main>
     );
   }
