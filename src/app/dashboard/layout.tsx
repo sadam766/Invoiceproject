@@ -42,7 +42,6 @@ import {
   ShieldAlert,
   LogOut,
   BadgeCheck,
-  CreditCard,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -160,7 +159,7 @@ export default function DashboardLayout({
     <SidebarProvider>
       <Sidebar collapsible="icon">
         <SidebarHeader>
-          <div className="flex items-center gap-2 px-2 py-4">
+          <div className="flex items-center gap-2 px-2 py-4 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-0 transition-all duration-200 overflow-hidden">
             <Avatar className="w-10 h-10 border-2 border-primary shrink-0">
               <AvatarImage src={user?.photoURL || ""} />
               <AvatarFallback className="bg-primary text-white font-bold">

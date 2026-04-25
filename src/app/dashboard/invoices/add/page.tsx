@@ -432,7 +432,21 @@ export default function AddInvoicePage() {
                                 <ChevronsUpDown className="h-4 w-4 shrink-0 opacity-50" />
                               </Button>
                             </PopoverTrigger>
-                            <PopoverContent className="w-[--radix-popover-trigger-width] p-0"><Command><CommandInput placeholder="Search product..." /><CommandList><CommandGroup>{productListData?.map((p) => (<CommandItem key={p.id} value={p.name} onSelect={() => { setItems(items.map(it => it.id === item.id ? { ...it, name: p.name, unit: p.unit, price: p.price, total: parseFormattedNumber(String(it.quantity)) * p.price } : it)); setProductPopoverOpen(null); }}>{p.name}</CommandItem>))}</CommandGroup></CommandList></Command></PopoverContent>
+                            <PopoverContent className="w-[--radix-popover-trigger-width] p-0 shadow-xl border border-muted overflow-hidden">
+                              <Command>
+                                <CommandInput placeholder="Search product..." />
+                                <CommandList>
+                                  <CommandEmpty>No product found.</CommandEmpty>
+                                  <CommandGroup>
+                                    {productListData?.map((p) => (
+                                      <CommandItem key={p.id} value={p.name} onSelect={() => { setItems(items.map(it => it.id === item.id ? { ...it, name: p.name, unit: p.unit, price: p.price, total: parseFormattedNumber(String(it.quantity)) * p.price } : it)); setProductPopoverOpen(null); }}>
+                                        {p.name}
+                                      </CommandItem>
+                                    ))}
+                                  </CommandGroup>
+                                </CommandList>
+                              </Command>
+                            </PopoverContent>
                         </Popover>
                     </TableCell>
                     <TableCell className="p-2"><Input value={item.quantity} onChange={(e) => setItems(items.map(it => it.id === item.id ? { ...it, quantity: e.target.value, total: parseFormattedNumber(e.target.value) * parseFormattedNumber(String(it.price)) } : it))} onBlur={() => handleBlurFormat(v => setItems(items.map(it => it.id === item.id ? { ...it, quantity: v as string } : it)), item.quantity)} className="text-center" /></TableCell>
