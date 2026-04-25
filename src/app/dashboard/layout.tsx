@@ -1,3 +1,4 @@
+
 'use client';
 import {
   SidebarProvider,
@@ -66,7 +67,8 @@ import { cn } from '@/lib/utils';
 import { useAuth, useUser, useFirestore, useDoc, useMemoFirebase, useCollection } from '@/firebase';
 import { signOut } from 'firebase/auth';
 import { doc, query, collection, where } from 'firebase/firestore';
-import type { UserProfile } from '@/app/lib/data';
+import type { UserProfile, Invoice, SalesListItem } from '@/app/lib/data';
+import { parseISO, isBefore, startOfToday } from 'date-fns';
 
 export default function DashboardLayout({
   children,
@@ -91,23 +93,44 @@ export default function DashboardLayout({
   const isAdmin = userRole === 'admin';
   const isPending = !isSuperAdmin && userProfile?.status === 'pending';
 
+  // Alerts Monitoring for Bell
+  const invoicesQuery = useMemoFirebase(() => {
+    if (!firestore) return null;
+    return query(collection(firestore, 'invoices'));
+  }, [firestore]);
+  const { data: allInvoices } = useCollection<Invoice>(invoicesQuery);
+
+  const salesQuery = useMemoFirebase(() => {
+    if (!firestore) return null;
+    return query(collection(firestore, 'sales'));
+  }, [firestore]);
+  const { data: allSales } = useCollection<SalesListItem>(salesQuery);
+
   const pendingUsersQuery = useMemoFirebase(() => {
       if (!firestore || !isAdmin) return null;
       return query(collection(firestore, 'users'), where('status', '==', 'pending'));
   }, [firestore, isAdmin]);
   const { data: pendingUsers } = useCollection<UserProfile>(pendingUsersQuery);
 
+  const overdueInvoices = useMemo(() => {
+    if (!allInvoices) return [];
+    const today = startOfToday();
+    return allInvoices.filter(inv => {
+        if (inv.status === 'paid' || !inv.dueDate) return false;
+        return isBefore(parseISO(inv.dueDate), today);
+    });
+  }, [allInvoices]);
+
+  const emptyPoValue = useMemo(() => {
+    if (!allSales) return [];
+    return allSales.filter(s => s.amount <= 0);
+  }, [allSales]);
+
   useEffect(() => {
     if (!isUserLoading && !user) {
       router.push('/login');
     }
   }, [user, isUserLoading, router]);
-
-  useEffect(() => {
-    if (userProfile?.status === 'suspended' && !isSuperAdmin) {
-        signOut(auth).then(() => router.push('/login'));
-    }
-  }, [userProfile, auth, router, isSuperAdmin]);
 
   const handleLogout = async () => {
     try {
@@ -158,8 +181,8 @@ export default function DashboardLayout({
   return (
     <SidebarProvider>
       <Sidebar collapsible="icon">
-        <SidebarHeader>
-          <div className="flex items-center gap-2 px-2 py-4 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-0 transition-all duration-200 overflow-hidden">
+        <SidebarHeader className="group-data-[collapsible=icon]:p-0">
+          <div className="flex items-center gap-2 px-2 py-4 group-data-[collapsible=icon]:justify-center transition-all duration-200 overflow-hidden">
             <Avatar className="w-10 h-10 border-2 border-primary shrink-0">
               <AvatarImage src={user?.photoURL || ""} />
               <AvatarFallback className="bg-primary text-white font-bold">
@@ -312,7 +335,7 @@ export default function DashboardLayout({
                     <PopoverTrigger asChild>
                         <Button variant="ghost" size="icon" className="relative">
                             <Bell className="h-5 w-5" />
-                            {isAdmin && pendingUsers && pendingUsers.length > 0 && (
+                            {(overdueInvoices.length > 0 || emptyPoValue.length > 0 || (isAdmin && pendingUsers && pendingUsers.length > 0)) && (
                                 <span className="absolute top-2 right-2.5 flex h-2.5 w-2.5">
                                     <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
                                     <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-red-500"></span>
@@ -323,21 +346,32 @@ export default function DashboardLayout({
                     <PopoverContent className="w-80 p-0" align="end">
                         <div className="p-4 border-b bg-muted/50"><h3 className="font-bold text-sm">Notifikasi Dakota</h3></div>
                         <div className="max-h-[350px] overflow-y-auto">
-                            {isAdmin && pendingUsers && pendingUsers.length > 0 ? (
-                                <div className="p-2 space-y-2">
-                                    {pendingUsers.map(u => (
-                                        <div key={u.uid} className="p-3 rounded-lg border bg-yellow-50/50 hover:bg-yellow-100/50 cursor-pointer transition-colors" onClick={() => router.push('/dashboard/users')}>
-                                            <p className="text-sm font-semibold">User Baru Mendaftar</p>
-                                            <p className="text-xs text-muted-foreground mt-1"><strong>{u.displayName || u.email}</strong></p>
-                                            <div className="flex items-center gap-1 text-[10px] text-blue-600 font-bold uppercase mt-2"><UserCog className="h-3 w-3" /> Klik untuk aktivasi</div>
-                                        </div>
-                                    ))}
-                                </div>
-                            ) : (
-                                <div className="p-8 text-center text-sm text-muted-foreground flex flex-col items-center gap-2">
-                                    <Bell className="h-8 w-8 opacity-20" /><p>Tidak ada pemberitahuan baru.</p>
-                                </div>
-                            )}
+                            <div className="p-2 space-y-2">
+                                {overdueInvoices.map(inv => (
+                                    <div key={inv.id} className="p-3 rounded-lg border border-red-100 bg-red-50/50 hover:bg-red-50 transition-colors cursor-pointer" onClick={() => router.push('/dashboard/invoices')}>
+                                        <p className="text-sm font-bold text-red-700">Invoice Overdue!</p>
+                                        <p className="text-xs text-red-600 mt-1">{inv.id} - {inv.customer}</p>
+                                    </div>
+                                ))}
+                                {emptyPoValue.map(po => (
+                                    <div key={po.poNumber} className="p-3 rounded-lg border border-yellow-100 bg-yellow-50/50 hover:bg-yellow-50 transition-colors cursor-pointer" onClick={() => router.push('/dashboard/sales')}>
+                                        <p className="text-sm font-bold text-yellow-700">Amount PO Kosong</p>
+                                        <p className="text-xs text-yellow-600 mt-1">PO: {po.poNumber} belum ada nilainya.</p>
+                                    </div>
+                                ))}
+                                {isAdmin && pendingUsers && pendingUsers.map(u => (
+                                    <div key={u.uid} className="p-3 rounded-lg border bg-blue-50/50 hover:bg-blue-100/50 cursor-pointer transition-colors" onClick={() => router.push('/dashboard/users')}>
+                                        <p className="text-sm font-semibold">User Baru Mendaftar</p>
+                                        <p className="text-xs text-muted-foreground mt-1"><strong>{u.displayName || u.email}</strong></p>
+                                        <div className="flex items-center gap-1 text-[10px] text-blue-600 font-bold uppercase mt-2"><UserCog className="h-3 w-3" /> Klik untuk aktivasi</div>
+                                    </div>
+                                ))}
+                                {overdueInvoices.length === 0 && emptyPoValue.length === 0 && (!isAdmin || (pendingUsers && pendingUsers.length === 0)) && (
+                                    <div className="p-8 text-center text-sm text-muted-foreground flex flex-col items-center gap-2">
+                                        <Bell className="h-8 w-8 opacity-20" /><p>Tidak ada pemberitahuan baru.</p>
+                                    </div>
+                                )}
+                            </div>
                         </div>
                     </PopoverContent>
                 </Popover>
