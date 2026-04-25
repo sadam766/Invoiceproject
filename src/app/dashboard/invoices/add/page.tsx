@@ -60,6 +60,7 @@ import {
   Lock,
   Unlock,
   RefreshCw,
+  AlertTriangle,
 } from 'lucide-react';
 import { type InvoiceNumber, type Customer, type ProductListItem, type Invoice, type SalesOrder, type UserProfile, type VirtualAccount, type CustomerAddress } from '@/app/lib/data';
 import { useToast } from '@/hooks/use-toast';
@@ -113,6 +114,12 @@ export default function AddInvoicePage() {
   const [dpMode, setDpMode] = useState<'percent' | 'nominal'>('nominal');
   const [retentionValue, setRetentionValue] = useState<string | number>('');
   const [retentionMode, setRetentionMode] = useState<'percent' | 'nominal'>('nominal');
+
+  // Calculation Results for Display
+  const [calculatedNegNominal, setCalculatedNegNominal] = useState(0);
+  const [calculatedDpNominal, setCalculatedDpNominal] = useState(0);
+  const [calculatedRetNominal, setCalculatedRetNominal] = useState(0);
+  const [isOverLimit, setIsOverLimit] = useState(false);
 
   // Tax Overrides
   const [isTaxManual, setIsTaxManual] = useState(false);
@@ -185,19 +192,26 @@ export default function AddInvoicePage() {
     const currentSubtotal = items.reduce((acc, item) => acc + (parseFormattedNumber(item.quantity) * parseFormattedNumber(item.price)), 0);
     setSubtotal(currentSubtotal);
   
-    // Negotiation Calculation
+    // 1. Negotiation Calculation (Prioritas Nominal Absolut)
     const negInputVal = parseFormattedNumber(String(negotiationValue));
     const negNominal = negotiationMode === 'percent' ? (currentSubtotal * (negInputVal / 100)) : negInputVal;
+    setCalculatedNegNominal(negNominal);
 
     const baseAfterNeg = currentSubtotal - negNominal;
 
-    // DP Calculation
+    // 2. DP Calculation
     const dpInputVal = parseFormattedNumber(String(dpValue));
     const dpNominal = dpMode === 'percent' ? (baseAfterNeg * (dpInputVal / 100)) : dpInputVal;
+    setCalculatedDpNominal(dpNominal);
 
-    // Retention Calculation
+    // 3. Retention Calculation
     const retInputVal = parseFormattedNumber(String(retentionValue));
     const retNominal = retentionMode === 'percent' ? (baseAfterNeg * (retInputVal / 100)) : retInputVal;
+    setCalculatedRetNominal(retNominal);
+
+    // Validation: Check if total deductions exceed subtotal
+    const totalDeductions = negNominal + dpNominal + retNominal;
+    setIsOverLimit(totalDeductions > currentSubtotal);
 
     const baseForTax = baseAfterNeg - dpNominal - retNominal;
     
@@ -253,6 +267,11 @@ export default function AddInvoicePage() {
         return;
     }
 
+    if (isOverLimit) {
+        toast({ variant: "destructive", title: "Calculation Error", description: "Akumulasi potongan melebihi nilai barang." });
+        return;
+    }
+
     const batch = writeBatch(firestore);
     const safeInvoiceId = invoiceId.replace(/\//g, '_');
     const finalAmountValue = parseFormattedNumber(String(totalAmount));
@@ -273,8 +292,9 @@ export default function AddInvoicePage() {
         sjNumbers: sjInput.split(',').map(s => s.trim()).filter(s => s !== ''),
         ownerId: user.uid,
         createdBy: user.email,
-        negotiation: parseFormattedNumber(String(negotiationValue)),
-        negotiationMode,
+        negotiation: calculatedNegNominal,
+        dpValue: calculatedDpNominal,
+        retention: calculatedRetNominal,
     }, { merge: true });
 
     await batch.commit();
@@ -285,13 +305,6 @@ export default function AddInvoicePage() {
   const handlePreview = () => {
     if (!selectedAddress) { toast({ variant: "destructive", title: "Alamat Cabang Wajib Dipilih" }); return; }
     
-    const currentSubtotal = items.reduce((acc, item) => acc + (parseFormattedNumber(item.quantity) * parseFormattedNumber(item.price)), 0);
-    const negNominal = negotiationMode === 'percent' ? (currentSubtotal * (parseFormattedNumber(String(negotiationValue)) / 100)) : parseFormattedNumber(String(negotiationValue));
-    
-    const baseAfterNeg = currentSubtotal - negNominal;
-    const dpNominal = dpMode === 'percent' ? (baseAfterNeg * (parseFormattedNumber(String(dpValue)) / 100)) : parseFormattedNumber(String(dpValue));
-    const retNominal = retentionMode === 'percent' ? (baseAfterNeg * (parseFormattedNumber(String(retentionValue)) / 100)) : parseFormattedNumber(String(retentionValue));
-
     const previewData = {
       id: invoiceId, soNumber, poNumber, customer: { name: customer?.name, address: selectedAddress.address, npwp: selectedAddress.npwp }, 
       date: issueDate ? format(issueDate, 'yyyy-MM-dd') : '',
@@ -303,13 +316,13 @@ export default function AddInvoicePage() {
         quantity: parseFormattedNumber(String(item.quantity)), unit: item.unit,
         price: parseFormattedNumber(String(item.price)), total: item.total
       })),
-      subtotal: currentSubtotal, 
+      subtotal: subtotal, 
       dppVat: parseFormattedNumber(String(dppVat)), 
       vat12: parseFormattedNumber(String(vat12)),
-      negotiation: negNominal, 
-      dpValue: dpNominal,
-      pelunasan: retNominal,
-      grandTotal: parseFormattedNumber(String(dppVat)), 
+      negotiation: calculatedNegNominal, 
+      dpValue: calculatedDpNominal,
+      pelunasan: calculatedRetNominal,
+      grandTotal: parseFormattedNumber(String(totalAmount)), 
       virtualAccount: isVaActive ? availableVAs.find(va => va.id === selectedVaId) : undefined,
       paymentTerms: '90 Hari setelah invoice diterima',
       paymentMethod: paymentMethodText,
@@ -543,7 +556,12 @@ export default function AddInvoicePage() {
                             <Button variant={negotiationMode === 'nominal' ? 'secondary' : 'ghost'} size="sm" className="h-5 px-2 text-[9px] font-bold" onClick={() => setNegotiationMode('nominal')}>Rp</Button>
                         </div>
                     </div>
-                    <Input value={negotiationValue} onChange={e => setNegotiationValue(e.target.value)} className="h-8 text-right font-bold text-red-600 bg-muted/10" placeholder="0" />
+                    <div className="space-y-1">
+                        <Input value={negotiationValue} onChange={e => setNegotiationValue(e.target.value)} className="h-8 text-right font-bold text-red-600 bg-muted/10" placeholder="0" />
+                        {negotiationMode === 'nominal' && calculatedNegNominal > 0 && (
+                            <p className="text-[9px] text-right text-muted-foreground italic font-medium">Setara {(calculatedNegNominal / subtotal * 100 || 0).toFixed(1)}%</p>
+                        )}
+                    </div>
                 </div>
               </div>
 
@@ -559,7 +577,12 @@ export default function AddInvoicePage() {
                             <Button variant={dpMode === 'nominal' ? 'secondary' : 'ghost'} size="sm" className="h-5 px-2 text-[9px] font-bold" onClick={() => setDpMode('nominal')}>Rp</Button>
                         </div>
                     </div>
-                    <Input value={dpValue} onChange={e => setDpValue(e.target.value)} className="h-9 text-right font-bold bg-muted/20" placeholder="0" />
+                    <div className="space-y-1">
+                        <Input value={dpValue} onChange={e => setDpValue(e.target.value)} className="h-9 text-right font-bold bg-muted/20" placeholder="0" />
+                        {dpMode === 'nominal' && calculatedDpNominal > 0 && (
+                            <p className="text-[9px] text-right text-muted-foreground italic font-medium">Setara {(calculatedDpNominal / (subtotal - calculatedNegNominal) * 100 || 0).toFixed(1)}%</p>
+                        )}
+                    </div>
                 </div>
 
                 <div className="space-y-2">
@@ -570,9 +593,21 @@ export default function AddInvoicePage() {
                             <Button variant={retentionMode === 'nominal' ? 'secondary' : 'ghost'} size="sm" className="h-5 px-2 text-[9px] font-bold" onClick={() => setRetentionMode('nominal')}>Rp</Button>
                         </div>
                     </div>
-                    <Input value={retentionValue} onChange={e => setRetentionValue(e.target.value)} className="h-9 text-right font-bold text-amber-600 bg-muted/20" placeholder="0" />
+                    <div className="space-y-1">
+                        <Input value={retentionValue} onChange={e => setRetentionValue(e.target.value)} className="h-9 text-right font-bold text-amber-600 bg-muted/20" placeholder="0" />
+                        {retentionMode === 'nominal' && calculatedRetNominal > 0 && (
+                            <p className="text-[9px] text-right text-muted-foreground italic font-medium">Setara {(calculatedRetNominal / (subtotal - calculatedNegNominal) * 100 || 0).toFixed(1)}%</p>
+                        )}
+                    </div>
                 </div>
               </div>
+
+              {isOverLimit && (
+                <div className="bg-red-50 border border-red-200 p-2 rounded-lg flex items-center gap-2 text-red-700 animate-pulse">
+                    <AlertTriangle className="h-4 w-4 shrink-0" />
+                    <span className="text-[10px] font-black uppercase">Peringatan: Potongan melebihi subtotal!</span>
+                </div>
+              )}
 
               <div className="bg-muted/50 p-4 rounded-xl space-y-4 border border-dashed border-primary/20">
                 <div className="flex justify-between items-center">
@@ -620,10 +655,10 @@ export default function AddInvoicePage() {
               <Separator />
 
               <div className="space-y-3">
-                  <Button className="w-full h-11 bg-primary hover:bg-primary/90 font-black uppercase tracking-tighter shadow-lg" onClick={() => handleSaveInvoice('sent')}>
+                  <Button className="w-full h-11 bg-primary hover:bg-primary/90 font-black uppercase tracking-tighter shadow-lg" onClick={() => handleSaveInvoice('sent')} disabled={isOverLimit}>
                       <Send className="mr-2 h-4 w-4" /> TERBITKAN INVOICE
                   </Button>
-                  <Button variant="outline" className="w-full h-11 font-black uppercase text-xs" onClick={handlePreview}>
+                  <Button variant="outline" className="w-full h-11 font-black uppercase text-xs" onClick={handlePreview} disabled={isOverLimit}>
                       <Eye className="mr-2 h-4 w-4" /> PRATINJAU DOKUMEN
                   </Button>
               </div>
