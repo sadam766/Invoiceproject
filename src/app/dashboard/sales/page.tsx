@@ -84,6 +84,8 @@ import {
     }, [firestore]);
     const { data: invoices, isLoading: isInvoicesLoading } = useCollection<Invoice>(invoicesCollection);
 
+    const isLoading = isSalesLoading || isInvoicesLoading;
+
     const filteredSales = useMemo(() => {
         if (!sales || !invoices) return [];
         

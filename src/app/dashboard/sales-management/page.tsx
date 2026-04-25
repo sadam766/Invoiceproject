@@ -42,7 +42,8 @@ import {
     Banknote,
     ReceiptText,
     Scale,
-    Wallet
+    Wallet,
+    BadgeCheck
   } from 'lucide-react';
   import { type SalesListItem, type Invoice, type TaxInvoice, type UserProfile } from '@/app/lib/data';
   import { useFirestore, useUser, useCollection, useMemoFirebase, useDoc } from '@/firebase';
