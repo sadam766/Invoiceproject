@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useEffect, useState, useMemo } from 'react';
@@ -42,7 +43,7 @@ import {
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { cn, formatNumberWithCommas, parseFormattedNumber } from '@/lib/utils';
-import { format } from 'date-fns';
+import { format, addDays } from 'date-fns';
 import {
   ChevronLeft,
   Calendar as CalendarIcon,
@@ -87,8 +88,8 @@ export default function AddInvoicePage() {
   const [poNumber, setPoNumber] = useState('');
   const [customer, setCustomer] = useState<Customer | undefined>(undefined);
 
-  const [issueDate, setIssueDate] = useState<Date | undefined>(new Date('2026-04-25'));
-  const [dueDate, setDueDate] = useState<Date | undefined>();
+  const [issueDate, setIssueDate] = useState<Date | undefined>(new Date());
+  const [dueDate, setDueDate] = useState<Date | undefined>(addDays(new Date(), 30));
   const [status, setStatus] = useState<'paid' | 'unpaid' | 'sent' | 'draft'>('draft');
   const [printType, setPrintType] = useState<'original' | 'copy'>('original');
 
@@ -208,6 +209,7 @@ export default function AddInvoicePage() {
         setStatus(invoiceToEditData.status);
         setCustomer(customerListData?.find(c => c.name === invoiceToEditData.customer));
         if (invoiceToEditData.date) setIssueDate(new Date(invoiceToEditData.date));
+        if (invoiceToEditData.dueDate) setDueDate(new Date(invoiceToEditData.dueDate));
 
         const soItems = salesOrderListData.filter(so => so.soNumber === invoiceToEditData.soNumber);
         if (soItems.length > 0) {
@@ -296,6 +298,7 @@ export default function AddInvoicePage() {
         poNumber: poNumber,
         customer: customer.name,
         date: format(issueDate, 'yyyy-MM-dd'),
+        dueDate: dueDate ? format(dueDate, 'yyyy-MM-dd') : format(addDays(issueDate, 30), 'yyyy-MM-dd'),
         amount: finalAmountValue,
         status: invoiceStatus,
         paymentMethod: paymentMethodText,
@@ -322,7 +325,9 @@ export default function AddInvoicePage() {
   const handlePreview = () => {
     const selectedVa = isVaActive ? availableVAs.find(va => va.id === selectedVaId) : undefined;
     const previewData = {
-      id: invoiceId, soNumber, poNumber, customer, date: issueDate ? format(issueDate, 'yyyy-MM-dd') : '',
+      id: invoiceId, soNumber, poNumber, customer, 
+      date: issueDate ? format(issueDate, 'yyyy-MM-dd') : '',
+      dueDate: dueDate ? format(dueDate, 'yyyy-MM-dd') : '',
       amount: parseFormattedNumber(String(totalAmount)), status, printType,
       items: items.map((item, index) => ({
         id: item.id, no: index + 1, item: item.name, name: item.name,
@@ -366,7 +371,11 @@ export default function AddInvoicePage() {
                  <label className="text-sm font-medium">Bill To</label>
                  <Popover open={customerPopoverOpen} onOpenChange={setCustomerPopoverOpen}>
                     <PopoverTrigger asChild><Button variant="outline" className="w-full justify-between">{customer?.name ?? "Cari Customer..."}<ChevronsUpDown className="ml-2 h-4 w-4 opacity-50" /></Button></PopoverTrigger>
-                    <PopoverContent className="w-[400px] p-0 shadow-xl border border-muted" align="start"><Command><CommandInput placeholder="Search customer..." /><CommandList><CommandEmpty /><CommandGroup>{customerListData?.map((c) => (<CommandItem key={c.id} value={`${c.name}|${c.id}`} onSelect={handleCustomerSelect} className="flex flex-col items-start gap-1"><div className="flex items-center gap-2"><Check className={cn("h-4 w-4", customer?.name.toLowerCase() === c.name.toLowerCase() ? "opacity-100" : "opacity-0")} /><span className="font-bold">{c.name}</span></div><p className="text-[10px] text-muted-foreground ml-6 truncate w-full">{c.address}</p></CommandItem>))}</CommandGroup></CommandList></Command></PopoverContent>
+                    <PopoverContent className="w-[400px] p-0 shadow-xl border border-muted" align="start"><Command><CommandInput placeholder="Search customer..." /><CommandList><CommandEmpty /><CommandGroup>{customerListData?.map((c) => (
+                      <CommandItem key={c.id} value={`${c.name}|${c.id}`} onSelect={handleCustomerSelect} className="flex flex-col items-start gap-1">
+                        <div className="flex items-center gap-2"><Check className={cn("h-4 w-4", customer?.name.toLowerCase() === c.name.toLowerCase() ? "opacity-100" : "opacity-0")} /><span className="font-bold">{c.name}</span></div>
+                        <p className="text-[10px] text-muted-foreground ml-6 truncate w-full">{c.address}</p>
+                      </CommandItem>))}</CommandGroup></CommandList></Command></PopoverContent>
                  </Popover>
               </div>
               <div><label className="text-sm font-medium">Issue Date</label><Popover><PopoverTrigger asChild><Button variant={'outline'} className="w-full justify-start"><CalendarIcon className="mr-2 h-4 w-4" />{issueDate ? format(issueDate, 'dd/MM/yyyy') : 'Pilih Tanggal'}</Button></PopoverTrigger><PopoverContent className="w-auto p-0"><Calendar mode="single" selected={issueDate} onSelect={setIssueDate} /></PopoverContent></Popover></div>

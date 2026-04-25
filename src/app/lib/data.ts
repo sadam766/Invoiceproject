@@ -127,7 +127,8 @@ export type Invoice = {
   soNumber: string;
   poNumber: string;
   customer: string;
-  date: string;
+  date: string; // Issue Date
+  dueDate?: string; // Due Date
   amount: number;
   status: 'paid' | 'unpaid' | 'sent' | 'draft';
   spdNumber: string;
