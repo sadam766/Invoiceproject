@@ -7,6 +7,7 @@ import {
     CardContent,
     CardHeader,
     CardTitle,
+    CardFooter,
   } from '@/components/ui/card';
   import {
     Table,
@@ -16,10 +17,29 @@ import {
     TableHeader,
     TableRow,
   } from '@/components/ui/table';
+  import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuTrigger,
+  } from '@/components/ui/dropdown-menu';
   import { Input } from '@/components/ui/input';
   import { Button } from '@/components/ui/button';
   import { Badge } from '@/components/ui/badge';
-  import { Search, Eye, TrendingUp, CreditCard, AlertCircle, ArrowUpDown } from 'lucide-react';
+  import { 
+    Search, 
+    Eye, 
+    TrendingUp, 
+    CreditCard, 
+    AlertCircle, 
+    LayoutGrid, 
+    List, 
+    MoreVertical, 
+    FileText,
+    User,
+    ClipboardCheck,
+    Banknote
+  } from 'lucide-react';
   import { type SalesListItem, type Invoice } from '@/app/lib/data';
   import { useFirestore, useUser, useCollection, useMemoFirebase } from '@/firebase';
   import { collection, query } from 'firebase/firestore';
@@ -37,9 +57,23 @@ import {
     const [searchQuery, setSearchQuery] = useState('');
     const [selectedSale, setSelectedSale] = useState<MergedRecord | null>(null);
     const [detailOpen, setDetailOpen] = useState(false);
+    const [viewMode, setViewMode] = useState<'list' | 'book'>('list');
 
     const firestore = useFirestore();
     const { user } = useUser();
+
+    // Persist view mode
+    useEffect(() => {
+        const savedView = localStorage.getItem('salesManagementViewMode');
+        if (savedView === 'list' || savedView === 'book') {
+            setViewMode(savedView);
+        }
+    }, []);
+
+    const handleViewChange = (mode: 'list' | 'book') => {
+        setViewMode(mode);
+        localStorage.setItem('salesManagementViewMode', mode);
+    };
 
     // Fetch necessary data
     const salesCollection = useMemoFirebase(() => {
@@ -64,7 +98,7 @@ import {
             const related = invoiceList.filter(inv => inv.poNumber === sale.poNumber);
             const paid = related.filter(inv => inv.status === 'paid').reduce((sum, inv) => sum + inv.amount, 0);
             
-            // Dynamic Status Calculation
+            // Dynamic Status Calculation: Real-time Sync Logic
             let status: any = 'Waiting';
             if (paid >= sale.amount && sale.amount > 0) status = 'Paid';
             else if (paid > 0) status = 'Partial';
@@ -78,8 +112,9 @@ import {
             };
         }).filter(item => 
             item.poNumber.toLowerCase().includes(searchQuery.toLowerCase()) ||
-            item.customer.toLowerCase().includes(searchQuery.toLowerCase())
-        ).sort((a, b) => b.outstanding - a.outstanding); // Sort by highest outstanding first
+            item.customer.toLowerCase().includes(searchQuery.toLowerCase()) ||
+            (item.soNumber && item.soNumber.toLowerCase().includes(searchQuery.toLowerCase()))
+        ).sort((a, b) => b.outstanding - a.outstanding);
     }, [salesList, invoiceList, searchQuery]);
 
     // Financial KPIs
@@ -108,9 +143,29 @@ import {
     
     return (
       <main className="flex flex-1 flex-col gap-4 p-4 md:gap-8 md:p-8">
-        <div>
-            <h1 className="text-2xl font-bold tracking-tight">Sales Management (Buku Piutang)</h1>
-            <p className="text-muted-foreground">Monitoring arus kas masuk per-dokumen PO.</p>
+        <div className="flex justify-between items-start">
+            <div>
+                <h1 className="text-2xl font-bold tracking-tight">Sales Management (Buku Piutang)</h1>
+                <p className="text-muted-foreground">Monitoring arus kas masuk per-dokumen PO.</p>
+            </div>
+            <div className="flex bg-muted rounded-md p-1 border">
+                <Button 
+                    variant={viewMode === 'list' ? 'secondary' : 'ghost'} 
+                    size="sm" 
+                    className="h-8 gap-2"
+                    onClick={() => handleViewChange('list')}
+                >
+                    <List className="h-4 w-4" /> <span className="hidden sm:inline">List View</span>
+                </Button>
+                <Button 
+                    variant={viewMode === 'book' ? 'secondary' : 'ghost'} 
+                    size="sm" 
+                    className="h-8 gap-2"
+                    onClick={() => handleViewChange('book')}
+                >
+                    <LayoutGrid className="h-4 w-4" /> <span className="hidden sm:inline">Book Mode</span>
+                </Button>
+            </div>
         </div>
 
         <div className="grid gap-4 md:grid-cols-3">
@@ -133,57 +188,153 @@ import {
                 <div className="flex justify-between items-center mb-6">
                     <div className="relative w-1/3">
                         <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-                        <Input placeholder="Cari nomor PO atau customer..." className="pl-8" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} />
+                        <Input placeholder="Cari nomor PO, SO, atau customer..." className="pl-8" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} />
                     </div>
                     <p className="text-xs text-muted-foreground font-medium">Data diurutkan berdasarkan Sisa Piutang tertinggi.</p>
                 </div>
 
-                <div className="rounded-md border overflow-hidden">
-                    <Table>
-                        <TableHeader className="bg-muted/50">
-                            <TableRow>
-                                <TableHead>PO NUMBER</TableHead>
-                                <TableHead>CUSTOMER</TableHead>
-                                <TableHead className="text-right">TOTAL PO</TableHead>
-                                <TableHead className="text-right">TERBAYAR</TableHead>
-                                <TableHead className="text-right">OUTSTANDING</TableHead>
-                                <TableHead className="text-center">PROGRES</TableHead>
-                                <TableHead className="text-right">TINDAKAN</TableHead>
-                            </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                            {isLoading ? (
-                                <TableRow><TableCell colSpan={7} className="text-center py-8">Menganalisa Buku Piutang...</TableCell></TableRow>
-                            ) : mergedData.map((item) => (
-                                <TableRow key={item.poNumber}>
-                                    <TableCell className="font-bold">{item.poNumber}</TableCell>
-                                    <TableCell>
-                                        <div className="flex flex-col">
-                                            <span className="font-medium text-sm">{item.customer}</span>
-                                            <span className="text-[10px] text-muted-foreground uppercase">{item.sales}</span>
-                                        </div>
-                                    </TableCell>
-                                    <TableCell className="text-right font-medium">Rp {item.amount.toLocaleString('id-ID')}</TableCell>
-                                    <TableCell className="text-right text-green-600 font-medium">Rp {item.totalPaid.toLocaleString('id-ID')}</TableCell>
-                                    <TableCell className="text-right text-red-600 font-bold">Rp {item.outstanding.toLocaleString('id-ID')}</TableCell>
-                                    <TableCell className="text-center">
-                                        <Badge className={cn(
-                                            item.status === 'Paid' ? 'bg-green-600' : 
-                                            item.status === 'Partial' ? 'bg-yellow-500' : 'bg-gray-400'
-                                        )}>
-                                            {item.status}
-                                        </Badge>
-                                    </TableCell>
-                                    <TableCell className="text-right">
-                                        <Button variant="outline" size="sm" onClick={() => { setSelectedSale(item); setDetailOpen(true); }}>
-                                            <Eye className="mr-2 h-4 w-4" /> Buku Pembayaran
-                                        </Button>
-                                    </TableCell>
+                {isLoading ? (
+                    <div className="py-20 text-center space-y-4">
+                        <div className="animate-spin h-8 w-8 border-4 border-primary border-t-transparent rounded-full mx-auto" />
+                        <p className="text-muted-foreground">Menganalisa Buku Piutang...</p>
+                    </div>
+                ) : viewMode === 'list' ? (
+                    <div className="rounded-md border overflow-hidden">
+                        <Table>
+                            <TableHeader className="bg-muted/50">
+                                <TableRow>
+                                    <TableHead>SO NUMBER</TableHead>
+                                    <TableHead>CUSTOMER</TableHead>
+                                    <TableHead className="text-right">TOTAL PO</TableHead>
+                                    <TableHead className="text-right">TERBAYAR</TableHead>
+                                    <TableHead className="text-right">OUTSTANDING</TableHead>
+                                    <TableHead className="text-center">PROGRES</TableHead>
+                                    <TableHead className="text-right"></TableHead>
                                 </TableRow>
-                            ))}
-                        </TableBody>
-                    </Table>
-                </div>
+                            </TableHeader>
+                            <TableBody>
+                                {mergedData.length === 0 ? (
+                                    <TableRow><TableCell colSpan={7} className="text-center py-8">Tidak ada data ditemukan.</TableCell></TableRow>
+                                ) : mergedData.map((item) => (
+                                    <TableRow key={item.poNumber}>
+                                        <TableCell className="font-bold">{item.soNumber || '(Waiting SO)'}</TableCell>
+                                        <TableCell>
+                                            <div className="flex flex-col">
+                                                <span className="font-medium text-sm">{item.customer}</span>
+                                                <span className="text-[10px] text-muted-foreground uppercase">{item.sales}</span>
+                                            </div>
+                                        </TableCell>
+                                        <TableCell className="text-right font-medium">Rp {item.amount.toLocaleString('id-ID')}</TableCell>
+                                        <TableCell className="text-right text-green-600 font-medium">Rp {item.totalPaid.toLocaleString('id-ID')}</TableCell>
+                                        <TableCell className="text-right text-red-600 font-bold">Rp {item.outstanding.toLocaleString('id-ID')}</TableCell>
+                                        <TableCell className="text-center">
+                                            <Badge className={cn(
+                                                item.status === 'Paid' ? 'bg-green-600' : 
+                                                item.status === 'Partial' ? 'bg-yellow-500' : 'bg-gray-400'
+                                            )}>
+                                                {item.status}
+                                            </Badge>
+                                        </TableCell>
+                                        <TableCell className="text-right">
+                                            <DropdownMenu>
+                                                <DropdownMenuTrigger asChild>
+                                                    <Button variant="ghost" size="icon"><MoreVertical className="h-4 w-4" /></Button>
+                                                </DropdownMenuTrigger>
+                                                <DropdownMenuContent align="end">
+                                                    <DropdownMenuItem onClick={() => { setSelectedSale(item); setDetailOpen(true); }}>
+                                                        <Eye className="mr-2 h-4 w-4" /> View Details
+                                                    </DropdownMenuItem>
+                                                    <DropdownMenuItem>
+                                                        <FileText className="mr-2 h-4 w-4" /> Export PDF
+                                                    </DropdownMenuItem>
+                                                </DropdownMenuContent>
+                                            </DropdownMenu>
+                                        </TableCell>
+                                    </TableRow>
+                                ))}
+                            </TableBody>
+                        </Table>
+                    </div>
+                ) : (
+                    <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+                        {mergedData.map((item) => (
+                            <Card key={item.poNumber} className="overflow-hidden hover:shadow-md transition-shadow flex flex-col">
+                                <div className={cn(
+                                    "h-1 w-full",
+                                    item.status === 'Paid' ? "bg-green-500" : 
+                                    item.status === 'Partial' ? "bg-yellow-500" : "bg-gray-400"
+                                )} />
+                                <CardHeader className="pb-2 flex flex-row items-center justify-between space-y-0">
+                                    <div className="flex flex-col">
+                                        <span className="text-[10px] text-muted-foreground uppercase font-bold">SO Number</span>
+                                        <CardTitle className="text-sm font-bold">{item.soNumber || '(Waiting SO)'}</CardTitle>
+                                    </div>
+                                    <Badge className={cn(
+                                        item.status === 'Paid' ? 'bg-green-600' : 
+                                        item.status === 'Partial' ? 'bg-yellow-500' : 'bg-gray-400'
+                                    )}>
+                                        {item.status}
+                                    </Badge>
+                                </CardHeader>
+                                <CardContent className="flex-1 pt-2 pb-4 space-y-4">
+                                    <div className="space-y-2">
+                                        <div className="flex items-start gap-2 text-sm">
+                                            <User className="h-4 w-4 text-muted-foreground mt-0.5 shrink-0" />
+                                            <div>
+                                                <p className="font-bold leading-tight">{item.customer}</p>
+                                                <p className="text-[10px] text-muted-foreground">Sales: {item.sales}</p>
+                                            </div>
+                                        </div>
+                                        <div className="flex items-center gap-2 text-xs">
+                                            <ClipboardCheck className="h-4 w-4 text-muted-foreground shrink-0" />
+                                            <span className="text-muted-foreground">PO Customer:</span>
+                                            <span className="font-medium">{item.poNumber}</span>
+                                        </div>
+                                    </div>
+
+                                    <div className="grid grid-cols-2 gap-2 p-3 bg-muted/30 rounded-lg">
+                                        <div>
+                                            <p className="text-[10px] text-muted-foreground uppercase">Total Amount</p>
+                                            <p className="text-xs font-bold">Rp {item.amount.toLocaleString('id-ID')}</p>
+                                        </div>
+                                        <div>
+                                            <p className="text-[10px] text-muted-foreground uppercase">Terbayar</p>
+                                            <p className="text-xs font-bold text-green-600">Rp {item.totalPaid.toLocaleString('id-ID')}</p>
+                                        </div>
+                                    </div>
+
+                                    <div className="pt-2 border-t border-dashed">
+                                        <div className="flex items-center justify-between">
+                                            <div className="flex items-center gap-1">
+                                                <Banknote className="h-4 w-4 text-red-500" />
+                                                <span className="text-xs font-bold text-red-600 uppercase">Sisa Piutang</span>
+                                            </div>
+                                            <span className="text-sm font-black text-red-600">Rp {item.outstanding.toLocaleString('id-ID')}</span>
+                                        </div>
+                                    </div>
+                                    
+                                    <div className="space-y-1">
+                                        <div className="flex justify-between text-[10px]">
+                                            <span className="text-muted-foreground">Status Tagihan:</span>
+                                            <span className={item.relatedInvoices.length > 0 ? "text-blue-600 font-bold" : "text-orange-600 font-bold"}>
+                                                {item.relatedInvoices.length > 0 ? "Invoice Issued" : "Not Invoiced"}
+                                            </span>
+                                        </div>
+                                        <div className="flex justify-between text-[10px]">
+                                            <span className="text-muted-foreground">Tax Invoice:</span>
+                                            <span className="font-medium">-</span>
+                                        </div>
+                                    </div>
+                                </CardContent>
+                                <CardFooter className="bg-muted/10 p-3 pt-0 mt-auto">
+                                    <Button variant="outline" className="w-full h-8 text-xs font-bold" onClick={() => { setSelectedSale(item); setDetailOpen(true); }}>
+                                        <Eye className="mr-2 h-4 w-4" /> Buka Buku Pembayaran
+                                    </Button>
+                                </CardFooter>
+                            </Card>
+                        ))}
+                    </div>
+                )}
             </CardContent>
         </Card>
 
