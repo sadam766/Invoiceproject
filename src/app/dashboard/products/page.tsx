@@ -1,4 +1,3 @@
-
 'use client';
 import { useState, useMemo, useRef } from 'react';
 import {
@@ -28,7 +27,7 @@ import {
   import { AddProductDialog } from './_components/add-product-dialog';
   import { DeleteConfirmationDialog } from '@/app/components/delete-confirmation-dialog';
   import { useToast } from '@/hooks/use-toast';
-  import { exportToExcel, importFromExcel, generateExcelTemplate } from '@/lib/utils';
+  import { exportToExcel, importFromExcel, generateExcelTemplate, parseFormattedNumber } from '@/lib/utils';
   import { useFirestore, useUser, useCollection, useMemoFirebase, errorEmitter, FirestorePermissionError, useDoc } from '@/firebase';
   import { collection, doc, setDoc, deleteDoc, writeBatch, query } from 'firebase/firestore';
   
@@ -174,18 +173,73 @@ import {
 
     const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
         const file = event.target.files?.[0];
-        if (file && firestore && user) {
+        if (file && firestore && user && products) {
             try {
-                const data = await importFromExcel(file) as Omit<ProductListItem, 'id'|'ownerId'>[];
+                const rawData = await importFromExcel(file) as any[];
                 const batch = writeBatch(firestore);
-                data.forEach(item => {
-                    const newDocRef = doc(collection(firestore, 'products'));
-                    batch.set(newDocRef, { ...item, id: newDocRef.id, ownerId: user.uid });
+                let newCount = 0;
+                let mergedCount = 0;
+
+                // 1. Konsolidasi internal data Excel (menggabungkan item yang sama di dalam file itu sendiri)
+                const consolidatedImports: Record<string, any> = {};
+                rawData.forEach(item => {
+                    const name = String(item.name || '').trim();
+                    const unit = String(item.unit || '').trim();
+                    const price = parseFormattedNumber(item.price);
+                    const qty = parseFormattedNumber(item.quantity);
+                    const category = String(item.category || 'kabel').trim();
+
+                    if (!name) return; // Lewati jika nama kosong
+
+                    const key = `${name.toLowerCase()}|${unit.toLowerCase()}|${price}`;
+                    if (consolidatedImports[key]) {
+                        consolidatedImports[key].quantity += qty;
+                    } else {
+                        consolidatedImports[key] = { name, unit, price, quantity: qty, category };
+                    }
                 });
+
+                // 2. Bandingkan dengan Database dan terapkan logika Merge atau Add
+                Object.values(consolidatedImports).forEach(item => {
+                    const existingProduct = products.find(p => 
+                        p.name.trim().toLowerCase() === item.name.toLowerCase() && 
+                        p.unit.trim().toLowerCase() === item.unit.toLowerCase() && 
+                        p.price === item.price
+                    );
+
+                    if (existingProduct) {
+                        const docRef = doc(firestore, 'products', existingProduct.id!);
+                        batch.update(docRef, { 
+                            quantity: existingProduct.quantity + item.quantity 
+                        });
+                        mergedCount++;
+                    } else {
+                        const newDocRef = doc(collection(firestore, 'products'));
+                        batch.set(newDocRef, { 
+                            ...item, 
+                            id: newDocRef.id, 
+                            ownerId: user.uid 
+                        });
+                        newCount++;
+                    }
+                });
+
                 await batch.commit();
-                toast({ title: "Import Berhasil", description: `${data.length} produk ditambahkan.` });
+                
+                toast({ 
+                    title: "Impor Berhasil", 
+                    description: `Total ${Object.keys(consolidatedImports).length} data diproses: ${newCount} item baru berhasil ditambahkan, ${mergedCount} item digabungkan (stok diperbarui).` 
+                });
+                
+                // Reset input file agar bisa digunakan lagi untuk file yang sama jika perlu
+                event.target.value = '';
             } catch (error) {
-                toast({ variant: "destructive", title: "Import Gagal" });
+                console.error("Import error:", error);
+                toast({ 
+                    variant: "destructive", 
+                    title: "Gagal Impor", 
+                    description: "Terjadi kesalahan saat memproses file Excel. Pastikan format kolom sesuai template." 
+                });
             }
         }
     };
