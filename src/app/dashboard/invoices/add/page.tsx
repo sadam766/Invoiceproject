@@ -66,6 +66,7 @@ import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useFirestore, useCollection, useMemoFirebase, useUser, useDoc } from '@/firebase';
 import { collection, query, doc, writeBatch, updateDoc, arrayUnion } from 'firebase/firestore';
+import { Badge } from '@/components/ui/badge';
 
 type InvoiceItem = {
     id: number;
@@ -76,8 +77,6 @@ type InvoiceItem = {
     price: number | string;
     total: number;
 };
-
-const ADD_INVOICE_SESSION_KEY = 'addInvoiceFormState';
 
 export default function AddInvoicePage() {
   const router = useRouter();
@@ -104,7 +103,10 @@ export default function AddInvoicePage() {
 
   // --- CALCULATION STATES ---
   const [subtotal, setSubtotal] = useState(0);
-  const [negotiation, setNegotiation] = useState<number | string>(0);
+  
+  // Negotiation Logic
+  const [negotiationValue, setNegotiationValue] = useState<string | number>('');
+  const [negotiationMode, setNegotiationMode] = useState<'percent' | 'nominal'>('nominal');
   
   // DP & Retention
   const [dpValue, setDpValue] = useState<string | number>('');
@@ -147,6 +149,9 @@ export default function AddInvoicePage() {
   const vaCollection = useMemoFirebase(() => firestore ? query(collection(firestore, 'virtualAccounts')) : null, [firestore]);
   const { data: vaListData } = useCollection<VirtualAccount>(vaCollection);
 
+  const invoiceNumberRef = useMemoFirebase(() => (!firestore || !invoiceNumberId) ? null : doc(firestore, 'invoiceNumbers', invoiceNumberId), [firestore, invoiceNumberId]);
+  const { data: invoiceNumberData, isLoading: isInvoiceNumberLoading } = useDoc<InvoiceNumber>(invoiceNumberRef);
+
   const availableVAs = useMemo(() => {
     if (!vaListData || !customer) return [];
     return vaListData.filter(va => va.customerName === customer.name);
@@ -180,18 +185,21 @@ export default function AddInvoicePage() {
     const currentSubtotal = items.reduce((acc, item) => acc + (parseFormattedNumber(item.quantity) * parseFormattedNumber(item.price)), 0);
     setSubtotal(currentSubtotal);
   
-    const neg = parseFormattedNumber(String(negotiation));
-    const baseVal = currentSubtotal - neg;
+    // Negotiation Calculation
+    const negInputVal = parseFormattedNumber(String(negotiationValue));
+    const negNominal = negotiationMode === 'percent' ? (currentSubtotal * (negInputVal / 100)) : negInputVal;
+
+    const baseAfterNeg = currentSubtotal - negNominal;
 
     // DP Calculation
     const dpInputVal = parseFormattedNumber(String(dpValue));
-    const dpNominal = dpMode === 'percent' ? (baseVal * (dpInputVal / 100)) : dpInputVal;
+    const dpNominal = dpMode === 'percent' ? (baseAfterNeg * (dpInputVal / 100)) : dpInputVal;
 
     // Retention Calculation
     const retInputVal = parseFormattedNumber(String(retentionValue));
-    const retNominal = retentionMode === 'percent' ? (baseVal * (retInputVal / 100)) : retInputVal;
+    const retNominal = retentionMode === 'percent' ? (baseAfterNeg * (retInputVal / 100)) : retInputVal;
 
-    const baseForTax = baseVal - dpNominal - retNominal;
+    const baseForTax = baseAfterNeg - dpNominal - retNominal;
     
     if (!isTaxManual) {
         const calculatedDpp = baseForTax / 1.12;
@@ -203,9 +211,8 @@ export default function AddInvoicePage() {
     const currentDpp = parseFormattedNumber(String(dppVat));
     const currentVat = parseFormattedNumber(String(vat12));
     
-    // Total Amount is always DPP + VAT for reconciliation accuracy
     setTotalAmount(formatNumberWithCommas(currentDpp + currentVat));
-  }, [items, negotiation, dpValue, dpMode, retentionValue, retentionMode, isTaxManual, dppVat, vat12]);
+  }, [items, negotiationValue, negotiationMode, dpValue, dpMode, retentionValue, retentionMode, isTaxManual, dppVat, vat12]);
 
   // --- HANDLERS ---
   const handleSoSelect = (selectedSo: string) => {
@@ -266,6 +273,8 @@ export default function AddInvoicePage() {
         sjNumbers: sjInput.split(',').map(s => s.trim()).filter(s => s !== ''),
         ownerId: user.uid,
         createdBy: user.email,
+        negotiation: parseFormattedNumber(String(negotiationValue)),
+        negotiationMode,
     }, { merge: true });
 
     await batch.commit();
@@ -276,11 +285,12 @@ export default function AddInvoicePage() {
   const handlePreview = () => {
     if (!selectedAddress) { toast({ variant: "destructive", title: "Alamat Cabang Wajib Dipilih" }); return; }
     
-    // Map current dynamic calculation for preview consumption
-    const neg = parseFormattedNumber(String(negotiation));
-    const baseVal = subtotal - neg;
-    const dpNominal = dpMode === 'percent' ? (baseVal * (parseFormattedNumber(String(dpValue)) / 100)) : parseFormattedNumber(String(dpValue));
-    const retNominal = retentionMode === 'percent' ? (baseVal * (parseFormattedNumber(String(retentionValue)) / 100)) : parseFormattedNumber(String(retentionValue));
+    const currentSubtotal = items.reduce((acc, item) => acc + (parseFormattedNumber(item.quantity) * parseFormattedNumber(item.price)), 0);
+    const negNominal = negotiationMode === 'percent' ? (currentSubtotal * (parseFormattedNumber(String(negotiationValue)) / 100)) : parseFormattedNumber(String(negotiationValue));
+    
+    const baseAfterNeg = currentSubtotal - negNominal;
+    const dpNominal = dpMode === 'percent' ? (baseAfterNeg * (parseFormattedNumber(String(dpValue)) / 100)) : parseFormattedNumber(String(dpValue));
+    const retNominal = retentionMode === 'percent' ? (baseAfterNeg * (parseFormattedNumber(String(retentionValue)) / 100)) : parseFormattedNumber(String(retentionValue));
 
     const previewData = {
       id: invoiceId, soNumber, poNumber, customer: { name: customer?.name, address: selectedAddress.address, npwp: selectedAddress.npwp }, 
@@ -293,9 +303,12 @@ export default function AddInvoicePage() {
         quantity: parseFormattedNumber(String(item.quantity)), unit: item.unit,
         price: parseFormattedNumber(String(item.price)), total: item.total
       })),
-      subtotal, dppVat: parseFormattedNumber(String(dppVat)), vat12: parseFormattedNumber(String(vat12)),
-      negotiation: neg, dpValue: dpNominal,
-      pelunasan: retNominal, // Mapping retention to pelunasan row in preview if applicable
+      subtotal: currentSubtotal, 
+      dppVat: parseFormattedNumber(String(dppVat)), 
+      vat12: parseFormattedNumber(String(vat12)),
+      negotiation: negNominal, 
+      dpValue: dpNominal,
+      pelunasan: retNominal,
       grandTotal: parseFormattedNumber(String(dppVat)), 
       virtualAccount: isVaActive ? availableVAs.find(va => va.id === selectedVaId) : undefined,
       paymentTerms: '90 Hari setelah invoice diterima',
@@ -304,9 +317,6 @@ export default function AddInvoicePage() {
     sessionStorage.setItem('invoicePreviewData', JSON.stringify(previewData));
     router.push(`/dashboard/invoices/preview/${encodeURIComponent(invoiceId || 'new')}`);
   };
-
-  const invoiceNumberRef = useMemoFirebase(() => (!firestore || !invoiceNumberId) ? null : doc(firestore, 'invoiceNumbers', invoiceNumberId), [firestore, invoiceNumberId]);
-  const { data: invoiceNumberData, isLoading: isInvoiceNumberLoading } = useDoc<InvoiceNumber>(invoiceNumberRef);
 
   if (isInvoiceNumberLoading) return <main className="p-8"><Skeleton className="h-64 w-full" /></main>;
 
@@ -523,9 +533,17 @@ export default function AddInvoicePage() {
                     <span className="text-muted-foreground font-bold uppercase tracking-tighter">Gross Subtotal</span>
                     <span className="font-black">Rp {formatNumberWithCommas(subtotal)}</span>
                 </div>
-                <div className="space-y-1.5">
-                    <Label className="text-[10px] font-black uppercase text-muted-foreground">Diskon / Negosiasi</Label>
-                    <Input value={negotiation} onChange={e => setNegotiation(e.target.value)} className="h-8 text-right font-bold text-red-600" placeholder="0" />
+                
+                {/* Negotiation Logic */}
+                <div className="space-y-2">
+                    <div className="flex justify-between items-center">
+                        <Label className="text-[10px] font-black uppercase text-muted-foreground">Negotiation</Label>
+                        <div className="flex bg-muted rounded p-0.5 scale-90 origin-right">
+                            <Button variant={negotiationMode === 'percent' ? 'secondary' : 'ghost'} size="sm" className="h-5 px-2 text-[9px] font-bold" onClick={() => setNegotiationMode('percent')}>%</Button>
+                            <Button variant={negotiationMode === 'nominal' ? 'secondary' : 'ghost'} size="sm" className="h-5 px-2 text-[9px] font-bold" onClick={() => setNegotiationMode('nominal')}>Rp</Button>
+                        </div>
+                    </div>
+                    <Input value={negotiationValue} onChange={e => setNegotiationValue(e.target.value)} className="h-8 text-right font-bold text-red-600 bg-muted/10" placeholder="0" />
                 </div>
               </div>
 

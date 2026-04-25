@@ -155,7 +155,8 @@ const InvoicePreviewPage = () => {
     );
     const totalPages = itemChunks.length;
     
-    const totalRp = parseFormattedNumber(grandTotal) + parseFormattedNumber(vat12);
+    // grandTotal in this context is the cumulative goods value (after negotiation)
+    const totalRp = parseFormattedNumber(dppVat) + parseFormattedNumber(vat12);
 
     const invoiceTitle = invoiceId.startsWith('KW') ? 'PROFORMA INVOICE' : 'INVOICE/OFFICIAL RECEIPT';
 
@@ -273,7 +274,7 @@ const InvoicePreviewPage = () => {
                                         <div className="w-1/2 text-[10px] leading-snug">
                                             <div className="grid grid-cols-[1fr_auto] gap-x-3">
                                                 <span className="text-right">Goods:</span>
-                                                <span className="text-right">{formatCurrency(grandTotal)}</span>
+                                                <span className="text-right">{formatCurrency(dppVat)}</span>
                                                 <span className="text-right">DPP VAT (11/12):</span>
                                                 <span className="text-right">{formatCurrency(dppVat)}</span>
                                                 <span className="text-right">VAT 12%:</span>

@@ -49,7 +49,9 @@ export type Invoice = {
   ownerId?: string;
   createdBy?: string;
   virtualAccounts?: VirtualAccount[];
-  sjNumbers?: string[]; // New: List of Delivery Note numbers
+  sjNumbers?: string[]; // List of Delivery Note numbers
+  negotiation?: number;
+  negotiationMode?: 'percent' | 'nominal';
 };
 
 export type InvoiceNumber = {
@@ -127,7 +129,7 @@ export type SpdInvoiceEntry = {
     customer: string;
     address: string;
     status: 'pending' | 'received' | 'rejected';
-    sjNumbers?: string[]; // New: List of SJ numbers per invoice entry
+    sjNumbers?: string[]; // List of SJ numbers per invoice entry
 };
 
 export type SpdData = {
