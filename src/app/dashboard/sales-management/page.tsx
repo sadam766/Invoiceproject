@@ -26,6 +26,7 @@ import {
   import { Input } from '@/components/ui/input';
   import { Button } from '@/components/ui/button';
   import { Badge } from '@/components/ui/badge';
+  import { Checkbox } from '@/components/ui/checkbox';
   import { 
     Search, 
     Eye, 
@@ -40,13 +41,16 @@ import {
     ClipboardCheck,
     Banknote,
     ReceiptText,
-    Scale
+    Scale,
+    Wallet
   } from 'lucide-react';
-  import { type SalesListItem, type Invoice, type TaxInvoice } from '@/app/lib/data';
-  import { useFirestore, useUser, useCollection, useMemoFirebase } from '@/firebase';
-  import { collection, query } from 'firebase/firestore';
+  import { type SalesListItem, type Invoice, type TaxInvoice, type UserProfile } from '@/app/lib/data';
+  import { useFirestore, useUser, useCollection, useMemoFirebase, useDoc } from '@/firebase';
+  import { collection, query, doc, writeBatch, updateDoc } from 'firebase/firestore';
   import { cn } from '@/lib/utils';
   import { PaymentDetailDialog } from './_components/payment-detail-dialog';
+  import { RecordPaymentDialog } from './_components/record-payment-dialog';
+  import { useToast } from '@/hooks/use-toast';
   
   type MergedRecord = SalesListItem & {
     relatedInvoices: (Invoice & { taxInfo?: TaxInvoice })[];
@@ -58,13 +62,22 @@ import {
 
   export default function SalesManagementPage() {
     const router = useRouter();
+    const { toast } = useToast();
     const [searchQuery, setSearchQuery] = useState('');
     const [selectedSale, setSelectedSale] = useState<MergedRecord | null>(null);
     const [detailOpen, setDetailOpen] = useState(false);
+    const [recordPaymentOpen, setRecordPaymentOpen] = useState(false);
     const [viewMode, setViewMode] = useState<'list' | 'book'>('list');
+    
+    // Multi-select for bulk payment
+    const [selectedInvoiceIds, setSelectedInvoiceIds] = useState<Set<string>>(new Set());
 
     const firestore = useFirestore();
     const { user } = useUser();
+
+    const userProfileRef = useMemoFirebase(() => (!firestore || !user) ? null : doc(firestore, 'users', user.uid), [firestore, user]);
+    const { data: userProfile } = useDoc<UserProfile>(userProfileRef);
+    const isAdmin = user?.email?.toLowerCase() === 'fa@gmail.com' || userProfile?.role === 'admin';
 
     useEffect(() => {
         const savedView = localStorage.getItem('salesManagementViewMode');
@@ -142,136 +155,190 @@ import {
         };
     }, [mergedData]);
 
-    useEffect(() => {
-        const poFromSession = sessionStorage.getItem('activePoPreview');
-        if (poFromSession && mergedData.length > 0) {
-            const found = mergedData.find(m => m.poNumber === poFromSession);
-            if (found) {
-                setSelectedSale(found);
-                setDetailOpen(true);
-            }
-            sessionStorage.removeItem('activePoPreview');
-        }
-    }, [mergedData]);
-    
+    const handleToggleInvoice = (id: string) => {
+        const next = new Set(selectedInvoiceIds);
+        if (next.has(id)) next.delete(id);
+        else next.add(id);
+        setSelectedInvoiceIds(next);
+    };
+
+    const handleRecordBulkPayment = () => {
+        if (selectedInvoiceIds.size === 0) return;
+        setRecordPaymentOpen(true);
+    };
+
+    const handlePaymentSuccess = async (paymentData: any) => {
+        if (!firestore) return;
+        
+        const batch = writeBatch(firestore);
+        const timestamp = new Date().toISOString();
+        const recorder = userProfile?.displayName || user?.email || 'System';
+
+        // Get selected invoices full data
+        const selectedInvoices = invoiceList?.filter(inv => selectedInvoiceIds.has(inv.id)) || [];
+
+        selectedInvoices.forEach(inv => {
+            const safeId = inv.id.replace(/\//g, '_');
+            const invRef = doc(firestore, 'invoices', safeId);
+            
+            // For collective payment, we usually apply the specific portion if split, 
+            // but for MVP, let's assume full settlement for the selected invoices 
+            // OR distributed if multiple.
+            
+            // Logic: Mark as Paid
+            batch.update(invRef, {
+                status: 'paid',
+                payments: [
+                    ...(inv.payments || []),
+                    {
+                        id: doc(collection(firestore, 'dummy')).id,
+                        date: paymentData.date,
+                        amount: inv.amount, // Set to full inv amount for collective verification
+                        reference: paymentData.reference,
+                        method: paymentData.method,
+                        recordedBy: recorder
+                    }
+                ],
+                lastUpdatedAt: timestamp,
+                lastUpdatedBy: recorder,
+                revisionLogs: [
+                    ...(inv.revisionLogs || []),
+                    { updatedAt: timestamp, updatedBy: recorder, action: `Full payment recorded via Payment Center: ${paymentData.reference}` }
+                ]
+            });
+        });
+
+        await batch.commit();
+        toast({ title: "Pembayaran Berhasil", description: `${selectedInvoiceIds.size} Invoice telah dilunaskan.` });
+        setSelectedInvoiceIds(new Set());
+        setRecordPaymentOpen(false);
+    };
+
     return (
-      <main className="flex flex-1 flex-col gap-4 p-4 md:gap-8 md:p-8">
+      <main className="flex flex-1 flex-col gap-4 p-4 md:gap-8 md:p-8 max-w-[1600px] mx-auto">
         <div className="flex justify-between items-start">
             <div>
-                <h1 className="text-2xl font-bold tracking-tight">Sales Management (Buku Piutang)</h1>
-                <p className="text-muted-foreground">Monitoring arus kas, penagihan, dan perpajakan per-PO.</p>
+                <h1 className="text-2xl font-black tracking-tight uppercase">Payment & Receivables</h1>
+                <p className="text-muted-foreground font-medium">Pusat pelunasan invoice dan monitoring buku piutang.</p>
             </div>
-            <div className="flex bg-muted rounded-md p-1 border">
-                <Button 
-                    variant={viewMode === 'list' ? 'secondary' : 'ghost'} 
-                    size="sm" 
-                    className="h-8 gap-2"
-                    onClick={() => handleViewChange('list')}
-                >
-                    <List className="h-4 w-4" /> <span className="hidden sm:inline">List View</span>
-                </Button>
-                <Button 
-                    variant={viewMode === 'book' ? 'secondary' : 'ghost'} 
-                    size="sm" 
-                    className="h-8 gap-2"
-                    onClick={() => handleViewChange('book')}
-                >
-                    <LayoutGrid className="h-4 w-4" /> <span className="hidden sm:inline">Book Mode</span>
-                </Button>
+            <div className="flex gap-2">
+                {selectedInvoiceIds.size > 0 && (
+                    <Button onClick={handleRecordBulkPayment} className="bg-emerald-600 hover:bg-emerald-700 shadow-lg font-black uppercase">
+                        <Wallet className="mr-2 h-4 w-4" /> Pelunasan Kolektif ({selectedInvoiceIds.size})
+                    </Button>
+                )}
+                <div className="flex bg-muted rounded-md p-1 border">
+                    <Button 
+                        variant={viewMode === 'list' ? 'secondary' : 'ghost'} 
+                        size="sm" 
+                        className="h-8 gap-2"
+                        onClick={() => handleViewChange('list')}
+                    >
+                        <List className="h-4 w-4" /> <span className="hidden sm:inline">List View</span>
+                    </Button>
+                    <Button 
+                        variant={viewMode === 'book' ? 'secondary' : 'ghost'} 
+                        size="sm" 
+                        className="h-8 gap-2"
+                        onClick={() => handleViewChange('book')}
+                    >
+                        <LayoutGrid className="h-4 w-4" /> <span className="hidden sm:inline">Book Mode</span>
+                    </Button>
+                </div>
             </div>
         </div>
 
         <div className="grid gap-4 md:grid-cols-3">
-            <Card className="bg-blue-50/30 border-blue-100 shadow-sm">
-                <CardHeader className="pb-2"><CardTitle className="text-xs uppercase font-bold text-blue-600 flex items-center gap-2"><TrendingUp className="h-3 w-3" /> Total PO Terdaftar</CardTitle></CardHeader>
-                <CardContent><div className="text-2xl font-bold">Rp {totals.po.toLocaleString('id-ID')}</div></CardContent>
+            <Card className="bg-primary/5 border-primary/20 shadow-sm border-l-4 border-l-primary">
+                <CardHeader className="pb-2"><CardTitle className="text-[10px] uppercase font-black text-primary tracking-widest flex items-center gap-2"><TrendingUp className="h-3 w-3" /> Total PO Aktif</CardTitle></CardHeader>
+                <CardContent><div className="text-2xl font-black">Rp {totals.po.toLocaleString('id-ID')}</div></CardContent>
             </Card>
-            <Card className="bg-green-50/30 border-green-100 shadow-sm">
-                <CardHeader className="pb-2"><CardTitle className="text-xs uppercase font-bold text-green-600 flex items-center gap-2"><CreditCard className="h-3 w-3" /> Total Terbayar (Paid)</CardTitle></CardHeader>
-                <CardContent><div className="text-2xl font-bold text-green-700">Rp {totals.paid.toLocaleString('id-ID')}</div></CardContent>
+            <Card className="bg-emerald-50/50 border-emerald-200 shadow-sm border-l-4 border-l-emerald-500">
+                <CardHeader className="pb-2"><CardTitle className="text-[10px] uppercase font-black text-emerald-700 tracking-widest flex items-center gap-2"><CreditCard className="h-3 w-3" /> Dana Masuk (Paid)</CardTitle></CardHeader>
+                <CardContent><div className="text-2xl font-black text-emerald-700">Rp {totals.paid.toLocaleString('id-ID')}</div></CardContent>
             </Card>
-            <Card className="bg-red-50/30 border-red-100 shadow-sm">
-                <CardHeader className="pb-2"><CardTitle className="text-xs uppercase font-bold text-red-600 flex items-center gap-2"><AlertCircle className="h-3 w-3" /> Sisa Piutang (Unpaid)</CardTitle></CardHeader>
-                <CardContent><div className="text-2xl font-bold text-red-700">Rp {totals.outstanding.toLocaleString('id-ID')}</div></CardContent>
+            <Card className="bg-red-50/50 border-red-200 shadow-sm border-l-4 border-l-red-500">
+                <CardHeader className="pb-2"><CardTitle className="text-[10px] uppercase font-black text-red-700 tracking-widest flex items-center gap-2"><AlertCircle className="h-3 w-3" /> Sisa Piutang (Unpaid)</CardTitle></CardHeader>
+                <CardContent><div className="text-2xl font-black text-red-700">Rp {totals.outstanding.toLocaleString('id-ID')}</div></CardContent>
             </Card>
         </div>
 
-        <Card>
+        <Card className="shadow-md border-none ring-1 ring-border">
             <CardContent className="pt-6">
                 <div className="flex justify-between items-center mb-6">
-                    <div className="relative w-1/3">
+                    <div className="relative w-full md:w-1/3">
                         <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-                        <Input placeholder="Cari nomor PO, SO, atau customer..." className="pl-8" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} />
+                        <Input placeholder="Cari No. PO, SO, atau Customer..." className="pl-8 bg-muted/20 border-none font-medium" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} />
                     </div>
-                    <p className="text-xs text-muted-foreground font-medium">Data diurutkan berdasarkan Sisa Piutang tertinggi.</p>
                 </div>
 
                 {isLoading ? (
                     <div className="py-20 text-center space-y-4">
                         <div className="animate-spin h-8 w-8 border-4 border-primary border-t-transparent rounded-full mx-auto" />
-                        <p className="text-muted-foreground">Menganalisa Buku Piutang & Perpajakan...</p>
+                        <p className="text-muted-foreground font-bold">Menganalisa Buku Piutang...</p>
                     </div>
                 ) : viewMode === 'list' ? (
-                    <div className="rounded-md border overflow-hidden">
+                    <div className="rounded-xl border overflow-hidden">
                         <Table>
                             <TableHeader className="bg-muted/50">
                                 <TableRow>
-                                    <TableHead>SO / PO NUMBER</TableHead>
-                                    <TableHead>CUSTOMER</TableHead>
-                                    <TableHead>LATEST INVOICE / TAX</TableHead>
-                                    <TableHead className="text-right">TOTAL PO</TableHead>
-                                    <TableHead className="text-right">TERBAYAR</TableHead>
-                                    <TableHead className="text-right">OUTSTANDING</TableHead>
-                                    <TableHead className="text-center">STATUS</TableHead>
-                                    <TableHead className="text-right"></TableHead>
+                                    <TableHead className="text-[10px] font-black uppercase tracking-widest py-4">PO & Customer</TableHead>
+                                    <TableHead className="text-[10px] font-black uppercase tracking-widest py-4">Status Invoice</TableHead>
+                                    <TableHead className="text-right text-[10px] font-black uppercase tracking-widest py-4">Nilai PO</TableHead>
+                                    <TableHead className="text-right text-[10px] font-black uppercase tracking-widest py-4">Piutang</TableHead>
+                                    <TableHead className="text-center text-[10px] font-black uppercase tracking-widest py-4">Status</TableHead>
+                                    <TableHead className="text-right py-4"></TableHead>
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
                                 {mergedData.length === 0 ? (
-                                    <TableRow><TableCell colSpan={8} className="text-center py-8">Tidak ada data ditemukan.</TableCell></TableRow>
+                                    <TableRow><TableCell colSpan={6} className="text-center py-20 text-muted-foreground italic">Tidak ada piutang aktif.</TableCell></TableRow>
                                 ) : mergedData.map((item) => (
-                                    <TableRow key={item.poNumber}>
-                                        <TableCell>
-                                            <div className="flex flex-col">
-                                                <span className="font-bold text-sm">{item.soNumber || '(Waiting SO)'}</span>
-                                                <span className="text-[10px] text-muted-foreground">{item.poNumber}</span>
+                                    <TableRow key={item.poNumber} className="hover:bg-muted/5 border-b last:border-0">
+                                        <TableCell className="py-4">
+                                            <div className="flex flex-col gap-1">
+                                                <span className="font-black text-sm text-slate-800">{item.poNumber}</span>
+                                                <span className="text-[10px] font-bold uppercase text-muted-foreground truncate max-w-[200px]">{item.customer}</span>
                                             </div>
                                         </TableCell>
-                                        <TableCell>
-                                            <div className="flex flex-col">
-                                                <span className="font-medium text-sm">{item.customer}</span>
-                                                <span className="text-[10px] text-muted-foreground uppercase">{item.sales}</span>
+                                        <TableCell className="py-4">
+                                            <div className="flex flex-wrap gap-1.5">
+                                                {item.relatedInvoices.map(inv => (
+                                                    <div 
+                                                        key={inv.id} 
+                                                        onClick={() => inv.status !== 'paid' && handleToggleInvoice(inv.id)}
+                                                        className={cn(
+                                                            "group cursor-pointer flex items-center gap-2 border px-2 py-1 rounded-md text-[9px] font-black transition-all",
+                                                            selectedInvoiceIds.has(inv.id) ? "bg-primary text-white border-primary" : 
+                                                            inv.status === 'paid' ? "bg-emerald-50 text-emerald-700 border-emerald-200 opacity-60" : "bg-white text-slate-700 hover:border-primary"
+                                                        )}
+                                                    >
+                                                        {inv.id.split('/').pop()}
+                                                        {inv.status === 'paid' && <BadgeCheck className="h-2.5 w-2.5" />}
+                                                    </div>
+                                                ))}
                                             </div>
                                         </TableCell>
-                                        <TableCell>
-                                            <div className="flex flex-col gap-0.5">
-                                                <span className="text-[10px] font-medium text-blue-600 truncate max-w-[120px]">{item.latestInvoiceDate || '-'}</span>
-                                                <span className="text-[10px] text-muted-foreground truncate max-w-[120px]">{item.latestTaxNumber || 'No Tax Invoice'}</span>
-                                            </div>
+                                        <TableCell className="text-right py-4 font-bold text-sm">Rp {item.amount.toLocaleString('id-ID')}</TableCell>
+                                        <TableCell className="text-right py-4">
+                                            <span className={cn("font-black text-sm", item.outstanding > 0 ? "text-red-600" : "text-emerald-600")}>
+                                                Rp {item.outstanding.toLocaleString('id-ID')}
+                                            </span>
                                         </TableCell>
-                                        <TableCell className="text-right font-medium">Rp {item.amount.toLocaleString('id-ID')}</TableCell>
-                                        <TableCell className="text-right text-green-600 font-medium">Rp {item.totalPaid.toLocaleString('id-ID')}</TableCell>
-                                        <TableCell className="text-right text-red-600 font-bold">Rp {item.outstanding.toLocaleString('id-ID')}</TableCell>
-                                        <TableCell className="text-center">
+                                        <TableCell className="text-center py-4">
                                             <Badge className={cn(
-                                                item.status === 'Paid' ? 'bg-green-600' : 
-                                                item.status === 'Partial' ? 'bg-yellow-500' : 'bg-gray-400'
+                                                "text-[9px] font-black uppercase px-2 py-0.5",
+                                                item.status === 'Paid' ? 'bg-emerald-600' : 
+                                                item.status === 'Partial' ? 'bg-amber-500' : 'bg-slate-400'
                                             )}>
                                                 {item.status}
                                             </Badge>
                                         </TableCell>
-                                        <TableCell className="text-right">
+                                        <TableCell className="text-right py-4">
                                             <DropdownMenu>
-                                                <DropdownMenuTrigger asChild>
-                                                    <Button variant="ghost" size="icon"><MoreVertical className="h-4 w-4" /></Button>
-                                                </DropdownMenuTrigger>
+                                                <DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="rounded-full"><MoreVertical className="h-4 w-4" /></Button></DropdownMenuTrigger>
                                                 <DropdownMenuContent align="end">
-                                                    <DropdownMenuItem onClick={() => { setSelectedSale(item); setDetailOpen(true); }}>
-                                                        <Eye className="mr-2 h-4 w-4" /> View Details
-                                                    </DropdownMenuItem>
-                                                    <DropdownMenuItem>
-                                                        <FileText className="mr-2 h-4 w-4" /> Export Report
-                                                    </DropdownMenuItem>
+                                                    <DropdownMenuItem onClick={() => { setSelectedSale(item); setDetailOpen(true); }}><Eye className="mr-2 h-4 w-4" /> Buka Buku Pembayaran</DropdownMenuItem>
                                                 </DropdownMenuContent>
                                             </DropdownMenu>
                                         </TableCell>
@@ -283,83 +350,74 @@ import {
                 ) : (
                     <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
                         {mergedData.map((item) => (
-                            <Card key={item.poNumber} className="overflow-hidden hover:shadow-md transition-shadow flex flex-col">
+                            <Card key={item.poNumber} className="overflow-hidden border-none shadow-md hover:shadow-xl transition-all duration-300 ring-1 ring-border group">
                                 <div className={cn(
-                                    "h-1 w-full",
-                                    item.status === 'Paid' ? "bg-green-500" : 
-                                    item.status === 'Partial' ? "bg-yellow-500" : "bg-gray-400"
+                                    "h-1.5 w-full",
+                                    item.status === 'Paid' ? "bg-emerald-500" : 
+                                    item.status === 'Partial' ? "bg-amber-500" : "bg-slate-300"
                                 )} />
-                                <CardHeader className="pb-2 flex flex-row items-center justify-between space-y-0">
-                                    <div className="flex flex-col">
-                                        <span className="text-[10px] text-muted-foreground uppercase font-bold">SO Number</span>
-                                        <CardTitle className="text-sm font-bold">{item.soNumber || '(Waiting SO)'}</CardTitle>
-                                    </div>
-                                    <Badge className={cn(
-                                        item.status === 'Paid' ? 'bg-green-600' : 
-                                        item.status === 'Partial' ? 'bg-yellow-500' : 'bg-gray-400'
-                                    )}>
-                                        {item.status}
-                                    </Badge>
-                                </CardHeader>
-                                <CardContent className="flex-1 pt-2 pb-4 space-y-4">
-                                    <div className="space-y-2">
-                                        <div className="flex items-start gap-2 text-sm">
-                                            <User className="h-4 w-4 text-muted-foreground mt-0.5 shrink-0" />
-                                            <div>
-                                                <p className="font-bold leading-tight">{item.customer}</p>
-                                                <p className="text-[10px] text-muted-foreground">Sales: {item.sales}</p>
-                                            </div>
-                                        </div>
-                                        <div className="flex items-center gap-2 text-xs">
-                                            <ClipboardCheck className="h-4 w-4 text-muted-foreground shrink-0" />
-                                            <span className="text-muted-foreground">PO:</span>
-                                            <span className="font-medium">{item.poNumber}</span>
-                                        </div>
-                                    </div>
-
-                                    {/* SEKSI BARU: PENAGIHAN & PAJAK */}
-                                    <div className="p-3 bg-muted/20 rounded-lg border border-dashed space-y-2">
-                                        <p className="text-[10px] font-bold uppercase text-muted-foreground flex items-center gap-1">
-                                            <ReceiptText className="h-3 w-3" /> Riwayat Penagihan & Pajak
-                                        </p>
+                                <CardHeader className="pb-2 bg-muted/5 border-b">
+                                    <div className="flex justify-between items-start">
                                         <div className="space-y-1">
-                                            <div className="flex justify-between text-[10px]">
-                                                <span className="text-muted-foreground">Latest Inv:</span>
-                                                <span className="font-medium">{item.latestInvoiceDate || 'Not Issued'}</span>
-                                            </div>
-                                            <div className="flex justify-between text-[10px]">
-                                                <span className="text-muted-foreground">Tax Invoice:</span>
-                                                <span className={item.latestTaxNumber ? "text-blue-600 font-bold" : "text-muted-foreground"}>
-                                                    {item.latestTaxNumber || '-'}
-                                                </span>
-                                            </div>
+                                            <span className="text-[9px] font-black uppercase text-muted-foreground/60 leading-none tracking-widest">PO Number</span>
+                                            <CardTitle className="text-sm font-black text-slate-800">{item.poNumber}</CardTitle>
+                                        </div>
+                                        <Badge className={cn(
+                                            "text-[8px] font-black uppercase",
+                                            item.status === 'Paid' ? 'bg-emerald-600' : 
+                                            item.status === 'Partial' ? 'bg-amber-500' : 'bg-slate-400'
+                                        )}>
+                                            {item.status}
+                                        </Badge>
+                                    </div>
+                                </CardHeader>
+                                <CardContent className="pt-4 space-y-4">
+                                    <div className="flex items-start gap-3">
+                                        <User className="h-4 w-4 text-primary mt-0.5" />
+                                        <div className="min-w-0">
+                                            <p className="font-black text-xs uppercase leading-tight truncate">{item.customer}</p>
+                                            <p className="text-[10px] font-bold text-muted-foreground">Sales: {item.sales}</p>
                                         </div>
                                     </div>
 
-                                    <div className="grid grid-cols-2 gap-2 p-3 bg-muted/30 rounded-lg">
-                                        <div>
-                                            <p className="text-[10px] text-muted-foreground uppercase">Total Amount</p>
-                                            <p className="text-xs font-bold">Rp {item.amount.toLocaleString('id-ID')}</p>
-                                        </div>
-                                        <div>
-                                            <p className="text-[10px] text-muted-foreground uppercase">Terbayar</p>
-                                            <p className="text-xs font-bold text-green-600">Rp {item.totalPaid.toLocaleString('id-ID')}</p>
+                                    <div className="p-3 bg-muted/20 rounded-xl space-y-2 border border-dashed">
+                                        <p className="text-[9px] font-black uppercase text-muted-foreground/60 flex items-center gap-1.5 tracking-widest">
+                                            <ReceiptText className="h-3 w-3" /> Linked Invoices
+                                        </p>
+                                        <div className="grid grid-cols-2 gap-2">
+                                            {item.relatedInvoices.slice(0, 4).map(inv => (
+                                                <div 
+                                                    key={inv.id} 
+                                                    onClick={() => inv.status !== 'paid' && handleToggleInvoice(inv.id)}
+                                                    className={cn(
+                                                        "p-1.5 rounded-lg border text-center text-[9px] font-black transition-all cursor-pointer",
+                                                        selectedInvoiceIds.has(inv.id) ? "bg-primary text-white border-primary shadow-sm" : 
+                                                        inv.status === 'paid' ? "bg-emerald-50 text-emerald-700 border-emerald-100 opacity-60" : "bg-white text-slate-500 hover:border-primary"
+                                                    )}
+                                                >
+                                                    {inv.id.split('/').pop()}
+                                                </div>
+                                            ))}
+                                            {item.relatedInvoices.length > 4 && (
+                                                <div className="text-[9px] text-muted-foreground font-bold flex items-center justify-center">+ {item.relatedInvoices.length - 4} More</div>
+                                            )}
                                         </div>
                                     </div>
 
-                                    <div className="pt-2 border-t border-dashed">
-                                        <div className="flex items-center justify-between">
-                                            <div className="flex items-center gap-1">
-                                                <Banknote className="h-4 w-4 text-red-500" />
-                                                <span className="text-xs font-bold text-red-600 uppercase">Sisa Piutang</span>
-                                            </div>
+                                    <div className="pt-2 flex flex-col gap-1 border-t border-dashed">
+                                        <div className="flex justify-between items-center">
+                                            <span className="text-[9px] font-black uppercase text-muted-foreground/60 tracking-widest">Total Piutang</span>
                                             <span className="text-sm font-black text-red-600">Rp {item.outstanding.toLocaleString('id-ID')}</span>
+                                        </div>
+                                        <div className="flex justify-between items-center">
+                                            <span className="text-[9px] font-black uppercase text-muted-foreground/60 tracking-widest">Sudah Dibayar</span>
+                                            <span className="text-[10px] font-black text-emerald-600">Rp {item.totalPaid.toLocaleString('id-ID')}</span>
                                         </div>
                                     </div>
                                 </CardContent>
-                                <CardFooter className="bg-muted/10 p-3 pt-0 mt-auto">
-                                    <Button variant="outline" className="w-full h-8 text-xs font-bold" onClick={() => { setSelectedSale(item); setDetailOpen(true); }}>
-                                        <Eye className="mr-2 h-4 w-4" /> Buka Buku Pembayaran
+                                <CardFooter className="p-3 bg-muted/5 border-t mt-auto">
+                                    <Button variant="outline" className="w-full h-8 text-[10px] font-black uppercase tracking-widest hover:bg-primary hover:text-white transition-colors" onClick={() => { setSelectedSale(item); setDetailOpen(true); }}>
+                                        <Eye className="mr-2 h-3.5 w-3.5" /> BUKA BUKU PEMBAYARAN
                                     </Button>
                                 </CardFooter>
                             </Card>
@@ -374,6 +432,14 @@ import {
             onOpenChange={setDetailOpen} 
             sale={selectedSale} 
             invoices={selectedSale?.relatedInvoices || []} 
+        />
+
+        <RecordPaymentDialog
+            isOpen={recordPaymentOpen}
+            onOpenChange={setRecordPaymentOpen}
+            onSave={handlePaymentSuccess}
+            selectedCount={selectedInvoiceIds.size}
+            totalAmount={invoiceList?.filter(i => selectedInvoiceIds.has(i.id)).reduce((s, i) => s + i.amount, 0) || 0}
         />
       </main>
     );

@@ -61,6 +61,7 @@ import {
   RefreshCw,
   AlertTriangle,
   ShieldCheck,
+  Banknote,
 } from 'lucide-react';
 import { type InvoiceNumber, type Customer, type ProductListItem, type Invoice, type SalesOrder, type UserProfile, type VirtualAccount } from '@/app/lib/data';
 import { useToast } from '@/hooks/use-toast';
@@ -99,9 +100,9 @@ export default function AddInvoicePage() {
   const [issueDate, setIssueDate] = useState<Date | undefined>(new Date());
   const [dueDate, setDueDate] = useState<Date | undefined>(addDays(new Date(), 30));
   const [status, setStatus] = useState<'paid' | 'unpaid' | 'sent' | 'draft'>('draft');
-  const [printType, setPrintType] = useState<'original' | 'copy'>('original');
   const [items, setItems] = useState<InvoiceItem[]>([]);
   const [isFinalized, setIsFinalized] = useState(false);
+  const [isPaid, setIsPaid] = useState(false);
 
   // --- CALCULATION STATES ---
   const [subtotal, setSubtotal] = useState(0);
@@ -122,14 +123,10 @@ export default function AddInvoicePage() {
   const [vat12, setVat12] = useState<string | number>(0);
   const [totalAmount, setTotalAmount] = useState<string | number>(0);
 
-  const [isVaActive, setIsVaActive] = useState(false);
-  const [selectedVaId, setSelectedVaId] = useState<string>('');
   const [paymentMethodText, setPaymentMethodMethodText] = useState('Bank Transfer');
 
   // Popovers
-  const [soPopoverOpen, setSoPopoverOpen] = useState(false);
   const [customerPopoverOpen, setCustomerPopoverOpen] = useState(false);
-  const [productPopoverOpen, setProductPopoverOpen] = useState<number | null>(null);
 
   // --- DATA FETCHING ---
   const userProfileRef = useMemoFirebase(() => (!firestore || !user) ? null : doc(firestore, 'users', user.uid), [firestore, user]);
@@ -139,17 +136,8 @@ export default function AddInvoicePage() {
   const customersCollection = useMemoFirebase(() => firestore ? query(collection(firestore, 'customers')) : null, [firestore]);
   const { data: customerListData } = useCollection<Customer>(customersCollection);
 
-  const productsCollection = useMemoFirebase(() => firestore ? collection(firestore, 'products') : null, [firestore]);
-  const { data: productListData } = useCollection<ProductListItem>(productsCollection);
-
-  const salesOrdersCollection = useMemoFirebase(() => firestore ? query(collection(firestore, 'salesOrders')) : null, [firestore]);
-  const { data: salesOrderListData } = useCollection<SalesOrder>(salesOrdersCollection);
-
   const invoicesCollection = useMemoFirebase(() => firestore ? query(collection(firestore, 'invoices')) : null, [firestore]);
   const { data: allInvoices } = useCollection<Invoice>(invoicesCollection);
-
-  const vaCollection = useMemoFirebase(() => firestore ? query(collection(firestore, 'virtualAccounts')) : null, [firestore]);
-  const { data: vaListData } = useCollection<VirtualAccount>(vaCollection);
 
   // --- LOGIC: OVERDUE EXPOSURE ---
   const overdueExposure = useMemo(() => {
@@ -182,13 +170,11 @@ export default function AddInvoicePage() {
             setDueDate(found.dueDate ? new Date(found.dueDate) : undefined);
             setStatus(found.status as any);
             setIsFinalized(found.status === 'finalized');
+            setIsPaid(found.status === 'paid');
             setCalculatedNegNominal(found.negotiation || 0);
             setCalculatedDpNominal(found.dpValue || 0);
             setCalculatedRetNominal(found.retention || 0);
         }
-    } else if (invoiceNumberId && !editInvoiceId) {
-        const invoiceNumberRef = doc(firestore, 'invoiceNumbers', invoiceNumberId);
-        // ... (existing logic for invoiceNumberData loading)
     }
   }, [editInvoiceId, allInvoices, customerListData]);
 
@@ -282,7 +268,7 @@ export default function AddInvoicePage() {
         });
   };
 
-  const isLocked = isFinalized && !isSuperAdmin;
+  const isLocked = (isFinalized || isPaid) && !isSuperAdmin;
 
   return (
     <main className="flex flex-1 flex-col gap-4 p-4 md:gap-8 md:p-8 max-w-[1600px] mx-auto bg-background">
@@ -293,7 +279,10 @@ export default function AddInvoicePage() {
             </Button>
             <div>
                 <h1 className="text-2xl font-black tracking-tight uppercase">Invoice Constructor</h1>
-                {isFinalized && <Badge className="bg-indigo-600 ml-2">FINALIZED & LOCKED</Badge>}
+                <div className="flex gap-2 mt-1">
+                    {isFinalized && <Badge className="bg-indigo-600 text-[9px] font-black uppercase">FINALIZED & LOCKED</Badge>}
+                    {isPaid && <Badge className="bg-emerald-600 text-[9px] font-black uppercase">PAID & SECURED</Badge>}
+                </div>
             </div>
         </div>
       </div>
@@ -306,6 +295,14 @@ export default function AddInvoicePage() {
                 Customer ini memiliki <b>{overdueExposure.length} invoice Overdue</b> senilai <b>Rp {totalOverdueAmount.toLocaleString('id-ID')}</b>. 
                 Mohon pertimbangkan sebelum menerbitkan tagihan baru.
               </AlertDescription>
+          </Alert>
+      )}
+
+      {isPaid && (
+          <Alert className="bg-emerald-50 border-emerald-200 text-emerald-800">
+              <Banknote className="h-4 w-4 text-emerald-600" />
+              <AlertTitle className="font-black uppercase text-[10px]">Dokumen Lunas</AlertTitle>
+              <AlertDescription className="text-xs">Invoice ini sudah dilunasi melalui Payment Center dan telah dikunci demi keamanan audit.</AlertDescription>
           </Alert>
       )}
 
@@ -402,7 +399,7 @@ export default function AddInvoicePage() {
             <CardHeader className="bg-primary/5 py-4 border-b">
                 <CardTitle className="text-sm font-black uppercase flex items-center justify-between">
                     Kalkulasi Finansial
-                    {isFinalized && <ShieldCheck className="h-4 w-4 text-indigo-600" />}
+                    {(isFinalized || isPaid) && <ShieldCheck className="h-4 w-4 text-indigo-600" />}
                 </CardTitle>
             </CardHeader>
             <CardContent className="p-6 space-y-5">
@@ -445,7 +442,7 @@ export default function AddInvoicePage() {
                         <Send className="mr-2 h-4 w-4" /> SIMPAN & TERBITKAN
                       </Button>
                   )}
-                  {isSuperAdmin && !isFinalized && (
+                  {isSuperAdmin && !isFinalized && !isPaid && (
                       <Button variant="outline" className="w-full h-11 border-indigo-600 text-indigo-600 font-black uppercase text-xs" onClick={() => handleSaveInvoice('finalized')}>
                         <ShieldCheck className="mr-2 h-4 w-4" /> FINALIZE & LOCK
                       </Button>
@@ -453,21 +450,6 @@ export default function AddInvoicePage() {
               </div>
             </CardContent>
           </Card>
-
-          {/* Audit Logs Mini */}
-          {editInvoiceId && (
-              <Card className="border-dashed bg-muted/5">
-                <CardHeader className="py-2"><CardTitle className="text-[9px] font-black uppercase text-muted-foreground">Recent Revision History</CardTitle></CardHeader>
-                <CardContent className="p-3 space-y-2">
-                    {allInvoices?.find(inv => inv.id.replace(/\//g, '_') === editInvoiceId)?.revisionLogs?.slice(-3).map((log, i) => (
-                        <div key={i} className="text-[8px] flex justify-between border-b pb-1">
-                            <span className="font-bold">{log.updatedBy}</span>
-                            <span className="text-muted-foreground">{log.action}</span>
-                        </div>
-                    ))}
-                </CardContent>
-              </Card>
-          )}
         </div>
       </div>
     </main>

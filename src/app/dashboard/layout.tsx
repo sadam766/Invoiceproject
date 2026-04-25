@@ -288,8 +288,8 @@ export default function DashboardLayout({
             {/* Sales Management & User Management HANYA UNTUK Leader/Admin */}
             {isAdmin && (
                <SidebarMenuItem>
-                  <SidebarMenuButton asChild isActive={pathname === '/dashboard/sales-management'} tooltip="Sales Management">
-                      <Link href="/dashboard/sales-management"><BarChart /> <span>Sales Management</span></Link>
+                  <SidebarMenuButton asChild isActive={pathname === '/dashboard/sales-management'} tooltip="Payment & Receivables">
+                      <Link href="/dashboard/sales-management"><BarChart /> <span>Payment & Receivables</span></Link>
                   </SidebarMenuButton>
               </SidebarMenuItem>
             )}

@@ -37,7 +37,8 @@ import {
   FileSpreadsheet,
   TrendingUp,
   Banknote,
-  XCircle
+  XCircle,
+  ShieldCheck
 } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -63,6 +64,7 @@ type GlobalTrackRecord = {
   isSpdLate: boolean;
   hasInvoices: boolean;
   latestInvoiceDate?: string;
+  invoicesInRange?: (Invoice & { taxInfo?: TaxInvoice })[];
 };
 
 export default function SalesMonitoringPage() {
@@ -114,9 +116,10 @@ export default function SalesMonitoringPage() {
         s.invoices.some(si => relatedInvoices.some(ri => ri.id === si.invoiceId))
       );
 
-      const totalPaid = relatedInvoices
-        .filter(inv => inv.status === 'paid')
-        .reduce((sum, inv) => sum + inv.amount, 0);
+      const totalPaid = relatedInvoices.reduce((sum, inv) => {
+          const paidOnInv = inv.payments?.reduce((s, p) => s + p.amount, 0) || (inv.status === 'paid' ? inv.amount : 0);
+          return sum + paidOnInv;
+      }, 0);
 
       const isOverdue = relatedInvoices.some(inv => 
         inv.status !== 'paid' && inv.dueDate && isBefore(parseISO(inv.dueDate), today)
@@ -149,9 +152,9 @@ export default function SalesMonitoringPage() {
         latestInvoiceDate: relatedInvoices.sort((a,b) => b.date.localeCompare(a.date))[0]?.date
       };
     }).filter(item => {
-        if (activeTab === 'cancelled') return false; // Handled differently if needed
+        if (activeTab === 'cancelled') return false; 
         
-        const dateMatch = item.invoicesInRange!.length > 0;
+        const dateMatch = (item.invoicesInRange?.length || 0) > 0;
         const searchMatch = item.poNumber.toLowerCase().includes(searchQuery.toLowerCase()) ||
                             item.customer.toLowerCase().includes(searchQuery.toLowerCase());
 
@@ -160,17 +163,17 @@ export default function SalesMonitoringPage() {
   }, [salesList, soList, invoiceList, taxList, spdList, searchQuery, dateRange, activeTab]);
 
   const quickSummary = useMemo(() => {
-    const invoicesCreated = trackedData.reduce((sum, item) => sum + item.invoicesInRange!.length, 0);
+    const invoicesCreated = trackedData.reduce((sum, item) => sum + (item.invoicesInRange?.length || 0), 0);
     const totalValue = trackedData.reduce((sum, item) => 
-        sum + item.invoicesInRange!.reduce((s, i) => s + i.amount, 0), 0);
+        sum + (item.invoicesInRange?.reduce((s, i) => s + i.amount, 0) || 0), 0);
     const taxPending = trackedData.reduce((sum, item) => 
-        sum + item.invoicesInRange!.filter(i => !i.taxInfo).length, 0);
+        sum + (item.invoicesInRange?.filter(i => !i.taxInfo).length || 0), 0);
 
     return { invoicesCreated, totalValue, taxPending };
   }, [trackedData]);
 
   const filteredData = useMemo(() => {
-    if (activeTab === 'pajak') return trackedData.filter(d => d.invoicesInRange!.some(i => !i.taxInfo));
+    if (activeTab === 'pajak') return trackedData.filter(d => d.invoicesInRange?.some(i => !i.taxInfo));
     if (activeTab === 'piutang') return trackedData.filter(d => d.totalPaid < d.poAmount);
     return trackedData;
   }, [trackedData, activeTab]);
@@ -194,12 +197,12 @@ export default function SalesMonitoringPage() {
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-black tracking-tighter uppercase">Global Monitoring Hub</h1>
-          <p className="text-muted-foreground font-medium flex items-center gap-2">
+          <div className="text-muted-foreground font-medium flex items-center gap-2">
             Pusat pelacakan dokumen harian. 
             <span className="text-[10px] font-black bg-primary/10 text-primary px-2 py-0.5 rounded">
                 Range: {format(dateRange.from, 'dd MMM')} - {format(dateRange.to, 'dd MMM')}
             </span>
-          </p>
+          </div>
         </div>
         <div className="flex items-center gap-2">
             <Button variant="outline" size="sm" onClick={handleExport} className="h-9 font-bold text-[11px] uppercase tracking-wider">
@@ -272,14 +275,18 @@ export default function SalesMonitoringPage() {
                         </TableCell>
                         <TableCell className="py-4">
                             <div className="flex flex-wrap gap-2">
-                                {item.invoicesInRange!.map(inv => (
+                                {(item.invoicesInRange || []).map(inv => (
                                     <div key={inv.id} className="flex flex-col gap-1 bg-white border p-2 rounded-lg shadow-sm">
                                         <div className="flex items-center gap-2">
-                                            <span className="text-[10px] font-black text-primary">{inv.id}</span>
+                                            <span className="text-[10px] font-black text-primary">{inv.id.split('/').pop()}</span>
                                             {!inv.taxInfo && <AlertCircle className="h-3 w-3 text-red-500" />}
+                                            {inv.status === 'paid' && <CheckCircle2 className="h-3 w-3 text-emerald-500" />}
                                         </div>
                                         <div className="flex items-center gap-1.5">
-                                            <Badge variant="outline" className="text-[8px] h-3.5 px-1 font-black">{inv.status}</Badge>
+                                            <Badge variant="outline" className={cn(
+                                                "text-[7px] h-3.5 px-1 font-black uppercase",
+                                                inv.status === 'paid' ? "bg-emerald-50 text-emerald-700 border-emerald-100" : ""
+                                            )}>{inv.status}</Badge>
                                             {inv.spdNumber && <Truck className="h-2.5 w-2.5 text-indigo-600" />}
                                         </div>
                                     </div>

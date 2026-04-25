@@ -39,6 +39,16 @@ export type RevisionLog = {
     action: string;
 };
 
+export type PaymentRecord = {
+    id: string;
+    date: string;
+    amount: number;
+    reference: string;
+    recordedBy: string;
+    method: string;
+    notes?: string;
+};
+
 export type Invoice = {
   id: string;
   soNumber: string;
@@ -49,7 +59,7 @@ export type Invoice = {
   date: string; // Issue Date
   dueDate?: string; // Due Date
   amount: number;
-  status: 'paid' | 'unpaid' | 'sent' | 'draft' | 'received' | 'cancelled' | 'finalized';
+  status: 'paid' | 'unpaid' | 'sent' | 'draft' | 'received' | 'cancelled' | 'finalized' | 'partial';
   voidReason?: string;
   spdNumber?: string;
   paymentMethod?: string;
@@ -64,6 +74,7 @@ export type Invoice = {
   negotiationMode?: 'percent' | 'nominal';
   dpValue?: number;
   retention?: number;
+  payments?: PaymentRecord[]; // Payment history
 };
 
 export type InvoiceNumber = {

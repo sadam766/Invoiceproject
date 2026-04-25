@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useMemo, useState, useEffect } from 'react';
@@ -138,17 +139,24 @@ export default function DashboardPage() {
     if (!filteredInvoices || !salesList) return { outstanding: 0, realization: 0, target: 0, taxPending: 0 };
     
     const outstanding = filteredInvoices
-      .filter(i => i.status !== 'paid')
-      .reduce((sum, i) => sum + i.amount, 0);
+      .filter(i => i.status !== 'paid' && i.status !== 'cancelled')
+      .reduce((sum, i) => {
+          // If status is partial, we should subtract already paid amounts
+          const paidAmount = i.payments?.reduce((s, p) => s + p.amount, 0) || 0;
+          return sum + (i.amount - paidAmount);
+      }, 0);
     
     const realization = filteredInvoices
-      .filter(i => i.status === 'paid')
-      .reduce((sum, i) => sum + i.amount, 0);
+      .filter(i => i.status !== 'cancelled')
+      .reduce((sum, i) => {
+          const paidAmount = i.payments?.reduce((s, p) => s + p.amount, 0) || 0;
+          return sum + paidAmount;
+      }, 0);
     
-    const target = salesList.reduce((sum, s) => sum + s.amount, 0);
+    const target = salesList.filter(s => s.status !== 'Cancelled').reduce((sum, s) => sum + s.amount, 0);
     
     const taxPending = filteredInvoices.filter(inv => 
-      !taxList?.some(t => t.invoiceNumber === inv.id)
+      inv.status !== 'cancelled' && !taxList?.some(t => t.invoiceNumber === inv.id)
     ).length;
 
     return { outstanding, realization, target, taxPending };
