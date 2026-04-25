@@ -311,9 +311,9 @@ export default function AddInvoicePage() {
             </Button>
             <div>
                 <h1 className="text-2xl font-black tracking-tight uppercase">Invoice Constructor</h1>
-                <p className="text-muted-foreground text-xs font-bold uppercase tracking-widest flex items-center gap-1.5">
+                <div className="text-muted-foreground text-xs font-bold uppercase tracking-widest flex items-center gap-1.5">
                     Dual-Numbering System <Badge variant="secondary" className="text-[8px] bg-indigo-100 text-indigo-700 h-3.5">Active</Badge>
-                </p>
+                </div>
             </div>
         </div>
         <div className="flex items-center gap-3 bg-indigo-50 px-4 py-2 rounded-xl border border-indigo-100">
