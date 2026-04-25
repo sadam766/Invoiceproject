@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useEffect, useState, useMemo } from 'react';
@@ -380,7 +379,7 @@ export default function AddInvoicePage() {
   if (isLoading) return <main className="p-8 text-center"><Skeleton className="h-64 w-full" /></main>;
 
   return (
-    <main className="flex flex-1 flex-col gap-4 p-4 md:gap-8 md:p-8">
+    <main className="flex flex-1 flex-col gap-4 p-4 md:gap-8 md:p-8 max-w-[1600px] mx-auto">
       <div className="flex items-center gap-4">
         <Button variant="outline" size="icon" onClick={() => { sessionStorage.removeItem(ADD_INVOICE_SESSION_KEY); router.push('/dashboard/invoices'); }}><ChevronLeft className="h-4 w-4" /></Button>
         <h1 className="text-xl font-semibold">{editInvoiceId ? "Edit Invoice" : "Create Invoice"}</h1>
@@ -410,32 +409,46 @@ export default function AddInvoicePage() {
               <div><label className="text-sm font-medium">Due Date</label><Popover><PopoverTrigger asChild><Button variant={'outline'} className="w-full justify-start"><CalendarIcon className="mr-2 h-4 w-4" />{dueDate ? format(dueDate, 'dd/MM/yyyy') : 'Pilih Tanggal'}</Button></PopoverTrigger><PopoverContent className="w-auto p-0"><Calendar mode="single" selected={dueDate} onSelect={setDueDate} /></PopoverContent></Popover></div>
             </div>
 
-            <div className="mt-6">
-              <Table>
-                <TableHeader><TableRow><TableHead>Item</TableHead><TableHead className="w-24">Qty</TableHead><TableHead className="w-24">Unit</TableHead><TableHead className="w-36">Price</TableHead><TableHead className="w-36 text-right">Total</TableHead><TableHead className="w-10"></TableHead></TableRow></TableHeader>
+            <div className="mt-6 overflow-x-auto">
+              <Table className="w-full">
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="min-w-[200px]">Item</TableHead>
+                    <TableHead className="w-[80px] text-center">Qty</TableHead>
+                    <TableHead className="w-[80px] text-center">Unit</TableHead>
+                    <TableHead className="w-[140px] text-right">Price</TableHead>
+                    <TableHead className="w-[140px] text-right">Total</TableHead>
+                    <TableHead className="w-[50px]"></TableHead>
+                  </TableRow>
+                </TableHeader>
                 <TableBody>
                   {items.map(item => (
                   <TableRow key={item.id}>
-                    <TableCell>
+                    <TableCell className="p-2">
                         <Popover open={productPopoverOpen === item.id} onOpenChange={(o) => setProductPopoverOpen(o ? item.id : null)}>
-                            <PopoverTrigger asChild><Button variant="outline" className="w-full justify-between font-normal">{item.name || "Cari Produk..."}</Button></PopoverTrigger>
+                            <PopoverTrigger asChild>
+                              <Button variant="outline" className="w-full flex items-center justify-between font-normal overflow-hidden group">
+                                <span className="truncate mr-2 flex-1 text-left">{item.name || "Cari Produk..."}</span>
+                                <ChevronsUpDown className="h-4 w-4 shrink-0 opacity-50" />
+                              </Button>
+                            </PopoverTrigger>
                             <PopoverContent className="w-[--radix-popover-trigger-width] p-0"><Command><CommandInput placeholder="Search product..." /><CommandList><CommandGroup>{productListData?.map((p) => (<CommandItem key={p.id} value={p.name} onSelect={() => { setItems(items.map(it => it.id === item.id ? { ...it, name: p.name, unit: p.unit, price: p.price, total: parseFormattedNumber(String(it.quantity)) * p.price } : it)); setProductPopoverOpen(null); }}>{p.name}</CommandItem>))}</CommandGroup></CommandList></Command></PopoverContent>
                         </Popover>
                     </TableCell>
-                    <TableCell><Input value={item.quantity} onChange={(e) => setItems(items.map(it => it.id === item.id ? { ...it, quantity: e.target.value, total: parseFormattedNumber(e.target.value) * parseFormattedNumber(String(it.price)) } : it))} onBlur={() => handleBlurFormat(v => setItems(items.map(it => it.id === item.id ? { ...it, quantity: v as string } : it)), item.quantity)} className="text-right" /></TableCell>
-                    <TableCell><Input value={item.unit} onChange={(e) => setItems(items.map(it => it.id === item.id ? { ...it, unit: e.target.value } : it))} /></TableCell>
-                    <TableCell><Input value={item.price} onChange={(e) => setItems(items.map(it => it.id === item.id ? { ...it, price: e.target.value, total: parseFormattedNumber(String(it.quantity)) * parseFormattedNumber(e.target.value) } : it))} onBlur={() => handleBlurFormat(v => setItems(items.map(it => it.id === item.id ? { ...it, price: v as string } : it)), item.price)} className="text-right" /></TableCell>
-                    <TableCell className="text-right">Rp {formatNumberWithCommas(item.total)}</TableCell>
-                    <TableCell><Button variant="ghost" size="icon" onClick={() => setItems(items.filter(it => it.id !== item.id))}><Trash2 className="h-4 w-4" /></Button></TableCell>
+                    <TableCell className="p-2"><Input value={item.quantity} onChange={(e) => setItems(items.map(it => it.id === item.id ? { ...it, quantity: e.target.value, total: parseFormattedNumber(e.target.value) * parseFormattedNumber(String(it.price)) } : it))} onBlur={() => handleBlurFormat(v => setItems(items.map(it => it.id === item.id ? { ...it, quantity: v as string } : it)), item.quantity)} className="text-center" /></TableCell>
+                    <TableCell className="p-2"><Input value={item.unit} onChange={(e) => setItems(items.map(it => it.id === item.id ? { ...it, unit: e.target.value } : it))} className="text-center" /></TableCell>
+                    <TableCell className="p-2"><Input value={item.price} onChange={(e) => setItems(items.map(it => it.id === item.id ? { ...it, price: e.target.value, total: parseFormattedNumber(String(it.quantity)) * parseFormattedNumber(e.target.value) } : it))} onBlur={() => handleBlurFormat(v => setItems(items.map(it => it.id === item.id ? { ...it, price: v as string } : it)), item.price)} className="text-right" /></TableCell>
+                    <TableCell className="p-2 text-right font-medium">Rp {formatNumberWithCommas(item.total)}</TableCell>
+                    <TableCell className="p-2 text-center"><Button variant="ghost" size="icon" onClick={() => setItems(items.filter(it => it.id !== item.id))} className="text-destructive hover:bg-destructive/10"><Trash2 className="h-4 w-4" /></Button></TableCell>
                   </TableRow>
                   ))}
                 </TableBody>
               </Table>
-              <Button variant="outline" className="mt-4" onClick={() => setItems([...items, { id: Date.now(), name: '', quantity: 1, unit: 'pcs', price: 0, total: 0 }])}><Plus className="mr-2 h-4 w-4" /> Add item</Button>
+              <Button variant="outline" className="mt-4 border-dashed" onClick={() => setItems([...items, { id: Date.now(), name: '', quantity: 1, unit: 'pcs', price: 0, total: 0 }])}><Plus className="mr-2 h-4 w-4" /> Add item</Button>
             </div>
 
             <div className="mt-6 flex justify-end">
-                <div className="w-80 space-y-2">
+                <div className="w-full md:w-80 space-y-2">
                     <div className="flex justify-between items-center"><span className="text-sm">Subtotal:</span><span className="text-sm font-medium">Rp {formatNumberWithCommas(subtotal)}</span></div>
                     <div className="flex justify-between items-center"><span className="text-sm">A/Negotiation:</span><Input className="h-8 w-44 text-right" value={negotiation} onChange={e => setNegotiation(e.target.value)} onBlur={() => handleBlurFormat(setNegotiation, negotiation)} /></div>
                     <div className="flex justify-between items-center"><span className="text-sm">DP Value:</span><Input className="h-8 w-44 text-right" value={dpValue} onChange={e => setDpValue(e.target.value)} onBlur={() => handleBlurFormat(setDpValue, dpValue)} /></div>
@@ -443,7 +456,7 @@ export default function AddInvoicePage() {
                     <div className="flex justify-between items-center font-bold border-t pt-2"><span>Grand Total:</span><Input className="h-8 w-44 text-right font-bold" value={grandTotal} onChange={e => setGrandTotal(e.target.value)} onBlur={() => { const v = parseFormattedNumber(String(grandTotal)); setGrandTotal(formatNumberWithCommas(v)); setDppVat(formatNumberWithCommas(v/1.12)); setVat12(formatNumberWithCommas((v/1.12)*0.12)); setTotalAmount(formatNumberWithCommas(v + (v/1.12)*0.12)); }} /></div>
                     <div className="flex justify-between items-center"><span className="text-sm">DPP VAT:</span><Input className="h-8 w-44 text-right" value={dppVat} onChange={e => setDppVat(e.target.value)} onBlur={() => { const v = parseFormattedNumber(String(dppVat)); setDppVat(formatNumberWithCommas(v)); setVat12(formatNumberWithCommas(v*0.12)); setTotalAmount(formatNumberWithCommas(parseFormattedNumber(String(grandTotal)) + v*0.12)); }} /></div>
                     <div className="flex justify-between items-center"><span className="text-sm">VAT 12%:</span><Input className="h-8 w-44 text-right" value={vat12} onChange={e => setVat12(e.target.value)} onBlur={() => { const v = parseFormattedNumber(String(vat12)); setVat12(formatNumberWithCommas(v)); setTotalAmount(formatNumberWithCommas(parseFormattedNumber(String(grandTotal)) + v)); }} /></div>
-                    <div className="flex justify-between items-center font-bold border-t pt-2"><span>Total:</span><Input className="h-8 w-44 text-right font-bold" value={totalAmount} onChange={e => setTotalAmount(e.target.value)} onBlur={() => handleBlurFormat(setTotalAmount, totalAmount)} /></div>
+                    <div className="flex justify-between items-center font-bold border-t pt-2"><span>Total:</span><Input className="h-8 w-44 text-right font-bold text-primary" value={totalAmount} onChange={e => setTotalAmount(e.target.value)} onBlur={() => handleBlurFormat(setTotalAmount, totalAmount)} /></div>
                 </div>
             </div>
           </Card>
@@ -459,7 +472,7 @@ export default function AddInvoicePage() {
                     <Switch id="va-mode" checked={isVaActive} onCheckedChange={setIsVaActive} />
                 </div>
                 {isVaActive && (
-                    <div className="space-y-2">
+                    <div className="space-y-2 animate-in fade-in slide-in-from-top-2 duration-300">
                         <Label className="text-xs">Pilih Bank VA</Label>
                         <Select value={selectedVaId} onValueChange={setSelectedVaId}>
                             <SelectTrigger>
@@ -480,9 +493,9 @@ export default function AddInvoicePage() {
             </CardContent>
           </Card>
           <Card><CardContent className="p-4 space-y-4">
-              <Button className="w-full" onClick={() => handleSaveInvoice('sent')}><Send className="mr-2 h-4 w-4" /> Send Invoice</Button>
+              <Button className="w-full shadow-md" onClick={() => handleSaveInvoice('sent')}><Send className="mr-2 h-4 w-4" /> Send Invoice</Button>
               <Button variant="outline" className="w-full" onClick={handlePreview}><Eye className="mr-2 h-4 w-4" /> Preview</Button>
-              <div className="p-3 rounded-md bg-muted border text-xs"><label className="font-bold text-muted-foreground uppercase">Pembuat (Otomatis)</label><p className="font-medium mt-1">{userProfile?.displayName || user?.email}</p></div>
+              <div className="p-3 rounded-md bg-muted border text-xs"><label className="font-bold text-muted-foreground uppercase">Pembuat (Otomatis)</label><p className="font-medium mt-1 text-primary">{userProfile?.displayName || user?.email}</p></div>
           </CardContent></Card>
         </div>
       </div>

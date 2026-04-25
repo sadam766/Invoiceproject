@@ -1,4 +1,3 @@
-
 'use client';
 import {
   SidebarProvider,
@@ -159,16 +158,16 @@ export default function DashboardLayout({
 
   return (
     <SidebarProvider>
-      <Sidebar>
+      <Sidebar collapsible="icon">
         <SidebarHeader>
           <div className="flex items-center gap-2 px-2 py-4">
-            <Avatar className="w-10 h-10 border-2 border-primary">
+            <Avatar className="w-10 h-10 border-2 border-primary shrink-0">
               <AvatarImage src={user?.photoURL || ""} />
               <AvatarFallback className="bg-primary text-white font-bold">
                 {userProfile?.displayName?.charAt(0).toUpperCase() || user?.email?.charAt(0).toUpperCase() || 'U'}
               </AvatarFallback>
             </Avatar>
-            <div className="flex flex-col overflow-hidden">
+            <div className="flex flex-col overflow-hidden group-data-[collapsible=icon]:hidden">
               <span className="font-bold text-sm truncate flex items-center gap-1">
                 {userProfile?.displayName || user?.displayName || 'Admin Dakota'}
                 {isSuperAdmin && <BadgeCheck className="h-3 w-3 text-blue-600" />}
@@ -182,24 +181,24 @@ export default function DashboardLayout({
         <SidebarContent>
           <SidebarMenu>
             <SidebarMenuItem>
-              <SidebarMenuButton asChild isActive={pathname === '/dashboard'}>
-                <Link href="/dashboard"><LayoutDashboard /> Dashboard</Link>
+              <SidebarMenuButton asChild isActive={pathname === '/dashboard'} tooltip="Dashboard">
+                <Link href="/dashboard"><LayoutDashboard /> <span>Dashboard</span></Link>
               </SidebarMenuButton>
             </SidebarMenuItem>
 
             <SidebarMenuItem>
-              <SidebarMenuButton asChild isActive={pathname === '/dashboard/monitoring'}>
-                <Link href="/dashboard/monitoring"><Eye /> Monitoring</Link>
+              <SidebarMenuButton asChild isActive={pathname === '/dashboard/monitoring'} tooltip="Monitoring">
+                <Link href="/dashboard/monitoring"><Eye /> <span>Monitoring</span></Link>
               </SidebarMenuButton>
             </SidebarMenuItem>
             
-            <Collapsible asChild defaultOpen={pathname.startsWith('/dashboard/invoices')}>
+            <Collapsible asChild defaultOpen={pathname.startsWith('/dashboard/invoices')} className="group/collapsible">
               <SidebarMenuItem>
                 <CollapsibleTrigger asChild>
-                    <SidebarMenuButton>
-                      <FileText /> Invoices
+                    <SidebarMenuButton tooltip="Invoices">
+                      <FileText /> <span>Invoices</span>
                       <div className="grow" />
-                      <ChevronDown className={cn('h-4 w-4 transition-transform', 'group-data-[state=open]:rotate-180')} />
+                      <ChevronDown className={cn('h-4 w-4 transition-transform', 'group-data-[state=open]/collapsible:rotate-180')} />
                     </SidebarMenuButton>
                 </CollapsibleTrigger>
                 <CollapsibleContent asChild>
@@ -240,46 +239,46 @@ export default function DashboardLayout({
             </Collapsible>
 
             <SidebarMenuItem>
-              <SidebarMenuButton asChild isActive={pathname.startsWith('/dashboard/products')}>
-                <Link href="/dashboard/products"><Package /> Products</Link>
+              <SidebarMenuButton asChild isActive={pathname.startsWith('/dashboard/products')} tooltip="Products">
+                <Link href="/dashboard/products"><Package /> <span>Products</span></Link>
               </SidebarMenuButton>
             </SidebarMenuItem>
             <SidebarMenuItem>
-              <SidebarMenuButton asChild isActive={pathname === '/dashboard/sales-orders'}>
-                <Link href="/dashboard/sales-orders"><ShoppingCart /> SalesOrders</Link>
+              <SidebarMenuButton asChild isActive={pathname === '/dashboard/sales-orders'} tooltip="Sales Orders">
+                <Link href="/dashboard/sales-orders"><ShoppingCart /> <span>SalesOrders</span></Link>
               </SidebarMenuButton>
             </SidebarMenuItem>
             <SidebarMenuItem>
-              <SidebarMenuButton asChild isActive={pathname.startsWith('/dashboard/customers')}>
-                <Link href="/dashboard/customers"><Users /> Customers</Link>
+              <SidebarMenuButton asChild isActive={pathname.startsWith('/dashboard/customers')} tooltip="Customers">
+                <Link href="/dashboard/customers"><Users /> <span>Customers</span></Link>
               </SidebarMenuButton>
             </SidebarMenuItem>
 
              <SidebarMenuItem>
-                <SidebarMenuButton asChild isActive={pathname.startsWith('/dashboard/sales')}>
-                    <Link href="/dashboard/sales"><ShoppingCart /> Sales List</Link>
+                <SidebarMenuButton asChild isActive={pathname.startsWith('/dashboard/sales')} tooltip="Sales List">
+                    <Link href="/dashboard/sales"><ShoppingCart /> <span>Sales List</span></Link>
                 </SidebarMenuButton>
             </SidebarMenuItem>
 
             {isAdmin && (
                <SidebarMenuItem>
-                  <SidebarMenuButton asChild isActive={pathname === '/dashboard/sales-management'}>
-                      <Link href="/dashboard/sales-management"><BarChart /> Sales Management</Link>
+                  <SidebarMenuButton asChild isActive={pathname === '/dashboard/sales-management'} tooltip="Sales Management">
+                      <Link href="/dashboard/sales-management"><BarChart /> <span>Sales Management</span></Link>
                   </SidebarMenuButton>
               </SidebarMenuItem>
             )}
 
             {isAdmin && (
                <SidebarMenuItem>
-                  <SidebarMenuButton asChild isActive={pathname === '/dashboard/users'}>
-                      <Link href="/dashboard/users"><UserCog /> User Management</Link>
+                  <SidebarMenuButton asChild isActive={pathname === '/dashboard/users'} tooltip="User Management">
+                      <Link href="/dashboard/users"><UserCog /> <span>User Management</span></Link>
                   </SidebarMenuButton>
               </SidebarMenuItem>
             )}
 
              <SidebarMenuItem>
-              <SidebarMenuButton asChild isActive={pathname === '/dashboard/calendar'}>
-                <Link href="/dashboard/calendar"><Calendar /> Calendar</Link>
+              <SidebarMenuButton asChild isActive={pathname === '/dashboard/calendar'} tooltip="Calendar">
+                <Link href="/dashboard/calendar"><Calendar /> <span>Calendar</span></Link>
               </SidebarMenuButton>
             </SidebarMenuItem>
           </SidebarMenu>
@@ -287,20 +286,20 @@ export default function DashboardLayout({
         <SidebarFooter>
             <SidebarMenu>
                 <SidebarMenuItem>
-                    <SidebarMenuButton asChild isActive={pathname === '/dashboard/settings'}>
-                        <Link href="/dashboard/settings"><Settings /> Pengaturan</Link>
+                    <SidebarMenuButton asChild isActive={pathname === '/dashboard/settings'} tooltip="Pengaturan">
+                        <Link href="/dashboard/settings"><Settings /> <span>Pengaturan</span></Link>
                     </SidebarMenuButton>
                 </SidebarMenuItem>
             </SidebarMenu>
-            <Button variant="ghost" className="w-full justify-start mt-2" onClick={handleLogout}>
-                <LogOut className="mr-2 h-4 w-4" />
-                <span className="grow text-left">Keluar</span>
+            <Button variant="ghost" className="w-full justify-start mt-2 group-data-[collapsible=icon]:px-0 group-data-[collapsible=icon]:justify-center" onClick={handleLogout}>
+                <LogOut className="mr-2 h-4 w-4 shrink-0" />
+                <span className="grow text-left group-data-[collapsible=icon]:hidden">Keluar</span>
             </Button>
         </SidebarFooter>
       </Sidebar>
       <SidebarInset>
-        <header className="flex h-14 items-center gap-4 border-b bg-background px-4 md:px-6 sticky top-0 z-30">
-            <SidebarTrigger className="md:hidden" />
+        <header className="flex h-14 items-center gap-4 border-b bg-background px-4 md:px-6 sticky top-0 z-30 transition-all duration-300">
+            <SidebarTrigger className="-ml-1" />
             <div className="w-full flex-1">
                <div className="relative">
                   <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
@@ -375,7 +374,9 @@ export default function DashboardLayout({
                 </DropdownMenu>
             </div>
         </header>
-        {children}
+        <div className="flex-1 overflow-auto">
+          {children}
+        </div>
         </SidebarInset>
     </SidebarProvider>
   );
