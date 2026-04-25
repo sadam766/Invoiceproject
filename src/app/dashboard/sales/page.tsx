@@ -16,19 +16,25 @@ import {
     TableHeader,
     TableRow,
   } from '@/components/ui/table';
-  import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
   import { Input } from '@/components/ui/input';
   import { Button } from '@/components/ui/button';
   import { Badge } from '@/components/ui/badge';
   import { Checkbox } from '@/components/ui/checkbox';
-  import { type SalesListItem, type UserProfile } from '@/app/lib/data';
-  import { Search, MoreHorizontal, ArrowUpDown, Upload, Download, Eye, Edit, Trash2, FileSpreadsheet } from 'lucide-react';
+  import { 
+    Dialog, 
+    DialogContent, 
+    DialogHeader, 
+    DialogTitle, 
+    DialogFooter 
+  } from '@/components/ui/dialog';
+  import { type SalesListItem, type UserProfile, type Invoice } from '@/app/lib/data';
+  import { Search, MoreHorizontal, Upload, Download, Eye, Edit, Trash2, FileSpreadsheet, RefreshCw } from 'lucide-react';
   import { AddSaleDialog } from './_components/add-sale-dialog';
   import { useToast } from '@/hooks/use-toast';
   import { DeleteConfirmationDialog } from '@/app/components/delete-confirmation-dialog';
   import { exportToExcel, importFromExcel, generateExcelTemplate } from '@/lib/utils';
   import { useFirestore, useUser, useCollection, useMemoFirebase, errorEmitter, FirestorePermissionError, useDoc } from '@/firebase';
-  import { collection, doc, setDoc, deleteDoc, writeBatch, query } from 'firebase/firestore';
+  import { collection, doc, setDoc, deleteDoc, writeBatch, query, updateDoc } from 'firebase/firestore';
   import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
   
   export default function SalesListPage() {
@@ -41,9 +47,12 @@ import {
     const [editingSale, setEditingSale] = useState<SalesListItem | undefined>(undefined);
     const [isDialogOpen, setIsDialogOpen] = useState(false);
     const [searchQuery, setSearchQuery] = useState('');
-    const [activeTab, setActiveTab] = useState('all');
     const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
-    const [deleteDialogState, setDeleteDialogState] = useState<{ isOpen: boolean; soNumber?: string; isBulk?: boolean }>({ isOpen: false });
+    const [deleteDialogState, setDeleteDialogState] = useState<{ isOpen: boolean; poNumber?: string; isBulk?: boolean }>({ isOpen: false });
+
+    // SO Update State
+    const [soUpdateState, setSoUpdateState] = useState<{ isOpen: boolean; poNumber?: string; currentSo?: string }>({ isOpen: false });
+    const [tempSo, setTempSo] = useState('');
 
     // Role check
     const userProfileRef = useMemoFirebase(() => {
@@ -59,30 +68,33 @@ import {
         if (!firestore) return null;
         return query(collection(firestore, 'sales'));
     }, [firestore]);
-    const { data: sales, isLoading } = useCollection<SalesListItem>(salesCollection);
+    const { data: sales, isLoading: isSalesLoading } = useCollection<SalesListItem>(salesCollection);
+
+    const invoicesCollection = useMemoFirebase(() => {
+        if (!firestore) return null;
+        return query(collection(firestore, 'invoices'));
+    }, [firestore]);
+    const { data: invoices, isLoading: isInvoicesLoading } = useCollection<Invoice>(invoicesCollection);
 
     const filteredSales = useMemo(() => {
-        if (!sales) return [];
-        let filtered = sales;
-        if (activeTab !== 'all') {
-            filtered = sales.filter(s => s.status.toLowerCase() === activeTab);
-        }
-        if (searchQuery) {
-            filtered = filtered.filter(s => 
-                s.soNumber.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                s.customer.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                s.sales.toLowerCase().includes(searchQuery.toLowerCase())
-            );
-        }
-        return filtered;
-    }, [sales, activeTab, searchQuery]);
+        if (!sales || !invoices) return [];
+        
+        return sales.filter(s => 
+            s.poNumber.toLowerCase().includes(searchQuery.toLowerCase()) ||
+            s.customer.toLowerCase().includes(searchQuery.toLowerCase()) ||
+            s.sales.toLowerCase().includes(searchQuery.toLowerCase())
+        ).map(sale => {
+            // Calculate dynamic status
+            const relatedInvoices = invoices.filter(inv => inv.poNumber === sale.poNumber);
+            const totalPaid = relatedInvoices.filter(inv => inv.status === 'paid').reduce((sum, inv) => sum + inv.amount, 0);
+            
+            let status: 'Waiting' | 'Partial' | 'Paid' = 'Waiting';
+            if (totalPaid >= sale.amount && sale.amount > 0) status = 'Paid';
+            else if (totalPaid > 0) status = 'Partial';
 
-    const totalFiltered = filteredSales.reduce((sum, item) => sum + item.amount, 0);
-
-    const handleSelectAll = (checked: boolean) => {
-        if (checked) setSelectedIds(new Set(filteredSales.map(s => s.soNumber)));
-        else setSelectedIds(new Set());
-    };
+            return { ...sale, status };
+        });
+    }, [sales, invoices, searchQuery]);
 
     const handleSelectRow = (id: string) => {
         const next = new Set(selectedIds);
@@ -100,165 +112,160 @@ import {
                 batch.delete(doc(firestore, 'sales', id));
             });
             await batch.commit();
-            toast({ title: `${selectedIds.size} sales dihapus` });
+            toast({ title: `${selectedIds.size} data dihapus` });
             setSelectedIds(new Set());
-        } else if (deleteDialogState.soNumber) {
-            const docRef = doc(firestore, 'sales', deleteDialogState.soNumber);
+        } else if (deleteDialogState.poNumber) {
+            const docRef = doc(firestore, 'sales', deleteDialogState.poNumber);
             await deleteDoc(docRef);
-            toast({ title: "Sale Berhasil Dihapus" });
+            toast({ title: "Data Berhasil Dihapus" });
         }
         setDeleteDialogState({ isOpen: false });
     };
 
-    const handleExport = () => {
-        const dataToExport = selectedIds.size > 0 
-            ? filteredSales.filter(s => selectedIds.has(s.soNumber))
-            : filteredSales;
+    const handleUpdateSo = async () => {
+        if (!firestore || !soUpdateState.poNumber) return;
+        const docRef = doc(firestore, 'sales', soUpdateState.poNumber);
         
-        exportToExcel(dataToExport, 'sales_data');
-        toast({ title: "Export Berhasil", description: `${dataToExport.length} data diekspor.` });
-    };
+        // Batch update for all invoices linked to this PO
+        const batch = writeBatch(firestore);
+        batch.update(docRef, { soNumber: tempSo });
 
-    const handleDownloadTemplate = () => {
-        generateExcelTemplate(['soNumber', 'customer', 'sales', 'poNumber', 'amount', 'status', 'paidDate'], 'template_sales');
-    };
+        const relatedInvoices = invoices?.filter(inv => inv.poNumber === soUpdateState.poNumber) || [];
+        relatedInvoices.forEach(inv => {
+            const invRef = doc(firestore, 'invoices', inv.id.replace(/\//g, '_'));
+            batch.update(invRef, { soNumber: tempSo });
+        });
 
-    const handleImportClick = () => fileInputRef.current?.click();
-
-    const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
-        const file = event.target.files?.[0];
-        if (file && firestore && user) {
-            try {
-                const data = await importFromExcel(file) as SalesListItem[];
-                const batch = writeBatch(firestore);
-                data.forEach(item => {
-                    const docRef = doc(firestore, 'sales', item.soNumber);
-                    batch.set(docRef, { ...item, ownerId: user.uid });
-                });
-                await batch.commit();
-                toast({ title: "Import Berhasil", description: `${data.length} data ditambahkan.` });
-            } catch (e) {
-                toast({ variant: "destructive", title: "Gagal Import" });
-            }
-        }
+        await batch.commit();
+        toast({ title: "SO Number Updated", description: "Nomor SO telah sinkron dengan semua invoice terkait." });
+        setSoUpdateState({ isOpen: false });
     };
 
     return (
       <main className="flex flex-1 flex-col gap-4 p-4 md:gap-8 md:p-8">
         <div className="flex justify-between items-center">
-            <h1 className="text-2xl font-bold tracking-tight">Payment Overview</h1>
+            <div>
+                <h1 className="text-2xl font-bold tracking-tight">Sales List (Registrasi PO)</h1>
+                <p className="text-muted-foreground">Daftarkan PO Customer dan kelola status transaksinya.</p>
+            </div>
             <div className="flex items-center gap-2">
-                <input type="file" ref={fileInputRef} onChange={handleFileChange} className="hidden" accept=".xlsx, .xls" />
-                <Button variant="outline" onClick={handleImportClick}><Upload className="mr-2 h-4 w-4"/> Import</Button>
-                <Button variant="outline" onClick={handleDownloadTemplate}><FileSpreadsheet className="mr-2 h-4 w-4"/> Template</Button>
-                <Button variant="outline" onClick={handleExport}><Download className="mr-2 h-4 w-4"/> Export</Button>
+                <input type="file" ref={fileInputRef} className="hidden" accept=".xlsx, .xls" />
+                <Button variant="outline" onClick={() => generateExcelTemplate(['poNumber', 'customer', 'sales', 'soNumber', 'amount'], 'template_po')}><FileSpreadsheet className="mr-2 h-4 w-4"/> Template</Button>
+                <Button variant="outline" onClick={() => exportToExcel(filteredSales, 'daftar_po')}><Download className="mr-2 h-4 w-4"/> Export</Button>
                 <AddSaleDialog 
                     isOpen={isDialogOpen}
                     onOpenChange={setIsDialogOpen}
-                    onSave={(s) => setDoc(doc(firestore!, 'sales', s.soNumber), {...s, ownerId: user!.uid}, {merge: true}).then(() => toast({title: "Berhasil"}))}
+                    onSave={(s) => setDoc(doc(firestore!, 'sales', s.poNumber), {...s, ownerId: user!.uid}, {merge: true}).then(() => toast({title: "Berhasil Terdaftar"}))}
                     saleData={editingSale}
                     onAddClick={() => { setEditingSale(undefined); setIsDialogOpen(true); }}
                 />
             </div>
         </div>
 
-        <div className="grid gap-4 md:grid-cols-3">
-            <Card className="bg-blue-50/50 border-blue-200">
-                <CardHeader className="pb-2"><CardTitle className="text-sm font-medium">Total (Filtered)</CardTitle></CardHeader>
-                <CardContent><div className="text-2xl font-bold">Rp {totalFiltered.toLocaleString('id-ID')}</div></CardContent>
-            </Card>
-        </div>
-  
         <Card>
             <CardContent className="pt-6">
-                <Tabs value={activeTab} onValueChange={setActiveTab}>
-                    <div className="flex justify-between items-center mb-4">
-                        <TabsList>
-                            <TabsTrigger value="all">Semua Sales</TabsTrigger>
-                            <TabsTrigger value="paid">Lunas</TabsTrigger>
-                            <TabsTrigger value="unpaid">Piutang</TabsTrigger>
-                        </TabsList>
-                        <div className="flex items-center gap-2">
-                            <div className="relative w-64">
-                                <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-                                <Input placeholder="Search..." className="pl-8" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} />
-                            </div>
-                            {selectedIds.size > 0 && isAdmin && (
-                                <Button variant="destructive" size="sm" onClick={() => setDeleteDialogState({ isOpen: true, isBulk: true })}>
-                                    <Trash2 className="mr-2 h-4 w-4" /> Hapus Terpilih ({selectedIds.size})
-                                </Button>
-                            )}
-                        </div>
+                <div className="flex justify-between items-center mb-4">
+                    <div className="relative w-1/3">
+                        <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                        <Input placeholder="Cari PO, Customer, atau Sales..." className="pl-8" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} />
                     </div>
-                    
-                    <div className="rounded-md border overflow-hidden">
-                        <Table>
-                            <TableHeader>
-                                <TableRow>
-                                    <TableHead className="w-[40px]">
-                                        <Checkbox 
-                                            checked={filteredSales.length > 0 && selectedIds.size === filteredSales.length}
-                                            onCheckedChange={handleSelectAll}
-                                        />
-                                    </TableHead>
-                                    <TableHead>NUMBER SO</TableHead>
-                                    <TableHead>CUSTOMER</TableHead>
-                                    <TableHead>SALES</TableHead>
-                                    <TableHead>AMOUNT</TableHead>
-                                    <TableHead>STATUS</TableHead>
-                                    <TableHead className="text-right">AKSI</TableHead>
+                    {selectedIds.size > 0 && isAdmin && (
+                        <Button variant="destructive" size="sm" onClick={() => setDeleteDialogState({ isOpen: true, isBulk: true })}>
+                            <Trash2 className="mr-2 h-4 w-4" /> Hapus Terpilih ({selectedIds.size})
+                        </Button>
+                    )}
+                </div>
+                
+                <div className="rounded-md border overflow-hidden">
+                    <Table>
+                        <TableHeader>
+                            <TableRow>
+                                <TableHead className="w-[40px]">
+                                    <Checkbox onCheckedChange={(checked) => setSelectedIds(checked ? new Set(filteredSales.map(s => s.poNumber)) : new Set())} />
+                                </TableHead>
+                                <TableHead>PO NUMBER</TableHead>
+                                <TableHead>CUSTOMER</TableHead>
+                                <TableHead>SALES</TableHead>
+                                <TableHead>SO NUMBER</TableHead>
+                                <TableHead>AMOUNT</TableHead>
+                                <TableHead>STATUS</TableHead>
+                                <TableHead className="text-right">AKSI</TableHead>
+                            </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                            {(isSalesLoading || isInvoicesLoading) ? (
+                                <TableRow><TableCell colSpan={8} className="text-center py-8">Memuat data...</TableCell></TableRow>
+                            ) : filteredSales.map((sale) => (
+                                <TableRow key={sale.poNumber} className={selectedIds.has(sale.poNumber) ? "bg-muted/50" : ""}>
+                                    <TableCell>
+                                        <Checkbox checked={selectedIds.has(sale.poNumber)} onCheckedChange={() => handleSelectRow(sale.poNumber)} />
+                                    </TableCell>
+                                    <TableCell className="font-bold">{sale.poNumber}</TableCell>
+                                    <TableCell>{sale.customer}</TableCell>
+                                    <TableCell>{sale.sales}</TableCell>
+                                    <TableCell>
+                                        <div className="flex items-center gap-2">
+                                            <span className={sale.soNumber ? "font-medium" : "italic text-muted-foreground"}>{sale.soNumber || 'Waiting SO'}</span>
+                                            <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => { setTempSo(sale.soNumber || ''); setSoUpdateState({ isOpen: true, poNumber: sale.poNumber, currentSo: sale.soNumber }); }}>
+                                                <RefreshCw className="h-3 w-3" />
+                                            </Button>
+                                        </div>
+                                    </TableCell>
+                                    <TableCell>Rp {sale.amount.toLocaleString('id-ID')}</TableCell>
+                                    <TableCell>
+                                        <Badge className={cn(
+                                            sale.status === 'Paid' ? 'bg-green-100 text-green-800' : 
+                                            sale.status === 'Partial' ? 'bg-yellow-100 text-yellow-800' : 'bg-gray-100 text-gray-800'
+                                        )}>
+                                            {sale.status}
+                                        </Badge>
+                                    </TableCell>
+                                    <TableCell className="text-right">
+                                        <DropdownMenu>
+                                            <DropdownMenuTrigger asChild><Button variant="ghost" size="icon"><MoreHorizontal className="h-4 w-4" /></Button></DropdownMenuTrigger>
+                                            <DropdownMenuContent align="end">
+                                                <DropdownMenuItem onClick={() => { sessionStorage.setItem('activePoPreview', sale.poNumber); router.push('/dashboard/sales-management'); }}><Eye className="mr-2 h-4 w-4" /> Buka Buku Piutang</DropdownMenuItem>
+                                                {isAdmin && (
+                                                    <>
+                                                        <DropdownMenuItem onClick={() => { setEditingSale(sale); setIsDialogOpen(true); }}><Edit className="mr-2 h-4 w-4" /> Edit PO</DropdownMenuItem>
+                                                        <DropdownMenuItem className="text-destructive" onClick={() => setDeleteDialogState({ isOpen: true, poNumber: sale.poNumber, isBulk: false })}><Trash2 className="mr-2 h-4 w-4" /> Hapus</DropdownMenuItem>
+                                                    </>
+                                                )}
+                                            </DropdownMenuContent>
+                                        </DropdownMenu>
+                                    </TableCell>
                                 </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                                {isLoading ? (
-                                    <TableRow><TableCell colSpan={7} className="text-center py-8">Memuat data...</TableCell></TableRow>
-                                ) : filteredSales.map((sale) => (
-                                    <TableRow key={sale.soNumber} className={selectedIds.has(sale.soNumber) ? "bg-muted/50" : ""}>
-                                        <TableCell>
-                                            <Checkbox 
-                                                checked={selectedIds.has(sale.soNumber)} 
-                                                onCheckedChange={() => handleSelectRow(sale.soNumber)}
-                                            />
-                                        </TableCell>
-                                        <TableCell className="font-medium">{sale.soNumber}</TableCell>
-                                        <TableCell>{sale.customer}</TableCell>
-                                        <TableCell>{sale.sales}</TableCell>
-                                        <TableCell>Rp {sale.amount.toLocaleString('id-ID')}</TableCell>
-                                        <TableCell>
-                                            <Badge variant={sale.status === 'Paid' ? 'outline' : 'destructive'} 
-                                            className={sale.status === 'Paid' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}>
-                                                {sale.status}
-                                            </Badge>
-                                        </TableCell>
-                                        <TableCell className="text-right">
-                                            <DropdownMenu>
-                                                <DropdownMenuTrigger asChild><Button variant="ghost" size="icon"><MoreHorizontal className="h-4 w-4" /></Button></DropdownMenuTrigger>
-                                                <DropdownMenuContent align="end">
-                                                    <DropdownMenuItem onClick={() => { sessionStorage.setItem('salesPreviewData', JSON.stringify(sale)); router.push('/dashboard/sales-management'); }}><Eye className="mr-2 h-4 w-4" /> Preview</DropdownMenuItem>
-                                                    {isAdmin && (
-                                                        <>
-                                                            <DropdownMenuItem onClick={() => { setEditingSale(sale); setIsDialogOpen(true); }}><Edit className="mr-2 h-4 w-4" /> Edit</DropdownMenuItem>
-                                                            <DropdownMenuItem className="text-destructive" onClick={() => setDeleteDialogState({ isOpen: true, soNumber: sale.soNumber, isBulk: false })}><Trash2 className="mr-2 h-4 w-4" /> Hapus</DropdownMenuItem>
-                                                        </>
-                                                    )}
-                                                </DropdownMenuContent>
-                                            </DropdownMenu>
-                                        </TableCell>
-                                    </TableRow>
-                                ))}
-                            </TableBody>
-                        </Table>
-                    </div>
-                </Tabs>
+                            ))}
+                        </TableBody>
+                    </Table>
+                </div>
             </CardContent>
         </Card>
+
+        {/* Update SO Modal */}
+        <Dialog open={soUpdateState.isOpen} onOpenChange={(o) => setSoUpdateState(prev => ({...prev, isOpen: o}))}>
+            <DialogContent className="sm:max-w-[400px]">
+                <DialogHeader>
+                    <DialogTitle>Update SO Number</DialogTitle>
+                    <p className="text-sm text-muted-foreground">Hubungkan PO <b>{soUpdateState.poNumber}</b> ke nomor SO produksi.</p>
+                </DialogHeader>
+                <div className="py-4">
+                    <Label>Nomor Sales Order (SO)</Label>
+                    <Input value={tempSo} onChange={e => setTempSo(e.target.value)} placeholder="Contoh: SO-12345" className="mt-2" />
+                </div>
+                <DialogFooter>
+                    <Button variant="outline" onClick={() => setSoUpdateState(prev => ({...prev, isOpen: false}))}>Batal</Button>
+                    <Button onClick={handleUpdateSo}>Update & Sinkron</Button>
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
 
         <DeleteConfirmationDialog 
             open={deleteDialogState.isOpen} 
             onOpenChange={(open) => setDeleteDialogState(prev => ({...prev, isOpen: open}))} 
             onConfirm={handleDeleteConfirm}
         >
-            <span />
+            <div className="hidden" />
         </DeleteConfirmationDialog>
       </main>
     );

@@ -1,3 +1,4 @@
+
 'use client';
 import { useEffect, useState, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
@@ -6,42 +7,41 @@ import {
     CardContent,
     CardHeader,
     CardTitle,
-    CardFooter,
   } from '@/components/ui/card';
   import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
-  } from '@/components/ui/select';
+    Table,
+    TableBody,
+    TableCell,
+    TableHead,
+    TableHeader,
+    TableRow,
+  } from '@/components/ui/table';
   import { Input } from '@/components/ui/input';
   import { Button } from '@/components/ui/button';
   import { Badge } from '@/components/ui/badge';
-  import { Calendar, ChevronRight, Edit, Search, ArrowUpDown, List, LayoutGrid, Plus, MoreVertical } from 'lucide-react';
-  import { AddDocumentDialog } from './_components/add-document-dialog';
-  import { type SalesListItem, type Invoice, type TaxInvoice } from '@/app/lib/data';
+  import { Search, Eye, TrendingUp, CreditCard, AlertCircle, ArrowUpDown } from 'lucide-react';
+  import { type SalesListItem, type Invoice } from '@/app/lib/data';
   import { useFirestore, useUser, useCollection, useMemoFirebase } from '@/firebase';
   import { collection, query } from 'firebase/firestore';
   import { cn } from '@/lib/utils';
+  import { PaymentDetailDialog } from './_components/payment-detail-dialog';
   
-  type DocumentView = 'grid' | 'list';
-
-  type MergedDocument = SalesListItem & {
-    invoice?: Invoice;
-    taxInvoice?: TaxInvoice;
+  type MergedRecord = SalesListItem & {
+    relatedInvoices: Invoice[];
+    totalPaid: number;
+    outstanding: number;
   };
 
   export default function SalesManagementPage() {
     const router = useRouter();
-    const [viewMode, setViewMode] = useState<DocumentView>('list');
     const [searchQuery, setSearchQuery] = useState('');
-    const [sortOption, setSortOption] = useState('soNumber-desc');
+    const [selectedSale, setSelectedSale] = useState<MergedRecord | null>(null);
+    const [detailOpen, setDetailOpen] = useState(false);
 
     const firestore = useFirestore();
     const { user } = useUser();
 
-    // Fetch all necessary data collections
+    // Fetch necessary data
     const salesCollection = useMemoFirebase(() => {
         if (!firestore) return null;
         return query(collection(firestore, 'sales'));
@@ -54,191 +54,146 @@ import {
     }, [firestore]);
     const { data: invoiceList, isLoading: isInvoicesLoading } = useCollection<Invoice>(invoicesCollection);
     
-    const taxInvoicesCollection = useMemoFirebase(() => {
-        if (!firestore) return null;
-        return query(collection(firestore, 'taxInvoices'));
-    }, [firestore]);
-    const { data: taxInvoiceList, isLoading: isTaxInvoicesLoading } = useCollection<TaxInvoice>(taxInvoicesCollection);
-    
-    const isLoading = isSalesLoading || isInvoicesLoading || isTaxInvoicesLoading;
+    const isLoading = isSalesLoading || isInvoicesLoading;
 
-    const mergedDocuments = useMemo((): MergedDocument[] => {
-        if (!salesList || !invoiceList || !taxInvoiceList) return [];
+    // Logic: Combine PO data with real-time Invoice payments
+    const mergedData = useMemo((): MergedRecord[] => {
+        if (!salesList || !invoiceList) return [];
 
-        let docs = salesList.map(sale => {
-            const invoice = invoiceList.find(inv => inv.soNumber === sale.soNumber);
-            const taxInvoice = invoice ? taxInvoiceList.find(ti => ti.invoiceNumber === invoice.id) : undefined;
+        return salesList.map(sale => {
+            const related = invoiceList.filter(inv => inv.poNumber === sale.poNumber);
+            const paid = related.filter(inv => inv.status === 'paid').reduce((sum, inv) => sum + inv.amount, 0);
+            
+            // Dynamic Status Calculation
+            let status: any = 'Waiting';
+            if (paid >= sale.amount && sale.amount > 0) status = 'Paid';
+            else if (paid > 0) status = 'Partial';
+
             return {
                 ...sale,
-                invoice,
-                taxInvoice,
+                status,
+                relatedInvoices: related,
+                totalPaid: paid,
+                outstanding: sale.amount - paid
             };
-        });
+        }).filter(item => 
+            item.poNumber.toLowerCase().includes(searchQuery.toLowerCase()) ||
+            item.customer.toLowerCase().includes(searchQuery.toLowerCase())
+        ).sort((a, b) => b.outstanding - a.outstanding); // Sort by highest outstanding first
+    }, [salesList, invoiceList, searchQuery]);
 
-        // Search Filter
-        if (searchQuery) {
-            docs = docs.filter(doc =>
-                doc.soNumber.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                doc.customer.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                (doc.invoice?.id && doc.invoice.id.toLowerCase().includes(searchQuery.toLowerCase()))
-            );
-        }
+    // Financial KPIs
+    const totals = useMemo(() => {
+        const totalPo = mergedData.reduce((sum, item) => sum + item.amount, 0);
+        const totalPaid = mergedData.reduce((sum, item) => sum + item.totalPaid, 0);
+        return {
+            po: totalPo,
+            paid: totalPaid,
+            outstanding: totalPo - totalPaid
+        };
+    }, [mergedData]);
 
-        // Sorting Logic
-        const [key, direction] = sortOption.split('-');
-        docs.sort((a, b) => {
-            let valA, valB;
-            if (key === 'amount') {
-                valA = a.amount;
-                valB = b.amount;
-            } else { // Default to soNumber
-                valA = a.soNumber;
-                valB = b.soNumber;
+    // Handle deep-link from Sales List
+    useEffect(() => {
+        const poFromSession = sessionStorage.getItem('activePoPreview');
+        if (poFromSession && mergedData.length > 0) {
+            const found = mergedData.find(m => m.poNumber === poFromSession);
+            if (found) {
+                setSelectedSale(found);
+                setDetailOpen(true);
             }
-
-            if (valA === undefined) valA = 0;
-            if (valB === undefined) valB = 0;
-            
-            if (valA < valB) return direction === 'asc' ? -1 : 1;
-            if (valA > valB) return direction === 'asc' ? 1 : -1;
-            return 0;
-        });
-
-
-        return docs;
-    }, [salesList, invoiceList, taxInvoiceList, searchQuery, sortOption]);
+            sessionStorage.removeItem('activePoPreview');
+        }
+    }, [mergedData]);
     
     return (
       <main className="flex flex-1 flex-col gap-4 p-4 md:gap-8 md:p-8">
+        <div>
+            <h1 className="text-2xl font-bold tracking-tight">Sales Management (Buku Piutang)</h1>
+            <p className="text-muted-foreground">Monitoring arus kas masuk per-dokumen PO.</p>
+        </div>
+
+        <div className="grid gap-4 md:grid-cols-3">
+            <Card className="bg-blue-50/30 border-blue-100 shadow-sm">
+                <CardHeader className="pb-2"><CardTitle className="text-xs uppercase font-bold text-blue-600 flex items-center gap-2"><TrendingUp className="h-3 w-3" /> Total PO Terdaftar</CardTitle></CardHeader>
+                <CardContent><div className="text-2xl font-bold">Rp {totals.po.toLocaleString('id-ID')}</div></CardContent>
+            </Card>
+            <Card className="bg-green-50/30 border-green-100 shadow-sm">
+                <CardHeader className="pb-2"><CardTitle className="text-xs uppercase font-bold text-green-600 flex items-center gap-2"><CreditCard className="h-3 w-3" /> Total Terbayar (Paid)</CardTitle></CardHeader>
+                <CardContent><div className="text-2xl font-bold text-green-700">Rp {totals.paid.toLocaleString('id-ID')}</div></CardContent>
+            </Card>
+            <Card className="bg-red-50/30 border-red-100 shadow-sm">
+                <CardHeader className="pb-2"><CardTitle className="text-xs uppercase font-bold text-red-600 flex items-center gap-2"><AlertCircle className="h-3 w-3" /> Sisa Piutang (Unpaid)</CardTitle></CardHeader>
+                <CardContent><div className="text-2xl font-bold text-red-700">Rp {totals.outstanding.toLocaleString('id-ID')}</div></CardContent>
+            </Card>
+        </div>
+
         <Card>
             <CardContent className="pt-6">
-                <div className="flex justify-between items-center mb-4">
+                <div className="flex justify-between items-center mb-6">
                     <div className="relative w-1/3">
                         <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-                        <Input 
-                            type="search" 
-                            placeholder="Search documents" 
-                            className="pl-8" 
-                            value={searchQuery}
-                            onChange={(e) => setSearchQuery(e.target.value)}
-                        />
+                        <Input placeholder="Cari nomor PO atau customer..." className="pl-8" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} />
                     </div>
-                    <div className="flex items-center gap-2">
-                        <Select value={sortOption} onValueChange={setSortOption}>
-                            <SelectTrigger className="w-[180px]">
-                                <ArrowUpDown className="mr-2 h-4 w-4" />
-                                <SelectValue placeholder="Sort by" />
-                            </SelectTrigger>
-                            <SelectContent>
-                                <SelectItem value="soNumber-desc">SO Number (Desc)</SelectItem>
-                                <SelectItem value="soNumber-asc">SO Number (Asc)</SelectItem>
-                                <SelectItem value="amount-desc">Amount (Desc)</SelectItem>
-                                <SelectItem value="amount-asc">Amount (Asc)</SelectItem>
-                            </SelectContent>
-                        </Select>
-                        <div className="flex items-center gap-1 rounded-md bg-muted p-1">
-                            <Button 
-                                variant={viewMode === 'list' ? 'secondary' : 'ghost'} 
-                                size="icon" 
-                                className="h-8 w-8"
-                                onClick={() => setViewMode('list')}
-                            >
-                                <List className="h-4 w-4"/>
-                            </Button>
-                            <Button 
-                                variant={viewMode === 'grid' ? 'secondary' : 'ghost'}
-                                size="icon" 
-                                className="h-8 w-8"
-                                onClick={() => setViewMode('grid')}
-                            >
-                                <LayoutGrid className="h-4 w-4"/>
-                            </Button>
-                        </div>
-                        <AddDocumentDialog />
-                    </div>
+                    <p className="text-xs text-muted-foreground font-medium">Data diurutkan berdasarkan Sisa Piutang tertinggi.</p>
                 </div>
 
-                {isLoading && <div className="text-center p-8">Loading documents...</div>}
-
-                {!isLoading && viewMode === 'grid' && (
-                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                        {mergedDocuments.map((doc) => (
-                            <Card key={doc.soNumber} className="flex flex-col">
-                                <CardHeader className="flex-row items-center justify-between pb-2">
-                                    <CardTitle className="text-base font-bold">{doc.soNumber}</CardTitle>
-                                    <Badge variant={doc.status === 'Paid' ? 'outline' : 'destructive'} className={cn(doc.status === 'Paid' ? 'bg-green-100 text-green-800 border-green-200' : 'bg-red-100 text-red-800 border-red-200', "capitalize")}>{doc.status}</Badge>
-                                </CardHeader>
-                                <CardContent className="flex-grow">
-                                    <p className="text-sm font-medium text-gray-800 dark:text-gray-200">{doc.customer}</p>
-                                    <p className="text-xs text-muted-foreground">{doc.sales}</p>
-                                    <div className="my-3 border-t border-dashed" />
-                                    <div className="space-y-1 text-xs">
-                                        <div className="flex justify-between">
-                                            <span className="text-muted-foreground">PO Number:</span>
-                                            <span className="font-medium">{doc.poNumber}</span>
+                <div className="rounded-md border overflow-hidden">
+                    <Table>
+                        <TableHeader className="bg-muted/50">
+                            <TableRow>
+                                <TableHead>PO NUMBER</TableHead>
+                                <TableHead>CUSTOMER</TableHead>
+                                <TableHead className="text-right">TOTAL PO</TableHead>
+                                <TableHead className="text-right">TERBAYAR</TableHead>
+                                <TableHead className="text-right">OUTSTANDING</TableHead>
+                                <TableHead className="text-center">PROGRES</TableHead>
+                                <TableHead className="text-right">TINDAKAN</TableHead>
+                            </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                            {isLoading ? (
+                                <TableRow><TableCell colSpan={7} className="text-center py-8">Menganalisa Buku Piutang...</TableCell></TableRow>
+                            ) : mergedData.map((item) => (
+                                <TableRow key={item.poNumber}>
+                                    <TableCell className="font-bold">{item.poNumber}</TableCell>
+                                    <TableCell>
+                                        <div className="flex flex-col">
+                                            <span className="font-medium text-sm">{item.customer}</span>
+                                            <span className="text-[10px] text-muted-foreground uppercase">{item.sales}</span>
                                         </div>
-                                        <div className="flex justify-between">
-                                            <span className="text-muted-foreground">Amount:</span>
-                                            <span className="font-medium">Rp {doc.amount.toLocaleString('id-ID')}</span>
-                                        </div>
-                                        <div className="flex justify-between">
-                                            <span className="text-muted-foreground">Invoice:</span>
-                                            <span className="font-medium">{doc.invoice?.id || 'Not Invoiced'}</span>
-                                        </div>
-                                         <div className="flex justify-between">
-                                            <span className="text-muted-foreground">Tax Invoice:</span>
-                                            <span className="font-medium">{doc.taxInvoice?.taxInvoiceNumber || '-'}</span>
-                                        </div>
-                                    </div>
-                                </CardContent>
-                                <CardFooter className="bg-muted/50 p-3 flex justify-end">
-                                     <Button variant="ghost" size="sm">View Details</Button>
-                                </CardFooter>
-                            </Card>
-                        ))}
-                    </div>
-                )}
-                
-                {!isLoading && viewMode === 'list' && (
-                    <div className="w-full overflow-auto">
-                        <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-                            <thead className="bg-gray-50 dark:bg-gray-700">
-                                <tr>
-                                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">SO Number</th>
-                                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">Customer</th>
-                                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">Amount</th>
-                                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">Status</th>
-                                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">Invoice ID</th>
-                                    <th scope="col" className="relative px-6 py-3"><span className="sr-only">Actions</span></th>
-                                </tr>
-                            </thead>
-                            <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
-                                {mergedDocuments.map((doc) => (
-                                    <tr key={doc.soNumber}>
-                                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white">{doc.soNumber}</td>
-                                        <td className="px-6 py-4 whitespace-nowrap text-sm text-muted-foreground">{doc.customer}</td>
-                                        <td className="px-6 py-4 whitespace-nowrap text-sm text-muted-foreground">Rp {doc.amount.toLocaleString('id-ID')}</td>
-                                        <td className="px-6 py-4 whitespace-nowrap text-sm">
-                                            <Badge variant={doc.status === 'Paid' ? 'outline' : 'destructive'} className={cn(doc.status === 'Paid' ? 'bg-green-100 text-green-800 border-green-200' : 'bg-red-100 text-red-800 border-red-200', "capitalize")}>{doc.status}</Badge>
-                                        </td>
-                                        <td className="px-6 py-4 whitespace-nowrap text-sm text-muted-foreground">{doc.invoice?.id || '-'}</td>
-                                        <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                                            <Button variant="ghost" size="icon"><MoreVertical className="h-4 w-4"/></Button>
-                                        </td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
-                    </div>
-                )}
-                
-                {!isLoading && (
-                    <div className="text-sm text-muted-foreground mt-4">
-                        Showing 1 to {mergedDocuments.length} of {mergedDocuments.length} entries
-                    </div>
-                )}
+                                    </TableCell>
+                                    <TableCell className="text-right font-medium">Rp {item.amount.toLocaleString('id-ID')}</TableCell>
+                                    <TableCell className="text-right text-green-600 font-medium">Rp {item.totalPaid.toLocaleString('id-ID')}</TableCell>
+                                    <TableCell className="text-right text-red-600 font-bold">Rp {item.outstanding.toLocaleString('id-ID')}</TableCell>
+                                    <TableCell className="text-center">
+                                        <Badge className={cn(
+                                            item.status === 'Paid' ? 'bg-green-600' : 
+                                            item.status === 'Partial' ? 'bg-yellow-500' : 'bg-gray-400'
+                                        )}>
+                                            {item.status}
+                                        </Badge>
+                                    </TableCell>
+                                    <TableCell className="text-right">
+                                        <Button variant="outline" size="sm" onClick={() => { setSelectedSale(item); setDetailOpen(true); }}>
+                                            <Eye className="mr-2 h-4 w-4" /> Buku Pembayaran
+                                        </Button>
+                                    </TableCell>
+                                </TableRow>
+                            ))}
+                        </TableBody>
+                    </Table>
+                </div>
             </CardContent>
         </Card>
+
+        {/* Payment Detail Buku Piutang */}
+        <PaymentDetailDialog 
+            isOpen={detailOpen} 
+            onOpenChange={setDetailOpen} 
+            sale={selectedSale} 
+            invoices={selectedSale?.relatedInvoices || []} 
+        />
       </main>
     );
   }
