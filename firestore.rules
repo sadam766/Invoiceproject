@@ -65,5 +65,9 @@ service cloud.firestore {
     match /sales/{saleId} {
       allow read, list, create, update, delete: if isSignedIn();
     }
+
+    match /virtualAccounts/{vaId} {
+      allow read, list, create, update, delete: if isSignedIn();
+    }
   }
 }
