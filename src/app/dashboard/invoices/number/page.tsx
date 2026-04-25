@@ -1,4 +1,3 @@
-
 'use client';
 import { useState, useRef, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
@@ -27,7 +26,7 @@ import {
   import { AddInvoiceNumberDialog } from './_components/add-invoice-number-dialog';
   import { DeleteConfirmationDialog } from '@/app/components/delete-confirmation-dialog';
   import { Skeleton } from '@/components/ui/skeleton';
-  import { exportToExcel, importFromExcel, generateExcelTemplate } from '@/lib/utils';
+  import { cn, exportToExcel, importFromExcel, generateExcelTemplate } from '@/lib/utils';
   import { useToast } from '@/hooks/use-toast';
   import { useFirestore, useUser, useCollection, useMemoFirebase, errorEmitter, FirestorePermissionError } from '@/firebase';
   import { collection, doc, setDoc, deleteDoc, writeBatch, query } from 'firebase/firestore';
