@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useMemo, useState, useEffect } from 'react';
@@ -153,7 +152,7 @@ export default function DashboardPage() {
     ).length;
 
     return { outstanding, realization, target, taxPending };
-  }, [filteredInvoices, stats, salesList, taxList]);
+  }, [filteredInvoices, salesList, taxList]);
 
   const logisticStats = useMemo(() => {
     const pendingShipment = filteredInvoices.filter(inv => inv.status === 'sent' && !inv.spdNumber).length;
