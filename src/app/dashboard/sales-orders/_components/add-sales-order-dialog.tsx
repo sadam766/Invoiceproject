@@ -1,3 +1,4 @@
+
 'use client';
 import { Button } from '@/components/ui/button';
 import {
@@ -33,6 +34,7 @@ type AddSalesOrderDialogProps = {
 
 export function AddSalesOrderDialog({ isOpen, onOpenChange, onSave, orderData, onAddClick }: AddSalesOrderDialogProps) {
   const [soNumber, setSoNumber] = useState('');
+  const [poNumber, setPoNumber] = useState('');
   const [productName, setProductName] = useState('');
   const [customer, setCustomer] = useState('');
   const [category, setCategory] = useState('');
@@ -43,6 +45,7 @@ export function AddSalesOrderDialog({ isOpen, onOpenChange, onSave, orderData, o
   useEffect(() => {
     if (orderData && isOpen) {
       setSoNumber(orderData.soNumber);
+      setPoNumber(orderData.poNumber || '');
       setProductName(orderData.productName);
       setCategory(orderData.category);
       setQuantity(formatNumberWithCommas(orderData.quantity));
@@ -51,6 +54,7 @@ export function AddSalesOrderDialog({ isOpen, onOpenChange, onSave, orderData, o
       setCustomer(orderData.customer);
     } else if (!isOpen) {
       setSoNumber('');
+      setPoNumber('');
       setProductName('');
       setCategory('');
       setQuantity(0);
@@ -72,6 +76,7 @@ export function AddSalesOrderDialog({ isOpen, onOpenChange, onSave, orderData, o
     onSave({ 
         id: orderData?.id,
         soNumber, 
+        poNumber,
         productName, 
         category, 
         quantity: typeof quantity === 'string' ? parseFormattedNumber(quantity) : quantity, 
@@ -105,6 +110,12 @@ export function AddSalesOrderDialog({ isOpen, onOpenChange, onSave, orderData, o
               SO Number
             </Label>
             <Input id="so-number" value={soNumber} onChange={(e) => setSoNumber(e.target.value)} className="col-span-3" />
+          </div>
+          <div className="grid grid-cols-4 items-center gap-4">
+            <Label htmlFor="po-number" className="text-right">
+              PO Number
+            </Label>
+            <Input id="po-number" value={poNumber} onChange={(e) => setPoNumber(e.target.value)} className="col-span-3" placeholder="Reference PO dari Customer" />
           </div>
           <div className="grid grid-cols-4 items-center gap-4">
             <Label htmlFor="customer" className="text-right">

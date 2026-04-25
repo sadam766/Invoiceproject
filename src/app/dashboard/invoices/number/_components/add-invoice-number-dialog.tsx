@@ -1,3 +1,4 @@
+
 'use client';
 import { useState, useEffect, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
@@ -60,6 +61,7 @@ export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceDa
   const [fullInvoiceNumber, setFullInvoiceNumber] = useState('');
   
   const [salesOrder, setSalesOrder] = useState('');
+  const [poNumber, setPoNumber] = useState('');
   const [customer, setCustomer] = useState('');
   const [amount, setAmount] = useState<string>('');
 
@@ -168,6 +170,7 @@ export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceDa
     setIsAutoNumber(false); 
     setCustomer(invoice.customer);
     setSalesOrder(invoice.salesOrder);
+    setPoNumber(invoice.poNumber || '');
     if (invoice.date) {
       const dateParts = invoice.date.split('/');
       if (dateParts.length === 3) {
@@ -194,6 +197,7 @@ export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceDa
           
           setCustomer('');
           setSalesOrder('');
+          setPoNumber('');
           setDate(new Date());
           setAmount('');
       }
@@ -229,13 +233,12 @@ export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceDa
       if (soDetails.length > 0) {
         const totalAmount = soDetails.reduce((sum, item) => sum + (item.quantity * item.price), 0);
         setAmount(formatNumberWithCommas(totalAmount));
-        const customerName = soDetails[0].customer;
-        if(customerName) {
-            setCustomer(customerName);
-        }
+        setCustomer(soDetails[0].customer);
+        setPoNumber(soDetails[0].poNumber || '');
       } else {
         setAmount('');
         setCustomer('');
+        setPoNumber('');
       }
 
     } else {
@@ -263,19 +266,22 @@ export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceDa
         toast({ variant: "destructive", title: "Validation Error", description: "Nomor urut tidak boleh kosong." });
         return;
     }
+
+    if (!salesOrder && !poNumber) {
+        toast({ variant: "destructive", title: "Validation Error", description: "Nomor PO wajib diisi jika SO belum tersedia." });
+        return;
+    }
     
     const finalInvoiceNumber = fullInvoiceNumber;
-    
     const existsInNumberList = allInvoiceNumbers?.some(inv => inv.id === finalInvoiceNumber);
     const existsInInvoiceList = existingInvoices?.some(inv => inv.id === finalInvoiceNumber);
-    
     const isChangingId = invoiceData && invoiceData.id !== finalInvoiceNumber;
     
     if ((!invoiceData || isChangingId) && (existsInNumberList || existsInInvoiceList)) {
       toast({
         variant: "destructive",
         title: "Nomor Faktur Duplikat",
-        description: `Nomor "${finalInvoiceNumber}" sudah terdaftar dalam sistem, harap gunakan nomor lain.`,
+        description: `Nomor "${finalInvoiceNumber}" sudah terdaftar dalam sistem.`,
       });
       return; 
     }
@@ -286,6 +292,7 @@ export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceDa
       id: finalInvoiceNumber,
       customer,
       salesOrder,
+      poNumber,
       date: formattedDate,
       amount: numericAmount
     }, action);
@@ -362,10 +369,6 @@ export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceDa
               />
               {suffix && <div className="bg-muted px-3 py-2 rounded-md border text-sm font-mono">{suffix}</div>}
             </div>
-            <div className="mt-2">
-                <Label className="text-[10px] uppercase text-muted-foreground">Preview Hasil:</Label>
-                <Input value={fullInvoiceNumber} disabled className="bg-muted/50 font-bold text-center border-dashed" />
-            </div>
           </div>
            <div className="space-y-2">
             <Label htmlFor="sales-order">Sales Order / SO (Opsional)</Label>
@@ -379,7 +382,7 @@ export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceDa
                     >
                     {salesOrder
                         ? uniqueSalesOrders.find((so) => so === salesOrder)
-                        : "Search and select a Sales Order"}
+                        : "Cari SO (Kosongkan jika hanya penagihan awal/DP)"}
                     <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                     </Button>
                 </PopoverTrigger>
@@ -411,6 +414,16 @@ export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceDa
             </Popover>
           </div>
           <div className="space-y-2">
+            <Label htmlFor="po-number">Nomor PO Customer { !salesOrder && <span className="text-red-500">*</span> }</Label>
+            <Input 
+                id="po-number" 
+                value={poNumber} 
+                onChange={e => setPoNumber(e.target.value)} 
+                placeholder="Misal: PO-ABC-2024" 
+                disabled={!!salesOrder}
+            />
+          </div>
+          <div className="space-y-2">
             <Label htmlFor="customer">Pelanggan</Label>
             <Popover open={customerPopoverOpen} onOpenChange={setCustomerPopoverOpen}>
                 <PopoverTrigger asChild>
@@ -423,7 +436,7 @@ export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceDa
                     >
                     {customer && customerListData
                         ? customerListData.find((c) => c.name.toLowerCase() === customer.toLowerCase())?.name
-                        : "e.g., PT. XYZ Corp"}
+                        : "Pilih Pelanggan"}
                     <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                     </Button>
                 </PopoverTrigger>
