@@ -38,18 +38,22 @@ import {
     FileText,
     User,
     ClipboardCheck,
-    Banknote
+    Banknote,
+    ReceiptText,
+    Scale
   } from 'lucide-react';
-  import { type SalesListItem, type Invoice } from '@/app/lib/data';
+  import { type SalesListItem, type Invoice, type TaxInvoice } from '@/app/lib/data';
   import { useFirestore, useUser, useCollection, useMemoFirebase } from '@/firebase';
   import { collection, query } from 'firebase/firestore';
   import { cn } from '@/lib/utils';
   import { PaymentDetailDialog } from './_components/payment-detail-dialog';
   
   type MergedRecord = SalesListItem & {
-    relatedInvoices: Invoice[];
+    relatedInvoices: (Invoice & { taxInfo?: TaxInvoice })[];
     totalPaid: number;
     outstanding: number;
+    latestInvoiceDate?: string;
+    latestTaxNumber?: string;
   };
 
   export default function SalesManagementPage() {
@@ -62,7 +66,6 @@ import {
     const firestore = useFirestore();
     const { user } = useUser();
 
-    // Persist view mode
     useEffect(() => {
         const savedView = localStorage.getItem('salesManagementViewMode');
         if (savedView === 'list' || savedView === 'book') {
@@ -75,7 +78,6 @@ import {
         localStorage.setItem('salesManagementViewMode', mode);
     };
 
-    // Fetch necessary data
     const salesCollection = useMemoFirebase(() => {
         if (!firestore) return null;
         return query(collection(firestore, 'sales'));
@@ -87,37 +89,49 @@ import {
         return query(collection(firestore, 'invoices'));
     }, [firestore]);
     const { data: invoiceList, isLoading: isInvoicesLoading } = useCollection<Invoice>(invoicesCollection);
-    
-    const isLoading = isSalesLoading || isInvoicesLoading;
 
-    // Logic: Combine PO data with real-time Invoice payments
+    const taxInvoicesCollection = useMemoFirebase(() => {
+        if (!firestore) return null;
+        return query(collection(firestore, 'taxInvoices'));
+    }, [firestore]);
+    const { data: taxInvoiceList, isLoading: isTaxLoading } = useCollection<TaxInvoice>(taxInvoicesCollection);
+    
+    const isLoading = isSalesLoading || isInvoicesLoading || isTaxLoading;
+
     const mergedData = useMemo((): MergedRecord[] => {
         if (!salesList || !invoiceList) return [];
 
         return salesList.map(sale => {
-            const related = invoiceList.filter(inv => inv.poNumber === sale.poNumber);
+            const related = invoiceList.filter(inv => inv.poNumber === sale.poNumber).map(inv => {
+                const tax = taxInvoiceList?.find(t => t.invoiceNumber === inv.id);
+                return { ...inv, taxInfo: tax };
+            });
+
             const paid = related.filter(inv => inv.status === 'paid').reduce((sum, inv) => sum + inv.amount, 0);
             
-            // Dynamic Status Calculation: Real-time Sync Logic
             let status: any = 'Waiting';
             if (paid >= sale.amount && sale.amount > 0) status = 'Paid';
             else if (paid > 0) status = 'Partial';
+
+            const latestInv = [...related].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())[0];
+            const latestTax = related.find(r => r.taxInfo)?.taxInfo?.taxInvoiceNumber;
 
             return {
                 ...sale,
                 status,
                 relatedInvoices: related,
                 totalPaid: paid,
-                outstanding: sale.amount - paid
+                outstanding: sale.amount - paid,
+                latestInvoiceDate: latestInv?.date,
+                latestTaxNumber: latestTax
             };
         }).filter(item => 
             item.poNumber.toLowerCase().includes(searchQuery.toLowerCase()) ||
             item.customer.toLowerCase().includes(searchQuery.toLowerCase()) ||
             (item.soNumber && item.soNumber.toLowerCase().includes(searchQuery.toLowerCase()))
         ).sort((a, b) => b.outstanding - a.outstanding);
-    }, [salesList, invoiceList, searchQuery]);
+    }, [salesList, invoiceList, taxInvoiceList, searchQuery]);
 
-    // Financial KPIs
     const totals = useMemo(() => {
         const totalPo = mergedData.reduce((sum, item) => sum + item.amount, 0);
         const totalPaid = mergedData.reduce((sum, item) => sum + item.totalPaid, 0);
@@ -128,7 +142,6 @@ import {
         };
     }, [mergedData]);
 
-    // Handle deep-link from Sales List
     useEffect(() => {
         const poFromSession = sessionStorage.getItem('activePoPreview');
         if (poFromSession && mergedData.length > 0) {
@@ -146,7 +159,7 @@ import {
         <div className="flex justify-between items-start">
             <div>
                 <h1 className="text-2xl font-bold tracking-tight">Sales Management (Buku Piutang)</h1>
-                <p className="text-muted-foreground">Monitoring arus kas masuk per-dokumen PO.</p>
+                <p className="text-muted-foreground">Monitoring arus kas, penagihan, dan perpajakan per-PO.</p>
             </div>
             <div className="flex bg-muted rounded-md p-1 border">
                 <Button 
@@ -196,32 +209,44 @@ import {
                 {isLoading ? (
                     <div className="py-20 text-center space-y-4">
                         <div className="animate-spin h-8 w-8 border-4 border-primary border-t-transparent rounded-full mx-auto" />
-                        <p className="text-muted-foreground">Menganalisa Buku Piutang...</p>
+                        <p className="text-muted-foreground">Menganalisa Buku Piutang & Perpajakan...</p>
                     </div>
                 ) : viewMode === 'list' ? (
                     <div className="rounded-md border overflow-hidden">
                         <Table>
                             <TableHeader className="bg-muted/50">
                                 <TableRow>
-                                    <TableHead>SO NUMBER</TableHead>
+                                    <TableHead>SO / PO NUMBER</TableHead>
                                     <TableHead>CUSTOMER</TableHead>
+                                    <TableHead>LATEST INVOICE / TAX</TableHead>
                                     <TableHead className="text-right">TOTAL PO</TableHead>
                                     <TableHead className="text-right">TERBAYAR</TableHead>
                                     <TableHead className="text-right">OUTSTANDING</TableHead>
-                                    <TableHead className="text-center">PROGRES</TableHead>
+                                    <TableHead className="text-center">STATUS</TableHead>
                                     <TableHead className="text-right"></TableHead>
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
                                 {mergedData.length === 0 ? (
-                                    <TableRow><TableCell colSpan={7} className="text-center py-8">Tidak ada data ditemukan.</TableCell></TableRow>
+                                    <TableRow><TableCell colSpan={8} className="text-center py-8">Tidak ada data ditemukan.</TableCell></TableRow>
                                 ) : mergedData.map((item) => (
                                     <TableRow key={item.poNumber}>
-                                        <TableCell className="font-bold">{item.soNumber || '(Waiting SO)'}</TableCell>
+                                        <TableCell>
+                                            <div className="flex flex-col">
+                                                <span className="font-bold text-sm">{item.soNumber || '(Waiting SO)'}</span>
+                                                <span className="text-[10px] text-muted-foreground">{item.poNumber}</span>
+                                            </div>
+                                        </TableCell>
                                         <TableCell>
                                             <div className="flex flex-col">
                                                 <span className="font-medium text-sm">{item.customer}</span>
                                                 <span className="text-[10px] text-muted-foreground uppercase">{item.sales}</span>
+                                            </div>
+                                        </TableCell>
+                                        <TableCell>
+                                            <div className="flex flex-col gap-0.5">
+                                                <span className="text-[10px] font-medium text-blue-600 truncate max-w-[120px]">{item.latestInvoiceDate || '-'}</span>
+                                                <span className="text-[10px] text-muted-foreground truncate max-w-[120px]">{item.latestTaxNumber || 'No Tax Invoice'}</span>
                                             </div>
                                         </TableCell>
                                         <TableCell className="text-right font-medium">Rp {item.amount.toLocaleString('id-ID')}</TableCell>
@@ -245,7 +270,7 @@ import {
                                                         <Eye className="mr-2 h-4 w-4" /> View Details
                                                     </DropdownMenuItem>
                                                     <DropdownMenuItem>
-                                                        <FileText className="mr-2 h-4 w-4" /> Export PDF
+                                                        <FileText className="mr-2 h-4 w-4" /> Export Report
                                                     </DropdownMenuItem>
                                                 </DropdownMenuContent>
                                             </DropdownMenu>
@@ -287,8 +312,27 @@ import {
                                         </div>
                                         <div className="flex items-center gap-2 text-xs">
                                             <ClipboardCheck className="h-4 w-4 text-muted-foreground shrink-0" />
-                                            <span className="text-muted-foreground">PO Customer:</span>
+                                            <span className="text-muted-foreground">PO:</span>
                                             <span className="font-medium">{item.poNumber}</span>
+                                        </div>
+                                    </div>
+
+                                    {/* SEKSI BARU: PENAGIHAN & PAJAK */}
+                                    <div className="p-3 bg-muted/20 rounded-lg border border-dashed space-y-2">
+                                        <p className="text-[10px] font-bold uppercase text-muted-foreground flex items-center gap-1">
+                                            <ReceiptText className="h-3 w-3" /> Riwayat Penagihan & Pajak
+                                        </p>
+                                        <div className="space-y-1">
+                                            <div className="flex justify-between text-[10px]">
+                                                <span className="text-muted-foreground">Latest Inv:</span>
+                                                <span className="font-medium">{item.latestInvoiceDate || 'Not Issued'}</span>
+                                            </div>
+                                            <div className="flex justify-between text-[10px]">
+                                                <span className="text-muted-foreground">Tax Invoice:</span>
+                                                <span className={item.latestTaxNumber ? "text-blue-600 font-bold" : "text-muted-foreground"}>
+                                                    {item.latestTaxNumber || '-'}
+                                                </span>
+                                            </div>
                                         </div>
                                     </div>
 
@@ -312,19 +356,6 @@ import {
                                             <span className="text-sm font-black text-red-600">Rp {item.outstanding.toLocaleString('id-ID')}</span>
                                         </div>
                                     </div>
-                                    
-                                    <div className="space-y-1">
-                                        <div className="flex justify-between text-[10px]">
-                                            <span className="text-muted-foreground">Status Tagihan:</span>
-                                            <span className={item.relatedInvoices.length > 0 ? "text-blue-600 font-bold" : "text-orange-600 font-bold"}>
-                                                {item.relatedInvoices.length > 0 ? "Invoice Issued" : "Not Invoiced"}
-                                            </span>
-                                        </div>
-                                        <div className="flex justify-between text-[10px]">
-                                            <span className="text-muted-foreground">Tax Invoice:</span>
-                                            <span className="font-medium">-</span>
-                                        </div>
-                                    </div>
                                 </CardContent>
                                 <CardFooter className="bg-muted/10 p-3 pt-0 mt-auto">
                                     <Button variant="outline" className="w-full h-8 text-xs font-bold" onClick={() => { setSelectedSale(item); setDetailOpen(true); }}>
@@ -338,7 +369,6 @@ import {
             </CardContent>
         </Card>
 
-        {/* Payment Detail Buku Piutang */}
         <PaymentDetailDialog 
             isOpen={detailOpen} 
             onOpenChange={setDetailOpen} 
