@@ -1,3 +1,4 @@
+
 'use client';
 import { useState, useMemo, useRef } from 'react';
 import {
@@ -23,7 +24,7 @@ import {
   import { Button } from '@/components/ui/button';
   import { Checkbox } from '@/components/ui/checkbox';
   import type { ProductListItem, UserProfile } from '@/app/lib/data';
-  import { Search, Upload, Download, Trash2, Edit, FileSpreadsheet } from 'lucide-react';
+  import { Search, Upload, Download, Trash2, Edit, FileSpreadsheet, UserCheck } from 'lucide-react';
   import { AddProductDialog } from './_components/add-product-dialog';
   import { DeleteConfirmationDialog } from '@/app/components/delete-confirmation-dialog';
   import { useToast } from '@/hooks/use-toast';
@@ -135,7 +136,12 @@ import {
         }
 
         const docRef = doc(firestore, 'products', productId!);
-        const dataToSave = { ...product, id: productId, ownerId: user.uid };
+        const dataToSave = { 
+            ...product, 
+            id: productId, 
+            ownerId: user.uid,
+            createdBy: userProfile?.displayName || user.email || 'System'
+        };
 
         setDoc(docRef, dataToSave, { merge: !isNewProduct })
             .then(() => {
@@ -180,7 +186,6 @@ import {
                 let newCount = 0;
                 let mergedCount = 0;
 
-                // 1. Konsolidasi internal data Excel (menggabungkan item yang sama di dalam file itu sendiri)
                 const consolidatedImports: Record<string, any> = {};
                 rawData.forEach(item => {
                     const name = String(item.name || '').trim();
@@ -189,7 +194,7 @@ import {
                     const qty = parseFormattedNumber(item.quantity);
                     const category = String(item.category || 'kabel').trim();
 
-                    if (!name) return; // Lewati jika nama kosong
+                    if (!name) return;
 
                     const key = `${name.toLowerCase()}|${unit.toLowerCase()}|${price}`;
                     if (consolidatedImports[key]) {
@@ -199,7 +204,6 @@ import {
                     }
                 });
 
-                // 2. Bandingkan dengan Database dan terapkan logika Merge atau Add
                 Object.values(consolidatedImports).forEach(item => {
                     const existingProduct = products.find(p => 
                         p.name.trim().toLowerCase() === item.name.toLowerCase() && 
@@ -218,28 +222,18 @@ import {
                         batch.set(newDocRef, { 
                             ...item, 
                             id: newDocRef.id, 
-                            ownerId: user.uid 
+                            ownerId: user.uid,
+                            createdBy: userProfile?.displayName || user.email || 'System'
                         });
                         newCount++;
                     }
                 });
 
                 await batch.commit();
-                
-                toast({ 
-                    title: "Impor Berhasil", 
-                    description: `Total ${Object.keys(consolidatedImports).length} data diproses: ${newCount} item baru berhasil ditambahkan, ${mergedCount} item digabungkan (stok diperbarui).` 
-                });
-                
-                // Reset input file agar bisa digunakan lagi untuk file yang sama jika perlu
+                toast({ title: "Impor Berhasil", description: `Total ${Object.keys(consolidatedImports).length} data diproses secara real-time.` });
                 event.target.value = '';
             } catch (error) {
-                console.error("Import error:", error);
-                toast({ 
-                    variant: "destructive", 
-                    title: "Gagal Impor", 
-                    description: "Terjadi kesalahan saat memproses file Excel. Pastikan format kolom sesuai template." 
-                });
+                toast({ variant: "destructive", title: "Gagal Impor" });
             }
         }
     };
@@ -250,7 +244,7 @@ import {
         <div className="flex justify-between items-center">
           <div>
             <h1 className="text-2xl font-bold tracking-tight">Product List</h1>
-            <p className="text-muted-foreground">Manage your products inventory.</p>
+            <p className="text-muted-foreground">Manage your products inventory in a centralized database.</p>
           </div>
           <div className="flex items-center gap-2">
             <input type="file" ref={fileInputRef} onChange={handleFileChange} className="hidden" accept=".xlsx, .xls" />
@@ -308,12 +302,13 @@ import {
                                 <TableHead>QUANTITY</TableHead>
                                 <TableHead>SATUAN</TableHead>
                                 <TableHead>PRICE</TableHead>
+                                <TableHead>ADDED BY</TableHead>
                                 <TableHead className="text-right">TINDAKAN</TableHead>
                             </TableRow>
                         </TableHeader>
                         <TableBody>
                             {isLoading ? (
-                                <TableRow><TableCell colSpan={7} className="text-center py-8">Memuat data...</TableCell></TableRow>
+                                <TableRow><TableCell colSpan={8} className="text-center py-8">Memuat data...</TableCell></TableRow>
                             ) : filteredProducts?.map((product) => (
                                 <TableRow key={product.id} className={selectedIds.has(product.id!) ? "bg-muted/50" : ""}>
                                     <TableCell>
@@ -327,6 +322,11 @@ import {
                                     <TableCell>{product.quantity} units</TableCell>
                                     <TableCell>{product.unit}</TableCell>
                                     <TableCell>Rp {product.price.toLocaleString('id-ID')},00</TableCell>
+                                    <TableCell>
+                                        <div className="flex items-center gap-1.5 text-[10px] font-bold text-muted-foreground uppercase">
+                                            <UserCheck className="h-3 w-3" /> {product.createdBy || 'Unknown'}
+                                        </div>
+                                    </TableCell>
                                     <TableCell className="text-right">
                                         {isAdmin && (
                                             <div className="flex justify-end gap-1">
@@ -348,19 +348,8 @@ import {
                         </TableBody>
                     </Table>
                 </div>
-                <div className="text-sm text-muted-foreground mt-4">
-                    Menampilkan {filteredProducts?.length || 0} dari {products?.length || 0} entri
-                </div>
             </CardContent>
         </Card>
-
-        <DeleteConfirmationDialog 
-            open={deleteDialogState.isOpen && deleteDialogState.isBulk} 
-            onOpenChange={(open) => setDeleteDialogState(prev => ({...prev, isOpen: open}))} 
-            onConfirm={handleDeleteConfirm}
-        >
-            <span />
-        </DeleteConfirmationDialog>
       </main>
     );
   }

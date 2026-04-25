@@ -64,6 +64,7 @@ export type InvoiceNumber = {
   date: string;
   amount: number;
   ownerId?: string;
+  createdBy?: string;
 };
 
 export type TaxInvoice = {
@@ -74,6 +75,7 @@ export type TaxInvoice = {
     taxInvoiceDate: string;
     invoiceNumber: string;
     ownerId?: string;
+    createdBy?: string;
 };
 
 export type ProductListItem = {
@@ -84,6 +86,7 @@ export type ProductListItem = {
     unit: string;
     price: number;
     ownerId?: string;
+    createdBy?: string;
 };
 
 export type SalesOrder = {
@@ -97,6 +100,7 @@ export type SalesOrder = {
     price: number;
     ownerId?: string;
     customer: string;
+    createdBy?: string;
 };
 
 export type CustomerAddress = {
@@ -113,6 +117,7 @@ export type Customer = {
   email?: string;
   addresses: CustomerAddress[];
   ownerId?: string;
+  createdBy?: string;
 };
 
 export type SalesListItem = {
@@ -121,9 +126,10 @@ export type SalesListItem = {
   sales: string;
   poNumber: string;
   amount: number;
-  status: 'Paid' | 'Unpaid';
+  status: 'Paid' | 'Unpaid' | 'Waiting' | 'Partial';
   paidDate?: string;
   ownerId?: string;
+  createdBy?: string;
 };
 
 export type SpdInvoiceEntry = {
@@ -141,6 +147,7 @@ export type SpdData = {
     invoices: SpdInvoiceEntry[];
     status: 'in_delivery' | 'received' | 'rejected';
     ownerId?: string;
+    createdBy?: string;
 };
 
 export type VirtualAccount = {
@@ -150,4 +157,5 @@ export type VirtualAccount = {
   bankName: string;
   vaNumber: string;
   ownerId?: string;
+  createdBy?: string;
 };

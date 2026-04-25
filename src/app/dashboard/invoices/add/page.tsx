@@ -66,7 +66,7 @@ import { type InvoiceNumber, type Customer, type ProductListItem, type Invoice, 
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useFirestore, useCollection, useMemoFirebase, useUser, useDoc } from '@/firebase';
-import { collection, query, doc, writeBatch, updateDoc, arrayUnion } from 'firebase/firestore';
+import { collection, query, doc, writeBatch, updateDoc, arrayUnion, setDoc } from 'firebase/firestore';
 import { Badge } from '@/components/ui/badge';
 
 type InvoiceItem = {
@@ -192,7 +192,7 @@ export default function AddInvoicePage() {
     const currentSubtotal = items.reduce((acc, item) => acc + (parseFormattedNumber(item.quantity) * parseFormattedNumber(item.price)), 0);
     setSubtotal(currentSubtotal);
   
-    // 1. Negotiation Calculation (Prioritas Nominal Absolut)
+    // 1. Negotiation Calculation
     const negInputVal = parseFormattedNumber(String(negotiationValue));
     const negNominal = negotiationMode === 'percent' ? (currentSubtotal * (negInputVal / 100)) : negInputVal;
     setCalculatedNegNominal(negNominal);
@@ -267,17 +267,27 @@ export default function AddInvoicePage() {
         return;
     }
 
+    // ANTI-DUPLICATE CHECK
+    const existing = allInvoices?.find(inv => inv.id.toLowerCase() === invoiceId.toLowerCase());
+    if (existing && !editInvoiceId) {
+        toast({ 
+            variant: "destructive", 
+            title: "Nomor Invoice Duplikat", 
+            description: `Nomor ini sudah digunakan oleh ${existing.createdBy || 'User lain'}.` 
+        });
+        return;
+    }
+
     if (isOverLimit) {
         toast({ variant: "destructive", title: "Calculation Error", description: "Akumulasi potongan melebihi nilai barang." });
         return;
     }
 
-    const batch = writeBatch(firestore);
     const safeInvoiceId = invoiceId.replace(/\//g, '_');
     const finalAmountValue = parseFormattedNumber(String(totalAmount));
 
     const invoiceDocRef = doc(firestore, 'invoices', safeInvoiceId);
-    batch.set(invoiceDocRef, {
+    const dataToSave = {
         id: invoiceId,
         soNumber: soNumber || '(Waiting SO)',
         poNumber: poNumber,
@@ -291,15 +301,22 @@ export default function AddInvoicePage() {
         paymentMethod: paymentMethodText,
         sjNumbers: sjInput.split(',').map(s => s.trim()).filter(s => s !== ''),
         ownerId: user.uid,
-        createdBy: user.email,
+        createdBy: userProfile?.displayName || user.email || 'System',
         negotiation: calculatedNegNominal,
         dpValue: calculatedDpNominal,
         retention: calculatedRetNominal,
-    }, { merge: true });
+    };
 
-    await batch.commit();
-    toast({ title: "Invoice Berhasil Disimpan" });
-    router.push('/dashboard/invoices');
+    setDoc(invoiceDocRef, dataToSave, { merge: true })
+        .then(() => {
+            toast({ title: "Invoice Berhasil Disimpan" });
+            router.push('/dashboard/invoices');
+        })
+        .catch(err => {
+            errorEmitter.emit('permission-error', new FirestorePermissionError({
+                path: invoiceDocRef.path, operation: editInvoiceId ? 'update' : 'create', requestResourceData: dataToSave
+            }));
+        });
   };
 
   const handlePreview = () => {
@@ -342,7 +359,7 @@ export default function AddInvoicePage() {
             </Button>
             <div>
                 <h1 className="text-2xl font-black tracking-tight uppercase">Invoice Constructor</h1>
-                <p className="text-xs text-muted-foreground font-bold">Lengkapi rincian penagihan dan sinkronisasi nilai pajak.</p>
+                <p className="text-xs text-muted-foreground font-bold">Lengkapi rincian penagihan dan sinkronisasi nilai pajak harian secara real-time.</p>
             </div>
         </div>
         <div className="flex items-center gap-2">

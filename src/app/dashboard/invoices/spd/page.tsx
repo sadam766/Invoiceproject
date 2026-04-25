@@ -29,8 +29,8 @@ import {
   import { AddSpdDialog } from './_components/add-spd-dialog';
   import { useToast } from '@/hooks/use-toast';
   import { DeleteConfirmationDialog } from '@/app/components/delete-confirmation-dialog';
-  import { useFirestore, useUser, useCollection, useMemoFirebase } from '@/firebase';
-  import { collection, doc, deleteDoc, writeBatch, query, updateDoc } from 'firebase/firestore';
+  import { useFirestore, useUser, useCollection, useMemoFirebase, useDoc } from '@/firebase';
+  import { collection, doc, deleteDoc, writeBatch, query, updateDoc, setDoc } from 'firebase/firestore';
   import { cn } from '@/lib/utils';
   import { 
     DropdownMenu, 
@@ -39,7 +39,7 @@ import {
     DropdownMenuTrigger 
   } from '@/components/ui/dropdown-menu';
   import { parseISO, differenceInDays } from 'date-fns';
-  import type { SpdData, Invoice, SpdInvoiceEntry } from '@/app/lib/data';
+  import type { SpdData, Invoice, SpdInvoiceEntry, UserProfile } from '@/app/lib/data';
   
   export default function SpdPage() {
     const firestore = useFirestore();
@@ -54,6 +54,10 @@ import {
 
     // State for pre-selected invoices from shortcut
     const [initialPreselected, setInitialPreselected] = useState<SpdInvoiceEntry[] | undefined>(undefined);
+
+    // Profile lookup for Audit Trail
+    const userProfileRef = useMemoFirebase(() => (!firestore || !user) ? null : doc(firestore, 'users', user.uid), [firestore, user]);
+    const { data: userProfile } = useDoc<UserProfile>(userProfileRef);
 
     const spdsCollection = useMemoFirebase(() => {
         if (!firestore) return null;
@@ -126,11 +130,28 @@ import {
 
     const handleSave = async (newItem: SpdData) => {
         if (!firestore || !user) return;
+
+        // ANTI-DUPLICATE CHECK
+        const existing = spds?.find(s => s.id.toLowerCase() === newItem.id.toLowerCase());
+        if (existing && !editingSpd) {
+            toast({ 
+                variant: "destructive", 
+                title: "Nomor SPD Duplikat", 
+                description: `Nomor ini sudah digunakan oleh ${existing.createdBy || 'User lain'}.` 
+            });
+            return;
+        }
         
         const safeId = newItem.id.replace(/\//g, '_');
         const batch = writeBatch(firestore);
         const spdRef = doc(firestore, 'spds', safeId);
         
+        const finalSpdData = { 
+            ...newItem, 
+            ownerId: user.uid,
+            createdBy: userProfile?.displayName || user.email || 'System'
+        };
+
         // 1. UPDATE INVOICES: Tandai invoice dengan No. SPD (Pencegahan Duplikasi)
         newItem.invoices.forEach(inv => {
             const safeInvId = inv.invoiceId.replace(/\//g, '_');
@@ -139,7 +160,7 @@ import {
         });
 
         // 2. SAVE SPD
-        batch.set(spdRef, { ...newItem, ownerId: user.uid }, { merge: true });
+        batch.set(spdRef, finalSpdData, { merge: true });
 
         await batch.commit();
         toast({ 
@@ -191,7 +212,7 @@ import {
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div>
             <h1 className="text-3xl font-black tracking-tighter uppercase">SPD Digital Dispatch</h1>
-            <p className="text-muted-foreground font-medium">Konsolidasi dokumen pengiriman dalam satu sistem terpadu.</p>
+            <p className="text-muted-foreground font-medium">Konsolidasi dokumen pengiriman dalam satu sistem terpadu secara real-time.</p>
           </div>
           <AddSpdDialog
                 isOpen={isDialogOpen}
@@ -299,21 +320,26 @@ import {
                                 </div>
                             </div>
 
-                            <div className="pt-2 flex gap-2">
-                                {spd.status === 'in_delivery' ? (
-                                    <>
-                                        <Button variant="outline" size="sm" className="flex-1 h-9 text-[10px] font-black border-emerald-200 hover:bg-emerald-50 text-emerald-700 shadow-sm" onClick={() => handleUpdateStatus(spd, 'received')}>
-                                            MARK RECEIVED
+                            <div className="pt-2 flex flex-col gap-2">
+                                <div className="flex gap-2">
+                                    {spd.status === 'in_delivery' ? (
+                                        <>
+                                            <Button variant="outline" size="sm" className="flex-1 h-9 text-[10px] font-black border-emerald-200 hover:bg-emerald-50 text-emerald-700 shadow-sm" onClick={() => handleUpdateStatus(spd, 'received')}>
+                                                MARK RECEIVED
+                                            </Button>
+                                            <Button variant="ghost" size="sm" className="h-9 text-[10px] font-black text-rose-600" onClick={() => handleUpdateStatus(spd, 'rejected')}>
+                                                REJECT
+                                            </Button>
+                                        </>
+                                    ) : (
+                                        <Button variant="outline" size="sm" className="w-full h-9 text-[10px] font-black tracking-widest" onClick={() => handleUpdateStatus(spd, 'in_delivery')}>
+                                            RESET TO DELIVERY
                                         </Button>
-                                        <Button variant="ghost" size="sm" className="h-9 text-[10px] font-black text-rose-600" onClick={() => handleUpdateStatus(spd, 'rejected')}>
-                                            REJECT
-                                        </Button>
-                                    </>
-                                ) : (
-                                    <Button variant="outline" size="sm" className="w-full h-9 text-[10px] font-black tracking-widest" onClick={() => handleUpdateStatus(spd, 'in_delivery')}>
-                                        RESET TO DELIVERY
-                                    </Button>
-                                )}
+                                    )}
+                                </div>
+                                <p className="text-[8px] text-muted-foreground text-center uppercase font-bold tracking-widest">
+                                    Dispatch By: {spd.createdBy || 'Unknown'}
+                                </p>
                             </div>
                         </CardContent>
                     </Card>

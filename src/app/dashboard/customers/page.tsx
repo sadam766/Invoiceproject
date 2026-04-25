@@ -18,7 +18,7 @@ import {
   import { Checkbox } from '@/components/ui/checkbox';
   import { Badge } from '@/components/ui/badge';
   import type { Customer, UserProfile } from '@/app/lib/data';
-  import { Search, Upload, Download, Trash2, Edit, FileSpreadsheet, MapPin } from 'lucide-react';
+  import { Search, Upload, Download, Trash2, Edit, FileSpreadsheet, MapPin, UserCheck } from 'lucide-react';
   import { AddCustomerDialog } from './_components/add-customer-dialog';
   import { DeleteConfirmationDialog } from '@/app/components/delete-confirmation-dialog';
   import { useToast } from '@/hooks/use-toast';
@@ -119,7 +119,12 @@ import {
         const isNewCustomer = !customer.id;
         const customerId = customer.id || doc(collection(firestore, 'customers')).id;
         const docRef = doc(firestore, 'customers', customerId);
-        const dataToSave = { ...customer, id: customerId, ownerId: user.uid };
+        const dataToSave = { 
+            ...customer, 
+            id: customerId, 
+            ownerId: user.uid,
+            createdBy: userProfile?.displayName || user.email || 'System'
+        };
         
         setDoc(docRef, dataToSave, { merge: true })
             .then(() => {
@@ -156,8 +161,13 @@ import {
                 const batch = writeBatch(firestore);
                 data.forEach(item => {
                     const newDocRef = doc(collection(firestore, 'customers'));
-                    // Import basic info, empty address book initially
-                    batch.set(newDocRef, { ...item, id: newDocRef.id, ownerId: user.uid, addresses: [] });
+                    batch.set(newDocRef, { 
+                        ...item, 
+                        id: newDocRef.id, 
+                        ownerId: user.uid, 
+                        addresses: [],
+                        createdBy: userProfile?.displayName || user.email || 'System'
+                    });
                 });
                 await batch.commit();
                 toast({ title: "Import Berhasil", description: `${data.length} pelanggan ditambahkan.` });
@@ -172,7 +182,7 @@ import {
         <div className="flex justify-between items-center">
             <div>
                 <h1 className="text-2xl font-bold tracking-tight">Customer List</h1>
-                <p className="text-muted-foreground">Manage your customer address book.</p>
+                <p className="text-muted-foreground">Manage your customer address book in a shared global database.</p>
             </div>
             <div className="flex items-center gap-2">
                 <input type="file" ref={fileInputRef} onChange={handleFileChange} className="hidden" accept=".xlsx, .xls" />
@@ -215,7 +225,7 @@ import {
                                 </TableHead>
                                 <TableHead>CUSTOMER</TableHead>
                                 <TableHead>DEFAULT ADDRESS</TableHead>
-                                <TableHead className="text-center">ADDRESS BOOK</TableHead>
+                                <TableHead>ADDED BY</TableHead>
                                 <TableHead className="text-right">ACTIONS</TableHead>
                             </TableRow>
                         </TableHeader>
@@ -248,8 +258,10 @@ import {
                                                 <span className="text-xs italic text-muted-foreground">Belum ada alamat</span>
                                             )}
                                         </TableCell>
-                                        <TableCell className="text-center">
-                                            <Badge variant="outline">{customer.addresses?.length || 0} Lokasi</Badge>
+                                        <TableCell>
+                                            <div className="flex items-center gap-1.5 text-[10px] font-bold text-muted-foreground uppercase">
+                                                <UserCheck className="h-3 w-3" /> {customer.createdBy || 'Unknown'}
+                                            </div>
                                         </TableCell>
                                         <TableCell className="text-right">
                                             <div className="flex justify-end gap-1">
@@ -275,14 +287,6 @@ import {
                 </div>
             </CardContent>
         </Card>
-
-        <DeleteConfirmationDialog 
-            open={deleteDialogState.isOpen && deleteDialogState.isBulk} 
-            onOpenChange={(open) => setDeleteDialogState(prev => ({...prev, isOpen: open}))} 
-            onConfirm={handleDeleteConfirm}
-        >
-            <span />
-        </DeleteConfirmationDialog>
       </main>
     );
   }

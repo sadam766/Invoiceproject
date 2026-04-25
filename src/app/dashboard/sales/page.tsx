@@ -1,3 +1,4 @@
+
 'use client';
 import { useState, useMemo, useRef } from 'react';
 import { useRouter } from 'next/navigation';
@@ -28,7 +29,7 @@ import {
     DialogFooter 
   } from '@/components/ui/dialog';
   import { type SalesListItem, type UserProfile, type Invoice } from '@/app/lib/data';
-  import { Search, MoreHorizontal, Upload, Download, Eye, Edit, Trash2, FileSpreadsheet, RefreshCw } from 'lucide-react';
+  import { Search, MoreHorizontal, Upload, Download, Eye, Edit, Trash2, FileSpreadsheet, RefreshCw, UserCheck } from 'lucide-react';
   import { AddSaleDialog } from './_components/add-sale-dialog';
   import { useToast } from '@/hooks/use-toast';
   import { DeleteConfirmationDialog } from '@/app/components/delete-confirmation-dialog';
@@ -141,12 +142,45 @@ import {
         setSoUpdateState({ isOpen: false });
     };
 
+    const handleSaveSale = (saleData: Omit<SalesListItem, 'ownerId'>) => {
+        if (!firestore || !user) return;
+
+        // ANTI-DUPLICATE CHECK
+        const existing = sales?.find(s => s.poNumber.toLowerCase() === saleData.poNumber.toLowerCase());
+        if (existing && !editingSale) {
+            toast({ 
+                variant: "destructive", 
+                title: "Nomor PO Duplikat", 
+                description: `Nomor PO ini sudah terdaftar oleh ${existing.createdBy || 'User lain'}. Anda tidak dapat menginput ulang.` 
+            });
+            return;
+        }
+
+        const docRef = doc(firestore, 'sales', saleData.poNumber);
+        const dataToSave = { 
+            ...saleData, 
+            ownerId: user.uid, 
+            createdBy: userProfile?.displayName || user.email || 'System' 
+        };
+
+        setDoc(docRef, dataToSave, { merge: true })
+            .then(() => {
+                toast({ title: editingSale ? "Berhasil Diperbarui" : "Berhasil Terdaftar" });
+                setIsDialogOpen(false);
+            })
+            .catch(err => {
+                errorEmitter.emit('permission-error', new FirestorePermissionError({
+                    path: docRef.path, operation: editingSale ? 'update' : 'create', requestResourceData: dataToSave
+                }));
+            });
+    };
+
     return (
       <main className="flex flex-1 flex-col gap-4 p-4 md:gap-8 md:p-8">
         <div className="flex justify-between items-center">
             <div>
                 <h1 className="text-2xl font-bold tracking-tight">Sales List (Registrasi PO)</h1>
-                <p className="text-muted-foreground">Daftarkan PO Customer dan kelola status transaksinya.</p>
+                <p className="text-muted-foreground">Daftarkan PO Customer dan kelola status transaksinya dalam satu database terpusat.</p>
             </div>
             <div className="flex items-center gap-2">
                 <input type="file" ref={fileInputRef} className="hidden" accept=".xlsx, .xls" />
@@ -155,7 +189,7 @@ import {
                 <AddSaleDialog 
                     isOpen={isDialogOpen}
                     onOpenChange={setIsDialogOpen}
-                    onSave={(s) => setDoc(doc(firestore!, 'sales', s.poNumber), {...s, ownerId: user!.uid}, {merge: true}).then(() => toast({title: "Berhasil Terdaftar"}))}
+                    onSave={handleSaveSale}
                     saleData={editingSale}
                     onAddClick={() => { setEditingSale(undefined); setIsDialogOpen(true); }}
                 />
@@ -185,10 +219,10 @@ import {
                                 </TableHead>
                                 <TableHead>PO NUMBER</TableHead>
                                 <TableHead>CUSTOMER</TableHead>
-                                <TableHead>SALES</TableHead>
                                 <TableHead>SO NUMBER</TableHead>
                                 <TableHead>AMOUNT</TableHead>
                                 <TableHead>STATUS</TableHead>
+                                <TableHead>INPUT BY</TableHead>
                                 <TableHead className="text-right">AKSI</TableHead>
                             </TableRow>
                         </TableHeader>
@@ -202,7 +236,6 @@ import {
                                     </TableCell>
                                     <TableCell className="font-bold">{sale.poNumber}</TableCell>
                                     <TableCell>{sale.customer}</TableCell>
-                                    <TableCell>{sale.sales}</TableCell>
                                     <TableCell>
                                         <div className="flex items-center gap-2">
                                             <span className={sale.soNumber ? "font-medium" : "italic text-muted-foreground"}>{sale.soNumber || 'Waiting SO'}</span>
@@ -219,6 +252,11 @@ import {
                                         )}>
                                             {sale.status}
                                         </Badge>
+                                    </TableCell>
+                                    <TableCell>
+                                        <div className="flex items-center gap-1.5 text-[10px] font-bold text-muted-foreground uppercase">
+                                            <UserCheck className="h-3 w-3" /> {sale.createdBy || 'Unknown'}
+                                        </div>
                                     </TableCell>
                                     <TableCell className="text-right">
                                         <DropdownMenu>
