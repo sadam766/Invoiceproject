@@ -35,26 +35,40 @@
       "$schema": "http://json-schema.org/draft-07/schema#",
       "title": "Customer",
       "type": "object",
-      "description": "Represents a customer in the sales dashboard.",
+      "description": "Represents a customer with multiple addresses.",
       "properties": {
         "id": {
-          "type": "string",
-          "description": "Unique identifier for the customer."
+          "type": "string"
         },
         "name": {
           "type": "string",
-          "description": "Name of the customer."
+          "description": "Legal name of the customer (Pusat)."
         },
         "email": {
           "type": "string",
-          "description": "Email address of the customer.",
           "format": "email"
+        },
+        "addresses": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": { "type": "string" },
+              "label": { "type": "string", "description": "e.g. Kantor Pusat, Gudang A" },
+              "address": { "type": "string" },
+              "npwp": { "type": "string" },
+              "isDefault": { "type": "boolean" }
+            }
+          }
+        },
+        "ownerId": {
+          "type": "string"
         }
       },
       "required": [
         "id",
         "name",
-        "email"
+        "ownerId"
       ]
     },
     "Sale": {
@@ -117,33 +131,33 @@
       "type": "object",
       "properties": {
         "id": {
-          "type": "string",
-          "description": "Unique identifier for the invoice, often formatted (e.g., INV/2024/001)."
+          "type": "string"
         },
         "soNumber": {
-          "type": "string",
-          "description": "Sales Order number related to this invoice."
+          "type": "string"
         },
         "poNumber": {
-          "type": "string",
-          "description": "Purchase Order number from the customer."
+          "type": "string"
         },
         "customer": {
+          "type": "string"
+        },
+        "billingAddress": {
           "type": "string",
-          "description": "Name of the customer being invoiced."
+          "description": "The specific branch address selected for this invoice."
+        },
+        "billingNpwp": {
+          "type": "string"
         },
         "date": {
           "type": "string",
-          "description": "The date the invoice was issued.",
           "format": "date"
         },
         "amount": {
-          "type": "number",
-          "description": "The total amount of the invoice."
+          "type": "number"
         },
         "status": {
           "type": "string",
-          "description": "The current status of the invoice.",
           "enum": [
             "paid",
             "unpaid",
@@ -152,12 +166,10 @@
           ]
         },
         "spdNumber": {
-          "type": "string",
-          "description": "The SPD (Surat Pengantar Dokumen) number associated with this invoice, if any."
+          "type": "string"
         },
         "ownerId": {
-          "type": "string",
-          "description": "The UID of the user who owns this document."
+          "type": "string"
         }
       },
       "required": [
@@ -176,8 +188,7 @@
       "type": "object",
       "properties": {
         "spd": {
-          "type": "string",
-          "description": "Unique identifier for the SPD."
+          "type": "string"
         },
         "tanggal": {
           "type": "string",
@@ -218,8 +229,7 @@
           "type": "string"
         },
         "ownerId": {
-          "type": "string",
-          "description": "The UID of the user who owns this document."
+          "type": "string"
         }
       },
       "required": [
@@ -237,8 +247,7 @@
       "type": "object",
       "properties": {
         "taxInvoiceNumber": {
-          "type": "string",
-          "description": "Unique identifier for the tax invoice."
+          "type": "string"
         },
         "buyerNpwp": {
           "type": "string"
@@ -257,8 +266,7 @@
           "type": "string"
         },
         "ownerId": {
-          "type": "string",
-          "description": "The UID of the user who owns this document."
+          "type": "string"
         }
       },
       "required": [
@@ -277,40 +285,31 @@
         "type": "object",
         "properties": {
             "id": {
-                "type": "string",
-                "description": "Unique identifier for the sales order item."
+                "type": "string"
             },
             "soNumber": {
-                "type": "string",
-                "description": "The sales order number this item belongs to."
+                "type": "string"
             },
             "customer": {
-                "type": "string",
-                "description": "The customer associated with this sales order."
+                "type": "string"
             },
             "productName": {
-                "type": "string",
-                "description": "Name of the product."
+                "type": "string"
             },
             "category": {
-                "type": "string",
-                "description": "Category of the product."
+                "type": "string"
             },
             "quantity": {
-                "type": "number",
-                "description": "Quantity of the product ordered."
+                "type": "number"
             },
             "unit": {
-                "type": "string",
-                "description": "Unit of measurement for the quantity."
+                "type": "string"
             },
             "price": {
-                "type": "number",
-                "description": "Price per unit of the product."
+                "type": "number"
             },
             "ownerId": {
-                "type": "string",
-                "description": "The UID of the user who owns this document."
+                "type": "string"
             }
         },
         "required": [

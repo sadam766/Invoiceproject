@@ -16,8 +16,9 @@ import {
   import { Input } from '@/components/ui/input';
   import { Button } from '@/components/ui/button';
   import { Checkbox } from '@/components/ui/checkbox';
+  import { Badge } from '@/components/ui/badge';
   import type { Customer, UserProfile } from '@/app/lib/data';
-  import { Search, Upload, Download, Trash2, Edit, FileSpreadsheet } from 'lucide-react';
+  import { Search, Upload, Download, Trash2, Edit, FileSpreadsheet, MapPin } from 'lucide-react';
   import { AddCustomerDialog } from './_components/add-customer-dialog';
   import { DeleteConfirmationDialog } from '@/app/components/delete-confirmation-dialog';
   import { useToast } from '@/hooks/use-toast';
@@ -58,9 +59,8 @@ import {
         if (!customers) return [];
         if (!searchQuery) return customers;
         return customers.filter((customer) =>
-          Object.values(customer).some((value) =>
-            String(value).toLowerCase().includes(searchQuery.toLowerCase())
-          )
+          customer.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          customer.addresses.some(a => a.address.toLowerCase().includes(searchQuery.toLowerCase()))
         );
       }, [customers, searchQuery]);
 
@@ -143,7 +143,7 @@ import {
     };
 
     const handleDownloadTemplate = () => {
-        generateExcelTemplate(['name', 'address', 'spdAddress'], 'customer_template');
+        generateExcelTemplate(['name', 'email'], 'customer_template');
     };
 
     const handleImportClick = () => fileInputRef.current?.click();
@@ -156,7 +156,8 @@ import {
                 const batch = writeBatch(firestore);
                 data.forEach(item => {
                     const newDocRef = doc(collection(firestore, 'customers'));
-                    batch.set(newDocRef, { ...item, id: newDocRef.id, ownerId: user.uid });
+                    // Import basic info, empty address book initially
+                    batch.set(newDocRef, { ...item, id: newDocRef.id, ownerId: user.uid, addresses: [] });
                 });
                 await batch.commit();
                 toast({ title: "Import Berhasil", description: `${data.length} pelanggan ditambahkan.` });
@@ -171,7 +172,7 @@ import {
         <div className="flex justify-between items-center">
             <div>
                 <h1 className="text-2xl font-bold tracking-tight">Customer List</h1>
-                <p className="text-muted-foreground">Manage your customer base.</p>
+                <p className="text-muted-foreground">Manage your customer address book.</p>
             </div>
             <div className="flex items-center gap-2">
                 <input type="file" ref={fileInputRef} onChange={handleFileChange} className="hidden" accept=".xlsx, .xls" />
@@ -193,7 +194,7 @@ import {
                 <div className="flex justify-between items-center mb-4">
                     <div className="relative w-64">
                         <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-                        <Input placeholder="Cari pelanggan..." className="pl-8" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} />
+                        <Input placeholder="Cari pelanggan atau alamat..." className="pl-8" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} />
                     </div>
                     {selectedIds.size > 0 && isAdmin && (
                         <Button variant="destructive" size="sm" onClick={() => setDeleteDialogState({ isOpen: true, isBulk: true })}>
@@ -213,48 +214,64 @@ import {
                                     />
                                 </TableHead>
                                 <TableHead>CUSTOMER</TableHead>
-                                <TableHead>ALAMAT</TableHead>
-                                <TableHead>ALAMAT SPD</TableHead>
-                                <TableHead className="text-right">TINDAKAN</TableHead>
+                                <TableHead>DEFAULT ADDRESS</TableHead>
+                                <TableHead className="text-center">ADDRESS BOOK</TableHead>
+                                <TableHead className="text-right">ACTIONS</TableHead>
                             </TableRow>
                         </TableHeader>
                         <TableBody>
                             {isLoading ? (
                                 <TableRow><TableCell colSpan={5} className="text-center py-8">Memuat data...</TableCell></TableRow>
-                            ) : filteredCustomers?.map((customer) => (
-                                <TableRow key={customer.id} className={selectedIds.has(customer.id!) ? "bg-muted/50" : ""}>
-                                    <TableCell>
-                                        <Checkbox 
-                                            checked={selectedIds.has(customer.id!)} 
-                                            onCheckedChange={() => handleSelectRow(customer.id!)}
-                                        />
-                                    </TableCell>
-                                    <TableCell className="font-medium">{customer.name}</TableCell>
-                                    <TableCell>{customer.address}</TableCell>
-                                    <TableCell>{customer.spdAddress}</TableCell>
-                                    <TableCell className="text-right">
-                                        {isAdmin && (
+                            ) : filteredCustomers?.map((customer) => {
+                                const defaultAddr = customer.addresses?.find(a => a.isDefault) || customer.addresses?.[0];
+                                return (
+                                    <TableRow key={customer.id} className={selectedIds.has(customer.id!) ? "bg-muted/50" : ""}>
+                                        <TableCell>
+                                            <Checkbox 
+                                                checked={selectedIds.has(customer.id!)} 
+                                                onCheckedChange={() => handleSelectRow(customer.id!)}
+                                            />
+                                        </TableCell>
+                                        <TableCell>
+                                            <div className="flex flex-col">
+                                                <span className="font-bold">{customer.name}</span>
+                                                <span className="text-[10px] text-muted-foreground">{customer.email || '-'}</span>
+                                            </div>
+                                        </TableCell>
+                                        <TableCell>
+                                            {defaultAddr ? (
+                                                <div className="flex flex-col gap-0.5">
+                                                    <span className="text-[10px] font-black uppercase text-primary">{defaultAddr.label}</span>
+                                                    <p className="text-[11px] text-muted-foreground line-clamp-1 max-w-[300px]">{defaultAddr.address}</p>
+                                                </div>
+                                            ) : (
+                                                <span className="text-xs italic text-muted-foreground">Belum ada alamat</span>
+                                            )}
+                                        </TableCell>
+                                        <TableCell className="text-center">
+                                            <Badge variant="outline">{customer.addresses?.length || 0} Lokasi</Badge>
+                                        </TableCell>
+                                        <TableCell className="text-right">
                                             <div className="flex justify-end gap-1">
                                                 <Button variant="ghost" size="icon" onClick={() => handleEdit(customer)}><Edit className="h-4 w-4" /></Button>
-                                                <DeleteConfirmationDialog 
-                                                    open={deleteDialogState.isOpen && deleteDialogState.customerId === customer.id}
-                                                    onOpenChange={(open) => setDeleteDialogState(prev => ({...prev, isOpen: open, customerId: open ? customer.id : undefined, isBulk: false}))}
-                                                    onConfirm={handleDeleteConfirm}
-                                                >
-                                                    <Button variant="ghost" size="icon" className="text-destructive" onClick={(e) => { e.stopPropagation(); openDeleteDialog(customer.id!); }}>
-                                                        <Trash2 className="h-4 w-4" />
-                                                    </Button>
-                                                </DeleteConfirmationDialog>
+                                                {isAdmin && (
+                                                    <DeleteConfirmationDialog 
+                                                        open={deleteDialogState.isOpen && deleteDialogState.customerId === customer.id}
+                                                        onOpenChange={(open) => setDeleteDialogState(prev => ({...prev, isOpen: open, customerId: open ? customer.id : undefined, isBulk: false}))}
+                                                        onConfirm={handleDeleteConfirm}
+                                                    >
+                                                        <Button variant="ghost" size="icon" className="text-destructive" onClick={(e) => { e.stopPropagation(); openDeleteDialog(customer.id!); }}>
+                                                            <Trash2 className="h-4 w-4" />
+                                                        </Button>
+                                                    </DeleteConfirmationDialog>
+                                                )}
                                             </div>
-                                        )}
-                                    </TableCell>
-                                </TableRow>
-                            ))}
+                                        </TableCell>
+                                    </TableRow>
+                                );
+                            })}
                         </TableBody>
                     </Table>
-                </div>
-                <div className="text-sm text-muted-foreground mt-4">
-                    Menampilkan {filteredCustomers?.length || 0} dari {customers?.length || 0} entri
                 </div>
             </CardContent>
         </Card>

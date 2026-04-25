@@ -1,3 +1,4 @@
+
 'use client';
 import React, { useRef, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
@@ -24,6 +25,7 @@ interface InvoiceData {
     customer: {
         name: string;
         address: string;
+        npwp?: string;
     };
     date: string; // YYYY-MM-DD
     soNumber: string;
@@ -111,6 +113,7 @@ const InvoicePreviewPage = () => {
         const dataToExport = invoiceData.items.map(item => ({
             'Invoice ID': displayInvoiceId,
             'Customer': invoiceData.customer.name,
+            'Branch Address': invoiceData.customer.address,
             'SO Number': invoiceData.soNumber,
             'Date': formatDate(invoiceData.date),
             'Item Name': item.name,
@@ -152,7 +155,6 @@ const InvoicePreviewPage = () => {
     );
     const totalPages = itemChunks.length;
     
-    // Perhitungan total yang aman dengan parseFormattedNumber
     const totalRp = parseFormattedNumber(grandTotal) + parseFormattedNumber(vat12);
 
     const invoiceTitle = invoiceId.startsWith('KW') ? 'PROFORMA INVOICE' : 'INVOICE/OFFICIAL RECEIPT';
@@ -188,7 +190,8 @@ const InvoicePreviewPage = () => {
                                 <div className='flex justify-between items-start mt-4'>
                                     <div className='w-[45%]'>
                                         <p className="font-bold text-[10px] mb-0">{customer.name}</p>
-                                        <p className="text-[9px] mt-1 leading-tight">{customer.address}</p>
+                                        <p className="text-[9px] mt-1 leading-tight whitespace-pre-line">{customer.address}</p>
+                                        {customer.npwp && <p className="text-[9px] mt-1 font-bold">NPWP: {customer.npwp}</p>}
                                     </div>
                                     <div className="w-[30%] text-[10px] text-left leading-normal space-y-0">
                                         <p className="mb-0">Sales Order: {soNumber}</p> 
@@ -284,7 +287,6 @@ const InvoicePreviewPage = () => {
                                     </div>
                                     <div className="border-t border-black w-full my-1"></div>
                                     
-                                    {/* FOOTER PEMBAYARAN - AREA SENSITIF LOGIKA */}
                                     <div className="mt-0 pt-1">
                                         <div className="flex">
                                             <div className="w-[55%] pr-4 text-[10px] space-y-0.5 leading-normal"> 
@@ -299,7 +301,6 @@ const InvoicePreviewPage = () => {
                                                 <p className='mt-2 mb-1'>For payment, please transfer to our account:</p>
                                                 <p className="font-semibold text-[10px] mb-1">PT. Jembo Cable Company Tbk</p>
 
-                                                {/* LOGIKA VIRTUAL ACCOUNT VS REKENING MANUAL */}
                                                 {virtualAccount ? (
                                                     <div className="space-y-0 leading-tight border border-dashed border-gray-300 p-2 min-h-[85px]">
                                                         <div className="flex font-bold">
@@ -343,7 +344,6 @@ const InvoicePreviewPage = () => {
                                                 )}
                                             </div>
                                             
-                                            {/* AREA TANDA TANGAN - DIKUNCI AGAR TIDAK BERGESER */}
                                             <div className="w-[45%] pl-0 flex flex-col justify-between text-[10px] text-center" style={{ minHeight: '130px' }}>
                                                 <p className="font-semibold text-[10px]">PT. JEMBO CABLE COMPANY Tbk</p>
                                                 <div className="flex-grow"></div>

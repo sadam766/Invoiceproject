@@ -42,6 +42,7 @@ import {
 } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
+import { Separator } from '@/components/ui/separator';
 import { cn, formatNumberWithCommas, parseFormattedNumber } from '@/lib/utils';
 import { format, addDays } from 'date-fns';
 import {
@@ -54,12 +55,14 @@ import {
   ChevronsUpDown,
   Check,
   History,
+  MapPin,
+  Building,
 } from 'lucide-react';
-import { type InvoiceNumber, type Customer, type ProductListItem, type Invoice, type SalesOrder, type UserProfile, type VirtualAccount } from '@/app/lib/data';
+import { type InvoiceNumber, type Customer, type ProductListItem, type Invoice, type SalesOrder, type UserProfile, type VirtualAccount, type CustomerAddress } from '@/app/lib/data';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useFirestore, useCollection, useMemoFirebase, useUser, useDoc } from '@/firebase';
-import { collection, query, doc, writeBatch, where, getDocs, setDoc } from 'firebase/firestore';
+import { collection, query, doc, writeBatch, getDocs, setDoc, updateDoc, arrayUnion } from 'firebase/firestore';
 
 type InvoiceItem = {
     id: number;
@@ -87,6 +90,13 @@ export default function AddInvoicePage() {
   const [soNumber, setSoNumber] = useState('');
   const [poNumber, setPoNumber] = useState('');
   const [customer, setCustomer] = useState<Customer | undefined>(undefined);
+  
+  // Address selection state
+  const [selectedAddressId, setSelectedAddressId] = useState<string>('');
+  const [isAddingNewAddress, setIsAddingNewAddress] = useState(false);
+  const [newAddrLabel, setNewAddrLabel] = useState('');
+  const [newAddrText, setNewAddrText] = useState('');
+  const [newAddrNpwp, setNewAddrNpwp] = useState('');
 
   const [issueDate, setIssueDate] = useState<Date | undefined>(new Date());
   const [dueDate, setDueDate] = useState<Date | undefined>(addDays(new Date(), 30));
@@ -153,6 +163,10 @@ export default function AddInvoicePage() {
     return vaListData.filter(va => va.customerName === customer.name);
   }, [vaListData, customer]);
 
+  const selectedAddress = useMemo(() => {
+    return customer?.addresses?.find(a => a.id === selectedAddressId);
+  }, [customer, selectedAddressId]);
+
   // Logic: Previous Payments for the same PO
   const previousPayments = useMemo(() => {
     if (!allInvoices || !poNumber) return [];
@@ -196,7 +210,11 @@ export default function AddInvoicePage() {
       setInvoiceId(invoiceNumberData.id);
       setPoNumber(invoiceNumberData.poNumber || '');
       if (invoiceNumberData.salesOrder) handleSoSelect(invoiceNumberData.salesOrder);
-      else setCustomer(customerListData?.find(c => c.name === invoiceNumberData.customer));
+      else {
+          const found = customerListData?.find(c => c.name === invoiceNumberData.customer);
+          setCustomer(found);
+          if (found) setSelectedAddressId(found.addresses?.find(a => a.isDefault)?.id || found.addresses?.[0]?.id || '');
+      }
     }
   }, [invoiceNumberData, customerListData]);
 
@@ -207,7 +225,13 @@ export default function AddInvoicePage() {
         setSoNumber(invoiceToEditData.soNumber);
         setPoNumber(invoiceToEditData.poNumber);
         setStatus(invoiceToEditData.status);
-        setCustomer(customerListData?.find(c => c.name === invoiceToEditData.customer));
+        const found = customerListData?.find(c => c.name === invoiceToEditData.customer);
+        setCustomer(found);
+        
+        // Find correct address ID based on the string saved in invoice
+        const matchedAddr = found?.addresses?.find(a => a.address === invoiceToEditData.billingAddress);
+        if (matchedAddr) setSelectedAddressId(matchedAddr.id);
+        
         if (invoiceToEditData.date) setIssueDate(new Date(invoiceToEditData.date));
         if (invoiceToEditData.dueDate) setDueDate(new Date(invoiceToEditData.dueDate));
 
@@ -241,7 +265,9 @@ export default function AddInvoicePage() {
                 price: item.price,
                 total: item.quantity * item.price,
             })));
-            setCustomer(customerListData?.find(c => c.name === soItems[0].customer));
+            const foundCust = customerListData?.find(c => c.name === soItems[0].customer);
+            setCustomer(foundCust);
+            if (foundCust) setSelectedAddressId(foundCust.addresses?.find(a => a.isDefault)?.id || foundCust.addresses?.[0]?.id || '');
             setPoNumber(soItems[0].poNumber || '');
         }
     }
@@ -250,7 +276,11 @@ export default function AddInvoicePage() {
 
   const handleCustomerSelect = (value: string) => {
     const [name] = value.split('|');
-    setCustomer(customerListData?.find(c => c.name.toLowerCase() === name.toLowerCase()));
+    const found = customerListData?.find(c => c.name.toLowerCase() === name.toLowerCase());
+    setCustomer(found);
+    if (found) {
+        setSelectedAddressId(found.addresses?.find(a => a.isDefault)?.id || found.addresses?.[0]?.id || '');
+    }
     setCustomerPopoverOpen(false);
   }
 
@@ -276,14 +306,33 @@ export default function AddInvoicePage() {
     setter(formatNumberWithCommas(String(value)));
   };
 
-  const handleSaveInvoice = async (invoiceStatus: 'draft' | 'sent' | 'paid' | 'unpaid' = 'draft') => {
-    if (!firestore || !user || !invoiceId || !customer || !issueDate) {
-        toast({ variant: "destructive", title: "Validation Error", description: "Lengkapi Nomor Invoice, Customer, dan Tanggal." });
-        return;
-    }
+  const handleAddNewAddressInline = async () => {
+    if (!firestore || !customer || !newAddrLabel || !newAddrText) return;
+    
+    const newEntry: CustomerAddress = {
+        id: Math.random().toString(36).substr(2, 9),
+        label: newAddrLabel,
+        address: newAddrText,
+        npwp: newAddrNpwp,
+        isDefault: false
+    };
 
-    if (!soNumber && !poNumber) {
-        toast({ variant: "destructive", title: "Validation Error", description: "Nomor PO wajib diisi jika belum ada Sales Order (SO)." });
+    const docRef = doc(firestore, 'customers', customer.id!);
+    await updateDoc(docRef, {
+        addresses: arrayUnion(newEntry)
+    });
+
+    setSelectedAddressId(newEntry.id);
+    setIsAddingNewAddress(false);
+    setNewAddrLabel('');
+    setNewAddrText('');
+    setNewAddrNpwp('');
+    toast({ title: "Alamat Baru Berhasil Ditambahkan" });
+  };
+
+  const handleSaveInvoice = async (invoiceStatus: 'draft' | 'sent' | 'paid' | 'unpaid' = 'draft') => {
+    if (!firestore || !user || !invoiceId || !customer || !issueDate || !selectedAddress) {
+        toast({ variant: "destructive", title: "Validation Error", description: "Lengkapi Nomor Invoice, Customer, Alamat, dan Tanggal." });
         return;
     }
 
@@ -297,6 +346,8 @@ export default function AddInvoicePage() {
         soNumber: soNumber || '(Waiting SO)',
         poNumber: poNumber,
         customer: customer.name,
+        billingAddress: selectedAddress.address,
+        billingNpwp: selectedAddress.npwp || '',
         date: format(issueDate, 'yyyy-MM-dd'),
         dueDate: dueDate ? format(dueDate, 'yyyy-MM-dd') : format(addDays(issueDate, 30), 'yyyy-MM-dd'),
         amount: finalAmountValue,
@@ -306,7 +357,6 @@ export default function AddInvoicePage() {
         createdBy: user.email,
     }, { merge: true });
 
-    // Sync back to invoiceNumbers if exists
     const invNumRef = doc(firestore, 'invoiceNumbers', safeInvoiceId);
     batch.set(invNumRef, {
         id: invoiceId,
@@ -323,9 +373,13 @@ export default function AddInvoicePage() {
   };
 
   const handlePreview = () => {
+    if (!selectedAddress) {
+        toast({ variant: "destructive", title: "Alamat Wajib Dipilih" });
+        return;
+    }
     const selectedVa = isVaActive ? availableVAs.find(va => va.id === selectedVaId) : undefined;
     const previewData = {
-      id: invoiceId, soNumber, poNumber, customer, 
+      id: invoiceId, soNumber, poNumber, customer: { name: customer?.name, address: selectedAddress.address, npwp: selectedAddress.npwp }, 
       date: issueDate ? format(issueDate, 'yyyy-MM-dd') : '',
       dueDate: dueDate ? format(dueDate, 'yyyy-MM-dd') : '',
       amount: parseFormattedNumber(String(totalAmount)), status, printType,
@@ -354,7 +408,7 @@ export default function AddInvoicePage() {
         <h1 className="text-xl font-semibold">{editInvoiceId ? "Edit Invoice" : "Create Invoice"}</h1>
       </div>
       <div className="grid gap-4 lg:grid-cols-7">
-        <div className="lg:col-span-5">
+        <div className="lg:col-span-5 space-y-4">
           <Card className="p-6">
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
               <div><label className="text-sm font-medium">Invoice No.</label><Input value={invoiceId} onChange={e => setInvoiceId(e.target.value)} disabled={!!editInvoiceId || !!invoiceNumberId} /></div>
@@ -365,22 +419,63 @@ export default function AddInvoicePage() {
                 </Popover>
               </div>
               <div><label className="text-sm font-medium">No. PO Customer</label><Input value={poNumber} onChange={e => setPoNumber(e.target.value)} placeholder="Wajib jika SO kosong" disabled={!!soNumber} /></div>
-              <div><label className="text-sm font-medium">Payment</label><Input value={paymentMethodText} onChange={e => setPaymentMethodMethodText(e.target.value)} /></div>
+              <div><label className="text-sm font-medium">Issue Date</label><Popover><PopoverTrigger asChild><Button variant={'outline'} className="w-full justify-start"><CalendarIcon className="mr-2 h-4 w-4" />{issueDate ? format(issueDate, 'dd/MM/yyyy') : 'Pilih Tanggal'}</Button></PopoverTrigger><PopoverContent className="w-auto p-0"><Calendar mode="single" selected={issueDate} onSelect={setIssueDate} /></PopoverContent></Popover></div>
               
               <div className="lg:col-span-2">
-                 <label className="text-sm font-medium">Bill To</label>
+                 <label className="text-sm font-medium">Bill To (Pusat)</label>
                  <Popover open={customerPopoverOpen} onOpenChange={setCustomerPopoverOpen}>
-                    <PopoverTrigger asChild><Button variant="outline" className="w-full justify-between">{customer?.name ?? "Cari Customer..."}<ChevronsUpDown className="ml-2 h-4 w-4 opacity-50" /></Button></PopoverTrigger>
+                    <PopoverTrigger asChild><Button variant="outline" className="w-full justify-between h-10">{customer?.name ?? "Cari Customer..."}<ChevronsUpDown className="ml-2 h-4 w-4 opacity-50" /></Button></PopoverTrigger>
                     <PopoverContent className="w-[400px] p-0 shadow-xl border border-muted" align="start"><Command><CommandInput placeholder="Search customer..." /><CommandList><CommandEmpty /><CommandGroup>{customerListData?.map((c) => (
                       <CommandItem key={c.id} value={`${c.name}|${c.id}`} onSelect={handleCustomerSelect} className="flex flex-col items-start gap-1">
                         <div className="flex items-center gap-2"><Check className={cn("h-4 w-4", customer?.name.toLowerCase() === c.name.toLowerCase() ? "opacity-100" : "opacity-0")} /><span className="font-bold">{c.name}</span></div>
-                        <p className="text-[10px] text-muted-foreground ml-6 truncate w-full">{c.address}</p>
+                        <p className="text-[10px] text-muted-foreground ml-6 truncate w-full">{c.addresses?.find(a => a.isDefault)?.address || c.addresses?.[0]?.address || 'No address'}</p>
                       </CommandItem>))}</CommandGroup></CommandList></Command></PopoverContent>
                  </Popover>
               </div>
-              <div><label className="text-sm font-medium">Issue Date</label><Popover><PopoverTrigger asChild><Button variant={'outline'} className="w-full justify-start"><CalendarIcon className="mr-2 h-4 w-4" />{issueDate ? format(issueDate, 'dd/MM/yyyy') : 'Pilih Tanggal'}</Button></PopoverTrigger><PopoverContent className="w-auto p-0"><Calendar mode="single" selected={issueDate} onSelect={setIssueDate} /></PopoverContent></Popover></div>
-              <div><label className="text-sm font-medium">Due Date</label><Popover><PopoverTrigger asChild><Button variant={'outline'} className="w-full justify-start"><CalendarIcon className="mr-2 h-4 w-4" />{dueDate ? format(dueDate, 'dd/MM/yyyy') : 'Pilih Tanggal'}</Button></PopoverTrigger><PopoverContent className="w-auto p-0"><Calendar mode="single" selected={dueDate} onSelect={setDueDate} /></PopoverContent></Popover></div>
+
+              <div className="lg:col-span-2">
+                 <label className="text-sm font-medium">Invoice Address (Cabang/Lokasi)</label>
+                 <Select value={selectedAddressId} onValueChange={setSelectedAddressId} disabled={!customer}>
+                    <SelectTrigger className="h-10">
+                        <SelectValue placeholder="Pilih alamat cabang..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                        {customer?.addresses?.map(addr => (
+                            <SelectItem key={addr.id} value={addr.id}>
+                                <div className="flex flex-col items-start">
+                                    <span className="text-[10px] font-black uppercase flex items-center gap-1">
+                                        {addr.label} {addr.isDefault && <Check className="h-2 w-2" />}
+                                    </span>
+                                    <span className="text-[10px] text-muted-foreground line-clamp-1">{addr.address}</span>
+                                </div>
+                            </SelectItem>
+                        ))}
+                        <Separator className="my-1" />
+                        <Button variant="ghost" size="sm" className="w-full justify-start text-[10px] h-7 px-2 font-bold text-primary" onClick={(e) => { e.stopPropagation(); setIsAddingNewAddress(true); }}>
+                            <Plus className="h-3 w-3 mr-2" /> TAMBAH ALAMAT BARU
+                        </Button>
+                    </SelectContent>
+                 </Select>
+              </div>
             </div>
+
+            {/* Inline New Address Form */}
+            {isAddingNewAddress && (
+                <div className="mt-4 p-4 border-2 border-dashed border-primary/30 rounded-lg bg-primary/5 animate-in slide-in-from-top-2">
+                    <div className="flex items-center justify-between mb-4">
+                        <h4 className="text-xs font-black uppercase text-primary flex items-center gap-2"><MapPin className="h-3 w-3" /> Quick Add Address</h4>
+                        <Button variant="ghost" size="sm" className="h-6 text-[10px]" onClick={() => setIsAddingNewAddress(false)}>Batal</Button>
+                    </div>
+                    <div className="grid gap-3">
+                        <div className="grid grid-cols-2 gap-2">
+                            <Input placeholder="Label (e.g. Kantor Cabang Bali)" value={newAddrLabel} onChange={e => setNewAddrLabel(e.target.value)} className="h-8 text-xs" />
+                            <Input placeholder="NPWP Cabang (Jika Berbeda)" value={newAddrNpwp} onChange={e => setNewAddrNpwp(e.target.value)} className="h-8 text-xs font-mono" />
+                        </div>
+                        <Input placeholder="Alamat lengkap lokasi..." value={newAddrText} onChange={e => setNewAddrText(e.target.value)} className="h-8 text-xs" />
+                        <Button size="sm" className="h-8 w-full" onClick={handleAddNewAddressInline}>Simpan & Gunakan Alamat Ini</Button>
+                    </div>
+                </div>
+            )}
 
             <div className="mt-6 overflow-x-auto">
               <Table className="w-full">
@@ -415,7 +510,7 @@ export default function AddInvoicePage() {
                     </TableCell>
                     <TableCell className="p-2"><Input value={item.quantity} onChange={(e) => setItems(items.map(it => it.id === item.id ? { ...it, quantity: e.target.value, total: parseFormattedNumber(e.target.value) * parseFormattedNumber(String(it.price)) } : it))} onBlur={() => handleBlurFormat(v => setItems(items.map(it => it.id === item.id ? { ...it, quantity: v as string } : it)), item.quantity)} className="text-center" /></TableCell>
                     <TableCell className="p-2"><Input value={item.unit} onChange={(e) => setItems(items.map(it => it.id === item.id ? { ...it, unit: e.target.value } : it))} className="text-center uppercase" /></TableCell>
-                    <TableCell className="p-2"><Input value={item.price} onChange={(e) => setItems(items.map(it => it.id === item.id ? { ...it, price: e.target.value, total: parseFormattedNumber(String(it.quantity)) * parseFormattedNumber(e.target.value) } : it))} onBlur={() => handleBlurFormat(v => setItems(items.map(it => it.id === item.id ? { ...it, price: v as string } : it)), item.price)} className="text-right" /></TableCell>
+                    <TableCell className="p-2"><Input value={item.price} onChange={(e) => setItems(items.map(it => it.id === item.id ? { ...it, price: e.target.value, total: parseFormattedNumber(String(item.quantity)) * parseFormattedNumber(e.target.value) } : it))} onBlur={() => handleBlurFormat(v => setItems(items.map(it => it.id === item.id ? { ...it, price: v as string } : it)), item.price)} className="text-right" /></TableCell>
                     <TableCell className="p-2 text-right font-medium">Rp {formatNumberWithCommas(item.total)}</TableCell>
                     <TableCell className="p-2 text-center"><Button variant="ghost" size="icon" onClick={() => setItems(items.filter(it => it.id !== item.id))} className="text-destructive"><Trash2 className="h-4 w-4" /></Button></TableCell>
                   </TableRow>
