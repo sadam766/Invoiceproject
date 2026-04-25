@@ -3,7 +3,7 @@ import React, { useRef, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Download, Upload, ArrowLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { exportToExcel } from '@/lib/utils';
+import { exportToExcel, parseFormattedNumber } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
 import html2pdf from 'html2pdf.js';
 
@@ -32,7 +32,6 @@ interface InvoiceData {
     subtotal: number;
     dppVat: number;
     vat12: number;
-    totalRp: number;
     paymentTerms: string;
     printType: 'original' | 'copy';
     negotiation: number;
@@ -152,6 +151,8 @@ const InvoicePreviewPage = () => {
         items.slice(i * ITEMS_PER_PAGE, i * ITEMS_PER_PAGE + ITEMS_PER_PAGE)
     );
     const totalPages = itemChunks.length;
+    
+    // Perhitungan total yang aman dengan parseFormattedNumber
     const totalRp = parseFormattedNumber(grandTotal) + parseFormattedNumber(vat12);
 
     const invoiceTitle = invoiceId.startsWith('KW') ? 'PROFORMA INVOICE' : 'INVOICE/OFFICIAL RECEIPT';
