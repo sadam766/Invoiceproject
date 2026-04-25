@@ -96,6 +96,7 @@ export type Invoice = {
   amount: number;
   status: 'paid' | 'unpaid' | 'sent' | 'draft';
   spdNumber: string;
+  paymentMethod?: string;
   ownerId?: string;
   createdBy?: string;
   virtualAccounts?: VirtualAccount[]; // For preview data logic

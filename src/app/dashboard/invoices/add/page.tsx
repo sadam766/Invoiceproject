@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useEffect, useState, useMemo } from 'react';
@@ -308,6 +309,7 @@ export default function AddInvoicePage() {
     const batch = writeBatch(firestore);
     const safeInvoiceId = invoiceId.replace(/\//g, '_');
     const creatorInfo = userProfile?.displayName || user.email || 'System';
+    const finalAmountValue = parseFormattedNumber(String(totalAmount));
 
     const invoiceDocRef = doc(firestore, 'invoices', safeInvoiceId);
     const newInvoiceData = {
@@ -316,13 +318,18 @@ export default function AddInvoicePage() {
         poNumber: poNumber,
         customer: customer.name,
         date: format(issueDate, 'yyyy-MM-dd'),
-        amount: parseFormattedNumber(String(totalAmount)),
+        amount: finalAmountValue,
         status: invoiceStatus,
         spdNumber: invoiceToEditData?.spdNumber || '-',
+        paymentMethod: paymentMethodText,
         ownerId: user.uid,
         createdBy: invoiceToEditData?.createdBy || creatorInfo,
     };
     batch.set(invoiceDocRef, newInvoiceData, { merge: true });
+
+    // Sync Amount with invoiceNumbers collection
+    const invoiceNumberRef = doc(firestore, 'invoiceNumbers', safeInvoiceId);
+    batch.set(invoiceNumberRef, { amount: finalAmountValue }, { merge: true });
 
     const salesOrderQuery = query(collection(firestore, 'salesOrders'), where('soNumber', '==', soNumber || safeInvoiceId));
     try {
@@ -363,7 +370,8 @@ export default function AddInvoicePage() {
       negotiation: parseFormattedNumber(String(negotiation)), dpValue: parseFormattedNumber(String(dpValue)),
       pelunasan: parseFormattedNumber(String(pelunasan)), grandTotal: parseFormattedNumber(String(grandTotal)),
       virtualAccount: selectedVa ? { bankName: selectedVa.bankName, vaNumber: selectedVa.vaNumber } : undefined,
-      paymentTerms: '90 Hari setelah invoice diterima'
+      paymentTerms: '90 Hari setelah invoice diterima',
+      paymentMethod: paymentMethodText,
     };
     sessionStorage.setItem('invoicePreviewData', JSON.stringify(previewData));
     router.push(`/dashboard/invoices/preview/${encodeURIComponent(invoiceId || 'new')}`);

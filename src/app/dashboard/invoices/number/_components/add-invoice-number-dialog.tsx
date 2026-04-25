@@ -1,3 +1,4 @@
+
 'use client';
 import { useState, useEffect, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
@@ -61,7 +62,7 @@ export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceDa
   
   const [salesOrder, setSalesOrder] = useState('');
   const [customer, setCustomer] = useState('');
-  const [amount, setAmount] = useState<string | number>(0);
+  const [amount, setAmount] = useState<string>('');
 
   const [customerPopoverOpen, setCustomerPopoverOpen] = useState(false);
   const [soPopoverOpen, setSoPopoverOpen] = useState(false);
@@ -196,7 +197,7 @@ export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceDa
           setCustomer('');
           setSalesOrder('');
           setDate(new Date());
-          setAmount(0);
+          setAmount('');
       }
   }, [isOpen, invoiceData]);
 
@@ -234,23 +235,29 @@ export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceDa
             setCustomer(customerName);
         }
       } else {
-        setAmount(0);
+        setAmount('');
         setCustomer('');
       }
 
     } else {
         setCustomer('');
-        setAmount(0);
+        setAmount('');
     }
 
     setSoPopoverOpen(false);
   };
   
   const handleAmountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const value = e.target.value;
-    const parsedValue = parseFormattedNumber(value);
-    if (!isNaN(parsedValue) || value === '') {
-        setAmount(value === '' ? '' : formatNumberWithCommas(parsedValue));
+    // Memungkinkan input angka, titik, dan koma secara bebas untuk fleksibilitas manual
+    const value = e.target.value.replace(/[^\d.,]/g, '');
+    setAmount(value);
+  };
+
+  const handleBlurAmount = () => {
+    // Format saat blur untuk kerapihan tanpa mengunci saat mengetik
+    const numeric = parseFormattedNumber(amount);
+    if (!isNaN(numeric) && amount !== '') {
+        setAmount(formatNumberWithCommas(numeric));
     }
   };
 
@@ -277,7 +284,7 @@ export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceDa
     }
 
     const formattedDate = date ? format(date, 'dd/MM/yyyy') : '';
-    const numericAmount = typeof amount === 'string' ? parseFormattedNumber(amount) : amount;
+    const numericAmount = parseFormattedNumber(amount);
     onSave({
       id: finalInvoiceNumber,
       customer,
@@ -485,7 +492,14 @@ export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceDa
               </div>
             <div className="space-y-2">
               <Label htmlFor="amount">Jumlah</Label>
-              <Input id="amount" value={amount} onChange={handleAmountChange} placeholder="0" disabled={!!salesOrder} />
+              <Input 
+                id="amount" 
+                value={amount} 
+                onChange={handleAmountChange} 
+                onBlur={handleBlurAmount}
+                placeholder="0" 
+                disabled={!!salesOrder} 
+              />
             </div>
           </div>
         </div>

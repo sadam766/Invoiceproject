@@ -1,3 +1,4 @@
+
 'use client';
 import Link from 'next/link';
 import { useState, useMemo } from 'react';
@@ -22,7 +23,7 @@ import {
   import { Badge } from '@/components/ui/badge';
   import { Checkbox } from '@/components/ui/checkbox';
   import { type Invoice, type SpdData, type SalesOrder, type Customer, type UserProfile } from '@/app/lib/data';
-  import { Search, Filter, MoreHorizontal, ArrowUpDown, Plus, Eye, Pencil, Trash2 } from 'lucide-react';
+  import { Search, Filter, MoreHorizontal, ArrowUpDown, Plus, Eye, Pencil, Trash2, CreditCard } from 'lucide-react';
   import { Skeleton } from '@/components/ui/skeleton';
   import {
     DropdownMenu,
@@ -155,6 +156,7 @@ import {
             id: invoice.id, soNumber: invoice.soNumber, poNumber: invoice.poNumber, customer: foundCustomer,
             date: invoice.date, amount: invoice.amount, status: invoice.status,
             items: invoiceItems, subtotal, dppVat, vat12, negotiation: 0, dpValue: 0, pelunasan: 0, grandTotal,
+            paymentMethod: invoice.paymentMethod,
         };
         sessionStorage.setItem('invoicePreviewData', JSON.stringify(previewData));
         router.push(`/dashboard/invoices/preview/${encodeURIComponent(invoice.id)}`);
@@ -232,6 +234,7 @@ import {
                                     <TableHead className="w-[40px]"><Checkbox onCheckedChange={handleSelectAll} checked={filteredInvoices.length > 0 && selectedInvoices.size === filteredInvoices.length} /></TableHead>
                                     <TableHead>INVOICE <ArrowUpDown className="inline-block ml-2 h-4 w-4" /></TableHead>
                                     <TableHead>CUSTOMER</TableHead>
+                                    <TableHead>PAYMENT METHOD</TableHead>
                                     <TableHead>DATE</TableHead>
                                     <TableHead>AMOUNT</TableHead>
                                     <TableHead>STATUS</TableHead>
@@ -240,12 +243,18 @@ import {
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
-                                {isLoading ? Array.from({ length: 3 }).map((_, i) => (<TableRow key={i}><TableCell colSpan={8}><Skeleton className="h-8 w-full" /></TableCell></TableRow>)) : 
+                                {isLoading ? Array.from({ length: 3 }).map((_, i) => (<TableRow key={i}><TableCell colSpan={9}><Skeleton className="h-8 w-full" /></TableCell></TableRow>)) : 
                                     filteredInvoices?.map((invoice) => (
                                     <TableRow key={invoice.id}>
                                         <TableCell><Checkbox onCheckedChange={() => handleSelectionChange(invoice.id)} checked={selectedInvoices.has(invoice.id)} /></TableCell>
                                         <TableCell className="font-medium">{invoice.id}</TableCell>
                                         <TableCell>{invoice.customer}</TableCell>
+                                        <TableCell>
+                                            <div className="flex items-center gap-2">
+                                                <CreditCard className="h-3 w-3 text-muted-foreground" />
+                                                <span className="text-xs">{invoice.paymentMethod || 'Transfer Manual'}</span>
+                                            </div>
+                                        </TableCell>
                                         <TableCell>{invoice.date}</TableCell>
                                         <TableCell>Rp {invoice.amount.toLocaleString('id-ID')},00</TableCell>
                                         <TableCell><Badge variant={invoice.status === 'paid' ? 'outline' : 'destructive'} className={invoice.status === 'paid' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}>{invoice.status}</Badge></TableCell>
