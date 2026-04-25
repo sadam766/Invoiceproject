@@ -143,8 +143,7 @@
           "type": "string"
         },
         "billingAddress": {
-          "type": "string",
-          "description": "The specific branch address selected for this invoice."
+          "type": "string"
         },
         "billingNpwp": {
           "type": "string"
@@ -166,7 +165,8 @@
           ]
         },
         "spdNumber": {
-          "type": "string"
+          "type": "string",
+          "description": "Linked SPD number if any."
         },
         "ownerId": {
           "type": "string"
@@ -187,57 +187,42 @@
       "description": "Surat Pengantar Dokumen (Document Delivery Letter).",
       "type": "object",
       "properties": {
-        "spd": {
-          "type": "string"
+        "id": {
+          "type": "string",
+          "description": "The SPD Number (e.g. SPD/2024/05/001)"
         },
-        "tanggal": {
+        "date": {
           "type": "string",
           "format": "date"
         },
-        "sales": {
-          "type": "string"
-        },
-        "customer": {
-          "type": "string"
-        },
-        "noInvoice": {
-          "type": "string"
-        },
-        "tanggalInvoice": {
+        "courier": {
           "type": "string",
-          "format": "date"
+          "description": "Name of the courier or expedition."
         },
-        "tglTerimaCustomer": {
-          "type": "string"
+        "invoices": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "invoiceId": { "type": "string" },
+              "customer": { "type": "string" },
+              "address": { "type": "string" },
+              "status": { "type": "string", "enum": ["pending", "received", "rejected"] }
+            }
+          }
         },
-        "tglJatuhTempo": {
-          "type": "string"
-        },
-        "totalPiutang": {
-          "type": "number"
-        },
-        "keterangan": {
-          "type": "string"
-        },
-        "noKuitansi": {
-          "type": "string"
-        },
-        "noFakturPajak": {
-          "type": "string"
-        },
-        "suratJalan": {
-          "type": "string"
+        "status": {
+          "type": "string",
+          "enum": ["in_delivery", "received", "rejected"]
         },
         "ownerId": {
           "type": "string"
         }
       },
       "required": [
-        "spd",
-        "tanggal",
-        "customer",
-        "noInvoice",
-        "totalPiutang",
+        "id",
+        "date",
+        "courier",
         "ownerId"
       ]
     },

@@ -33,22 +33,6 @@ export type Sale = {
   status: 'Paid' | 'Unpaid';
 };
 
-export type SalesMonitoringData = {
-  soNumber: string;
-  poNumber: string;
-  customer: string;
-  date: string;
-  amount: number;
-  invoice: string;
-  invoiceStatus: 'Paid' | 'Unpaid' | 'Sent' | 'Draft';
-  taxInvoice: string;
-  spd: string;
-  paymentStatus: 'Paid' | 'Unpaid';
-  needsInvoice: boolean;
-  needsSpd: boolean;
-  isPoOnly: boolean;
-};
-
 export type Invoice = {
   id: string;
   soNumber: string;
@@ -60,7 +44,7 @@ export type Invoice = {
   dueDate?: string; // Due Date
   amount: number;
   status: 'paid' | 'unpaid' | 'sent' | 'draft';
-  spdNumber: string;
+  spdNumber?: string;
   paymentMethod?: string;
   ownerId?: string;
   createdBy?: string;
@@ -137,20 +121,19 @@ export type SalesListItem = {
   ownerId?: string;
 };
 
-export type SpdData = {
-    spd: string;
-    tanggal: string;
-    sales: string;
+export type SpdInvoiceEntry = {
+    invoiceId: string;
     customer: string;
-    noInvoice: string;
-    tanggalInvoice: string;
-    tglTerimaCustomer: string;
-    tglJatuhTempo: string;
-    totalPiutang: number;
-    keterangan: string;
-    noKuitansi: string;
-    noFakturPajak: string;
-    suratJalan: string;
+    address: string;
+    status: 'pending' | 'received' | 'rejected';
+};
+
+export type SpdData = {
+    id: string; // SPD Number
+    date: string;
+    courier: string;
+    invoices: SpdInvoiceEntry[];
+    status: 'in_delivery' | 'received' | 'rejected';
     ownerId?: string;
 };
 
