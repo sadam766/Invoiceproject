@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useMemo, useState } from 'react';
@@ -41,12 +40,18 @@ import {
   ChartTooltip,
   ChartTooltipContent,
 } from '@/components/ui/chart';
-import { Bar, BarChart, XAxis, YAxis, CartesianGrid, ResponsiveContainer, Cell } from 'recharts';
+import { Bar, BarChart, XAxis, YAxis, CartesianGrid, Cell } from 'recharts';
 import { useFirestore, useUser, useCollection, useMemoFirebase, useDoc } from '@/firebase';
 import { collection, query, doc } from 'firebase/firestore';
 import { type SalesListItem, type Invoice, type TaxInvoice, type UserProfile } from '@/app/lib/data';
-import { cn } from '@/lib/utils';
-import { format, isSameDay, parseISO, startOfToday } from 'date-fns';
+import { format, isSameDay, parseISO } from 'date-fns';
+
+const performanceChartConfig = {
+  value: {
+    label: "Total Sales",
+    color: "hsl(var(--primary))",
+  },
+} satisfies ChartConfig;
 
 export default function DashboardPage() {
   const router = useRouter();
@@ -353,7 +358,7 @@ export default function DashboardPage() {
             </CardHeader>
             <CardContent>
                 <div className="h-[300px] w-full">
-                    <ResponsiveContainer width="100%" height="100%">
+                    <ChartContainer config={performanceChartConfig}>
                         <BarChart data={salesPerformanceData} layout="vertical">
                             <CartesianGrid strokeDasharray="3 3" horizontal={true} vertical={false} />
                             <XAxis type="number" hide />
@@ -372,7 +377,7 @@ export default function DashboardPage() {
                                 ))}
                             </Bar>
                         </BarChart>
-                    </ResponsiveContainer>
+                    </ChartContainer>
                 </div>
                 <div className="mt-4 space-y-2">
                     {salesPerformanceData.slice(0, 3).map((s, i) => (
