@@ -1,3 +1,4 @@
+
 'use client';
 import Link from 'next/link';
 import { useState, useMemo } from 'react';
@@ -22,7 +23,7 @@ import {
   import { Badge } from '@/components/ui/badge';
   import { Checkbox } from '@/components/ui/checkbox';
   import { type Invoice, type SpdData, type SalesOrder, type Customer, type UserProfile } from '@/app/lib/data';
-  import { Search, Filter, MoreHorizontal, ArrowUpDown, Plus, Eye, Pencil, Trash2, CreditCard, Download, Truck } from 'lucide-react';
+  import { Search, Filter, MoreHorizontal, ArrowUpDown, Plus, Eye, Pencil, Trash2, CreditCard, Download, Truck, CheckCircle2 } from 'lucide-react';
   import { Skeleton } from '@/components/ui/skeleton';
   import {
     DropdownMenu,
@@ -34,7 +35,7 @@ import {
   import { useToast } from '@/hooks/use-toast';
   import { useFirestore, useCollection, useMemoFirebase, useUser, errorEmitter, FirestorePermissionError, useDoc } from '@/firebase';
   import { collection, query, doc, deleteDoc, writeBatch, setDoc } from 'firebase/firestore';
-  import { exportToExcel } from '@/lib/utils';
+  import { exportToExcel, cn } from '@/lib/utils';
 
 
   export default function InvoiceListPage() {
@@ -68,7 +69,8 @@ import {
         if (activeTab !== 'all') {
             filtered = invoices.filter(i => {
                 if (activeTab === 'paid') return i.status === 'paid';
-                if (activeTab === 'unpaid') return i.status !== 'paid';
+                if (activeTab === 'received') return i.status === 'received';
+                if (activeTab === 'unpaid') return i.status !== 'paid' && i.status !== 'received';
                 return true;
             });
         }
@@ -140,80 +142,94 @@ import {
       <main className="flex flex-1 flex-col gap-4 p-4 md:gap-8 md:p-8">
         <div className="flex justify-between items-center">
             <div>
-                <h1 className="text-2xl font-bold tracking-tight">Invoice List</h1>
-                <p className="text-muted-foreground">Kelola penagihan dan pantau jadwal pengiriman dokumen fisik.</p>
+                <h1 className="text-2xl font-black tracking-tighter uppercase">Invoice List</h1>
+                <p className="text-muted-foreground font-medium">Kelola penagihan dan pantau jadwal pengiriman dokumen fisik.</p>
             </div>
             <div className="flex items-center gap-2">
                 {selectedInvoices.size > 0 && (
-                    <Button variant="secondary" size="sm" onClick={handleCreateSpdFromSelected} className="bg-indigo-50 border-indigo-200 text-indigo-700 hover:bg-indigo-100">
+                    <Button variant="secondary" size="sm" onClick={handleCreateSpdFromSelected} className="bg-indigo-50 border-indigo-200 text-indigo-700 hover:bg-indigo-100 font-bold">
                         <Truck className="mr-2 h-4 w-4" /> Create SPD ({selectedInvoices.size})
                     </Button>
                 )}
                 {isSuperAdmin && selectedInvoices.size > 0 && (
-                    <Button variant="destructive" size="sm" onClick={() => setDeleteDialogState({ isOpen: true, isBulk: true })}>
+                    <Button variant="destructive" size="sm" onClick={() => setDeleteDialogState({ isOpen: true, isBulk: true })} className="font-bold">
                         <Trash2 className="mr-2 h-4 w-4" /> Leader Delete
                     </Button>
                 )}
-                <Button variant="outline" size="sm" onClick={() => exportToExcel(filteredInvoices, 'invoices')}><Download className="mr-2 h-4 w-4" /> Export</Button>
-                <Link href="/dashboard/invoices/add" passHref><Button size="sm"><Plus className="mr-2 h-4 w-4"/> New Invoice</Button></Link>
+                <Button variant="outline" size="sm" onClick={() => exportToExcel(filteredInvoices, 'invoices')} className="font-bold"><Download className="mr-2 h-4 w-4" /> Export</Button>
+                <Link href="/dashboard/invoices/add" passHref><Button size="sm" className="font-bold"><Plus className="mr-2 h-4 w-4"/> New Invoice</Button></Link>
             </div>
         </div>
 
-        <Card>
+        <Card className="shadow-md border-none ring-1 ring-border">
             <CardContent className="pt-6">
                 <Tabs defaultValue="all" value={activeTab} onValueChange={setActiveTab}>
                     <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
-                        <TabsList>
-                            <TabsTrigger value="all">Semua ({invoices?.length || 0})</TabsTrigger>
-                            <TabsTrigger value="paid">Lunas</TabsTrigger>
-                            <TabsTrigger value="unpaid">Belum Bayar</TabsTrigger>
+                        <TabsList className="bg-muted/50 p-1">
+                            <TabsTrigger value="all" className="text-xs font-bold uppercase">Semua ({invoices?.length || 0})</TabsTrigger>
+                            <TabsTrigger value="paid" className="text-xs font-bold uppercase px-4">Lunas</TabsTrigger>
+                            <TabsTrigger value="received" className="text-xs font-bold uppercase px-4">Diterima PT</TabsTrigger>
+                            <TabsTrigger value="unpaid" className="text-xs font-bold uppercase px-4">Draft/Sent</TabsTrigger>
                         </TabsList>
                         <div className="relative w-full sm:w-64">
                             <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-                            <Input placeholder="Cari invoice, customer, PO..." className="pl-8 h-9" value={searchQuery} onChange={e => setSearchQuery(e.target.value)} />
+                            <Input placeholder="Cari invoice, customer, PO..." className="pl-8 h-9 bg-muted/20 border-none font-medium" value={searchQuery} onChange={e => setSearchQuery(e.target.value)} />
                         </div>
                     </div>
 
-                    <div className="rounded-md border overflow-hidden">
+                    <div className="rounded-xl border overflow-hidden">
                         <Table>
                             <TableHeader className="bg-muted/30">
                                 <TableRow>
                                     <TableHead className="w-[40px]"><Checkbox onCheckedChange={(c) => c ? setSelectedInvoices(new Set(filteredInvoices.map(i => i.id))) : setSelectedInvoices(new Set())} /></TableHead>
-                                    <TableHead>INVOICE & SPD INFO</TableHead>
-                                    <TableHead>CUSTOMER</TableHead>
-                                    <TableHead>DATE</TableHead>
-                                    <TableHead>AMOUNT</TableHead>
-                                    <TableHead>STATUS</TableHead>
-                                    <TableHead className="text-right">AKSI</TableHead>
+                                    <TableHead className="text-[10px] font-black uppercase tracking-widest">Invoice & SPD Info</TableHead>
+                                    <TableHead className="text-[10px] font-black uppercase tracking-widest">Customer</TableHead>
+                                    <TableHead className="text-[10px] font-black uppercase tracking-widest">Date</TableHead>
+                                    <TableHead className="text-[10px] font-black uppercase tracking-widest">Amount</TableHead>
+                                    <TableHead className="text-[10px] font-black uppercase tracking-widest">Status</TableHead>
+                                    <TableHead className="text-right text-[10px] font-black uppercase tracking-widest">Aksi</TableHead>
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
                                 {isLoading ? <TableRow><TableCell colSpan={7} className="text-center py-20"><Skeleton className="h-8 w-full" /></TableCell></TableRow> : 
                                     filteredInvoices.map((invoice) => (
-                                    <TableRow key={invoice.id}>
+                                    <TableRow key={invoice.id} className="hover:bg-muted/5 transition-colors">
                                         <TableCell><Checkbox checked={selectedInvoices.has(invoice.id)} onCheckedChange={() => setSelectedInvoices(prev => { const n = new Set(prev); n.has(invoice.id) ? n.delete(invoice.id) : n.add(invoice.id); return n; })} /></TableCell>
                                         <TableCell>
                                             <div className="flex flex-col gap-1">
-                                                <span className="font-bold text-xs">{invoice.id}</span>
+                                                <span className="font-black text-xs text-indigo-700">{invoice.id}</span>
                                                 {invoice.spdNumber ? (
-                                                    <div className="flex items-center gap-1 text-[9px] font-black text-indigo-600 bg-indigo-50 px-1.5 py-0.5 rounded w-fit">
+                                                    <div className="flex items-center gap-1 text-[9px] font-black text-indigo-600 bg-indigo-50 px-1.5 py-0.5 rounded w-fit border border-indigo-100">
                                                         <Truck className="h-2.5 w-2.5" /> {invoice.spdNumber}
                                                     </div>
                                                 ) : (
-                                                    <span className="text-[9px] font-bold text-muted-foreground uppercase opacity-50">Not Picked</span>
+                                                    <span className="text-[9px] font-bold text-muted-foreground uppercase opacity-50 tracking-tighter">Not Picked (Gudang)</span>
                                                 )}
                                             </div>
                                         </TableCell>
                                         <TableCell className="text-xs">
-                                            <div className="font-medium">{invoice.customer}</div>
-                                            <div className="text-[10px] text-muted-foreground truncate max-w-[150px]">{invoice.billingAddress}</div>
+                                            <div className="font-black uppercase text-slate-800">{invoice.customer}</div>
+                                            <div className="text-[10px] text-muted-foreground truncate max-w-[200px] italic">{invoice.billingAddress}</div>
                                         </TableCell>
-                                        <TableCell className="text-xs">{invoice.date}</TableCell>
-                                        <TableCell className="text-xs font-bold">Rp {invoice.amount.toLocaleString('id-ID')}</TableCell>
-                                        <TableCell><Badge variant={invoice.status === 'paid' ? 'outline' : 'destructive'} className="text-[9px] uppercase">{invoice.status}</Badge></TableCell>
+                                        <TableCell className="text-xs font-medium">{invoice.date}</TableCell>
+                                        <TableCell className="text-xs font-black">Rp {invoice.amount.toLocaleString('id-ID')}</TableCell>
+                                        <TableCell>
+                                            <Badge 
+                                                variant={invoice.status === 'paid' ? 'outline' : invoice.status === 'received' ? 'secondary' : 'destructive'} 
+                                                className={cn(
+                                                    "text-[9px] uppercase font-black px-2 py-0",
+                                                    invoice.status === 'received' ? "bg-blue-50 text-blue-700 border-blue-100" : 
+                                                    invoice.status === 'paid' ? "bg-emerald-50 text-emerald-700 border-emerald-100" : ""
+                                                )}
+                                            >
+                                                {invoice.status === 'received' ? (
+                                                    <span className="flex items-center gap-1"><CheckCircle2 className="h-2.5 w-2.5" /> RECEIVED</span>
+                                                ) : invoice.status}
+                                            </Badge>
+                                        </TableCell>
                                         <TableCell className="text-right">
                                             <DropdownMenu>
-                                                <DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8"><MoreHorizontal className="h-4 w-4" /></Button></DropdownMenuTrigger>
+                                                <DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8 rounded-full hover:bg-primary/10 transition-colors"><MoreHorizontal className="h-4 w-4" /></Button></DropdownMenuTrigger>
                                                 <DropdownMenuContent align="end">
                                                     <DropdownMenuItem onClick={() => router.push(`/dashboard/invoices/preview/${encodeURIComponent(invoice.id)}`)}><Eye className="mr-2 h-4 w-4" /> Pratinjau</DropdownMenuItem>
                                                     <DropdownMenuItem onClick={() => router.push(`/dashboard/invoices/add?editInvoiceId=${invoice.id.replace(/\//g, '_')}`)}><Pencil className="mr-2 h-4 w-4" /> Edit</DropdownMenuItem>

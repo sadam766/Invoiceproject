@@ -43,7 +43,7 @@ export type Invoice = {
   date: string; // Issue Date
   dueDate?: string; // Due Date
   amount: number;
-  status: 'paid' | 'unpaid' | 'sent' | 'draft';
+  status: 'paid' | 'unpaid' | 'sent' | 'draft' | 'received';
   spdNumber?: string;
   paymentMethod?: string;
   ownerId?: string;
@@ -52,6 +52,8 @@ export type Invoice = {
   sjNumbers?: string[]; // List of Delivery Note numbers
   negotiation?: number;
   negotiationMode?: 'percent' | 'nominal';
+  dpValue?: number;
+  retention?: number;
 };
 
 export type InvoiceNumber = {

@@ -1,3 +1,4 @@
+
 'use client';
 import { useState, useMemo, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
@@ -22,7 +23,8 @@ import {
     MoreVertical, 
     Calendar as CalendarIcon,
     Layers,
-    FileCheck
+    FileCheck,
+    AlertTriangle
   } from 'lucide-react';
   import { AddSpdDialog } from './_components/add-spd-dialog';
   import { useToast } from '@/hooks/use-toast';
@@ -36,6 +38,7 @@ import {
     DropdownMenuItem, 
     DropdownMenuTrigger 
   } from '@/components/ui/dropdown-menu';
+  import { parseISO, differenceInDays } from 'date-fns';
   import type { SpdData, Invoice, SpdInvoiceEntry } from '@/app/lib/data';
   
   export default function SpdPage() {
@@ -151,8 +154,30 @@ import {
     const handleUpdateStatus = async (spd: SpdData, newStatus: SpdData['status']) => {
         if (!firestore) return;
         const safeId = spd.id.replace(/\//g, '_');
-        await updateDoc(doc(firestore, 'spds', safeId), { status: newStatus });
-        toast({ title: `Status SPD: ${newStatus.replace('_', ' ').toUpperCase()}` });
+        const batch = writeBatch(firestore);
+        
+        // Update SPD status
+        batch.update(doc(firestore, 'spds', safeId), { status: newStatus });
+        
+        // Automated Status Link: If Received, update all linked invoices status
+        if (newStatus === 'received') {
+            spd.invoices.forEach(invEntry => {
+                const safeInvId = invEntry.invoiceId.replace(/\//g, '_');
+                batch.update(doc(firestore, 'invoices', safeInvId), { status: 'received' });
+            });
+        } else if (newStatus === 'in_delivery') {
+            // Revert back to sent if reset to delivery
+            spd.invoices.forEach(invEntry => {
+                const safeInvId = invEntry.invoiceId.replace(/\//g, '_');
+                batch.update(doc(firestore, 'invoices', safeInvId), { status: 'sent' });
+            });
+        }
+
+        await batch.commit();
+        toast({ 
+            title: `Status SPD: ${newStatus.replace('_', ' ').toUpperCase()}`,
+            description: newStatus === 'received' ? "Semua invoice terkait telah ditandai sebagai 'Diterima Customer'." : undefined
+        });
     };
 
     const statusConfig = {
@@ -165,7 +190,7 @@ import {
       <main className="flex flex-1 flex-col gap-4 p-4 md:gap-8 md:p-8 max-w-[1400px] mx-auto">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div>
-            <h1 className="text-3xl font-black tracking-tighter">SPD Digital Dispatch</h1>
+            <h1 className="text-3xl font-black tracking-tighter uppercase">SPD Digital Dispatch</h1>
             <p className="text-muted-foreground font-medium">Konsolidasi dokumen pengiriman dalam satu sistem terpadu.</p>
           </div>
           <AddSpdDialog
@@ -183,7 +208,7 @@ import {
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input 
                     placeholder="Cari Nomor SPD, Kurir, atau Nama Customer..." 
-                    className="pl-10 h-11 bg-muted/20 border-none shadow-none" 
+                    className="pl-10 h-11 bg-muted/20 border-none shadow-none font-bold" 
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                 />
@@ -201,12 +226,18 @@ import {
             ) : filteredData.length === 0 ? (
                 <div className="col-span-full py-20 text-center space-y-4">
                     <Layers className="h-12 w-12 mx-auto text-muted-foreground/30" />
-                    <p className="text-muted-foreground font-medium">Belum ada daftar pengiriman aktif hari ini.</p>
+                    <p className="text-muted-foreground font-medium italic">Belum ada daftar pengiriman aktif hari ini.</p>
                 </div>
             ) : filteredData.map((spd) => {
                 const Conf = statusConfig[spd.status];
+                const aging = differenceInDays(new Date(), parseISO(spd.date));
+                const isLate = spd.status === 'in_delivery' && aging > 5;
+
                 return (
-                    <Card key={spd.id} className="group relative overflow-hidden border-none shadow-md hover:shadow-xl transition-all duration-300 ring-1 ring-border">
+                    <Card key={spd.id} className={cn(
+                        "group relative overflow-hidden border-none shadow-md hover:shadow-xl transition-all duration-300 ring-1 ring-border",
+                        isLate ? "ring-2 ring-amber-500 bg-amber-50/10" : ""
+                    )}>
                         <div className={cn("absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200 z-10")}>
                              <DropdownMenu>
                                 <DropdownMenuTrigger asChild><Button variant="secondary" size="icon" className="h-8 w-8 rounded-full shadow-lg"><MoreVertical className="h-4 w-4" /></Button></DropdownMenuTrigger>
@@ -224,6 +255,7 @@ import {
                                     <CardTitle className="text-sm font-black font-mono text-indigo-700 tracking-tighter">{spd.id}</CardTitle>
                                     <div className="flex items-center gap-1.5 text-[10px] font-bold text-muted-foreground">
                                         <CalendarIcon className="h-3 w-3" /> {spd.date}
+                                        {isLate && <span className="ml-2 text-amber-600 font-black flex items-center gap-1"><AlertTriangle className="h-3 w-3" /> {aging} HARI DI JALAN</span>}
                                     </div>
                                 </div>
                                 <Badge variant="outline" className={cn("text-[9px] font-black uppercase px-2 py-0.5 rounded-full border-2", Conf.color)}>

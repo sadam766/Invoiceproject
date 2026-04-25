@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useMemo, useState } from 'react';
@@ -28,7 +29,11 @@ import {
   ArrowUpRight,
   User,
   MoreVertical,
-  CheckCircle2
+  CheckCircle2,
+  Truck,
+  PackageCheck,
+  AlertTriangle,
+  Layers
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -43,7 +48,7 @@ import {
 import { Bar, BarChart, XAxis, YAxis, CartesianGrid, Cell } from 'recharts';
 import { useFirestore, useUser, useCollection, useMemoFirebase, useDoc } from '@/firebase';
 import { collection, query, doc } from 'firebase/firestore';
-import { type SalesListItem, type Invoice, type TaxInvoice, type UserProfile } from '@/app/lib/data';
+import { type SalesListItem, type Invoice, type TaxInvoice, type UserProfile, type SpdData } from '@/app/lib/data';
 import { format, isSameDay, parseISO } from 'date-fns';
 
 const performanceChartConfig = {
@@ -84,6 +89,12 @@ export default function DashboardPage() {
   }, [firestore]);
   const { data: taxList } = useCollection<TaxInvoice>(taxInvoicesCollection);
 
+  const spdsCollection = useMemoFirebase(() => {
+    if (!firestore) return null;
+    return query(collection(firestore, 'spds'));
+  }, [firestore]);
+  const { data: spdList } = useCollection<SpdData>(spdsCollection);
+
   // LOGIC: Calculations
   const stats = useMemo(() => {
     if (!invoiceList || !salesList) return { outstanding: 0, realization: 0, target: 0, taxPending: 0 };
@@ -104,6 +115,13 @@ export default function DashboardPage() {
 
     return { outstanding, realization, target, taxPending };
   }, [invoiceList, salesList, taxList]);
+
+  const logisticStats = useMemo(() => {
+    const pendingShipment = invoiceList?.filter(inv => inv.status === 'sent' && !inv.spdNumber).length || 0;
+    const inTransit = spdList?.filter(s => s.status === 'in_delivery').length || 0;
+    const deliveryIssues = spdList?.filter(s => s.status === 'rejected').length || 0;
+    return { pendingShipment, inTransit, deliveryIssues };
+  }, [invoiceList, spdList]);
 
   const salesPerformanceData = useMemo(() => {
     if (!salesList) return [];
@@ -148,8 +166,8 @@ export default function DashboardPage() {
       {/* Header: Global Filter & Welcome */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">Dakota Command Center</h1>
-          <p className="text-muted-foreground">Monitor real-time Dakota Sales, Invoicing, and Taxation.</p>
+          <h1 className="text-2xl font-bold tracking-tight uppercase font-black">Dakota Command Center</h1>
+          <p className="text-muted-foreground font-medium">Monitor real-time Dakota Sales, Invoicing, and Taxation.</p>
         </div>
         <div className="flex items-center gap-2">
             <Badge variant="outline" className="bg-background px-3 py-1 text-xs">
@@ -207,7 +225,44 @@ export default function DashboardPage() {
         </Card>
       </div>
 
-      {/* Row 2: Pipeline & Mini Calendar */}
+      {/* Row 2: Logistic Status (New) */}
+      <div className="grid gap-4 md:grid-cols-3">
+        <Card className="bg-indigo-50/20 border-indigo-100 cursor-pointer hover:bg-indigo-50/40 transition-all" onClick={() => router.push('/dashboard/invoices/spd')}>
+           <CardHeader className="pb-2">
+              <CardTitle className="text-[10px] font-black uppercase text-indigo-600 flex items-center gap-2 tracking-widest">
+                <PackageCheck className="h-3.5 w-3.5" /> Logistic Status: Pending Delivery
+              </CardTitle>
+           </CardHeader>
+           <CardContent>
+              <div className="text-2xl font-bold">{logisticStats.pendingShipment} <span className="text-xs font-normal text-muted-foreground">Invoices</span></div>
+              <p className="text-[10px] text-muted-foreground mt-1 font-bold">Siap dijadwalkan ke rute kurir hari ini.</p>
+           </CardContent>
+        </Card>
+        <Card className="bg-amber-50/20 border-amber-100 cursor-pointer hover:bg-amber-50/40 transition-all" onClick={() => router.push('/dashboard/invoices/spd')}>
+           <CardHeader className="pb-2">
+              <CardTitle className="text-[10px] font-black uppercase text-amber-600 flex items-center gap-2 tracking-widest">
+                <Truck className="h-3.5 w-3.5" /> In Transit (Dispatched)
+              </CardTitle>
+           </CardHeader>
+           <CardContent>
+              <div className="text-2xl font-bold">{logisticStats.inTransit} <span className="text-xs font-normal text-muted-foreground">Active SPDs</span></div>
+              <p className="text-[10px] text-muted-foreground mt-1 font-bold">Dokumen sedang dibawa oleh kurir ke customer.</p>
+           </CardContent>
+        </Card>
+        <Card className="bg-rose-50/20 border-rose-100 cursor-pointer hover:bg-rose-50/40 transition-all" onClick={() => router.push('/dashboard/invoices/spd')}>
+           <CardHeader className="pb-2">
+              <CardTitle className="text-[10px] font-black uppercase text-rose-600 flex items-center gap-2 tracking-widest">
+                <AlertTriangle className="h-3.5 w-3.5" /> Delivery Issues / Rejected
+              </CardTitle>
+           </CardHeader>
+           <CardContent>
+              <div className="text-2xl font-bold">{logisticStats.deliveryIssues} <span className="text-xs font-normal text-muted-foreground">Alerts</span></div>
+              <p className="text-[10px] text-muted-foreground mt-1 font-bold">Invoice dikembalikan oleh customer (perlu cek ulang).</p>
+           </CardContent>
+        </Card>
+      </div>
+
+      {/* Row 3: Pipeline & Mini Calendar */}
       <div className="grid gap-4 lg:grid-cols-7">
         <Card className="lg:col-span-4">
           <CardHeader>
@@ -301,7 +356,7 @@ export default function DashboardPage() {
         </Card>
       </div>
 
-      {/* Row 3: Pending Payments & Performance */}
+      {/* Row 4: Pending Payments & Performance */}
       <div className="grid gap-4 lg:grid-cols-7">
         <Card className="lg:col-span-4">
           <CardHeader className="flex flex-row items-center justify-between">
