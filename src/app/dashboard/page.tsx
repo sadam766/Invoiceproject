@@ -153,7 +153,7 @@ export default function DashboardPage() {
     ).length;
 
     return { outstanding, realization, target, taxPending };
-  }, [filteredInvoices, salesList, taxList]);
+  }, [filteredInvoices, stats, salesList, taxList]);
 
   const logisticStats = useMemo(() => {
     const pendingShipment = filteredInvoices.filter(inv => inv.status === 'sent' && !inv.spdNumber).length;
@@ -166,12 +166,12 @@ export default function DashboardPage() {
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold tracking-tight uppercase font-black">Dakota Command Center</h1>
-          <p className="text-muted-foreground font-medium flex items-center gap-2">
+          <div className="text-muted-foreground font-medium flex items-center gap-2 text-sm">
             Global overview of Dakota business performance. 
             <Badge variant="secondary" className="bg-primary/10 text-primary text-[10px] font-black uppercase">
                 {format(dateRange.from, 'dd/MM')} - {format(dateRange.to, 'dd/MM/yy')}
             </Badge>
-          </p>
+          </div>
         </div>
         <DateRangePicker onRangeChange={setDateRange} />
       </div>
