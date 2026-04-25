@@ -65,7 +65,6 @@ export function getSalesMonitoringData(salesOrders: SalesOrder[], invoiceListDat
     return Object.values(soData).map(so => {
         const invoice = invoiceListData.find(inv => inv.soNumber === so.soNumber);
         
-        // Find related documents only if an invoice exists
         const taxInvoice = invoice ? taxInvoiceData.find(ti => ti.invoiceNumber === invoice.id) : undefined;
         const spd = invoice ? spdData.find(s => s.noInvoice.includes(invoice.id)) : undefined;
 
@@ -98,7 +97,8 @@ export type Invoice = {
   status: 'paid' | 'unpaid' | 'sent' | 'draft';
   spdNumber: string;
   ownerId?: string;
-  createdBy?: string; // Audit Trail: Nama/Email pembuat
+  createdBy?: string;
+  virtualAccounts?: VirtualAccount[]; // For preview data logic
 };
 
 export type InvoiceNumber = {
@@ -176,4 +176,13 @@ export type SpdData = {
     noFakturPajak: string;
     suratJalan: string;
     ownerId?: string;
+};
+
+export type VirtualAccount = {
+  id?: string;
+  customerCode?: string;
+  customerName: string;
+  bankName: string;
+  vaNumber: string;
+  ownerId?: string;
 };

@@ -1,3 +1,4 @@
+
 'use client';
 import {
   SidebarProvider,
@@ -42,6 +43,7 @@ import {
   ShieldAlert,
   LogOut,
   BadgeCheck,
+  CreditCard,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -79,7 +81,6 @@ export default function DashboardLayout({
   const firestore = useFirestore();
   const { user, isUserLoading } = useUser();
 
-  // Fetch user profile
   const userProfileRef = useMemoFirebase(() => {
     if (!firestore || !user) return null;
     return doc(firestore, 'users', user.uid);
@@ -87,13 +88,11 @@ export default function DashboardLayout({
 
   const { data: userProfile, isLoading: isProfileLoading } = useDoc<UserProfile>(userProfileRef);
 
-  // Super Admin Logic: Hardcoded override for fa@gmail.com
   const isSuperAdmin = user?.email?.toLowerCase() === 'fa@gmail.com' || userProfile?.email?.toLowerCase() === 'fa@gmail.com';
   const userRole = isSuperAdmin ? 'admin' : (userProfile?.role || 'staff');
   const isAdmin = userRole === 'admin';
   const isPending = !isSuperAdmin && userProfile?.status === 'pending';
 
-  // Notification for Pending Users (Visible to Admin only)
   const pendingUsersQuery = useMemoFirebase(() => {
       if (!firestore || !isAdmin) return null;
       return query(collection(firestore, 'users'), where('status', '==', 'pending'));
@@ -218,6 +217,11 @@ export default function DashboardLayout({
                     <SidebarMenuSubItem>
                       <SidebarMenuSubButton asChild isActive={pathname === '/dashboard/invoices/number'}>
                         <Link href="/dashboard/invoices/number">Invoice Number</Link>
+                      </SidebarMenuSubButton>
+                    </SidebarMenuSubItem>
+                     <SidebarMenuSubItem>
+                      <SidebarMenuSubButton asChild isActive={pathname === '/dashboard/invoices/virtual-account'}>
+                        <Link href="/dashboard/invoices/virtual-account">Virtual Account List</Link>
                       </SidebarMenuSubButton>
                     </SidebarMenuSubItem>
                      <SidebarMenuSubItem>

@@ -323,6 +323,20 @@
             "price",
             "ownerId"
         ]
+    },
+    "VirtualAccount": {
+      "title": "Virtual Account",
+      "description": "Represents a customer's Virtual Account for payments.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "customerCode": { "type": "string" },
+        "customerName": { "type": "string" },
+        "bankName": { "type": "string" },
+        "vaNumber": { "type": "string" },
+        "ownerId": { "type": "string" }
+      },
+      "required": ["customerName", "bankName", "vaNumber", "ownerId"]
     }
   },
   "auth": {
@@ -336,25 +350,25 @@
       "schema": {
         "$ref": "#/entities/Product"
       },
-      "description": "Stores product information. Write access is restricted to users with admin privileges."
+      "description": "Stores product information."
     },
     "/customers/{customerId}": {
       "schema": {
         "$ref": "#/entities/Customer"
       },
-      "description": "Stores customer data. Only the user who created it (ownerId) can read/write their own data."
+      "description": "Stores customer data."
     },
     "/sales/{saleId}": {
       "schema": {
         "$ref": "#/entities/Sale"
       },
-      "description": "Stores sale transaction data. The 'saleId' is the 'soNumber'. Only the user who created it (ownerId) can read/write it."
+      "description": "Stores sale transaction data."
     },
     "/invoices/{invoiceId}": {
       "schema": {
         "$ref": "#/entities/Invoice"
       },
-      "description": "Stores invoice documents. Only the user who created it (ownerId) can access it."
+      "description": "Stores invoice documents."
     },
     "/users/{uid}": {
       "description": "Stores user profile information, including their role."
@@ -363,22 +377,28 @@
       "schema": {
           "$ref": "#/entities/SalesOrder"
       },
-      "description": "Stores individual items of a sales order. Only the user who created it can access it."
+      "description": "Stores individual items of a sales order."
     },
     "/invoiceNumbers/{invoiceNumberId}": {
-      "description": "Stores generated invoice numbers. Only the user who created it can access it."
+      "description": "Stores generated invoice numbers."
     },
     "/spds/{spdId}": {
       "schema": {
         "$ref": "#/entities/SPD"
       },
-      "description": "Stores SPD documents. The 'spdId' is the 'spd' field. Only the user who created it can access it."
+      "description": "Stores SPD documents."
     },
     "/taxInvoices/{taxInvoiceId}": {
       "schema": {
         "$ref": "#/entities/TaxInvoice"
       },
-      "description": "Stores tax invoice documents. The 'taxInvoiceId' is the 'taxInvoiceNumber'. Only the user who created it can access it."
+      "description": "Stores tax invoice documents."
+    },
+    "/virtualAccounts/{vaId}": {
+      "schema": {
+        "$ref": "#/entities/VirtualAccount"
+      },
+      "description": "Stores customer Virtual Account information."
     }
   }
 }
