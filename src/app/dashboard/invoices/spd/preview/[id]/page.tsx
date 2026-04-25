@@ -4,7 +4,7 @@
 import { useEffect, useState, useRef, useMemo } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, Printer, Download, MapPin, UserCheck, Layers, FileText, Globe, Truck, Info, Cpu } from 'lucide-react';
+import { ArrowLeft, Printer, Download, MapPin, UserCheck, Layers, FileText, Globe, Truck, Info, Cpu, Database, Hash } from 'lucide-react';
 import { type SpdData, type Invoice } from '@/app/lib/data';
 import { format } from 'date-fns';
 import { id as indonesiaLocale } from 'date-fns/locale';
@@ -28,7 +28,7 @@ export default function SpdPreviewPage() {
     }, [firestore]);
     const { data: allSpds } = useCollection<SpdData>(spdCollectionQuery);
 
-    // Related Invoices lookup for PO Numbers and full data
+    // Related Invoices lookup for Full Data Check
     const allInvoicesQuery = useMemoFirebase(() => {
         if (!firestore) return null;
         return query(collection(firestore, 'invoices'));
@@ -69,7 +69,7 @@ export default function SpdPreviewPage() {
     if (!spdItem) return <div className="p-20 text-center animate-pulse font-bold text-muted-foreground">Mempersiapkan Summary SPD...</div>;
 
     return (
-        <main className="bg-slate-100 min-h-screen p-4 sm:p-10 font-sans">
+        <main className="bg-slate-100 min-h-screen p-4 sm:p-10 font-sans text-black">
             <div className="max-w-4xl mx-auto space-y-6">
                 <div className="flex justify-between items-center print:hidden bg-white p-4 rounded-xl shadow-sm border">
                     <Button onClick={() => router.back()} variant="ghost" className="font-bold hover:bg-slate-50">
@@ -85,7 +85,7 @@ export default function SpdPreviewPage() {
                     </div>
                 </div>
 
-                <div ref={printRef} className="bg-white shadow-2xl p-10 border border-slate-200 text-black overflow-hidden" style={{ minHeight: '297mm' }}>
+                <div ref={printRef} className="bg-white shadow-2xl p-10 border border-slate-200 overflow-hidden" style={{ minHeight: '297mm' }}>
                     {/* Header: Identity */}
                     <div className="flex justify-between items-start border-b-4 border-black pb-6 mb-8">
                         <div className="space-y-1">
@@ -133,7 +133,7 @@ export default function SpdPreviewPage() {
                     {/* Table Section */}
                     <div className="space-y-10">
                         <p className="text-[10px] font-black uppercase text-slate-400 border-b pb-2 tracking-widest mb-4 flex items-center gap-2">
-                           <FileText className="h-3 w-3" /> Batch Dispatch Detail (Dual Identity Check)
+                           <FileText className="h-3 w-3" /> Batch Dispatch Detail (Single Identity Check)
                         </p>
                         
                         {Object.entries(groupedByAddress).map(([address, invoices], groupIdx) => (
@@ -150,27 +150,29 @@ export default function SpdPreviewPage() {
                                     <thead>
                                         <tr className="bg-slate-100 text-slate-600">
                                             <th className="p-3 text-center border w-[5%] font-black uppercase text-[9px]">No</th>
-                                            <th className="p-3 text-left border w-[22%] font-black uppercase text-[9px]">No. SAR (Manual)</th>
-                                            <th className="p-3 text-left border w-[22%] font-black uppercase text-[9px]">ERP Reference</th>
-                                            <th className="p-3 text-left border font-black uppercase text-[9px]">Customer Name</th>
+                                            <th className="p-3 text-left border w-[40%] font-black uppercase text-[9px]">Nomor Invoice (Identity)</th>
+                                            <th className="p-3 text-left border font-black uppercase text-[9px]">Customer Name / PO</th>
                                             <th className="p-3 text-center border w-[15%] font-black uppercase text-[9px]">Signature</th>
                                         </tr>
                                     </thead>
                                     <tbody>
                                         {invoices.map((inv, invIdx) => {
+                                            const isERP = !(inv.invoiceId.startsWith('SAR') || inv.invoiceId.startsWith('KW'));
                                             const fullData = allInvoices?.find(fi => fi.id === inv.invoiceId);
                                             return (
                                                 <tr key={invIdx} className="hover:bg-slate-50 transition-colors h-16">
                                                     <td className="p-3 text-center border font-bold text-slate-500">{invIdx + 1}</td>
-                                                    <td className="p-3 font-mono font-black border text-indigo-700 bg-indigo-50/20">{inv.invoiceId}</td>
-                                                    <td className="p-3 font-mono border text-slate-600 bg-slate-50/20 italic">
-                                                        {fullData?.erpInvoiceId ? (
-                                                            <div className="flex items-center gap-1 text-[10px]">
-                                                                <Cpu className="h-3 w-3" /> {fullData.erpInvoiceId}
-                                                            </div>
-                                                        ) : '-'}
+                                                    <td className="p-3 font-mono font-black border text-indigo-700 bg-indigo-50/20">
+                                                        <div className="flex items-center gap-2">
+                                                            {inv.invoiceId}
+                                                            {isERP ? <Database className="h-3 w-3 text-emerald-600" /> : <Hash className="h-3 w-3 text-indigo-300" />}
+                                                        </div>
+                                                        <p className="text-[8px] text-slate-400 font-bold uppercase mt-1">Source: {isERP ? 'ERP Pusat' : 'Manual SAR'}</p>
                                                     </td>
-                                                    <td className="p-3 font-black uppercase border text-slate-800">{inv.customer}</td>
+                                                    <td className="p-3 font-black uppercase border text-slate-800">
+                                                        {inv.customer}
+                                                        <p className="text-[8px] text-slate-400 font-bold font-mono mt-1">REF PO: {fullData?.poNumber || '-'}</p>
+                                                    </td>
                                                     <td className="p-3 border relative overflow-hidden group">
                                                         <div className="absolute inset-0 flex items-center justify-center opacity-5 pointer-events-none group-hover:scale-110 transition-transform">
                                                             <UserCheck className="h-10 w-10" />
@@ -210,7 +212,7 @@ export default function SpdPreviewPage() {
                             <p className="font-black uppercase mb-2 flex items-center gap-2">
                                 <Info className="h-4 w-4" /> Syarat & Ketentuan Penyerahan Dokumen:
                             </p>
-                            <p>1. Penerima wajib memastikan nomor invoice SAR dan nomor referensi ERP fisik sesuai dengan daftar di atas sebelum menandatangani SPD ini.</p>
+                            <p>1. Penerima wajib memastikan nomor invoice fisik sesuai dengan daftar identitas tunggal di atas (SAR atau ERP) sebelum menandatangani SPD ini.</p>
                             <p>2. SPD Summary ini adalah bukti digital yang sah dalam sistem Dakota. Salinan fisik hanya berlaku dengan stempel basah asli.</p>
                         </div>
 

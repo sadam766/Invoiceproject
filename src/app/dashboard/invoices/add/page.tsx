@@ -28,7 +28,6 @@ import {
 } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { cn, formatNumberWithCommas, parseFormattedNumber } from '@/lib/utils';
 import { format, addDays } from 'date-fns';
 import {
@@ -37,9 +36,10 @@ import {
   Send,
   ShieldCheck,
   ReceiptText,
-  AlertTriangle,
   Cpu,
   Info,
+  Hash,
+  Database,
 } from 'lucide-react';
 import { type Invoice, type SalesOrder, type UserProfile, type SalesListItem, type Customer, type InvoiceItem } from '@/app/lib/data';
 import { useToast } from '@/hooks/use-toast';
@@ -59,7 +59,8 @@ export default function AddInvoicePage() {
   
   // --- FORM STATES ---
   const [invoiceId, setInvoiceId] = useState('');
-  const [erpInvoiceId, setErpInvoiceId] = useState('');
+  const [numberSource, setNumberSource] = useState<'manual' | 'erp'>('manual');
+  const [internalNote, setInternalNote] = useState('');
   const [soNumber, setSoNumber] = useState('');
   const [poNumber, setPoNumber] = useState('');
   const [customerName, setCustomerName] = useState('');
@@ -132,13 +133,13 @@ export default function AddInvoicePage() {
     return tracking;
   }, [poNumber, allSoItems, poRelatedInvoices]);
 
-  // --- LOGIC: AUTO-GENERATE DUAL NUMBERS (SMART SEQUENCE) ---
+  // --- LOGIC: AUTO-GENERATE NUMBER ---
   useEffect(() => {
-    if (!editInvoiceId && allInvoices && !invoiceId) {
+    if (!editInvoiceId && allInvoices && numberSource === 'manual' && !invoiceId) {
         const now = new Date();
         const yy = format(now, 'yy');
-        
         const prefix = isDpInvoice ? 'KW' : 'SAR';
+        
         const currentYearDocs = allInvoices.filter(inv => {
             if (isDpInvoice) return inv.id.startsWith('KW/') && inv.id.includes(`/${yy}`);
             return inv.id.startsWith(`SAR/${yy}`);
@@ -153,7 +154,7 @@ export default function AddInvoicePage() {
             setInvoiceId(`SAR/${yy}${seqStr}A`);
         }
     }
-  }, [allInvoices, editInvoiceId, invoiceId, isDpInvoice]);
+  }, [allInvoices, editInvoiceId, invoiceId, isDpInvoice, numberSource]);
 
   // --- LOGIC: INITIAL LOAD FROM PO ---
   useEffect(() => {
@@ -192,7 +193,7 @@ export default function AddInvoicePage() {
         const found = allInvoices.find(inv => inv.id.replace(/\//g, '_') === editInvoiceId);
         if (found) {
             setInvoiceId(found.id);
-            setErpInvoiceId(found.erpInvoiceId || '');
+            setInternalNote(found.erpInvoiceId || '');
             setSoNumber(found.soNumber);
             setPoNumber(found.poNumber);
             setCustomerName(found.customer);
@@ -207,6 +208,8 @@ export default function AddInvoicePage() {
             setRetentionValue(found.retention || '');
             setDpDeductionValue(found.dpDeduction || '');
             setItems(found.items || []);
+            // Guess source
+            setNumberSource(found.id.startsWith('SAR') || found.id.startsWith('KW') ? 'manual' : 'erp');
         }
     }
   }, [editInvoiceId, allInvoices]);
@@ -242,15 +245,6 @@ export default function AddInvoicePage() {
         return;
     }
 
-    // ANTI-DUPLICATE ERP CHECK
-    if (erpInvoiceId) {
-        const isDuplicateErp = allInvoices?.some(inv => inv.erpInvoiceId === erpInvoiceId && inv.id !== invoiceId);
-        if (isDuplicateErp) {
-            toast({ variant: "destructive", title: "Nomor ERP Duplikat", description: "Nomor ERP ini sudah terdaftar di sistem. Gunakan nomor lain." });
-            return;
-        }
-    }
-
     const safeInvoiceId = invoiceId.replace(/\//g, '_');
     const invoiceDocRef = doc(firestore, 'invoices', safeInvoiceId);
     const timestamp = new Date().toISOString();
@@ -258,7 +252,7 @@ export default function AddInvoicePage() {
 
     const dataToSave: any = {
         id: invoiceId,
-        erpInvoiceId: erpInvoiceId,
+        erpInvoiceId: internalNote,
         soNumber: soNumber,
         poNumber: poNumber,
         customer: customerName,
@@ -269,6 +263,7 @@ export default function AddInvoicePage() {
         amount: parseFormattedNumber(String(totalAmount)),
         status: invoiceStatus,
         isDpInvoice: isDpInvoice,
+        numberSource: numberSource,
         negotiation: parseFormattedNumber(String(negotiationValue)),
         dpValue: parseFormattedNumber(String(dpValue)),
         dpDeduction: parseFormattedNumber(String(dpDeductionValue)),
@@ -312,7 +307,7 @@ export default function AddInvoicePage() {
             <div>
                 <h1 className="text-2xl font-black tracking-tight uppercase">Invoice Constructor</h1>
                 <div className="text-muted-foreground text-xs font-bold uppercase tracking-widest flex items-center gap-1.5">
-                    Dual-Numbering System <Badge variant="secondary" className="text-[8px] bg-indigo-100 text-indigo-700 h-3.5">Active</Badge>
+                    Single Identity Switching <Badge variant="secondary" className="text-[8px] bg-indigo-100 text-indigo-700 h-3.5">Active</Badge>
                 </div>
             </div>
         </div>
@@ -331,28 +326,56 @@ export default function AddInvoicePage() {
           <Card className={cn("shadow-sm border-none ring-1 ring-border", isLocked && "opacity-60 pointer-events-none")}>
             <CardHeader className="bg-muted/30 border-b py-4">
                 <CardTitle className="text-sm font-black uppercase flex items-center gap-2">
-                    <ReceiptText className="h-4 w-4 text-primary" /> Identitas Penagihan (Dual-ID)
+                    <ReceiptText className="h-4 w-4 text-primary" /> Identitas Penagihan
                 </CardTitle>
             </CardHeader>
             <CardContent className="p-6">
               <div className="grid gap-6 md:grid-cols-2">
-                  <div className="grid grid-cols-2 gap-4">
-                      <div className="space-y-2">
-                          <Label className="text-[10px] font-black uppercase text-muted-foreground">No. Invoice SAR (Auto)</Label>
-                          <Input value={invoiceId} readOnly className="font-black text-indigo-700 bg-indigo-50/50 border-indigo-100" />
+                  <div className="md:col-span-2 p-4 bg-muted/20 rounded-xl border border-dashed mb-2">
+                      <div className="flex items-center justify-between mb-4">
+                          <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Pilih Sumber Nomor Invoice</Label>
+                          <div className="flex bg-white rounded-md p-0.5 border shadow-sm">
+                              <Button 
+                                variant={numberSource === 'manual' ? 'default' : 'ghost'} 
+                                size="sm" 
+                                className="h-7 text-[9px] font-black uppercase"
+                                onClick={() => { setNumberSource('manual'); setInvoiceId(''); }}
+                              >
+                                  <Hash className="h-3 w-3 mr-1" /> Otomatis SAR
+                              </Button>
+                              <Button 
+                                variant={numberSource === 'erp' ? 'default' : 'ghost'} 
+                                size="sm" 
+                                className="h-7 text-[9px] font-black uppercase"
+                                onClick={() => { setNumberSource('erp'); setInvoiceId(''); }}
+                              >
+                                  <Database className="h-3 w-3 mr-1" /> Input ERP Number
+                              </Button>
+                          </div>
                       </div>
-                      <div className="space-y-2">
-                          <Label className="text-[10px] font-black uppercase text-muted-foreground flex items-center gap-1">
-                              ERP Reference <Cpu className="h-2.5 w-2.5" />
-                          </Label>
-                          <Input 
-                            value={erpInvoiceId} 
-                            onChange={e => setErpInvoiceId(e.target.value)} 
-                            className="font-mono text-xs border-indigo-200" 
-                            placeholder="ERPSAR/26..." 
-                          />
+                      <div className="grid grid-cols-2 gap-4">
+                          <div className="space-y-2">
+                              <Label className="text-[10px] font-black uppercase text-muted-foreground">Invoice Number (Primary)</Label>
+                              <Input 
+                                value={invoiceId} 
+                                onChange={e => setInvoiceId(e.target.value)}
+                                readOnly={numberSource === 'manual'}
+                                className={cn("font-black text-indigo-700 h-10", numberSource === 'manual' ? "bg-indigo-50/50 border-indigo-100" : "bg-white border-primary ring-1 ring-primary/10")} 
+                                placeholder={numberSource === 'manual' ? "Generating..." : "ERPSAR/2026/..."}
+                              />
+                          </div>
+                          <div className="space-y-2">
+                              <Label className="text-[10px] font-black uppercase text-muted-foreground">Internal Note / Reference</Label>
+                              <Input 
+                                value={internalNote} 
+                                onChange={e => setInternalNote(e.target.value)} 
+                                className="font-mono text-xs h-10" 
+                                placeholder="Catatan internal sistem..." 
+                              />
+                          </div>
                       </div>
                   </div>
+
                   <div className="space-y-2">
                       <Label className="text-[10px] font-black uppercase text-muted-foreground">Customer</Label>
                       <Input value={customerName} disabled className="font-bold uppercase" />

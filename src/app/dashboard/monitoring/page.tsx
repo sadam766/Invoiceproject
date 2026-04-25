@@ -25,7 +25,8 @@ import {
   Eye, 
   CheckCircle2, 
   FileSpreadsheet,
-  Cpu,
+  Database,
+  Hash,
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useFirestore, useCollection, useMemoFirebase } from '@/firebase';
@@ -148,8 +149,7 @@ export default function SalesMonitoringPage() {
         const searchMatch = item.poNumber.toLowerCase().includes(searchQuery.toLowerCase()) ||
                             item.customer.toLowerCase().includes(searchQuery.toLowerCase()) ||
                             item.invoicesInRange?.some(inv => 
-                                inv.id.toLowerCase().includes(searchQuery.toLowerCase()) || 
-                                (inv.erpInvoiceId || '').toLowerCase().includes(searchQuery.toLowerCase())
+                                inv.id.toLowerCase().includes(searchQuery.toLowerCase())
                             );
         if (!searchQuery) {
             return (item.invoicesInRange?.length || 0) > 0;
@@ -185,7 +185,7 @@ export default function SalesMonitoringPage() {
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-black tracking-tighter uppercase">Global Monitoring Hub</h1>
-          <div className="text-muted-foreground font-medium flex items-center gap-2">
+          <div className="text-muted-foreground font-medium flex items-center gap-2 text-sm">
             Pusat pelacakan dokumen harian. 
             <span className="text-[10px] font-black bg-primary/10 text-primary px-2 py-0.5 rounded">
                 Range: {format(dateRange.from, 'dd MMM')} - {format(dateRange.to, 'dd MMM')}
@@ -220,10 +220,10 @@ export default function SalesMonitoringPage() {
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
               <div className="relative w-full md:w-1/3">
                 <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-                <Input placeholder="Cari No. PO, Customer, SAR, atau ERP..." className="pl-8 bg-muted/20 border-none font-medium" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} />
+                <Input placeholder="Cari No. PO, Customer, atau Invoice..." className="pl-8 bg-muted/20 border-none font-medium" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} />
               </div>
               <div className="flex gap-2">
-                 <Badge variant="outline" className="text-[9px] font-black uppercase">Live Dual-Numbering Tracking</Badge>
+                 <Badge variant="outline" className="text-[9px] font-black uppercase">Switching Logic Tracking</Badge>
               </div>
             </div>
 
@@ -233,7 +233,7 @@ export default function SalesMonitoringPage() {
                     <TableRow>
                         <TableHead className="text-[10px] font-black uppercase tracking-widest py-4">PO & Customer</TableHead>
                         <TableHead className="text-[10px] font-black uppercase tracking-widest py-4">Item Progress (Partial)</TableHead>
-                        <TableHead className="text-[10px] font-black uppercase tracking-widest py-4">Invoices (Dual-ID)</TableHead>
+                        <TableHead className="text-[10px] font-black uppercase tracking-widest py-4">Invoices (Single-ID)</TableHead>
                         <TableHead className="w-[200px] text-[10px] font-black uppercase tracking-widest py-4">Payment Health</TableHead>
                         <TableHead className="text-right py-4"></TableHead>
                     </TableRow>
@@ -260,19 +260,21 @@ export default function SalesMonitoringPage() {
                         </TableCell>
                         <TableCell className="py-4">
                             <div className="flex flex-wrap gap-2">
-                                {item.invoicesInRange?.map(inv => (
-                                    <div key={inv.id} className="flex flex-col gap-0.5 bg-white border p-2 rounded-md shadow-sm min-w-[100px]">
-                                        <div className="flex items-center justify-between">
-                                            <span className="text-[9px] font-black text-indigo-700">{inv.id.split('/').pop()}</span>
-                                            {inv.status === 'paid' && <CheckCircle2 className="h-2.5 w-2.5 text-emerald-500" />}
+                                {item.invoicesInRange?.map(inv => {
+                                    const isERP = !(inv.id.startsWith('SAR') || inv.id.startsWith('KW'));
+                                    return (
+                                        <div key={inv.id} className="flex flex-col gap-0.5 bg-white border p-2 rounded-md shadow-sm min-w-[100px]">
+                                            <div className="flex items-center justify-between">
+                                                <span className="text-[9px] font-black text-indigo-700">{inv.id.split('/').pop()}</span>
+                                                {inv.status === 'paid' && <CheckCircle2 className="h-2.5 w-2.5 text-emerald-500" />}
+                                            </div>
+                                            <div className="flex items-center gap-1">
+                                                {isERP ? <Database className="h-2 w-2 text-emerald-600" /> : <Hash className="h-2 w-2 text-indigo-400" />}
+                                                <span className="text-[7px] font-bold text-muted-foreground uppercase">{isERP ? 'ERP' : 'Manual'}</span>
+                                            </div>
                                         </div>
-                                        {inv.erpInvoiceId && (
-                                            <span className="text-[7px] font-mono font-bold text-muted-foreground uppercase flex items-center gap-1">
-                                                <Cpu className="h-2 w-2" /> {inv.erpInvoiceId.split('/').pop()}
-                                            </span>
-                                        )}
-                                    </div>
-                                ))}
+                                    );
+                                })}
                             </div>
                         </TableCell>
                         <TableCell className="py-4">

@@ -11,7 +11,7 @@ import {
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Plus, Calendar as CalendarIcon, Check, ChevronsUpDown } from 'lucide-react';
+import { Plus, Calendar as CalendarIcon, Check, ChevronsUpDown, Database, Hash } from 'lucide-react';
 import { Checkbox } from '@/components/ui/checkbox';
 import {
   Popover,
@@ -50,8 +50,10 @@ export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceDa
   const { user } = useUser();
   const [date, setDate] = useState<Date | undefined>(new Date());
   const [invoiceType, setInvoiceType] = useState<'sar' | 'kw'>('kw');
-  const [isAutoNumber, setIsAutoNumber] = useState(true);
+  const [numberSource, setNumberSource] = useState<'manual' | 'erp'>('manual');
+  const [erpNumberInput, setErpNumberInput] = useState('');
   
+  const [isAutoNumber, setIsAutoNumber] = useState(true);
   const [startingNumber, setStartingNumber] = useState<string>('');
   
   const [prefix, setPrefix] = useState('');
@@ -151,20 +153,20 @@ export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceDa
     const kwMatch = id.match(/^(KW[\/_])(\d+)([\/_]KEU[\/_]\d{4})$/);
 
     if (sarMatch) {
+        setNumberSource('manual');
         setInvoiceType('sar');
         setPrefix(sarMatch[1]);
         setMainNumber(sarMatch[2]);
         setSuffix(sarMatch[3]);
     } else if (kwMatch) {
+        setNumberSource('manual');
         setInvoiceType('kw');
         setPrefix(kwMatch[1]);
         setMainNumber(kwMatch[2]);
         setSuffix(kwMatch[3]);
     } else {
-        setInvoiceType('kw');
-        setPrefix('KW/');
-        setSuffix(`/KEU/${format(new Date(), 'yyyy')}`);
-        setMainNumber(id);
+        setNumberSource('erp');
+        setErpNumberInput(id);
     }
     
     setIsAutoNumber(false); 
@@ -191,6 +193,7 @@ export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceDa
       if (invoiceData) {
           handleManualSetup(invoiceData);
       } else {
+          setNumberSource('manual');
           setInvoiceType('sar');
           setIsAutoNumber(true);
           setupForAddMode('sar', startingNumber);
@@ -200,27 +203,23 @@ export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceDa
           setPoNumber('');
           setDate(new Date());
           setAmount('');
+          setErpNumberInput('');
       }
   }, [isOpen, invoiceData]);
 
   useEffect(() => {
-      if (isAutoNumber && !invoiceData && isOpen) {
+      if (isAutoNumber && !invoiceData && isOpen && numberSource === 'manual') {
           setupForAddMode(invoiceType, startingNumber);
       }
-  }, [startingNumber, invoiceType, isAutoNumber, isOpen]);
+  }, [startingNumber, invoiceType, isAutoNumber, isOpen, numberSource]);
 
   useEffect(() => {
-    setFullInvoiceNumber(`${prefix}${mainNumber}${suffix}`);
-  }, [prefix, mainNumber, suffix]);
-
-  const handleInvoiceTypeChange = (newType: 'sar' | 'kw') => {
-    if (invoiceType === newType) return;
-    setInvoiceType(newType);
-  }
-
-  const handleAutoNumberToggle = (checked: boolean) => {
-    setIsAutoNumber(checked);
-  }
+    if (numberSource === 'manual') {
+        setFullInvoiceNumber(`${prefix}${mainNumber}${suffix}`);
+    } else {
+        setFullInvoiceNumber(erpNumberInput);
+    }
+  }, [prefix, mainNumber, suffix, numberSource, erpNumberInput]);
 
   const handleSalesOrderSelect = (currentValue: string) => {
     const cleanSo = currentValue.split('|')[0];
@@ -262,8 +261,12 @@ export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceDa
   };
 
   const handleSave = (action: 'save' | 'create') => {
-    if (!mainNumber) {
+    if (numberSource === 'manual' && !mainNumber) {
         toast({ variant: "destructive", title: "Validation Error", description: "Nomor urut tidak boleh kosong." });
+        return;
+    }
+    if (numberSource === 'erp' && !erpNumberInput) {
+        toast({ variant: "destructive", title: "Validation Error", description: "Nomor ERP wajib diisi." });
         return;
     }
 
@@ -299,13 +302,13 @@ export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceDa
     onOpenChange(false);
   }
 
-  const dialogTitle = invoiceData ? "Edit Invoice Number" : "Add New Invoice Number";
+  const dialogTitle = invoiceData ? "Edit Invoice Identity" : "Add New Invoice Identity";
 
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
       <DialogTrigger asChild>
         <Button onClick={onAddClick}>
-          <Plus className="mr-2 h-4 w-4" /> Add Number
+          <Plus className="mr-2 h-4 w-4" /> Add Identity
         </Button>
       </DialogTrigger>
       <DialogContent className="sm:max-w-2xl">
@@ -314,62 +317,93 @@ export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceDa
         </DialogHeader>
         <div className="grid gap-6 py-4 max-h-[70vh] overflow-y-auto pr-4">
           
-              <div className="space-y-2">
-                <Label>Tipe Faktur</Label>
-                 <div className="flex w-full rounded-md border border-input">
-                    <Button
-                        variant={invoiceType === 'sar' ? 'default' : 'ghost'}
-                        onClick={() => handleInvoiceTypeChange('sar')}
-                        className="flex-1 rounded-r-none"
-                        disabled={!!invoiceData}
-                    >
-                        SAR
-                    </Button>
-                    <Button
-                        variant={invoiceType === 'kw' ? 'default' : 'ghost'}
-                        onClick={() => handleInvoiceTypeChange('kw')}
-                        className="flex-1 rounded-l-none"
-                        disabled={!!invoiceData}
-                    >
-                        KW / Proforma
-                    </Button>
-                </div>
+          <div className="p-4 bg-muted/20 rounded-xl border border-dashed">
+              <div className="flex items-center justify-between mb-4">
+                  <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Pilih Sumber Nomor</Label>
+                  <div className="flex bg-white rounded-md p-0.5 border shadow-sm">
+                      <Button 
+                        variant={numberSource === 'manual' ? 'default' : 'ghost'} 
+                        size="sm" 
+                        className="h-7 text-[9px] font-black uppercase"
+                        onClick={() => setNumberSource('manual')}
+                      >
+                          <Hash className="h-3 w-3 mr-1" /> Otomatis Manual
+                      </Button>
+                      <Button 
+                        variant={numberSource === 'erp' ? 'default' : 'ghost'} 
+                        size="sm" 
+                        className="h-7 text-[9px] font-black uppercase"
+                        onClick={() => setNumberSource('erp')}
+                      >
+                          <Database className="h-3 w-3 mr-1" /> Input ERP
+                      </Button>
+                  </div>
               </div>
-            
 
-           <div className="space-y-2">
-            <Label>Nomor Faktur</Label>
-            <div className="flex items-center gap-4 mb-2">
-                <div className="flex items-center space-x-2">
-                  <Checkbox id="auto-number" checked={isAutoNumber} onCheckedChange={(checked) => handleAutoNumberToggle(!!checked)} />
-                  <Label htmlFor="auto-number" className="font-normal">Nomor Otomatis</Label>
-                </div>
-                
-                {isAutoNumber && (
-                    <div className="flex items-center gap-2">
-                        <Label htmlFor="mulai-dari" className="text-xs font-normal text-muted-foreground whitespace-nowrap">Mulai Dari:</Label>
-                        <Input 
-                            id="mulai-dari"
-                            placeholder={invoiceType === 'sar' ? "001" : "0001"}
-                            className="h-7 w-24 text-xs"
-                            value={startingNumber}
-                            onChange={(e) => setStartingNumber(e.target.value)}
-                        />
-                    </div>
-                )}
-            </div>
-            
-            <div className="grid grid-cols-[auto_1fr_auto] items-center gap-2">
-              {prefix && <div className="bg-muted px-3 py-2 rounded-md border text-sm font-mono">{prefix}</div>}
-              <Input 
-                value={mainNumber} 
-                onChange={(e) => setMainNumber(e.target.value)} 
-                disabled={isAutoNumber} 
-                placeholder={invoiceType === 'sar' ? "000" : "0000"}
-              />
-              {suffix && <div className="bg-muted px-3 py-2 rounded-md border text-sm font-mono">{suffix}</div>}
-            </div>
+              {numberSource === 'manual' ? (
+                  <div className="space-y-4">
+                      <div className="space-y-2">
+                        <Label>Tipe Faktur</Label>
+                         <div className="flex w-full rounded-md border border-input bg-white">
+                            <Button
+                                variant={invoiceType === 'sar' ? 'default' : 'ghost'}
+                                onClick={() => setInvoiceType('sar')}
+                                className="flex-1 rounded-r-none h-8 text-[10px] font-bold"
+                                disabled={!!invoiceData}
+                            >
+                                SAR
+                            </Button>
+                            <Button
+                                variant={invoiceType === 'kw' ? 'default' : 'ghost'}
+                                onClick={() => setInvoiceType('kw')}
+                                className="flex-1 rounded-l-none h-8 text-[10px] font-bold"
+                                disabled={!!invoiceData}
+                            >
+                                KW / Proforma
+                            </Button>
+                        </div>
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label>Konfigurasi Nomor</Label>
+                        <div className="flex items-center gap-4 mb-2">
+                            <div className="flex items-center space-x-2">
+                              <Checkbox id="auto-number" checked={isAutoNumber} onCheckedChange={(checked) => setIsAutoNumber(!!checked)} />
+                              <Label htmlFor="auto-number" className="font-normal">Nomor Otomatis</Label>
+                            </div>
+                            {isAutoNumber && (
+                                <div className="flex items-center gap-2">
+                                    <Label className="text-xs font-normal text-muted-foreground">Mulai Dari:</Label>
+                                    <Input 
+                                        placeholder={invoiceType === 'sar' ? "001" : "0001"}
+                                        className="h-7 w-24 text-xs"
+                                        value={startingNumber}
+                                        onChange={(e) => setStartingNumber(e.target.value)}
+                                    />
+                                </div>
+                            )}
+                        </div>
+                        <div className="grid grid-cols-[auto_1fr_auto] items-center gap-2">
+                          {prefix && <div className="bg-white px-3 py-2 rounded-md border text-xs font-mono">{prefix}</div>}
+                          <Input value={mainNumber} onChange={(e) => setMainNumber(e.target.value)} disabled={isAutoNumber} className="h-9 font-bold" />
+                          {suffix && <div className="bg-white px-3 py-2 rounded-md border text-xs font-mono">{suffix}</div>}
+                        </div>
+                      </div>
+                  </div>
+              ) : (
+                  <div className="space-y-2">
+                      <Label>Nomor ERP Resmi (Pusat)</Label>
+                      <Input 
+                        value={erpNumberInput} 
+                        onChange={e => setErpNumberInput(e.target.value)} 
+                        placeholder="Contoh: ERPSAR/2600000" 
+                        className="h-10 font-black text-indigo-700 bg-white"
+                      />
+                      <p className="text-[9px] text-muted-foreground italic mt-1">Gunakan format penomoran yang terbit dari sistem ERP perusahaan.</p>
+                  </div>
+              )}
           </div>
+
            <div className="space-y-2">
             <Label htmlFor="sales-order">Sales Order / SO (Opsional)</Label>
             <Popover open={soPopoverOpen} onOpenChange={setSoPopoverOpen}>
@@ -506,7 +540,7 @@ export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceDa
                 </Popover>
               </div>
             <div className="space-y-2">
-              <Label htmlFor="amount">Jumlah</Label>
+              <Label htmlFor="amount">Jumlah Tagihan</Label>
               <Input 
                 id="amount" 
                 value={amount} 
@@ -520,8 +554,8 @@ export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceDa
         </div>
         <div className="pt-6 border-t flex justify-end gap-2">
           <Button variant="ghost" onClick={() => onOpenChange(false)}>Cancel</Button>
-          <Button variant="outline" onClick={() => handleSave('save')}>Save</Button>
-          <Button type="button" onClick={() => handleSave('create')} className="bg-primary text-primary-foreground">Create Invoice</Button>
+          <Button variant="outline" onClick={() => handleSave('save')}>Save Logic</Button>
+          <Button type="button" onClick={() => handleSave('create')} className="bg-primary text-primary-foreground">Generate Invoice</Button>
         </div>
       </DialogContent>
     </Dialog>

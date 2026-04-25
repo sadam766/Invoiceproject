@@ -1,3 +1,4 @@
+
 'use client';
 import { useState, useRef, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
@@ -22,7 +23,7 @@ import {
   import { Input } from '@/components/ui/input';
   import { Button } from '@/components/ui/button';
   import { type InvoiceNumber, type Invoice } from '@/app/lib/data';
-  import { Search, Upload, Download, Filter, MoreHorizontal, Edit, Trash2, Lock } from 'lucide-react';
+  import { Search, Upload, Download, MoreHorizontal, Edit, Trash2, Lock, Database, Hash } from 'lucide-react';
   import { AddInvoiceNumberDialog } from './_components/add-invoice-number-dialog';
   import { DeleteConfirmationDialog } from '@/app/components/delete-confirmation-dialog';
   import { Skeleton } from '@/components/ui/skeleton';
@@ -51,7 +52,7 @@ import {
     }, [firestore]);
     const { data: invoices, isLoading } = useCollection<InvoiceNumber>(invoiceNumbersCollection);
 
-    // Fetch Invoice List untuk pengecekan relasi/status (Sequential Guard)
+    // Fetch Invoice List untuk pengecekan relasi/status
     const invoicesCollection = useMemoFirebase(() => {
         if (!firestore) return null;
         return query(collection(firestore, 'invoices'));
@@ -92,10 +93,6 @@ import {
         setIsDialogOpen(true);
     };
 
-    /**
-     * Proteksi Penghapusan:
-     * Menjamin nomor faktur yang sudah dikirim (Sent) tidak bisa dihapus permanen.
-     */
     const handleDeleteConfirm = () => {
         if (!firestore || !deleteDialogState.invoiceId) return;
 
@@ -144,7 +141,7 @@ import {
       setDoc(docRef, dataToSave, { merge: true })
         .then(() => {
              toast({
-                title: editingInvoice ? 'Invoice Number Updated' : 'Invoice Number Created',
+                title: editingInvoice ? 'Identity Updated' : 'Identity Registered',
              });
              if (action === 'create') {
                 router.push(`/dashboard/invoices/add?invoiceNumberId=${safePathId}`);
@@ -172,58 +169,21 @@ import {
 
     const handleDownloadTemplate = () => {
         const headers = ['id', 'customer', 'salesOrder', 'date', 'amount'];
-        generateExcelTemplate(headers, 'invoice_number_template');
-        toast({ title: "Template Downloaded", description: "Invoice number template has been downloaded." });
+        generateExcelTemplate(headers, 'invoice_identity_template');
     };
     
     const handleExport = () => {
       if (invoices) {
-        exportToExcel(invoices, 'invoice-numbers');
-      }
-    };
-
-    const handleImportClick = () => {
-        fileInputRef.current?.click();
-    };
-    
-    const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
-      const file = event.target.files?.[0];
-      if (file && firestore && user) {
-        try {
-          const data = await importFromExcel(file) as Omit<InvoiceNumber, 'ownerId'>[];
-          const batch = writeBatch(firestore);
-          
-          data.forEach(item => {
-              if (item.id) {
-                const safeId = item.id.replace(/\//g, '_');
-                const docRef = doc(firestore, 'invoiceNumbers', safeId);
-                const dataToSave = { ...item, id: item.id, ownerId: user.uid };
-                batch.set(docRef, dataToSave);
-              }
-          });
-
-          await batch.commit();
-
-          toast({
-            title: "Success",
-            description: `${data.length} records imported successfully.`,
-          });
-        } catch (error: any) {
-           errorEmitter.emit('permission-error', new FirestorePermissionError({
-              path: 'invoiceNumbers',
-              operation: 'create',
-              requestResourceData: 'Batch import data',
-          }));
-        }
+        exportToExcel(invoices, 'invoice-identities');
       }
     };
 
     return (
       <main className="flex flex-1 flex-col gap-4 p-4 md:gap-8 md:p-8">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">Daftar Nomor Faktur</h1>
+          <h1 className="text-2xl font-bold tracking-tight">Invoice Identity Switching</h1>
           <p className="text-muted-foreground">
-            Kelola dan proteksi urutan nomor faktur Anda.
+            Kelola identitas penagihan tunggal (SAR Manual atau ERP Pusat).
           </p>
         </div>
         
@@ -234,16 +194,13 @@ import {
                         <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
                         <Input 
                             type="search" 
-                            placeholder="Cari Faktur" 
+                            placeholder="Cari Identitas Faktur" 
                             className="pl-8" 
                             value={searchQuery}
                             onChange={(e) => setSearchQuery(e.target.value)}
                         />
                     </div>
                     <div className="flex items-center gap-2">
-                       <input type="file" ref={fileInputRef} onChange={handleFileChange} className="hidden" accept=".xlsx, .xls" />
-                       <Button variant="outline" onClick={handleImportClick}><Upload className="mr-2 h-4 w-4"/> Impor</Button>
-                       <Button variant="outline" onClick={handleDownloadTemplate}><Download className="mr-2 h-4 w-4"/> Template</Button>
                        <Button variant="outline" onClick={handleExport}><Download className="mr-2 h-4 w-4"/> Ekspor</Button>
                        <AddInvoiceNumberDialog
                         isOpen={isDialogOpen}
@@ -260,7 +217,7 @@ import {
                     <Table>
                         <TableHeader>
                             <TableRow>
-                                <TableHead>NOMOR FAKTUR</TableHead>
+                                <TableHead>INVOICE NUMBER</TableHead>
                                 <TableHead>PELANGGAN</TableHead>
                                 <TableHead>SALES ORDER/SO</TableHead>
                                 <TableHead>TANGGAL</TableHead>
@@ -283,18 +240,21 @@ import {
                             ) : (
                                 filteredInvoices?.map((invoice) => {
                                     const isLinked = linkedInvoices?.some(inv => inv.id === invoice.id);
+                                    const isERP = !(invoice.id.startsWith('SAR') || invoice.id.startsWith('KW'));
                                     return (
                                         <TableRow key={invoice.id} className={isLinked ? "bg-muted/30" : ""}>
                                             <TableCell className="font-medium">
                                                 <div className="flex items-center gap-2">
                                                     {invoice.id}
-                                                    {isLinked && <Lock className="h-3 w-3 text-muted-foreground" title="Locked by Audit" />}
+                                                    {isLinked ? <Lock className="h-3 w-3 text-muted-foreground" /> : (
+                                                        isERP ? <Database className="h-3 w-3 text-emerald-600" /> : <Hash className="h-3 w-3 text-indigo-400" />
+                                                    )}
                                                 </div>
                                             </TableCell>
                                             <TableCell>{invoice.customer}</TableCell>
                                             <TableCell>{invoice.salesOrder}</TableCell>
                                             <TableCell>{invoice.date}</TableCell>
-                                            <TableCell>Rp {invoice.amount.toLocaleString('id-ID')},00</TableCell>
+                                            <TableCell>Rp {invoice.amount.toLocaleString('id-ID')}</TableCell>
                                             <TableCell className="text-right">
                                                 <DropdownMenu>
                                                     <DropdownMenuTrigger asChild>
@@ -339,9 +299,6 @@ import {
                             )}
                         </TableBody>
                     </Table>
-                </div>
-                <div className="text-sm text-muted-foreground mt-4">
-                    Showing 1 to {filteredInvoices?.length || 0} of {invoices?.length || 0} entries
                 </div>
             </CardContent>
         </Card>
