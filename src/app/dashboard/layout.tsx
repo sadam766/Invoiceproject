@@ -62,7 +62,7 @@ import React, { useEffect, useMemo } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { ThemeToggle } from '../components/theme-toggle';
-import { cn } from '@/lib/utils';
+import { cn } from '@/utils';
 import { useAuth, useUser, useFirestore, useDoc, useMemoFirebase, useCollection } from '@/firebase';
 import { signOut } from 'firebase/auth';
 import { doc, query, collection, where } from 'firebase/firestore';

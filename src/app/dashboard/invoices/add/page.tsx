@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useEffect, useState, useMemo } from 'react';
@@ -59,7 +58,7 @@ import { type InvoiceNumber, type Customer, type ProductListItem, type Invoice, 
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useFirestore, useCollection, useMemoFirebase, useUser, useDoc } from '@/firebase';
-import { collection, query, doc, writeBatch, where, getDocs } from 'firebase/firestore';
+import { collection, query, doc, writeBatch, where, getDocs, setDoc } from 'firebase/firestore';
 
 type InvoiceItem = {
     id: number;
@@ -301,27 +300,22 @@ export default function AddInvoicePage() {
         status: invoiceStatus,
         paymentMethod: paymentMethodText,
         ownerId: user.uid,
+        createdBy: user.email,
     }, { merge: true });
 
-    // Link items to SalesOrder collection
-    const itemsGroupKey = soNumber || safeInvoiceId;
-    items.forEach(item => {
-        const newSoRef = doc(collection(firestore, 'salesOrders'));
-        batch.set(newSoRef, {
-            id: newSoRef.id,
-            soNumber: itemsGroupKey,
-            poNumber: poNumber,
-            customer: customer.name,
-            productName: item.name, // This captures the ALIAS if edited
-            quantity: parseFormattedNumber(String(item.quantity)),
-            unit: item.unit,
-            price: parseFormattedNumber(String(item.price)),
-            ownerId: user.uid,
-        });
-    });
+    // Sync back to invoiceNumbers if exists
+    const invNumRef = doc(firestore, 'invoiceNumbers', safeInvoiceId);
+    batch.set(invNumRef, {
+        id: invoiceId,
+        amount: finalAmountValue,
+        customer: customer.name,
+        salesOrder: soNumber || '(Waiting SO)',
+        poNumber: poNumber,
+        ownerId: user.uid
+    }, { merge: true });
 
     await batch.commit();
-    toast({ title: "Invoice Disimpan" });
+    toast({ title: "Invoice Berhasil Disimpan" });
     router.push('/dashboard/invoices');
   };
 
@@ -362,7 +356,7 @@ export default function AddInvoicePage() {
               <div><label className="text-sm font-medium">SO/Sales Order</label>
                 <Popover open={soPopoverOpen} onOpenChange={setSoPopoverOpen}>
                     <PopoverTrigger asChild><Button variant="outline" className="w-full justify-between">{soNumber || "Cari SO (Opsional)"}<ChevronsUpDown className="ml-2 h-4 w-4 opacity-50" /></Button></PopoverTrigger>
-                    <PopoverContent className="w-[200px] p-0 shadow-xl border border-muted"><Command><CommandInput placeholder="Search SO..." /><CommandList><CommandEmpty /><CommandGroup>{uniqueSalesOrders.map((so) => (<CommandItem key={so} value={so} onSelect={handleSoSelect}><Check className={cn("mr-2 h-4 w-4", soNumber.toLowerCase() === so.toLowerCase() ? "opacity-100" : "opacity-0")} />{so}</CommandItem>))}</CommandGroup></CommandList></Command></PopoverContent>
+                    <PopoverContent className="w-[250px] p-0 shadow-xl border border-muted" align="start"><Command><CommandInput placeholder="Search SO..." /><CommandList><CommandEmpty /><CommandGroup>{uniqueSalesOrders.map((so) => (<CommandItem key={so} value={so} onSelect={handleSoSelect}><Check className={cn("mr-2 h-4 w-4", soNumber.toLowerCase() === so.toLowerCase() ? "opacity-100" : "opacity-0")} />{so}</CommandItem>))}</CommandGroup></CommandList></Command></PopoverContent>
                 </Popover>
               </div>
               <div><label className="text-sm font-medium">No. PO Customer</label><Input value={poNumber} onChange={e => setPoNumber(e.target.value)} placeholder="Wajib jika SO kosong" disabled={!!soNumber} /></div>
@@ -383,7 +377,7 @@ export default function AddInvoicePage() {
               <Table className="w-full">
                 <TableHeader>
                   <TableRow>
-                    <TableHead className="min-w-[250px]">Item (Editable Alias)</TableHead>
+                    <TableHead className="min-w-[250px]">Item (Alias Display Name)</TableHead>
                     <TableHead className="w-[80px] text-center">Qty</TableHead>
                     <TableHead className="w-[80px] text-center">Unit</TableHead>
                     <TableHead className="w-[140px] text-right">Price</TableHead>
@@ -408,10 +402,10 @@ export default function AddInvoicePage() {
                                 >{p.name}</CommandItem>))}</CommandGroup></CommandList></Command>
                             </PopoverContent>
                         </Popover>
-                        <Input value={item.name} onChange={e => setItems(items.map(it => it.id === item.id ? { ...it, name: e.target.value } : it))} placeholder="Ganti nama barang sesuai PO Customer..." className="h-8 text-sm bg-blue-50/50" />
+                        <Input value={item.name} onChange={e => setItems(items.map(it => it.id === item.id ? { ...it, name: e.target.value } : it))} placeholder="Edit Nama untuk dokumen (Alias)..." className="h-8 text-sm bg-blue-50/50" />
                     </TableCell>
                     <TableCell className="p-2"><Input value={item.quantity} onChange={(e) => setItems(items.map(it => it.id === item.id ? { ...it, quantity: e.target.value, total: parseFormattedNumber(e.target.value) * parseFormattedNumber(String(it.price)) } : it))} onBlur={() => handleBlurFormat(v => setItems(items.map(it => it.id === item.id ? { ...it, quantity: v as string } : it)), item.quantity)} className="text-center" /></TableCell>
-                    <TableCell className="p-2"><Input value={item.unit} onChange={(e) => setItems(items.map(it => it.id === item.id ? { ...it, unit: e.target.value } : it))} className="text-center" /></TableCell>
+                    <TableCell className="p-2"><Input value={item.unit} onChange={(e) => setItems(items.map(it => it.id === item.id ? { ...it, unit: e.target.value } : it))} className="text-center uppercase" /></TableCell>
                     <TableCell className="p-2"><Input value={item.price} onChange={(e) => setItems(items.map(it => it.id === item.id ? { ...it, price: e.target.value, total: parseFormattedNumber(String(it.quantity)) * parseFormattedNumber(e.target.value) } : it))} onBlur={() => handleBlurFormat(v => setItems(items.map(it => it.id === item.id ? { ...it, price: v as string } : it)), item.price)} className="text-right" /></TableCell>
                     <TableCell className="p-2 text-right font-medium">Rp {formatNumberWithCommas(item.total)}</TableCell>
                     <TableCell className="p-2 text-center"><Button variant="ghost" size="icon" onClick={() => setItems(items.filter(it => it.id !== item.id))} className="text-destructive"><Trash2 className="h-4 w-4" /></Button></TableCell>
