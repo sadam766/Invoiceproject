@@ -1,8 +1,8 @@
 
 /**
  * @file Firestore Security Rules
- * @description Implementasi hierarki hak akses Dakota: Leader, Admin, dan Staff.
- *              Leader (fa@gmail.com) memiliki otoritas penuh.
+ * @description Hierarki hak akses Dakota: Leader, Admin, dan Staff.
+ *              Leader (fa@gmail.com) memiliki otoritas mutlak tanpa syarat lookup dokumen.
  */
 rules_version = '2';
 service cloud.firestore {
@@ -14,39 +14,39 @@ service cloud.firestore {
       return request.auth != null;
     }
 
-    function getUserData() {
-      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
-    }
-
-    // Role Checks
+    // Leader Check: Otoritas mutlak berdasarkan email permanen
     function isLeader() {
-      return request.auth.token.email == 'fa@gmail.com' || getUserData().role == 'admin' && request.auth.token.email == 'fa@gmail.com';
+      return isSignedIn() && request.auth.token.email == 'fa@gmail.com';
     }
 
+    // Admin Check: Leader ATAU user dengan role 'admin' di profilnya
     function isAdmin() {
-      return isLeader() || getUserData().role == 'admin';
+      return isLeader() || (isSignedIn() && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin');
     }
     
+    // Staff Check: Leader ATAU Admin ATAU user dengan status 'active'
     function isStaff() {
-      return isSignedIn() && getUserData().status == 'active';
+      return isAdmin() || (isSignedIn() && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.status == 'active');
     }
 
     // --- ATURAN KOLEKSI ---
 
     /**
      * Manajemen Profil User
-     * Hanya Leader yang bisa mengelola semua user.
-     * User biasa hanya bisa baca profil sendiri.
+     * Leader bisa mengelola semua user.
+     * User biasa hanya bisa baca profil sendiri & buat profil saat register.
      */
     match /users/{userId} {
       allow read: if isSignedIn();
       allow create: if isSignedIn();
-      allow update, delete: if isLeader() || (request.auth.uid == userId && request.resource.data.role == resource.data.role);
+      allow update: if isLeader() || (request.auth.uid == userId && request.resource.data.role == resource.data.role);
+      allow delete: if isLeader();
     }
 
     /**
      * Data Operasional (Products, Customers, Sales, SO, Invoices, VA)
-     * Create/Read/Update: Admin & Staff (Active)
+     * Read: Leader, Admin, & Staff Aktif
+     * Create/Update: Leader & Admin
      * Delete: Hanya Leader
      */
     match /products/{id} {
@@ -92,18 +92,17 @@ service cloud.firestore {
     }
 
     /**
-     * Modul Pajak (Tax Invoices) & SPD
-     * Hanya Admin & Leader yang bisa akses.
+     * Modul Pajak & SPD
+     * Hanya Admin & Leader yang bisa akses (Read/Write).
+     * Delete: Hanya Leader.
      */
     match /taxInvoices/{id} {
-      allow read, list: if isAdmin();
-      allow create, update: if isAdmin();
+      allow read, list, create, update: if isAdmin();
       allow delete: if isLeader();
     }
 
     match /spds/{id} {
-      allow read, list: if isAdmin();
-      allow create, update: if isAdmin();
+      allow read, list, create, update: if isAdmin();
       allow delete: if isLeader();
     }
   }
