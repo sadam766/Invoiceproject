@@ -30,6 +30,15 @@ import {
     CommandItem,
     CommandList,
   } from '@/components/ui/command';
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select';
+import { Switch } from '@/components/ui/switch';
+import { Label } from '@/components/ui/label';
 import { cn, formatNumberWithCommas, parseFormattedNumber } from '@/lib/utils';
 import { format } from 'date-fns';
 import {
@@ -74,7 +83,8 @@ export default function AddInvoicePage() {
   const [poNumber, setPoNumber] = useState('');
   const [customer, setCustomer] = useState<Customer | undefined>(undefined);
 
-  const [issueDate, setIssueDate] = useState<Date | undefined>(new Date());
+  // Default Issue Date to 25/04/2026 per instruction
+  const [issueDate, setIssueDate] = useState<Date | undefined>(new Date('2026-04-25'));
   const [dueDate, setDueDate] = useState<Date | undefined>();
   const [status, setStatus] = useState<'paid' | 'unpaid' | 'sent' | 'draft'>('draft');
   const [printType, setPrintType] = useState<'original' | 'copy'>('original');
@@ -90,6 +100,11 @@ export default function AddInvoicePage() {
   const [dppVat, setDppVat] = useState<string | number>(0);
   const [vat12, setVat12] = useState<string | number>(0);
   const [totalAmount, setTotalAmount] = useState<string | number>(0);
+
+  // Virtual Account States
+  const [isVaActive, setIsVaActive] = useState(false);
+  const [selectedVaId, setSelectedVaId] = useState<string>('');
+  const [paymentMethodText, setPaymentMethodMethodText] = useState('Bank Transfer');
 
   const [soPopoverOpen, setSoPopoverOpen] = useState(false);
   const [customerPopoverOpen, setCustomerPopoverOpen] = useState(false);
@@ -125,6 +140,20 @@ export default function AddInvoicePage() {
   }, [firestore]);
   const { data: vaListData } = useCollection<VirtualAccount>(vaCollection);
 
+  const availableVAs = useMemo(() => {
+    if (!vaListData || !customer) return [];
+    return vaListData.filter(va => va.customerName === customer.name);
+  }, [vaListData, customer]);
+
+  useEffect(() => {
+      if (isVaActive && selectedVaId) {
+          const va = availableVAs.find(v => v.id === selectedVaId);
+          if (va) setPaymentMethodMethodText(`Virtual Account - ${va.bankName}`);
+      } else if (!isVaActive) {
+          setPaymentMethodMethodText('Bank Transfer');
+      }
+  }, [isVaActive, selectedVaId, availableVAs]);
+
   const uniqueSalesOrders = useMemo(() => {
       if (!salesOrderListData) return [];
       return Array.from(new Set(salesOrderListData.map(item => item.soNumber)))
@@ -154,7 +183,7 @@ export default function AddInvoicePage() {
             setSoNumber(savedState.soNumber || '');
             setPoNumber(savedState.poNumber || '');
             setCustomer(savedState.customer);
-            setIssueDate(savedState.issueDate ? new Date(savedState.issueDate) : new Date());
+            setIssueDate(savedState.issueDate ? new Date(savedState.issueDate) : new Date('2026-04-25'));
             setDueDate(savedState.dueDate ? new Date(savedState.dueDate) : undefined);
             setStatus(savedState.status || 'draft');
             setPrintType(savedState.printType || 'original');
@@ -167,6 +196,8 @@ export default function AddInvoicePage() {
             setDppVat(savedState.dppVat || 0);
             setVat12(savedState.vat12 || 0);
             setTotalAmount(savedState.totalAmount || 0);
+            setIsVaActive(savedState.isVaActive || false);
+            setSelectedVaId(savedState.selectedVaId || '');
         } catch (e) {
             console.error("Failed to parse saved invoice state:", e);
         }
@@ -176,10 +207,10 @@ export default function AddInvoicePage() {
   useEffect(() => {
     if (!isLoading) {
       sessionStorage.setItem(ADD_INVOICE_SESSION_KEY, JSON.stringify({
-        invoiceId, soNumber, poNumber, customer, issueDate: issueDate?.toISOString(), dueDate: dueDate?.toISOString(), status, printType, items, negotiation, dpPercent, dpValue, pelunasan, grandTotal, dppVat, vat12, totalAmount
+        invoiceId, soNumber, poNumber, customer, issueDate: issueDate?.toISOString(), dueDate: dueDate?.toISOString(), status, printType, items, negotiation, dpPercent, dpValue, pelunasan, grandTotal, dppVat, vat12, totalAmount, isVaActive, selectedVaId
       }));
     }
-  }, [invoiceId, soNumber, poNumber, customer, issueDate, dueDate, status, printType, items, negotiation, dpPercent, dpValue, pelunasan, grandTotal, dppVat, vat12, totalAmount, isLoading]);
+  }, [invoiceId, soNumber, poNumber, customer, issueDate, dueDate, status, printType, items, negotiation, dpPercent, dpValue, pelunasan, grandTotal, dppVat, vat12, totalAmount, isVaActive, selectedVaId, isLoading]);
 
 
   useEffect(() => {
@@ -319,7 +350,7 @@ export default function AddInvoicePage() {
   };
 
   const handlePreview = () => {
-    const customerVa = vaListData?.filter(va => va.customerName === customer?.name) || [];
+    const selectedVa = isVaActive ? availableVAs.find(va => va.id === selectedVaId) : undefined;
     const previewData = {
       id: invoiceId, soNumber, poNumber, customer, date: issueDate ? format(issueDate, 'yyyy-MM-dd') : '',
       amount: parseFormattedNumber(String(totalAmount)), status, printType,
@@ -331,7 +362,8 @@ export default function AddInvoicePage() {
       subtotal, dppVat: parseFormattedNumber(String(dppVat)), vat12: parseFormattedNumber(String(vat12)),
       negotiation: parseFormattedNumber(String(negotiation)), dpValue: parseFormattedNumber(String(dpValue)),
       pelunasan: parseFormattedNumber(String(pelunasan)), grandTotal: parseFormattedNumber(String(grandTotal)),
-      virtualAccount: customerVa.length > 0 ? { bankName: customerVa[0].bankName, vaNumber: customerVa[0].vaNumber } : undefined
+      virtualAccount: selectedVa ? { bankName: selectedVa.bankName, vaNumber: selectedVa.vaNumber } : undefined,
+      paymentTerms: '90 Hari setelah invoice diterima'
     };
     sessionStorage.setItem('invoicePreviewData', JSON.stringify(previewData));
     router.push(`/dashboard/invoices/preview/${encodeURIComponent(invoiceId || 'new')}`);
@@ -357,7 +389,7 @@ export default function AddInvoicePage() {
                 </Popover>
               </div>
               <div><label className="text-sm font-medium">No. PO</label><Input value={poNumber} onChange={e => setPoNumber(e.target.value)} /></div>
-              <div><label className="text-sm font-medium">Payment</label><Input placeholder="e.g. Bank Transfer" /></div>
+              <div><label className="text-sm font-medium">Payment</label><Input value={paymentMethodText} onChange={e => setPaymentMethodMethodText(e.target.value)} /></div>
               <div className="lg:col-span-2">
                  <label className="text-sm font-medium">Bill To</label>
                  <Popover open={customerPopoverOpen} onOpenChange={setCustomerPopoverOpen}>
@@ -408,7 +440,37 @@ export default function AddInvoicePage() {
             </div>
           </Card>
         </div>
-        <div className="lg:col-span-2">
+        <div className="lg:col-span-2 space-y-4">
+          <Card>
+            <CardContent className="p-4 space-y-4">
+                <div className="flex items-center justify-between space-x-2">
+                    <Label htmlFor="va-mode" className="flex flex-col space-y-1">
+                        <span>Gunakan Virtual Account</span>
+                        <span className="font-normal text-xs text-muted-foreground">Aktifkan untuk pembayaran via VA</span>
+                    </Label>
+                    <Switch id="va-mode" checked={isVaActive} onCheckedChange={setIsVaActive} />
+                </div>
+                {isVaActive && (
+                    <div className="space-y-2">
+                        <Label className="text-xs">Pilih Bank VA</Label>
+                        <Select value={selectedVaId} onValueChange={setSelectedVaId}>
+                            <SelectTrigger>
+                                <SelectValue placeholder="Pilih VA..." />
+                            </SelectTrigger>
+                            <SelectContent>
+                                {availableVAs.length > 0 ? (
+                                    availableVAs.map(va => (
+                                        <SelectItem key={va.id} value={va.id!}>{va.bankName} - {va.vaNumber}</SelectItem>
+                                    ))
+                                ) : (
+                                    <div className="p-2 text-xs text-center text-muted-foreground">Tidak ada VA terdaftar</div>
+                                )}
+                            </SelectContent>
+                        </Select>
+                    </div>
+                )}
+            </CardContent>
+          </Card>
           <Card><CardContent className="p-4 space-y-4">
               <Button className="w-full" onClick={() => handleSaveInvoice('sent')}><Send className="mr-2 h-4 w-4" /> Send Invoice</Button>
               <Button variant="outline" className="w-full" onClick={handlePreview}><Eye className="mr-2 h-4 w-4" /> Preview</Button>

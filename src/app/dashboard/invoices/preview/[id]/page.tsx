@@ -10,6 +10,7 @@ import html2pdf from 'html2pdf.js';
 // --- DEFINISI TIPE DATA ---
 interface Item {
     id: string;
+    no: number;
     name: string;
     quantity: number;
     unit: string;
@@ -28,13 +29,13 @@ interface InvoiceData {
     soNumber: string;
     poNumber: string;
     grandTotal: number;
+    subtotal: number;
     dppVat: number;
     vat12: number;
     totalRp: number;
     paymentTerms: string;
     printType: 'original' | 'copy';
     negotiation: number;
-    dpPercent: number | string;
     dpValue: number;
     pelunasan: number;
     virtualAccount?: {
@@ -77,39 +78,7 @@ const InvoicePreviewPage = () => {
             const dataFromSession = sessionStorage.getItem('invoicePreviewData');
             if (dataFromSession) {
                 const parsedData = JSON.parse(dataFromSession);
-                const formattedItems = parsedData.items.map((item: any) => ({
-                    id: item.id?.toString() ?? '',
-                    name: item.name ?? item.item,
-                    quantity: item.quantity,
-                    unit: item.unit,
-                    price: item.price,
-                    total: item.total ?? item.amount,
-                }));
-
-                setInvoiceData({
-                    id: parsedData.id,
-                    items: formattedItems,
-                    customer: {
-                        name: parsedData.customer?.name ?? 'N/A',
-                        address: parsedData.customer?.address ?? 'N/A',
-                    },
-                    date: parsedData.date,
-                    soNumber: parsedData.soNumber,
-                    poNumber: parsedData.poNumber || '',
-                    grandTotal: parsedData.grandTotal,
-                    dppVat: parsedData.dppVat,
-                    vat12: parsedData.vat12,
-                    totalRp: parsedData.grandTotal + parsedData.vat12,
-                    paymentTerms: parsedData.paymentTerms || '90 Hari setelah invoice diterima',
-                    printType: parsedData.printType || 'original',
-                    negotiation: parsedData.negotiation || 0,
-                    dpPercent: parsedData.dpPercent || 0,
-                    dpValue: parsedData.dpValue || 0,
-                    pelunasan: parsedData.pelunasan || 0,
-                    virtualAccount: parsedData.virtualAccount,
-                });
-            } else {
-                setInvoiceData(null);
+                setInvoiceData(parsedData);
             }
         } catch (error) {
             console.error("Failed to load or parse invoice data:", error);
@@ -128,7 +97,7 @@ const InvoicePreviewPage = () => {
             return;
         }
         const opt = {
-          margin:       [10, 10, 10, 10], // top, left, bottom, right
+          margin:       [10, 10, 10, 10], 
           filename:     `Invoice-${invoiceData.id.replace(/\//g, '_')}.pdf`,
           image:        { type: 'jpeg', quality: 0.98 },
           html2canvas:  { scale: 2, useCORS: true },
@@ -138,17 +107,8 @@ const InvoicePreviewPage = () => {
     };
 
     const handleExportExcel = () => {
-        if (!invoiceData) {
-            toast({
-                variant: "destructive",
-                title: "Error",
-                description: "No invoice data to export.",
-            });
-            return;
-        }
-
+        if (!invoiceData) return;
         const displayInvoiceId = invoiceData.id.replace(/_/g, '/');
-
         const dataToExport = invoiceData.items.map(item => ({
             'Invoice ID': displayInvoiceId,
             'Customer': invoiceData.customer.name,
@@ -160,25 +120,14 @@ const InvoicePreviewPage = () => {
             'Price': item.price,
             'Total': item.total,
         }));
-
-        dataToExport.push({
-            'Invoice ID': '---', 'Customer': '', 'SO Number': '', 'Date': '', 'Item Name': '---',
-            'Quantity': '', 'Unit': '', 'Price': '', 'Total': ''
-        });
-        dataToExport.push({ 'Invoice ID': 'Subtotal (Goods)', 'Total': invoiceData.grandTotal } as any);
-        dataToExport.push({ 'Invoice ID': 'DPP VAT', 'Total': invoiceData.dppVat } as any);
-        dataToExport.push({ 'Invoice ID': 'VAT 12%', 'Total': invoiceData.vat12 } as any);
-        dataToExport.push({ 'Invoice ID': 'Total', 'Total': invoiceData.totalRp } as any);
         exportToExcel(dataToExport, `Invoice-${invoiceData.id.replace(/\//g, '_')}`);
-        toast({
-            title: "Export Successful",
-            description: `Invoice ${displayInvoiceId} has been exported to Excel.`,
-        });
+        toast({ title: "Export Successful" });
     };
     
     if (!invoiceData) {
         return <div className="p-8">Loading invoice preview...</div>;
     }
+
     const {
         id: invoiceId,
         items,
@@ -187,15 +136,15 @@ const InvoicePreviewPage = () => {
         soNumber,
         poNumber,
         grandTotal,
+        subtotal,
         dppVat,
         vat12,
         paymentTerms,
-        totalRp,
         printType,
         negotiation,
-        dpPercent,
         dpValue,
-        pelunasan
+        pelunasan,
+        virtualAccount
     } = invoiceData;
 
     const displayInvoiceId = invoiceId.replace(/_/g, '/');
@@ -203,50 +152,32 @@ const InvoicePreviewPage = () => {
         items.slice(i * ITEMS_PER_PAGE, i * ITEMS_PER_PAGE + ITEMS_PER_PAGE)
     );
     const totalPages = itemChunks.length;
-    const subTotalItems = items.reduce((acc, item) => acc + item.total, 0);
+    const totalRp = parseFormattedNumber(grandTotal) + parseFormattedNumber(vat12);
+
     const invoiceTitle = invoiceId.startsWith('KW') ? 'PROFORMA INVOICE' : 'INVOICE/OFFICIAL RECEIPT';
 
     return (
         <div className="bg-gray-100 dark:bg-slate-900 min-h-screen p-4 sm:p-6 font-sans text-black">
             <style>{`
                 @media print {
-                    body {
-                        background-color: #fff !important;
-                    }
-                    .page-break {
-                        page-break-before: always;
-                    }
-                    .print-container {
-                        box-shadow: none !important;
-                        border: none !important;
-                        margin: 0 !important;
-                        padding: 0 !important;
-                    }
-                    .print-hidden, .print-hidden * {
-                        display: none !important;
-                    }
+                    body { background-color: #fff !important; }
+                    .page-break { page-break-before: always; }
+                    .print-container { box-shadow: none !important; border: none !important; margin: 0 !important; padding: 0 !important; }
+                    .print-hidden { display: none !important; }
                 }
             `}</style>
+            
             <div className="flex justify-center space-x-4 mb-4 print-hidden">
-                <Button onClick={() => router.back()} variant="outline">
-                    <ArrowLeft size={16} />
-                    <span>Back to Edit</span>
-                </Button>
-                <Button onClick={handleDownloadPdf} className="bg-blue-600 text-white hover:bg-blue-700">
-                    <Download size={16} />
-                    <span>Download PDF</span>
-                </Button>
-                <Button onClick={handleExportExcel} className="bg-green-600 text-white hover:bg-green-700">
-                    <Upload size={16} />
-                    <span>Export Excel</span>
-                </Button>
+                <Button onClick={() => router.back()} variant="outline"><ArrowLeft size={16} /> Back</Button>
+                <Button onClick={handleDownloadPdf} className="bg-blue-600"><Download size={16} /> PDF</Button>
+                <Button onClick={handleExportExcel} variant="outline"><Upload size={16} /> Excel</Button>
             </div>
             
             <div ref={invoiceContainerRef} className="print-container">
                 {itemChunks.map((chunk, pageIndex) => {
                     const isLastPage = pageIndex === totalPages - 1;
                     return (
-                        <div key={pageIndex} className={`w-full max-w-4xl mx-auto bg-white shadow-lg p-10 my-8 text-[10px] leading-tight flex flex-col ${pageIndex > 0 ? 'page-break' : ''}`} style={{ height: '297mm', width: '210mm' }}>
+                        <div key={pageIndex} className={`w-full max-w-4xl mx-auto bg-white shadow-lg p-4 my-8 text-[10px] leading-tight flex flex-col ${pageIndex > 0 ? 'page-break' : ''}`} style={{ height: '220mm' }}>
                             <header className="relative pt-0 pb-0 text-[10px] leading-snug">
                                 <p className="absolute right-0 top-0 font-normal text-sm capitalize">{printType}</p>
                                 <div className="w-full text-center mb-1 leading-none">
@@ -256,7 +187,7 @@ const InvoicePreviewPage = () => {
                                 <div className='flex justify-between items-start mt-4'>
                                     <div className='w-[45%]'>
                                         <p className="font-bold text-[10px] mb-0">{customer.name}</p>
-                                        <p className="text-[10px] whitespace-pre-wrap">{customer.address}</p>
+                                        <p className="text-[9px] mt-1 leading-tight">{customer.address}</p>
                                     </div>
                                     <div className="w-[30%] text-[10px] text-left leading-normal space-y-0">
                                         <p className="mb-0">Sales Order: {soNumber}</p> 
@@ -270,36 +201,29 @@ const InvoicePreviewPage = () => {
                                 </div>
                             </header>
 
-                            <main className='mt-2 flex-grow'>
-                                <table className="w-full border-collapse border border-black" style={{ tableLayout: 'fixed' }}>
+                            <main className='mt-0 flex-grow'>
+                                <table className="w-full border-collapse text-[10px] mt-0 table-fixed">
                                     <thead>
-                                        <tr className='bg-white'>
-                                            <th className="p-1 text-left border-r border-b border-black font-normal" style={{ width: '8%' }}>No.</th>
-                                            <th className="p-1 text-left border-r border-b border-black font-normal" style={{ width: '42%' }}>Item</th>
-                                            <th className="p-1 text-center border-r border-b border-black font-normal" style={{ width: '15%' }}>Quantity Unit</th>
-                                            <th className="p-1 text-right border-r border-b border-black font-normal" style={{ width: '17%' }}>Price</th>
-                                            <th className="p-1 text-right border-b border-black font-normal" style={{ width: '18%' }}>Amount</th>
+                                        <tr className='bg-white border border-black'>
+                                            <th className="p-1 text-left w-[8%] border-r border-black border-b border-black font-normal">No.</th>
+                                            <th className="p-1 text-left w-[42%] border-r border-black border-b border-black font-normal">Item</th>
+                                            <th className="p-1 text-center w-[15%] border-r border-black border-b border-black font-normal">Quantity Unit</th>
+                                            <th className="p-1 text-right w-[17%] border-r border-black border-b border-black font-normal">Price</th>
+                                            <th className="p-1 text-right w-[18%] border-b border-black font-normal">Amount</th>
                                         </tr>
                                     </thead>
                                     <tbody>
                                         {chunk.map((item, itemIdx) => (
                                             <tr key={item.id} className='align-top'>
-                                                <td className="p-1 h-[20px] border-r border-black">{pageIndex * ITEMS_PER_PAGE + itemIdx + 1}</td>
-                                                <td className="p-1 border-r border-black overflow-hidden">{item.name}</td>
-                                                <td className="p-1 text-center border-r border-black">{item.quantity.toLocaleString('id-ID')} {item.unit}</td>
-                                                <td className="p-1 text-right border-r border-black">{formatCurrency(item.price)}</td>
+                                                <td className="p-1 h-[18px] border-l border-r border-transparent">{pageIndex * ITEMS_PER_PAGE + itemIdx + 1}</td>
+                                                <td className="p-1 border-r border-transparent">{item.name}</td>
+                                                <td className="p-1 text-center border-r border-transparent">{item.quantity.toLocaleString('id-ID')} {item.unit}</td>
+                                                <td className="p-1 text-right border-r border-transparent">{formatCurrency(item.price)}</td>
                                                 <td className="p-1 text-right">{formatCurrency(item.total)}</td>
                                             </tr>
                                         ))}
-                                        {/* Filler rows to maintain height */}
-                                        {chunk.length < ITEMS_PER_PAGE && Array.from({ length: ITEMS_PER_PAGE - chunk.length }).map((_, i) => (
-                                            <tr key={`filler-${i}`} className='align-top'>
-                                                <td className="p-1 h-[20px] border-r border-black">&nbsp;</td>
-                                                <td className="p-1 border-r border-black">&nbsp;</td>
-                                                <td className="p-1 border-r border-black">&nbsp;</td>
-                                                <td className="p-1 border-r border-black">&nbsp;</td>
-                                                <td className="p-1">&nbsp;</td>
-                                            </tr>
+                                        {!isLastPage && Array.from({ length: ITEMS_PER_PAGE - chunk.length }).map((_, i) => (
+                                            <tr key={`empty-${i}`}><td className="p-1 h-[18px]" colSpan={5}>&nbsp;</td></tr>
                                         ))}
                                     </tbody>
                                 </table>
@@ -309,8 +233,8 @@ const InvoicePreviewPage = () => {
                                 <footer className="pt-0 text-black mt-auto text-[10px]">
                                     <div className="w-full flex justify-end items-end leading-normal">
                                         <div className="text-right w-1/2">
-                                            <div className="border-t border-black w-1/3 ml-auto mb-1"></div>
-                                            <p className="text-[10px] font-normal">{formatCurrency(subTotalItems)}</p>
+                                            {chunk.length < 5 && <div className="h-0.5 border-b border-black w-1/4 ml-auto" style={{marginTop: `-${(5 - chunk.length) * 18}px`}}></div>}
+                                            <p className="text-[10px] font-normal">{formatCurrency(subtotal)}</p>
                                         </div>
                                     </div>
                                 
@@ -324,7 +248,7 @@ const InvoicePreviewPage = () => {
                                             )}
                                             {dpValue > 0 && (
                                                 <div className='flex justify-start space-x-2'>
-                                                    <p className='mb-0'>DP {dpPercent ? `${dpPercent}%` : 'Value'} :</p>
+                                                    <p className='mb-0'>DP :</p>
                                                     <p className='mb-0'>{formatCurrency(dpValue)}</p>
                                                 </div>
                                             )}
@@ -351,14 +275,15 @@ const InvoicePreviewPage = () => {
                                                 <span className="text-right">VAT 12%:</span>
                                                 <span className="text-right">{formatCurrency(vat12)}</span>
                                             </div>
-                                            <div className="grid grid-cols-[1fr_auto] gap-x-3 font-normal border-t border-black mt-1">
-                                                <span className="text-right font-bold">Total Rp:</span>
-                                                <span className="text-right font-bold">{formatCurrency(totalRp)}</span>
+                                            <div className="grid grid-cols-[1fr_auto] gap-x-3 font-bold border-t border-black mt-1 pt-1">
+                                                <span className="text-right">Total Rp:</span>
+                                                <span className="text-right">{formatCurrency(totalRp)}</span>
                                             </div>
                                         </div>
                                     </div>
                                     <div className="border-t border-black w-full my-1"></div>
                                     
+                                    {/* FOOTER PEMBAYARAN - AREA SENSITIF LOGIKA */}
                                     <div className="mt-0 pt-1">
                                         <div className="flex">
                                             <div className="w-[55%] pr-4 text-[10px] space-y-0.5 leading-normal"> 
@@ -374,39 +299,43 @@ const InvoicePreviewPage = () => {
                                                 <p className="font-semibold text-[10px] mb-1">PT. Jembo Cable Company Tbk</p>
 
                                                 {/* LOGIKA VIRTUAL ACCOUNT VS REKENING MANUAL */}
-                                                {invoiceData.virtualAccount ? (
-                                                    <div className="space-y-0 leading-tight border border-dashed border-gray-300 p-2" style={{ minHeight: '80px' }}>
+                                                {virtualAccount ? (
+                                                    <div className="space-y-0 leading-tight border border-dashed border-gray-300 p-2 min-h-[85px]">
                                                         <div className="flex font-bold">
-                                                            <span className="w-1/3 pr-2 mb-0">{invoiceData.virtualAccount.bankName} -</span>
-                                                            <span className="flex-1 mb-0">VIRTUAL ACCOUNT</span>
+                                                            <span className="w-1/3 pr-2 mb-0">{virtualAccount.bankName} -</span>
+                                                            <span className="flex-1 mb-0 uppercase">VIRTUAL ACCOUNT</span>
                                                         </div>
                                                         <div className="flex text-lg tracking-wider font-mono mt-1">
-                                                            <span className="w-full mb-0">{invoiceData.virtualAccount.vaNumber}</span>
+                                                            <span className="w-full mb-0 font-bold">{virtualAccount.vaNumber}</span>
                                                         </div>
-                                                        <p className="text-[8px] italic mt-1">*Konfirmasi otomatis, tidak perlu kirim bukti transfer</p>
+                                                        <p className="text-[8px] italic mt-2 text-gray-500">*Konfirmasi otomatis, tidak perlu kirim bukti transfer</p>
                                                     </div>
                                                 ) : (
-                                                    <div className="space-y-0 leading-tight" style={{ minHeight: '80px' }}>
-                                                        <div className="flex">
-                                                            <span className="w-1/3 pr-2 mb-0">Bank Mandiri -</span>
-                                                            <span className="flex-1 mb-0">A/C No. : 102-0100206827 (Rp)</span>
-                                                        </div>
-                                                        <div className="flex">
-                                                            <span className="w-1/3 pr-2 mb-0">Jakarta Cabang</span>
-                                                            <span className="flex-1 mb-0">A/C No. : 102-0005000218 (Rp)</span>
-                                                        </div>
-                                                        <div className="flex">
-                                                            <span className="w-1/3 pr-2 mb-0">Sudirman</span>
-                                                            <span className="flex-1 mb-0">A/C No. : 102-0005000226 (USD)</span>
-                                                        </div>
-                                                        <div className="text-center my-1">OR</div>
-                                                        <div className="flex">
-                                                            <div className="w-1/3 pr-2 leading-tight space-y-0">
-                                                                <p className='mb-0'>Bank BCA - Jakarta</p>
-                                                                <p className='mt-0'>Cabang KEM TOWER</p>
+                                                    <div className="min-h-[85px]">
+                                                        <div className="space-y-0 leading-tight">
+                                                            <div className="flex">
+                                                                <span className="w-1/3 pr-2 mb-0">Bank Mandiri -</span>
+                                                                <span className="flex-1 mb-0">A/C No. : 102-0100206827 (Rp)</span>
                                                             </div>
-                                                            <div className="flex-1 text-left">
-                                                                <p className='mb-0'>A/C No. : 684-0198977 (Rp)</p>
+                                                            <div className="flex">
+                                                                <span className="w-1/3 pr-2 mb-0">Jakarta Cabang</span>
+                                                                <span className="flex-1 mb-0">A/C No. : 102-0005000218 (Rp)</span>
+                                                            </div>
+                                                            <div className="flex">
+                                                                <span className="w-1/3 pr-2 mb-0">Sudirman</span>
+                                                                <span className="flex-1 mb-0">A/C No. : 102-0005000226 (USD)</span>
+                                                            </div>
+                                                        </div>
+                                                        <div className="text-center my-0.5 text-[8px] italic">OR</div>
+                                                        <div className="space-y-0 leading-tight">
+                                                            <div className="flex">
+                                                                <div className="w-1/3 pr-2 leading-tight space-y-0">
+                                                                    <p className='mb-0'>Bank BCA - Jakarta</p>
+                                                                    <p className='mt-0 text-[8px]'>Cabang KEM TOWER</p>
+                                                                </div>
+                                                                <div className="flex-1 text-left">
+                                                                    <p className='mb-0'>A/C No. : 684-0198977 (Rp)</p>
+                                                                </div>
                                                             </div>
                                                         </div>
                                                     </div>
@@ -424,7 +353,7 @@ const InvoicePreviewPage = () => {
                                     </div>
                                 </footer>
                             ) : null}
-                            <div className="text-center text-gray-500 text-[8px] mt-auto pt-2 print-hidden">
+                            <div className="text-center text-gray-500 text-[8px] mt-auto pt-2">
                                 Halaman {pageIndex + 1} dari {totalPages}
                             </div>
                         </div>
