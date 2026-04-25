@@ -14,19 +14,21 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { Badge } from '@/components/ui/badge';
 import { 
   Plus, 
   Search, 
   Truck, 
-  FileText, 
   MapPin, 
   CheckCircle2, 
-  Calendar as CalendarIcon 
+  Calendar as CalendarIcon,
+  Layers,
+  Info
 } from 'lucide-react';
 import { useEffect, useState, useMemo } from 'react';
-import type { SpdData, Invoice, UserProfile, SpdInvoiceEntry } from '@/app/lib/data';
+import type { SpdData, Invoice, SpdInvoiceEntry } from '@/app/lib/data';
 import { useFirestore, useCollection, useMemoFirebase, useUser } from '@/firebase';
-import { collection, query, where, doc, getDocs } from 'firebase/firestore';
+import { collection, query, where } from 'firebase/firestore';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
 
@@ -48,7 +50,7 @@ export function AddSpdDialog({ isOpen, onOpenChange, onSave, spdData, onAddClick
   const [searchInvoice, setSearchInvoice] = useState('');
   const [selectedInvoices, setSelectedInvoices] = useState<SpdInvoiceEntry[]>([]);
 
-  // Fetch Invoices available for SPD (Status 'sent' and no spdNumber)
+  // SMART PICK: Fetch Invoices that are 'sent' but NOT yet in any SPD
   const availableInvoicesQuery = useMemoFirebase(() => {
     if (!firestore) return null;
     return query(
@@ -57,18 +59,21 @@ export function AddSpdDialog({ isOpen, onOpenChange, onSave, spdData, onAddClick
     );
   }, [firestore]);
   
-  const { data: allSentInvoices } = useCollection<Invoice>(availableInvoicesQuery);
+  const { data: allSentInvoices, isLoading: isLoadingInvoices } = useCollection<Invoice>(availableInvoicesQuery);
 
-  const filteredInvoices = useMemo(() => {
+  // Filter out invoices that already have an spdNumber (Status Sync)
+  const filteredAvailableInvoices = useMemo(() => {
       if (!allSentInvoices) return [];
-      // Filter out those already in another SPD (using spdNumber field)
-      // and filter by search
-      return allSentInvoices.filter(inv => 
-        (!inv.spdNumber || inv.spdNumber === spdId) &&
-        (inv.id.toLowerCase().includes(searchInvoice.toLowerCase()) || 
-         inv.customer.toLowerCase().includes(searchInvoice.toLowerCase()))
-      );
-  }, [allSentInvoices, searchInvoice, spdId]);
+      
+      return allSentInvoices.filter(inv => {
+          // If editing, allow invoices already in this SPD. 
+          // Otherwise, only show invoices with NO spdNumber assigned.
+          const isNotAssigned = !inv.spdNumber || (spdData && inv.spdNumber === spdData.id);
+          const matchesSearch = inv.id.toLowerCase().includes(searchInvoice.toLowerCase()) || 
+                                inv.customer.toLowerCase().includes(searchInvoice.toLowerCase());
+          return isNotAssigned && matchesSearch;
+      });
+  }, [allSentInvoices, searchInvoice, spdData]);
 
   useEffect(() => {
     if (spdData && isOpen) {
@@ -77,7 +82,6 @@ export function AddSpdDialog({ isOpen, onOpenChange, onSave, spdData, onAddClick
       setCourier(spdData.courier);
       setSelectedInvoices(spdData.invoices || []);
     } else if (!isOpen) {
-      // Generate new ID format: SPD/YYYY/MM/XXX
       const now = new Date();
       setSpdId(`SPD/${format(now, 'yyyy/MM')}/${Math.floor(100 + Math.random() * 900)}`);
       setDate(format(now, 'yyyy-MM-dd'));
@@ -115,108 +119,142 @@ export function AddSpdDialog({ isOpen, onOpenChange, onSave, spdData, onAddClick
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
       <DialogTrigger asChild>
-        <Button onClick={onAddClick} className="bg-indigo-600 hover:bg-indigo-700">
+        <Button onClick={onAddClick} className="bg-indigo-600 hover:bg-indigo-700 shadow-md">
           <Plus className="mr-2 h-4 w-4" /> BUAT SPD BARU
         </Button>
       </DialogTrigger>
-      <DialogContent className="sm:max-w-4xl max-h-[90vh] flex flex-col">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-              <Truck className="h-5 w-5 text-primary" /> 
-              {spdData ? "Edit SPD" : "Register Digital Dispatch (SPD)"}
+      <DialogContent className="sm:max-w-4xl max-h-[90vh] flex flex-col p-0 overflow-hidden">
+        <DialogHeader className="p-6 pb-0">
+          <DialogTitle className="flex items-center gap-2 text-xl font-bold">
+              <Layers className="h-6 w-6 text-indigo-600" /> 
+              Batch Picking: Penarikan Data SPD
           </DialogTitle>
           <DialogDescription>
-            Pilih invoice yang akan dibawa kurir untuk pengiriman hari ini.
+            Pilih secara kolektif invoice yang akan dibawa kurir dalam satu rute perjalanan.
           </DialogDescription>
         </DialogHeader>
         
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 py-4 flex-1 overflow-hidden">
-          {/* SPD Header Info */}
-          <div className="space-y-4 border-r pr-4">
-             <div className="space-y-2">
-                <Label className="text-[10px] font-bold uppercase text-muted-foreground">Nomor SPD (Auto)</Label>
-                <Input value={spdId} readOnly className="bg-muted font-mono text-xs" />
-             </div>
-             <div className="space-y-2">
-                <Label className="text-[10px] font-bold uppercase text-muted-foreground">Tanggal Kirim</Label>
-                <div className="relative">
-                    <CalendarIcon className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-                    <Input type="date" value={date} onChange={e => setDate(e.target.value)} className="pl-8" />
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-0 flex-1 overflow-hidden border-t mt-4">
+          {/* Section 1: Header Info & Summary */}
+          <div className="bg-muted/30 p-6 space-y-6 border-r">
+             <div className="space-y-4">
+                <div className="space-y-2">
+                    <Label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Nomor SPD Digital</Label>
+                    <Input value={spdId} readOnly className="bg-background font-mono text-xs font-bold border-indigo-100" />
+                </div>
+                <div className="space-y-2">
+                    <Label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Tanggal Pengiriman</Label>
+                    <div className="relative">
+                        <CalendarIcon className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                        <Input type="date" value={date} onChange={e => setDate(e.target.value)} className="pl-8 bg-background" />
+                    </div>
+                </div>
+                <div className="space-y-2">
+                    <Label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Kurir / Pembawa Dokumen</Label>
+                    <Input 
+                        placeholder="Nama Kurir atau Ekspedisi..." 
+                        value={courier} 
+                        onChange={e => setCourier(e.target.value)} 
+                        className="bg-background"
+                    />
                 </div>
              </div>
-             <div className="space-y-2">
-                <Label className="text-[10px] font-bold uppercase text-muted-foreground">Kurir / Ekspedisi</Label>
-                <Input 
-                    placeholder="Nama Kurir (Internal/Eksternal)" 
-                    value={courier} 
-                    onChange={e => setCourier(e.target.value)} 
-                />
-             </div>
 
-             <div className="pt-4 mt-4 border-t">
-                <p className="text-[10px] font-black uppercase text-indigo-600 mb-2">Summary</p>
-                <div className="bg-indigo-50 p-3 rounded-lg border border-indigo-100">
-                    <div className="flex justify-between items-center">
-                        <span className="text-xs">Invoice Terpilih:</span>
-                        <span className="text-sm font-bold text-indigo-700">{selectedInvoices.length}</span>
+             <div className="pt-6 border-t">
+                <p className="text-[10px] font-black uppercase text-indigo-600 mb-3 tracking-widest">Consolidation Summary</p>
+                <div className="bg-indigo-600 text-white p-4 rounded-xl shadow-inner space-y-1">
+                    <p className="text-[10px] opacity-80 font-medium">TOTAL INVOICE TERPILIH</p>
+                    <p className="text-3xl font-black">{selectedInvoices.length}</p>
+                    <div className="flex items-center gap-2 mt-2 pt-2 border-t border-white/20">
+                        <Info className="h-3 w-3" />
+                        <span className="text-[9px] leading-tight italic">Alamat akan dikelompokkan otomatis pada cetakan SPD.</span>
                     </div>
                 </div>
              </div>
           </div>
 
-          {/* Smart Pick Invoices */}
-          <div className="md:col-span-2 flex flex-col gap-4 overflow-hidden">
-             <div className="relative">
-                <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-                <Input 
-                    placeholder="Cari Nomor Invoice atau Customer..." 
-                    className="pl-8"
-                    value={searchInvoice}
-                    onChange={e => setSearchInvoice(e.target.value)}
-                />
+          {/* Section 2: Smart Pick Invoices List */}
+          <div className="md:col-span-2 flex flex-col bg-background overflow-hidden">
+             <div className="p-4 border-b bg-muted/10">
+                <div className="relative">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                    <Input 
+                        placeholder="Cari Nomor Invoice, Nama Customer, atau Alamat..." 
+                        className="pl-10 h-11 shadow-none border-none focus-visible:ring-0 text-sm"
+                        value={searchInvoice}
+                        onChange={e => setSearchInvoice(e.target.value)}
+                    />
+                </div>
              </div>
 
-             <Label className="text-[10px] font-bold uppercase text-muted-foreground">Daftar Invoice Siap Kirim (Status: Sent)</Label>
-             
-             <ScrollArea className="flex-1 border rounded-md p-2">
-                <div className="space-y-2">
-                    {filteredInvoices.length === 0 ? (
-                        <div className="text-center py-10 opacity-40 italic text-xs">Tidak ada invoice siap kirim ditemukan.</div>
-                    ) : filteredInvoices.map((inv) => {
+             <ScrollArea className="flex-1 p-4">
+                <div className="space-y-3">
+                    <div className="flex items-center justify-between px-2">
+                        <Label className="text-[10px] font-black uppercase text-muted-foreground tracking-tighter">Ready to Deliver Invoices</Label>
+                        <Badge variant="secondary" className="text-[9px] h-4">{filteredAvailableInvoices.length} Tersedia</Badge>
+                    </div>
+
+                    {isLoadingInvoices ? (
+                        <div className="text-center py-20 animate-pulse text-xs text-muted-foreground">Menganalisa daftar invoice...</div>
+                    ) : filteredAvailableInvoices.length === 0 ? (
+                        <div className="flex flex-col items-center justify-center py-20 opacity-40 text-center space-y-2">
+                            <Layers className="h-10 w-10 mb-2" />
+                            <p className="text-xs font-medium">Semua invoice berstatus 'Sent' sudah <br/>masuk ke dalam daftar SPD.</p>
+                        </div>
+                    ) : filteredAvailableInvoices.map((inv) => {
                         const isSelected = selectedInvoices.some(si => si.invoiceId === inv.id);
                         return (
                             <div 
                                 key={inv.id} 
                                 onClick={() => toggleInvoice(inv)}
                                 className={cn(
-                                    "flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-all hover:border-primary/50",
-                                    isSelected ? "bg-primary/5 border-primary shadow-sm" : "bg-card"
+                                    "group relative flex items-start gap-4 p-4 rounded-xl border transition-all cursor-pointer",
+                                    isSelected 
+                                        ? "bg-indigo-50/50 border-indigo-300 ring-1 ring-indigo-300" 
+                                        : "bg-background hover:border-indigo-200 hover:bg-muted/10"
                                 )}
                             >
-                                <Checkbox checked={isSelected} className="mt-1" />
-                                <div className="flex-1 space-y-1">
+                                <div className="mt-1">
+                                    <Checkbox checked={isSelected} className="rounded-full h-5 w-5 data-[state=checked]:bg-indigo-600 data-[state=checked]:border-indigo-600" />
+                                </div>
+                                <div className="flex-1 space-y-1.5 min-w-0">
                                     <div className="flex justify-between items-center">
-                                        <span className="text-xs font-bold font-mono">{inv.id}</span>
-                                        <span className="text-[10px] text-muted-foreground">Rp {inv.amount.toLocaleString('id-ID')}</span>
+                                        <span className="text-xs font-black font-mono tracking-tight text-indigo-700">{inv.id}</span>
+                                        <Badge variant="outline" className="text-[8px] h-4 bg-emerald-50 text-emerald-700 border-emerald-100">READY</Badge>
                                     </div>
-                                    <p className="text-[11px] font-black uppercase leading-none">{inv.customer}</p>
-                                    <div className="flex items-start gap-1 text-[9px] text-muted-foreground">
-                                        <MapPin className="h-2 w-2 shrink-0 mt-0.5" />
-                                        <span className="line-clamp-1">{inv.billingAddress}</span>
+                                    <p className="text-sm font-black uppercase leading-none truncate pr-4">{inv.customer}</p>
+                                    <div className="flex items-start gap-1.5 text-[10px] text-muted-foreground">
+                                        <MapPin className="h-3 w-3 shrink-0 mt-0.5 text-rose-500" />
+                                        <span className="line-clamp-1 italic">{inv.billingAddress}</span>
+                                    </div>
+                                    <div className="flex items-center gap-3 pt-1">
+                                        <span className="text-[9px] font-bold text-muted-foreground/60 uppercase">Nilai: Rp {inv.amount.toLocaleString('id-ID')}</span>
+                                        <span className="text-[9px] font-bold text-muted-foreground/60 uppercase">PO: {inv.poNumber || '-'}</span>
                                     </div>
                                 </div>
+                                {isSelected && (
+                                    <div className="absolute right-4 top-1/2 -translate-y-1/2">
+                                        <CheckCircle2 className="h-5 w-5 text-indigo-600" />
+                                    </div>
+                                )}
                             </div>
                         );
                     })}
                 </div>
+                <div className="h-6" />
              </ScrollArea>
           </div>
         </div>
 
-        <DialogFooter className="border-t pt-4">
-          <Button variant="ghost" onClick={() => onOpenChange(false)}>Batal</Button>
-          <Button type="button" onClick={handleSave} disabled={!courier || selectedInvoices.length === 0}>
-             <CheckCircle2 className="mr-2 h-4 w-4" /> SIMPAN & TERBITKAN SPD
+        <DialogFooter className="p-4 border-t bg-muted/20">
+          <Button variant="ghost" onClick={() => onOpenChange(false)} className="h-10">Batal</Button>
+          <Button 
+            type="button" 
+            onClick={handleSave} 
+            disabled={!courier || selectedInvoices.length === 0}
+            className="h-10 bg-indigo-600 hover:bg-indigo-700 px-8 font-bold"
+          >
+             <Layers className="mr-2 h-4 w-4" /> SIMPAN & TERBITKAN SPD
           </Button>
         </DialogFooter>
       </DialogContent>
