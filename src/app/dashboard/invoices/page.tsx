@@ -1,6 +1,5 @@
 
 'use client';
-import Link from 'next/link';
 import { useState, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import {
@@ -31,7 +30,7 @@ import {
   import { Label } from '@/components/ui/label';
   import { Textarea } from '@/components/ui/textarea';
   import { type Invoice, type UserProfile } from '@/app/lib/data';
-  import { Search, MoreHorizontal, Plus, Eye, Pencil, Trash2, Download, Truck, FileSpreadsheet, XCircle, ShieldCheck } from 'lucide-react';
+  import { Search, MoreHorizontal, Eye, Pencil, Download, Truck, FileSpreadsheet, XCircle, ShieldCheck, Layers } from 'lucide-react';
   import { Skeleton } from '@/components/ui/skeleton';
   import {
     DropdownMenu,
@@ -40,8 +39,8 @@ import {
     DropdownMenuTrigger,
   } from '@/components/ui/dropdown-menu';
   import { useToast } from '@/hooks/use-toast';
-  import { useFirestore, useCollection, useMemoFirebase, useUser, errorEmitter, FirestorePermissionError, useDoc } from '@/firebase';
-  import { collection, query, doc, writeBatch, updateDoc, arrayUnion } from 'firebase/firestore';
+  import { useFirestore, useCollection, useMemoFirebase, useUser, useDoc } from '@/firebase';
+  import { collection, query, doc, updateDoc, arrayUnion } from 'firebase/firestore';
   import { exportToExcel, cn } from '@/lib/utils';
   import { DateRangePicker } from '@/app/components/date-range-picker';
   import { isWithinInterval, parseISO, startOfToday, format } from 'date-fns';
@@ -110,7 +109,7 @@ import {
             );
         }
 
-        return filtered;
+        return filtered.sort((a,b) => b.date.localeCompare(a.date));
     }, [invoices, activeTab, searchQuery, dateRange]);
 
     const handleVoidInvoice = async () => {
@@ -188,7 +187,9 @@ import {
                 <Button variant="outline" size="sm" onClick={() => exportToExcel(filteredInvoices, `Invoice-Laporan-${format(dateRange.from, 'yyyyMMdd')}`)} className="font-bold h-9">
                     <FileSpreadsheet className="mr-2 h-4 w-4 text-green-600" /> Export
                 </Button>
-                <Link href="/dashboard/invoices/add" passHref><Button size="sm" className="font-bold h-9"><Plus className="mr-2 h-4 w-4"/> New Invoice</Button></Link>
+                <Button size="sm" className="font-black uppercase h-9 shadow-md bg-indigo-600 hover:bg-indigo-700" onClick={() => router.push('/dashboard/sales')}>
+                    <Layers className="mr-2 h-4 w-4" /> Start from Sales List
+                </Button>
             </div>
         </div>
 
@@ -216,13 +217,14 @@ import {
                                     <TableHead className="w-[40px]"><Checkbox onCheckedChange={(c) => c ? setSelectedInvoices(new Set(filteredInvoices.map(i => i.id))) : setSelectedInvoices(new Set())} /></TableHead>
                                     <TableHead className="text-[10px] font-black uppercase tracking-widest">Invoice Info</TableHead>
                                     <TableHead className="text-[10px] font-black uppercase tracking-widest">Customer</TableHead>
+                                    <TableHead className="text-[10px] font-black uppercase tracking-widest">SPD INFO</TableHead>
                                     <TableHead className="text-[10px] font-black uppercase tracking-widest">Amount</TableHead>
                                     <TableHead className="text-[10px] font-black uppercase tracking-widest">Status</TableHead>
                                     <TableHead className="text-right text-[10px] font-black uppercase tracking-widest">Aksi</TableHead>
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
-                                {isLoading ? <TableRow><TableCell colSpan={6} className="text-center py-20"><Skeleton className="h-8 w-full" /></TableCell></TableRow> : 
+                                {isLoading ? <TableRow><TableCell colSpan={7} className="text-center py-20 font-bold animate-pulse text-muted-foreground">Menganalisa Data Invoices...</TableCell></TableRow> : 
                                     filteredInvoices.map((invoice) => (
                                     <TableRow key={invoice.id} className={cn("hover:bg-muted/5 transition-colors", invoice.status === 'cancelled' && "opacity-40 grayscale")}>
                                         <TableCell><Checkbox checked={selectedInvoices.has(invoice.id)} onCheckedChange={() => setSelectedInvoices(prev => { const n = new Set(prev); n.has(invoice.id) ? n.delete(invoice.id) : n.add(invoice.id); return n; })} /></TableCell>
@@ -235,6 +237,15 @@ import {
                                         <TableCell className="text-xs">
                                             <div className="font-black uppercase text-slate-800">{invoice.customer}</div>
                                             <div className="text-[9px] text-muted-foreground truncate max-w-[200px] italic">PO: {invoice.poNumber}</div>
+                                        </TableCell>
+                                        <TableCell>
+                                            {invoice.spdNumber ? (
+                                                <Badge variant="outline" className="bg-indigo-50 text-indigo-700 border-indigo-100 text-[9px] font-black uppercase">
+                                                    <Truck className="h-3 w-3 mr-1" /> {invoice.spdNumber.split('/').pop()}
+                                                </Badge>
+                                            ) : (
+                                                <span className="text-[9px] font-bold text-muted-foreground/40 italic">Not Picked</span>
+                                            )}
                                         </TableCell>
                                         <TableCell className="text-xs font-black">Rp {invoice.amount.toLocaleString('id-ID')}</TableCell>
                                         <TableCell>

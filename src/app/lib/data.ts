@@ -1,14 +1,6 @@
 
 import type { LucideIcon } from 'lucide-react';
-import { DollarSign, Users, Package, Activity, Zap } from 'lucide-react';
 import { PlaceHolderImages, type ImagePlaceholder } from '@/lib/placeholder-images';
-
-export type Kpi = {
-  title: string;
-  value: string;
-  change: string;
-  icon: LucideIcon;
-};
 
 export type UserProfile = {
   uid: string;
@@ -16,21 +8,6 @@ export type UserProfile = {
   displayName: string;
   role: 'admin' | 'staff';
   status: 'active' | 'suspended' | 'pending';
-};
-
-export type Product = {
-  name: string;
-  image: ImagePlaceholder;
-  sales: number;
-  quantity: number;
-};
-
-export type Sale = {
-  invoiceId: string;
-  customer: string;
-  date: string;
-  amount: number;
-  status: 'Paid' | 'Unpaid';
 };
 
 export type RevisionLog = {
@@ -68,13 +45,12 @@ export type Invoice = {
   lastUpdatedBy?: string;
   lastUpdatedAt?: string;
   revisionLogs?: RevisionLog[];
-  virtualAccounts?: VirtualAccount[];
-  sjNumbers?: string[]; // List of Delivery Note numbers
+  sjNumbers?: string[]; 
   negotiation?: number;
   negotiationMode?: 'percent' | 'nominal';
   dpValue?: number;
   retention?: number;
-  payments?: PaymentRecord[]; // Payment history
+  payments?: PaymentRecord[];
 };
 
 export type InvoiceNumber = {
@@ -147,7 +123,7 @@ export type SalesListItem = {
   sales: string;
   poNumber: string;
   amount: number;
-  paidOffline?: number; // Adjustment for legacy system payments
+  paidOffline?: number; 
   status: 'Paid' | 'Unpaid' | 'Waiting' | 'Partial' | 'Cancelled';
   voidReason?: string;
   paidDate?: string;
@@ -160,11 +136,11 @@ export type SpdInvoiceEntry = {
     customer: string;
     address: string;
     status: 'pending' | 'received' | 'rejected';
-    sjNumbers?: string[]; // List of SJ numbers per invoice entry
+    sjNumbers?: string[];
 };
 
 export type SpdData = {
-    id: string; // SPD Number
+    id: string;
     date: string;
     courier: string;
     invoices: SpdInvoiceEntry[];

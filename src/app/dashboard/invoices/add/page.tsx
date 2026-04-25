@@ -19,20 +19,6 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { Calendar } from '@/components/ui/calendar';
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from '@/components/ui/popover';
-import {
-    Command,
-    CommandEmpty,
-    CommandGroup,
-    CommandInput,
-    CommandItem,
-    CommandList,
-  } from '@/components/ui/command';
 import {
     Select,
     SelectContent,
@@ -42,37 +28,27 @@ import {
 } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
-import { Separator } from '@/components/ui/separator';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { cn, formatNumberWithCommas, parseFormattedNumber } from '@/lib/utils';
 import { format, addDays, isBefore, parseISO, startOfToday } from 'date-fns';
 import {
   ChevronLeft,
-  Calendar as CalendarIcon,
   Plus,
-  Trash2,
   Send,
-  Eye,
-  ChevronsUpDown,
-  Check,
   History,
-  Lock,
-  Unlock,
-  RefreshCw,
   AlertTriangle,
   ShieldCheck,
   Banknote,
+  ReceiptText,
 } from 'lucide-react';
-import { type InvoiceNumber, type Customer, type ProductListItem, type Invoice, type SalesOrder, type UserProfile, type VirtualAccount } from '@/app/lib/data';
+import { type Invoice, type SalesOrder, type UserProfile, type SalesListItem, type Customer } from '@/app/lib/data';
 import { useToast } from '@/hooks/use-toast';
-import { Skeleton } from '@/components/ui/skeleton';
 import { useFirestore, useCollection, useMemoFirebase, useUser, useDoc, errorEmitter, FirestorePermissionError } from '@/firebase';
-import { collection, query, doc, setDoc, arrayUnion, updateDoc } from 'firebase/firestore';
+import { collection, query, doc, setDoc, arrayUnion } from 'firebase/firestore';
 import { Badge } from '@/components/ui/badge';
 
 type InvoiceItem = {
     id: number;
-    productId?: string;
     name: string;
     quantity: number | string;
     unit: string;
@@ -87,19 +63,18 @@ export default function AddInvoicePage() {
   const firestore = useFirestore();
   const { user } = useUser();
 
-  const invoiceNumberId = searchParams.get('invoiceNumberId');
+  const poNumberParam = searchParams.get('poNumber');
   const editInvoiceId = searchParams.get('editInvoiceId');
   
   // --- FORM STATES ---
   const [invoiceId, setInvoiceId] = useState('');
   const [soNumber, setSoNumber] = useState('');
   const [poNumber, setPoNumber] = useState('');
-  const [sjInput, setSjInput] = useState('');
-  const [customer, setCustomer] = useState<Customer | undefined>(undefined);
-  const [selectedAddressId, setSelectedAddressId] = useState<string>('');
-  const [issueDate, setIssueDate] = useState<Date | undefined>(new Date());
-  const [dueDate, setDueDate] = useState<Date | undefined>(addDays(new Date(), 30));
-  const [status, setStatus] = useState<'paid' | 'unpaid' | 'sent' | 'draft'>('draft');
+  const [customerName, setCustomerName] = useState('');
+  const [billingAddress, setBillingAddress] = useState('');
+  const [billingNpwp, setBillingNpwp] = useState('');
+  const [issueDate, setIssueDate] = useState<Date>(new Date());
+  const [dueDate, setDueDate] = useState<Date>(addDays(new Date(), 30));
   const [items, setItems] = useState<InvoiceItem[]>([]);
   const [isFinalized, setIsFinalized] = useState(false);
   const [isPaid, setIsPaid] = useState(false);
@@ -113,48 +88,71 @@ export default function AddInvoicePage() {
   const [retentionValue, setRetentionValue] = useState<string | number>('');
   const [retentionMode, setRetentionMode] = useState<'percent' | 'nominal'>('nominal');
 
-  const [calculatedNegNominal, setCalculatedNegNominal] = useState(0);
-  const [calculatedDpNominal, setCalculatedDpNominal] = useState(0);
-  const [calculatedRetNominal, setCalculatedRetNominal] = useState(0);
-  const [isOverLimit, setIsOverLimit] = useState(false);
-
   const [isTaxManual, setIsTaxManual] = useState(false);
   const [dppVat, setDppVat] = useState<string | number>(0);
   const [vat12, setVat12] = useState<string | number>(0);
   const [totalAmount, setTotalAmount] = useState<string | number>(0);
-
-  const [paymentMethodText, setPaymentMethodMethodText] = useState('Bank Transfer');
-
-  // Popovers
-  const [customerPopoverOpen, setCustomerPopoverOpen] = useState(false);
 
   // --- DATA FETCHING ---
   const userProfileRef = useMemoFirebase(() => (!firestore || !user) ? null : doc(firestore, 'users', user.uid), [firestore, user]);
   const { data: userProfile } = useDoc<UserProfile>(userProfileRef);
   const isSuperAdmin = user?.email?.toLowerCase() === 'fa@gmail.com' || userProfile?.role === 'admin';
 
-  const customersCollection = useMemoFirebase(() => firestore ? query(collection(firestore, 'customers')) : null, [firestore]);
-  const { data: customerListData } = useCollection<Customer>(customersCollection);
+  const salesCollection = useMemoFirebase(() => firestore ? query(collection(firestore, 'sales')) : null, [firestore]);
+  const { data: allSales } = useCollection<SalesListItem>(salesCollection);
+
+  const soItemsCollection = useMemoFirebase(() => firestore ? query(collection(firestore, 'salesOrders')) : null, [firestore]);
+  const { data: allSoItems } = useCollection<SalesOrder>(soItemsCollection);
 
   const invoicesCollection = useMemoFirebase(() => firestore ? query(collection(firestore, 'invoices')) : null, [firestore]);
   const { data: allInvoices } = useCollection<Invoice>(invoicesCollection);
 
-  // --- LOGIC: OVERDUE EXPOSURE ---
-  const overdueExposure = useMemo(() => {
-    if (!allInvoices || !customer) return [];
-    const today = startOfToday();
-    return allInvoices.filter(inv => 
-        inv.customer === customer.name && 
-        inv.status !== 'paid' && 
-        inv.status !== 'cancelled' &&
-        inv.dueDate && 
-        isBefore(parseISO(inv.dueDate), today)
-    );
-  }, [allInvoices, customer]);
+  const customersCollection = useMemoFirebase(() => firestore ? query(collection(firestore, 'customers')) : null, [firestore]);
+  const { data: customerListData } = useCollection<Customer>(customersCollection);
 
-  const totalOverdueAmount = overdueExposure.reduce((sum, inv) => sum + inv.amount, 0);
+  // --- LOGIC: AUTO-GENERATE INVOICE NUMBER ---
+  useEffect(() => {
+    if (!editInvoiceId && allInvoices && !invoiceId) {
+        const now = new Date();
+        const year = now.getFullYear();
+        // Count existing for the year to increment
+        const count = allInvoices.filter(inv => inv.id.includes(year.toString())).length + 1;
+        setInvoiceId(`KW/${count.toString().padStart(4, '0')}/KEU/${year}`);
+    }
+  }, [allInvoices, editInvoiceId, invoiceId]);
 
-  // --- LOGIC: INITIAL LOAD ---
+  // --- LOGIC: INITIAL LOAD FROM PO ---
+  useEffect(() => {
+    if (poNumberParam && allSales && allSoItems && customerListData) {
+        const foundSale = allSales.find(s => s.poNumber === poNumberParam);
+        if (foundSale) {
+            setPoNumber(foundSale.poNumber);
+            setSoNumber(foundSale.soNumber || '');
+            setCustomerName(foundSale.customer);
+            
+            // Auto-fetch default address
+            const cust = customerListData.find(c => c.name === foundSale.customer);
+            if (cust) {
+                const defAddr = cust.addresses?.find(a => a.isDefault) || cust.addresses?.[0];
+                setBillingAddress(defAddr?.address || '');
+                setBillingNpwp(defAddr?.npwp || '');
+            }
+
+            // Auto-load items
+            const relatedItems = allSoItems.filter(item => item.poNumber === poNumberParam || item.soNumber === foundSale.soNumber);
+            setItems(relatedItems.map((item, idx) => ({
+                id: idx,
+                name: item.productName,
+                quantity: item.quantity,
+                unit: item.unit,
+                price: item.price,
+                total: item.quantity * item.price
+            })));
+        }
+    }
+  }, [poNumberParam, allSales, allSoItems, customerListData]);
+
+  // --- LOGIC: EDIT MODE ---
   useEffect(() => {
     if (editInvoiceId && allInvoices) {
         const found = allInvoices.find(inv => inv.id.replace(/\//g, '_') === editInvoiceId);
@@ -162,21 +160,18 @@ export default function AddInvoicePage() {
             setInvoiceId(found.id);
             setSoNumber(found.soNumber);
             setPoNumber(found.poNumber);
-            setSjInput(found.sjNumbers?.join(', ') || '');
-            const cust = customerListData?.find(c => c.name === found.customer);
-            setCustomer(cust);
-            setSelectedAddressId(cust?.addresses?.find(a => a.address === found.billingAddress)?.id || '');
+            setCustomerName(found.customer);
+            setBillingAddress(found.billingAddress);
+            setBillingNpwp(found.billingNpwp || '');
             setIssueDate(found.date ? new Date(found.date) : new Date());
-            setDueDate(found.dueDate ? new Date(found.dueDate) : undefined);
-            setStatus(found.status as any);
             setIsFinalized(found.status === 'finalized');
             setIsPaid(found.status === 'paid');
-            setCalculatedNegNominal(found.negotiation || 0);
-            setCalculatedDpNominal(found.dpValue || 0);
-            setCalculatedRetNominal(found.retention || 0);
+            setNegotiationValue(found.negotiation || '');
+            setDpValue(found.dpValue || '');
+            setRetentionValue(found.retention || '');
         }
     }
-  }, [editInvoiceId, allInvoices, customerListData]);
+  }, [editInvoiceId, allInvoices]);
 
   // --- LOGIC: CALCULATIONS ---
   useEffect(() => {
@@ -185,25 +180,17 @@ export default function AddInvoicePage() {
   
     const negInputVal = parseFormattedNumber(String(negotiationValue));
     const negNominal = negotiationMode === 'percent' ? (currentSubtotal * (negInputVal / 100)) : negInputVal;
-    setCalculatedNegNominal(negNominal);
 
     const baseAfterNeg = currentSubtotal - negNominal;
 
     const dpInputVal = parseFormattedNumber(String(dpValue));
     const dpNominal = dpMode === 'percent' ? (baseAfterNeg * (dpInputVal / 100)) : dpInputVal;
-    setCalculatedDpNominal(dpNominal);
 
     const retInputVal = parseFormattedNumber(String(retentionValue));
     const retNominal = retentionMode === 'percent' ? (baseAfterNeg * (retInputVal / 100)) : retInputVal;
-    setCalculatedRetNominal(retNominal);
 
-    const totalDeductions = negNominal + dpNominal + retNominal;
-    setIsOverLimit(totalDeductions > currentSubtotal);
-
-    const baseForTax = baseAfterNeg - dpNominal - retNominal;
-    
     if (!isTaxManual) {
-        const calculatedDpp = baseForTax / 1.12;
+        const calculatedDpp = baseAfterNeg;
         const calculatedVat = calculatedDpp * 0.12;
         setDppVat(formatNumberWithCommas(calculatedDpp));
         setVat12(formatNumberWithCommas(calculatedVat));
@@ -211,12 +198,12 @@ export default function AddInvoicePage() {
 
     const currentDpp = parseFormattedNumber(String(dppVat));
     const currentVat = parseFormattedNumber(String(vat12));
-    setTotalAmount(formatNumberWithCommas(currentDpp + currentVat));
+    setTotalAmount(formatNumberWithCommas(currentDpp + currentVat - dpNominal - retNominal));
   }, [items, negotiationValue, negotiationMode, dpValue, dpMode, retentionValue, retentionMode, isTaxManual, dppVat, vat12]);
 
   const handleSaveInvoice = async (invoiceStatus: any = 'sent') => {
-    if (!firestore || !user || !invoiceId || !customer || !issueDate || !selectedAddressId) {
-        toast({ variant: "destructive", title: "Validation Error", description: "Lengkapi data wajib." });
+    if (!firestore || !user || !invoiceId || !customerName) {
+        toast({ variant: "destructive", title: "Gagal Simpan", description: "Nomor Invoice dan Customer wajib ada." });
         return;
     }
 
@@ -228,20 +215,18 @@ export default function AddInvoicePage() {
 
     const dataToSave: any = {
         id: invoiceId,
-        soNumber: soNumber || '(Waiting SO)',
+        soNumber: soNumber,
         poNumber: poNumber,
-        customer: customer.name,
-        billingAddress: customer.addresses.find(a => a.id === selectedAddressId)?.address || '',
-        billingNpwp: customer.addresses.find(a => a.id === selectedAddressId)?.npwp || '',
+        customer: customerName,
+        billingAddress: billingAddress,
+        billingNpwp: billingNpwp,
         date: format(issueDate, 'yyyy-MM-dd'),
-        dueDate: dueDate ? format(dueDate, 'yyyy-MM-dd') : format(addDays(issueDate, 30), 'yyyy-MM-dd'),
+        dueDate: format(dueDate, 'yyyy-MM-dd'),
         amount: parseFormattedNumber(String(totalAmount)),
         status: invoiceStatus,
-        paymentMethod: paymentMethodText,
-        sjNumbers: sjInput.split(',').map(s => s.trim()).filter(s => s !== ''),
-        negotiation: calculatedNegNominal,
-        dpValue: calculatedDpNominal,
-        retention: calculatedRetNominal,
+        negotiation: parseFormattedNumber(String(negotiationValue)),
+        dpValue: parseFormattedNumber(String(dpValue)),
+        retention: parseFormattedNumber(String(retentionValue)),
         lastUpdatedAt: timestamp,
         lastUpdatedBy: updater,
         revisionLogs: arrayUnion({
@@ -279,123 +264,86 @@ export default function AddInvoicePage() {
             </Button>
             <div>
                 <h1 className="text-2xl font-black tracking-tight uppercase">Invoice Constructor</h1>
-                <div className="flex gap-2 mt-1">
-                    {isFinalized && <Badge className="bg-indigo-600 text-[9px] font-black uppercase">FINALIZED & LOCKED</Badge>}
-                    {isPaid && <Badge className="bg-emerald-600 text-[9px] font-black uppercase">PAID & SECURED</Badge>}
-                </div>
+                <p className="text-muted-foreground text-xs font-bold uppercase tracking-widest">Pembuatan invoice otomatis berbasis PO/SO.</p>
             </div>
         </div>
       </div>
-
-      {overdueExposure.length > 0 && (
-          <Alert variant="destructive" className="bg-red-50 border-red-200">
-              <AlertTriangle className="h-4 w-4" />
-              <AlertTitle>Peringatan Limit Pelanggan</AlertTitle>
-              <AlertDescription>
-                Customer ini memiliki <b>{overdueExposure.length} invoice Overdue</b> senilai <b>Rp {totalOverdueAmount.toLocaleString('id-ID')}</b>. 
-                Mohon pertimbangkan sebelum menerbitkan tagihan baru.
-              </AlertDescription>
-          </Alert>
-      )}
 
       {isPaid && (
           <Alert className="bg-emerald-50 border-emerald-200 text-emerald-800">
               <Banknote className="h-4 w-4 text-emerald-600" />
               <AlertTitle className="font-black uppercase text-[10px]">Dokumen Lunas</AlertTitle>
-              <AlertDescription className="text-xs">Invoice ini sudah dilunasi melalui Payment Center dan telah dikunci demi keamanan audit.</AlertDescription>
+              <AlertDescription className="text-xs">Invoice ini sudah dilunasi dan terkunci untuk audit.</AlertDescription>
           </Alert>
       )}
 
       <div className="grid gap-6 lg:grid-cols-7 items-start">
-        {/* LEFT COLUMN */}
+        {/* LEFT COLUMN: PRIMARY DATA */}
         <div className="lg:col-span-5 space-y-6">
-          <Card className={cn("shadow-sm", isLocked && "opacity-60 pointer-events-none")}>
+          <Card className={cn("shadow-sm border-none ring-1 ring-border", isLocked && "opacity-60 pointer-events-none")}>
             <CardHeader className="bg-muted/30 border-b py-4">
                 <CardTitle className="text-sm font-black uppercase flex items-center gap-2">
-                    <History className="h-4 w-4 text-primary" /> Dokumen Utama
+                    <ReceiptText className="h-4 w-4 text-primary" /> Identitas Penagihan
                 </CardTitle>
             </CardHeader>
             <CardContent className="p-6 grid gap-6 md:grid-cols-2 lg:grid-cols-3">
               <div className="space-y-2">
-                  <Label className="text-[10px] font-black uppercase text-muted-foreground">No. Invoice</Label>
-                  <Input value={invoiceId} onChange={e => setInvoiceId(e.target.value)} className="font-bold" disabled={!!editInvoiceId} />
+                  <Label className="text-[10px] font-black uppercase text-muted-foreground">No. Invoice (Auto)</Label>
+                  <Input value={invoiceId} onChange={e => setInvoiceId(e.target.value)} className="font-black text-indigo-700 bg-indigo-50/30" disabled={!!editInvoiceId} />
               </div>
               <div className="space-y-2">
-                  <Label className="text-[10px] font-black uppercase text-muted-foreground">Customer (Pusat)</Label>
-                  <Popover open={customerPopoverOpen} onOpenChange={setCustomerPopoverOpen}>
-                      <PopoverTrigger asChild>
-                          <Button variant="outline" className="w-full justify-between font-bold">
-                              {customer?.name || "Pilih Customer..."}
-                              <ChevronsUpDown className="h-4 w-4 opacity-50" />
-                          </Button>
-                      </PopoverTrigger>
-                      <PopoverContent className="w-[400px] p-0 shadow-2xl" align="start">
-                          <Command>
-                              <CommandInput placeholder="Cari PT..." />
-                              <CommandList>
-                                  {customerListData?.map(c => (
-                                      <CommandItem key={c.id} value={c.name} onSelect={() => { setCustomer(c); setCustomerPopoverOpen(false); }}>
-                                          {c.name}
-                                      </CommandItem>
-                                  ))}
-                              </CommandList>
-                          </Command>
-                      </PopoverContent>
-                  </Popover>
+                  <Label className="text-[10px] font-black uppercase text-muted-foreground">Customer</Label>
+                  <Input value={customerName} disabled className="font-bold uppercase" />
+              </div>
+              <div className="space-y-2">
+                  <Label className="text-[10px] font-black uppercase text-muted-foreground">Referensi PO</Label>
+                  <Input value={poNumber} disabled className="font-mono" />
               </div>
               <div className="lg:col-span-3 space-y-2">
-                  <Label className="text-[10px] font-black uppercase text-muted-foreground">Alamat Penagihan (Cabang/Proyek)</Label>
-                  <Select value={selectedAddressId} onValueChange={setSelectedAddressId} disabled={!customer}>
-                      <SelectTrigger className="font-medium text-xs h-11">
-                          <SelectValue placeholder="Pilih lokasi spesifik..." />
-                      </SelectTrigger>
-                      <SelectContent>
-                          {customer?.addresses?.map(addr => (
-                              <SelectItem key={addr.id} value={addr.id} className="text-xs">
-                                  {addr.label} - {addr.address}
-                              </SelectItem>
-                          ))}
-                      </SelectContent>
-                  </Select>
+                  <Label className="text-[10px] font-black uppercase text-muted-foreground">Alamat Penagihan & NPWP</Label>
+                  <Input value={billingAddress} onChange={e => setBillingAddress(e.target.value)} className="font-medium" placeholder="Alamat lengkap..." />
+                  <Input value={billingNpwp} onChange={e => setBillingNpwp(e.target.value)} className="font-mono text-xs mt-2" placeholder="NPWP..." />
               </div>
             </CardContent>
           </Card>
 
-          <Card className={cn("shadow-sm", isLocked && "opacity-60 pointer-events-none")}>
-            <CardHeader className="bg-muted/30 border-b py-4"><CardTitle className="text-sm font-black uppercase">Item Penagihan</CardTitle></CardHeader>
+          <Card className={cn("shadow-sm border-none ring-1 ring-border", isLocked && "opacity-60 pointer-events-none")}>
+            <CardHeader className="bg-muted/30 border-b py-4"><CardTitle className="text-sm font-black uppercase">Item Penagihan (Sync SO)</CardTitle></CardHeader>
             <CardContent className="p-0">
                 <Table>
                     <TableHeader className="bg-muted/50">
                         <TableRow>
-                            <TableHead className="text-[10px] font-black uppercase py-2">Produk & Alias</TableHead>
+                            <TableHead className="text-[10px] font-black uppercase py-2">Nama Produk / Jasa</TableHead>
                             <TableHead className="w-[80px] text-center text-[10px] font-black uppercase py-2">Qty</TableHead>
                             <TableHead className="w-[140px] text-right text-[10px] font-black uppercase py-2">Harga Satuan</TableHead>
                             <TableHead className="w-[140px] text-right text-[10px] font-black uppercase py-2">Total</TableHead>
                         </TableRow>
                     </TableHeader>
                     <TableBody>
-                        {items.map(item => (
+                        {items.length === 0 ? (
+                            <TableRow><TableCell colSpan={4} className="text-center py-10 text-muted-foreground italic">Belum ada item SO terdeteksi.</TableCell></TableRow>
+                        ) : items.map(item => (
                             <TableRow key={item.id}>
-                                <TableCell><Input value={item.name} onChange={e => setItems(items.map(it => it.id === item.id ? { ...it, name: e.target.value } : it))} className="h-9 text-xs" /></TableCell>
-                                <TableCell><Input value={item.quantity} onChange={e => setItems(items.map(it => it.id === item.id ? { ...it, quantity: e.target.value, total: parseFormattedNumber(e.target.value) * parseFormattedNumber(String(it.price)) } : it))} className="text-center text-xs h-9" /></TableCell>
-                                <TableCell><Input value={item.price} onChange={e => setItems(items.map(it => it.id === item.id ? { ...it, price: e.target.value, total: parseFormattedNumber(String(it.quantity)) * parseFormattedNumber(e.target.value) } : it))} className="text-right text-xs h-9" /></TableCell>
-                                <TableCell className="text-right font-black text-xs">Rp {formatNumberWithCommas(item.total)}</TableCell>
+                                <TableCell><Input value={item.name} onChange={e => setItems(items.map(it => it.id === item.id ? { ...it, name: e.target.value } : it))} className="h-9 text-xs font-bold" /></TableCell>
+                                <TableCell><Input value={item.quantity} onChange={e => setItems(items.map(it => it.id === item.id ? { ...it, quantity: e.target.value, total: parseFormattedNumber(e.target.value) * parseFormattedNumber(String(it.price)) } : it))} className="text-center text-xs h-9 font-bold" /></TableCell>
+                                <TableCell><Input value={item.price} onChange={e => setItems(items.map(it => it.id === item.id ? { ...it, price: e.target.value, total: parseFormattedNumber(String(it.quantity)) * parseFormattedNumber(e.target.value) } : it))} className="text-right text-xs h-9 font-bold" /></TableCell>
+                                <TableCell className="text-right font-black text-xs text-slate-800">Rp {formatNumberWithCommas(item.total)}</TableCell>
                             </TableRow>
                         ))}
                     </TableBody>
                 </Table>
                 <div className="p-4 bg-muted/10 border-t">
                     <Button variant="outline" size="sm" onClick={() => setItems([...items, { id: Date.now(), name: '', quantity: 1, unit: 'm', price: 0, total: 0 }])} className="border-dashed h-8 text-[10px] font-bold">
-                        <Plus className="mr-2 h-3 w-3" /> TAMBAH BARIS
+                        <Plus className="mr-2 h-3 w-3" /> TAMBAH BARIS MANUAL
                     </Button>
                 </div>
             </CardContent>
           </Card>
         </div>
 
-        {/* RIGHT COLUMN */}
+        {/* RIGHT COLUMN: FINANCIAL SUMMARY */}
         <div className="lg:col-span-2 space-y-6 sticky top-24">
-          <Card className={cn("shadow-md border-primary/20", isLocked && "opacity-80 pointer-events-none")}>
+          <Card className={cn("shadow-md border-none ring-1 ring-primary/20", isLocked && "opacity-80 pointer-events-none")}>
             <CardHeader className="bg-primary/5 py-4 border-b">
                 <CardTitle className="text-sm font-black uppercase flex items-center justify-between">
                     Kalkulasi Finansial
@@ -405,18 +353,30 @@ export default function AddInvoicePage() {
             <CardContent className="p-6 space-y-5">
               <div className="space-y-4">
                 <div className="flex justify-between items-center text-xs">
-                    <span className="text-muted-foreground font-bold uppercase">Subtotal</span>
+                    <span className="text-muted-foreground font-black uppercase tracking-widest">Gross Subtotal</span>
                     <span className="font-black">Rp {formatNumberWithCommas(subtotal)}</span>
                 </div>
                 
                 <div className="space-y-2">
-                    <Label className="text-[10px] font-black uppercase text-muted-foreground">Negotiation</Label>
-                    <Input value={negotiationValue} onChange={e => setNegotiationValue(e.target.value)} className="h-8 text-right font-bold text-red-600" placeholder="0" />
+                    <div className="flex justify-between items-center">
+                        <Label className="text-[10px] font-black uppercase text-red-600">Negotiation</Label>
+                        <Select value={negotiationMode} onValueChange={(v: any) => setNegotiationMode(v)}>
+                            <SelectTrigger className="h-6 w-16 text-[9px] font-black uppercase"><SelectValue /></SelectTrigger>
+                            <SelectContent><SelectItem value="nominal">IDR</SelectItem><SelectItem value="percent">%</SelectItem></SelectContent>
+                        </Select>
+                    </div>
+                    <Input value={negotiationValue} onChange={e => setNegotiationValue(e.target.value)} className="h-8 text-right font-black text-red-600 border-red-100 bg-red-50/30" placeholder="0" />
                 </div>
 
                 <div className="space-y-2">
-                    <Label className="text-[10px] font-black uppercase text-muted-foreground">Down Payment (DP)</Label>
-                    <Input value={dpValue} onChange={e => setDpValue(e.target.value)} className="h-8 text-right font-bold" placeholder="0" />
+                    <div className="flex justify-between items-center">
+                        <Label className="text-[10px] font-black uppercase text-slate-800">Down Payment (DP)</Label>
+                        <Select value={dpMode} onValueChange={(v: any) => setDpMode(v)}>
+                            <SelectTrigger className="h-6 w-16 text-[9px] font-black uppercase"><SelectValue /></SelectTrigger>
+                            <SelectContent><SelectItem value="nominal">IDR</SelectItem><SelectItem value="percent">%</SelectItem></SelectContent>
+                        </Select>
+                    </div>
+                    <Input value={dpValue} onChange={e => setDpValue(e.target.value)} className="h-8 text-right font-black border-slate-200" placeholder="0" />
                 </div>
               </div>
 
@@ -426,19 +386,25 @@ export default function AddInvoicePage() {
                     <Switch checked={isTaxManual} onCheckedChange={setIsTaxManual} />
                 </div>
                 <div className="grid gap-3">
-                    <Input value={dppVat} onChange={e => setDppVat(e.target.value)} disabled={!isTaxManual} className="h-8 text-right font-mono text-xs" />
-                    <Input value={vat12} onChange={e => setVat12(e.target.value)} disabled={!isTaxManual} className="h-8 text-right font-mono text-xs" />
+                    <div className="grid gap-1">
+                        <span className="text-[8px] font-black uppercase text-muted-foreground">Dasar Pengenaan Pajak (DPP)</span>
+                        <Input value={dppVat} onChange={e => setDppVat(e.target.value)} disabled={!isTaxManual} className="h-8 text-right font-mono text-xs font-bold" />
+                    </div>
+                    <div className="grid gap-1">
+                        <span className="text-[8px] font-black uppercase text-muted-foreground">PPN (12%)</span>
+                        <Input value={vat12} onChange={e => setVat12(e.target.value)} disabled={!isTaxManual} className="h-8 text-right font-mono text-xs font-bold" />
+                    </div>
                 </div>
               </div>
 
-              <div className="pt-2 border-t">
-                  <span className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Grand Total</span>
-                  <div className="text-2xl font-black text-primary leading-none">Rp {totalAmount}</div>
+              <div className="pt-2 border-t border-dashed">
+                  <span className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Grand Total Tagihan</span>
+                  <div className="text-2xl font-black text-primary leading-none mt-1">Rp {totalAmount}</div>
               </div>
 
               <div className="space-y-3 pt-4">
                   {!isLocked && (
-                      <Button className="w-full h-11 bg-primary font-black uppercase shadow-lg" onClick={() => handleSaveInvoice('sent')} disabled={isOverLimit}>
+                      <Button className="w-full h-11 bg-indigo-600 hover:bg-indigo-700 font-black uppercase shadow-lg text-white" onClick={() => handleSaveInvoice('sent')}>
                         <Send className="mr-2 h-4 w-4" /> SIMPAN & TERBITKAN
                       </Button>
                   )}
@@ -450,6 +416,10 @@ export default function AddInvoicePage() {
               </div>
             </CardContent>
           </Card>
+          
+          <div className="p-4 bg-muted/30 rounded-lg border border-dashed text-center">
+             <p className="text-[10px] text-muted-foreground font-bold uppercase tracking-tighter">Preview PDF tersedia setelah simpan.</p>
+          </div>
         </div>
       </div>
     </main>

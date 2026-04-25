@@ -5,8 +5,6 @@ import { useRouter } from 'next/navigation';
 import {
     Card,
     CardContent,
-    CardHeader,
-    CardTitle,
   } from '@/components/ui/card';
   import {
     Table,
@@ -17,7 +15,6 @@ import {
     TableRow,
   } from '@/components/ui/table';
   import { Input } from '@/components/ui/input';
-  import { Label } from '@/components/ui/label';
   import { Button } from '@/components/ui/button';
   import { Badge } from '@/components/ui/badge';
   import { Checkbox } from '@/components/ui/checkbox';
@@ -31,13 +28,12 @@ import {
   } from '@/components/ui/dialog';
   import { Textarea } from '@/components/ui/textarea';
   import { type SalesListItem, type UserProfile, type Invoice } from '@/app/lib/data';
-  import { Search, MoreHorizontal, Upload, Download, Eye, Edit, Trash2, FileSpreadsheet, RefreshCw, UserCheck, XCircle } from 'lucide-react';
+  import { Search, MoreHorizontal, Download, Eye, Edit, FileSpreadsheet, RefreshCw, XCircle, FilePlus } from 'lucide-react';
   import { AddSaleDialog } from './_components/add-sale-dialog';
   import { useToast } from '@/hooks/use-toast';
-  import { DeleteConfirmationDialog } from '@/app/components/delete-confirmation-dialog';
-  import { cn, exportToExcel, importFromExcel, generateExcelTemplate } from '@/lib/utils';
+  import { cn, exportToExcel } from '@/lib/utils';
   import { useFirestore, useUser, useCollection, useMemoFirebase, errorEmitter, FirestorePermissionError, useDoc } from '@/firebase';
-  import { collection, doc, setDoc, deleteDoc, writeBatch, query, updateDoc } from 'firebase/firestore';
+  import { collection, doc, setDoc, query, updateDoc, writeBatch } from 'firebase/firestore';
   import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
   
   export default function SalesListPage() {
@@ -45,13 +41,11 @@ import {
     const { toast } = useToast();
     const firestore = useFirestore();
     const { user } = useUser();
-    const fileInputRef = useRef<HTMLInputElement>(null);
 
     const [editingSale, setEditingSale] = useState<SalesListItem | undefined>(undefined);
     const [isDialogOpen, setIsDialogOpen] = useState(false);
     const [searchQuery, setSearchQuery] = useState('');
     const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
-    const [deleteDialogState, setDeleteDialogState] = useState<{ isOpen: boolean; poNumber?: string; isBulk?: boolean }>({ isOpen: false });
 
     // Void State
     const [voidDialogOpen, setVoidDialogOpen] = useState(false);
@@ -169,11 +163,11 @@ import {
       <main className="flex flex-1 flex-col gap-4 p-4 md:gap-8 md:p-8">
         <div className="flex justify-between items-center">
             <div>
-                <h1 className="text-2xl font-bold tracking-tight">Sales List (Registrasi PO)</h1>
-                <p className="text-muted-foreground">Kelola PO Customer dan pantau real-time integritas data.</p>
+                <h1 className="text-2xl font-black tracking-tight uppercase">Sales List (Registrasi PO)</h1>
+                <p className="text-muted-foreground font-medium text-sm">Pilih PO untuk menerbitkan invoice secara otomatis.</p>
             </div>
             <div className="flex items-center gap-2">
-                <Button variant="outline" onClick={() => exportToExcel(filteredSales, 'daftar_po')}><Download className="mr-2 h-4 w-4"/> Export</Button>
+                <Button variant="outline" onClick={() => exportToExcel(filteredSales, 'daftar_po')} className="font-bold"><Download className="mr-2 h-4 w-4"/> Export</Button>
                 <AddSaleDialog 
                     isOpen={isDialogOpen}
                     onOpenChange={setIsDialogOpen}
@@ -184,68 +178,87 @@ import {
             </div>
         </div>
 
-        <Card>
+        <Card className="shadow-md border-none ring-1 ring-border">
             <CardContent className="pt-6">
-                <div className="flex justify-between items-center mb-4">
+                <div className="flex justify-between items-center mb-6">
                     <div className="relative w-1/3">
                         <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-                        <Input placeholder="Cari PO, Customer..." className="pl-8" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} />
+                        <Input placeholder="Cari PO, Customer..." className="pl-8 bg-muted/20 border-none font-medium" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} />
                     </div>
                 </div>
                 
-                <div className="rounded-md border overflow-hidden">
+                <div className="rounded-xl border overflow-hidden">
                     <Table>
-                        <TableHeader>
+                        <TableHeader className="bg-muted/50">
                             <TableRow>
                                 <TableHead className="w-[40px]"><Checkbox onCheckedChange={(checked) => setSelectedIds(checked ? new Set(filteredSales.map(s => s.poNumber)) : new Set())} /></TableHead>
-                                <TableHead>PO NUMBER</TableHead>
-                                <TableHead>CUSTOMER</TableHead>
-                                <TableHead>SO NUMBER</TableHead>
-                                <TableHead>AMOUNT</TableHead>
-                                <TableHead>STATUS</TableHead>
-                                <TableHead className="text-right">AKSI</TableHead>
+                                <TableHead className="text-[10px] font-black uppercase tracking-widest">PO Number</TableHead>
+                                <TableHead className="text-[10px] font-black uppercase tracking-widest">Customer</TableHead>
+                                <TableHead className="text-[10px] font-black uppercase tracking-widest">SO Produksi</TableHead>
+                                <TableHead className="text-[10px] font-black uppercase tracking-widest">Nilai PO</TableHead>
+                                <TableHead className="text-[10px] font-black uppercase tracking-widest text-center">Status</TableHead>
+                                <TableHead className="text-right py-4"></TableHead>
                             </TableRow>
                         </TableHeader>
                         <TableBody>
                             {isLoading ? (
-                                <TableRow><TableCell colSpan={7} className="text-center py-8">Memuat...</TableCell></TableRow>
+                                <TableRow><TableCell colSpan={7} className="text-center py-20 font-bold text-muted-foreground">Memuat Database Sales...</TableCell></TableRow>
+                            ) : filteredSales.length === 0 ? (
+                                <TableRow><TableCell colSpan={7} className="text-center py-20 text-muted-foreground font-medium italic">Belum ada data PO terdaftar.</TableCell></TableRow>
                             ) : filteredSales.map((sale) => (
-                                <TableRow key={sale.poNumber} className={cn(selectedIds.has(sale.poNumber) ? "bg-muted/50" : "", sale.status === 'Cancelled' && "opacity-40 grayscale")}>
+                                <TableRow key={sale.poNumber} className={cn("hover:bg-muted/5 border-b last:border-0", selectedIds.has(sale.poNumber) ? "bg-muted/30" : "", sale.status === 'Cancelled' && "opacity-40 grayscale")}>
                                     <TableCell><Checkbox checked={selectedIds.has(sale.poNumber)} onCheckedChange={() => setSelectedIds(prev => { const n = new Set(prev); n.has(sale.poNumber) ? n.delete(sale.poNumber) : n.add(sale.poNumber); return n; })} /></TableCell>
-                                    <TableCell className="font-bold">{sale.poNumber}</TableCell>
-                                    <TableCell>{sale.customer}</TableCell>
+                                    <TableCell className="font-black text-slate-800">{sale.poNumber}</TableCell>
+                                    <TableCell className="text-xs font-bold uppercase text-slate-600">{sale.customer}</TableCell>
                                     <TableCell>
                                         <div className="flex items-center gap-2">
-                                            <span className={sale.soNumber ? "font-medium" : "italic text-muted-foreground"}>{sale.soNumber || 'Waiting SO'}</span>
+                                            {sale.soNumber ? (
+                                                <Badge variant="outline" className="font-mono bg-blue-50 text-blue-700 font-bold border-blue-100">{sale.soNumber}</Badge>
+                                            ) : (
+                                                <span className="text-[10px] font-bold italic text-muted-foreground uppercase opacity-50">Waiting SO</span>
+                                            )}
                                             {sale.status !== 'Cancelled' && (
-                                                <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => { setTempSo(sale.soNumber || ''); setSoUpdateState({ isOpen: true, poNumber: sale.poNumber }); }}>
-                                                    <RefreshCw className="h-3 w-3" />
+                                                <Button variant="ghost" size="icon" className="h-6 w-6 rounded-full hover:bg-blue-100" onClick={() => { setTempSo(sale.soNumber || ''); setSoUpdateState({ isOpen: true, poNumber: sale.poNumber }); }}>
+                                                    <RefreshCw className="h-3 w-3 text-blue-600" />
                                                 </Button>
                                             )}
                                         </div>
                                     </TableCell>
-                                    <TableCell>Rp {sale.amount.toLocaleString('id-ID')}</TableCell>
-                                    <TableCell>
+                                    <TableCell className="font-black text-slate-800">Rp {sale.amount.toLocaleString('id-ID')}</TableCell>
+                                    <TableCell className="text-center">
                                         <Badge className={cn(
-                                            sale.status === 'Paid' ? 'bg-green-100 text-green-800' : 
-                                            sale.status === 'Cancelled' ? 'bg-red-100 text-red-800' : 'bg-gray-100 text-gray-800'
+                                            "text-[9px] font-black uppercase px-2 py-0.5",
+                                            sale.status === 'Paid' ? 'bg-emerald-600' : 
+                                            sale.status === 'Cancelled' ? 'bg-red-600' : 
+                                            sale.status === 'Partial' ? 'bg-amber-500' : 'bg-slate-400'
                                         )}>
                                             {sale.status}
                                         </Badge>
                                     </TableCell>
                                     <TableCell className="text-right">
-                                        <DropdownMenu>
-                                            <DropdownMenuTrigger asChild><Button variant="ghost" size="icon"><MoreHorizontal className="h-4 w-4" /></Button></DropdownMenuTrigger>
-                                            <DropdownMenuContent align="end">
-                                                <DropdownMenuItem onClick={() => { sessionStorage.setItem('activePoPreview', sale.poNumber); router.push('/dashboard/sales-management'); }}><Eye className="mr-2 h-4 w-4" /> Monitoring Piutang</DropdownMenuItem>
-                                                {isAdmin && sale.status !== 'Cancelled' && (
-                                                    <>
-                                                        <DropdownMenuItem onClick={() => { setEditingSale(sale); setIsDialogOpen(true); }}><Edit className="mr-2 h-4 w-4" /> Edit PO</DropdownMenuItem>
-                                                        <DropdownMenuItem className="text-destructive font-bold" onClick={() => { setTargetPoId(sale.poNumber); setVoidDialogOpen(true); }}><XCircle className="mr-2 h-4 w-4" /> Void / Cancel</DropdownMenuItem>
-                                                    </>
-                                                )}
-                                            </DropdownMenuContent>
-                                        </DropdownMenu>
+                                        <div className="flex justify-end gap-1">
+                                            {sale.status !== 'Cancelled' && (
+                                                <Button 
+                                                    size="sm" 
+                                                    className="h-8 bg-indigo-600 hover:bg-indigo-700 font-black uppercase text-[10px] tracking-widest shadow-md"
+                                                    onClick={() => router.push(`/dashboard/invoices/add?poNumber=${encodeURIComponent(sale.poNumber)}`)}
+                                                >
+                                                    <FilePlus className="mr-1.5 h-3.5 w-3.5" /> Terbitkan Invoice
+                                                </Button>
+                                            )}
+                                            <DropdownMenu>
+                                                <DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8 rounded-full"><MoreHorizontal className="h-4 w-4" /></Button></DropdownMenuTrigger>
+                                                <DropdownMenuContent align="end" className="w-48">
+                                                    <DropdownMenuItem onClick={() => { sessionStorage.setItem('activePoPreview', sale.poNumber); router.push('/dashboard/sales-management'); }}><Eye className="mr-2 h-4 w-4" /> Monitoring Piutang</DropdownMenuItem>
+                                                    {isAdmin && sale.status !== 'Cancelled' && (
+                                                        <>
+                                                            <DropdownMenuItem onClick={() => { setEditingSale(sale); setIsDialogOpen(true); }}><Edit className="mr-2 h-4 w-4" /> Edit Data PO</DropdownMenuItem>
+                                                            <DropdownMenuItem className="text-destructive font-bold" onClick={() => { setTargetPoId(sale.poNumber); setVoidDialogOpen(true); }}><XCircle className="mr-2 h-4 w-4" /> Void / Batalkan</DropdownMenuItem>
+                                                        </>
+                                                    )}
+                                                </DropdownMenuContent>
+                                            </DropdownMenu>
+                                        </div>
                                     </TableCell>
                                 </TableRow>
                             ))}
@@ -259,16 +272,16 @@ import {
         <Dialog open={voidDialogOpen} onOpenChange={setVoidDialogOpen}>
             <DialogContent className="sm:max-w-[400px]">
                 <DialogHeader>
-                    <DialogTitle>Membatalkan PO (Void)</DialogTitle>
+                    <DialogTitle>Konfirmasi Pembatalan PO</DialogTitle>
                     <DialogDescription>Nomor PO ini akan ditandai Batal dan tidak akan muncul di penagihan baru.</DialogDescription>
                 </DialogHeader>
                 <div className="py-4 space-y-2">
-                    <Label className="text-xs font-bold uppercase">Alasan Pembatalan</Label>
-                    <Textarea value={voidReason} onChange={(e) => setVoidReason(e.target.value)} placeholder="Contoh: Kesalahan input rute, Customer ganti vendor..." />
+                    <Label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Alasan Pembatalan</Label>
+                    <Textarea value={voidReason} onChange={(e) => setVoidReason(e.target.value)} placeholder="Contoh: Kesalahan input rute, Customer ganti vendor..." className="text-sm font-medium" />
                 </div>
                 <DialogFooter>
-                    <Button variant="outline" onClick={() => setVoidDialogOpen(false)}>Batal</Button>
-                    <Button variant="destructive" onClick={handleVoidPo} disabled={!voidReason}>SIMPAN VOID</Button>
+                    <Button variant="outline" onClick={() => setVoidDialogOpen(false)} className="font-bold">Batal</Button>
+                    <Button variant="destructive" onClick={handleVoidPo} disabled={!voidReason} className="font-black uppercase tracking-widest">SIMPAN VOID</Button>
                 </DialogFooter>
             </DialogContent>
         </Dialog>
@@ -276,9 +289,12 @@ import {
         {/* SO Update Modal */}
         <Dialog open={soUpdateState.isOpen} onOpenChange={(o) => setSoUpdateState(prev => ({...prev, isOpen: o}))}>
             <DialogContent className="sm:max-w-[400px]">
-                <DialogHeader><DialogTitle>Sinkronisasi Nomor SO</DialogTitle></DialogHeader>
-                <div className="py-4"><Input value={tempSo} onChange={e => setTempSo(e.target.value)} placeholder="Contoh: SO-12345" /></div>
-                <DialogFooter><Button onClick={handleUpdateSo}>Update & Sinkron</Button></DialogFooter>
+                <DialogHeader><DialogTitle className="uppercase font-black tracking-tight">Sinkronisasi No. SO</DialogTitle></DialogHeader>
+                <div className="py-4 space-y-2">
+                    <Label className="text-[10px] font-black uppercase text-muted-foreground">Nomor SO Produksi Baru</Label>
+                    <Input value={tempSo} onChange={e => setTempSo(e.target.value)} placeholder="Contoh: SO-12345" className="font-mono font-bold text-blue-700" />
+                </div>
+                <DialogFooter><Button onClick={handleUpdateSo} className="w-full bg-blue-600 hover:bg-blue-700 font-bold uppercase tracking-widest">Update & Sinkronkan</Button></DialogFooter>
             </DialogContent>
         </Dialog>
       </main>
