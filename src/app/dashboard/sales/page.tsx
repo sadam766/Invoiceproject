@@ -32,7 +32,7 @@ import {
   import { AddSaleDialog } from './_components/add-sale-dialog';
   import { useToast } from '@/hooks/use-toast';
   import { DeleteConfirmationDialog } from '@/app/components/delete-confirmation-dialog';
-  import { exportToExcel, importFromExcel, generateExcelTemplate } from '@/lib/utils';
+  import { cn, exportToExcel, importFromExcel, generateExcelTemplate } from '@/lib/utils';
   import { useFirestore, useUser, useCollection, useMemoFirebase, errorEmitter, FirestorePermissionError, useDoc } from '@/firebase';
   import { collection, doc, setDoc, deleteDoc, writeBatch, query, updateDoc } from 'firebase/firestore';
   import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
