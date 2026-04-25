@@ -331,7 +331,7 @@ export default function AddInvoicePage() {
       subtotal, dppVat: parseFormattedNumber(String(dppVat)), vat12: parseFormattedNumber(String(vat12)),
       negotiation: parseFormattedNumber(String(negotiation)), dpValue: parseFormattedNumber(String(dpValue)),
       pelunasan: parseFormattedNumber(String(pelunasan)), grandTotal: parseFormattedNumber(String(grandTotal)),
-      virtualAccounts: customerVa
+      virtualAccount: customerVa.length > 0 ? { bankName: customerVa[0].bankName, vaNumber: customerVa[0].vaNumber } : undefined
     };
     sessionStorage.setItem('invoicePreviewData', JSON.stringify(previewData));
     router.push(`/dashboard/invoices/preview/${encodeURIComponent(invoiceId || 'new')}`);
