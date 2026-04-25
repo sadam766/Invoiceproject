@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo } from 'react';
 import {
   Card,
   CardContent,
@@ -16,7 +16,6 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -24,21 +23,16 @@ import { Progress } from '@/components/ui/progress';
 import { 
   Search, 
   Eye, 
-  AlertCircle, 
-  Clock, 
   CheckCircle2, 
-  Truck, 
-  Calendar as CalendarIcon,
   FileSpreadsheet,
-  History,
-  Layers,
+  Cpu,
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useFirestore, useCollection, useMemoFirebase } from '@/firebase';
 import { collection, query } from 'firebase/firestore';
 import { type SalesListItem, type SalesOrder, type Invoice, type TaxInvoice, type SpdData } from '@/app/lib/data';
-import { cn, exportToExcel } from '@/lib/utils';
-import { isBefore, parseISO, startOfToday, differenceInDays, isWithinInterval, format } from 'date-fns';
+import { exportToExcel } from '@/lib/utils';
+import { isBefore, parseISO, startOfToday, isWithinInterval, format } from 'date-fns';
 import { DateRangePicker } from '@/app/components/date-range-picker';
 
 type GlobalTrackRecord = {
@@ -63,7 +57,6 @@ type GlobalTrackRecord = {
 export default function SalesMonitoringPage() {
   const router = useRouter();
   const firestore = useFirestore();
-  const [activeTab, setActiveTab] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [dateRange, setDateRange] = useState<{ from: Date; to: Date }>({
     from: startOfToday(),
@@ -153,7 +146,11 @@ export default function SalesMonitoringPage() {
       };
     }).filter(item => {
         const searchMatch = item.poNumber.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                            item.customer.toLowerCase().includes(searchQuery.toLowerCase());
+                            item.customer.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                            item.invoicesInRange?.some(inv => 
+                                inv.id.toLowerCase().includes(searchQuery.toLowerCase()) || 
+                                (inv.erpInvoiceId || '').toLowerCase().includes(searchQuery.toLowerCase())
+                            );
         if (!searchQuery) {
             return (item.invoicesInRange?.length || 0) > 0;
         }
@@ -223,10 +220,10 @@ export default function SalesMonitoringPage() {
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
               <div className="relative w-full md:w-1/3">
                 <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-                <Input placeholder="Cari No. PO, Customer..." className="pl-8 bg-muted/20 border-none font-medium" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} />
+                <Input placeholder="Cari No. PO, Customer, SAR, atau ERP..." className="pl-8 bg-muted/20 border-none font-medium" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} />
               </div>
               <div className="flex gap-2">
-                 <Badge variant="outline" className="text-[9px] font-black uppercase">Live Partial Tracking Enabled</Badge>
+                 <Badge variant="outline" className="text-[9px] font-black uppercase">Live Dual-Numbering Tracking</Badge>
               </div>
             </div>
 
@@ -236,7 +233,7 @@ export default function SalesMonitoringPage() {
                     <TableRow>
                         <TableHead className="text-[10px] font-black uppercase tracking-widest py-4">PO & Customer</TableHead>
                         <TableHead className="text-[10px] font-black uppercase tracking-widest py-4">Item Progress (Partial)</TableHead>
-                        <TableHead className="text-[10px] font-black uppercase tracking-widest py-4">Latest Action</TableHead>
+                        <TableHead className="text-[10px] font-black uppercase tracking-widest py-4">Invoices (Dual-ID)</TableHead>
                         <TableHead className="w-[200px] text-[10px] font-black uppercase tracking-widest py-4">Payment Health</TableHead>
                         <TableHead className="text-right py-4"></TableHead>
                     </TableRow>
@@ -264,10 +261,16 @@ export default function SalesMonitoringPage() {
                         <TableCell className="py-4">
                             <div className="flex flex-wrap gap-2">
                                 {item.invoicesInRange?.map(inv => (
-                                    <div key={inv.id} className="flex items-center gap-1.5 bg-white border p-1.5 rounded-md shadow-sm">
-                                        <span className="text-[9px] font-black text-indigo-700">{inv.id.split('/').pop()}</span>
-                                        {inv.isDpInvoice && <Badge className="text-[7px] h-3 bg-indigo-500">DP</Badge>}
-                                        {inv.status === 'paid' && <CheckCircle2 className="h-2.5 w-2.5 text-emerald-500" />}
+                                    <div key={inv.id} className="flex flex-col gap-0.5 bg-white border p-2 rounded-md shadow-sm min-w-[100px]">
+                                        <div className="flex items-center justify-between">
+                                            <span className="text-[9px] font-black text-indigo-700">{inv.id.split('/').pop()}</span>
+                                            {inv.status === 'paid' && <CheckCircle2 className="h-2.5 w-2.5 text-emerald-500" />}
+                                        </div>
+                                        {inv.erpInvoiceId && (
+                                            <span className="text-[7px] font-mono font-bold text-muted-foreground uppercase flex items-center gap-1">
+                                                <Cpu className="h-2 w-2" /> {inv.erpInvoiceId.split('/').pop()}
+                                            </span>
+                                        )}
                                     </div>
                                 ))}
                             </div>

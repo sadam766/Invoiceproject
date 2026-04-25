@@ -4,7 +4,7 @@
 import { useEffect, useState, useRef, useMemo } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, Printer, Download, MapPin, Phone, UserCheck, Layers, FileText, Globe, Truck, Info } from 'lucide-react';
+import { ArrowLeft, Printer, Download, MapPin, UserCheck, Layers, FileText, Globe, Truck, Info, Cpu } from 'lucide-react';
 import { type SpdData, type Invoice } from '@/app/lib/data';
 import { format } from 'date-fns';
 import { id as indonesiaLocale } from 'date-fns/locale';
@@ -133,7 +133,7 @@ export default function SpdPreviewPage() {
                     {/* Table Section */}
                     <div className="space-y-10">
                         <p className="text-[10px] font-black uppercase text-slate-400 border-b pb-2 tracking-widest mb-4 flex items-center gap-2">
-                           <FileText className="h-3 w-3" /> Batch Dispatch Detail (Invoice & Multi Surat Jalan)
+                           <FileText className="h-3 w-3" /> Batch Dispatch Detail (Dual Identity Check)
                         </p>
                         
                         {Object.entries(groupedByAddress).map(([address, invoices], groupIdx) => (
@@ -150,10 +150,10 @@ export default function SpdPreviewPage() {
                                     <thead>
                                         <tr className="bg-slate-100 text-slate-600">
                                             <th className="p-3 text-center border w-[5%] font-black uppercase text-[9px]">No</th>
-                                            <th className="p-3 text-left border w-[22%] font-black uppercase text-[9px]">No. Invoice</th>
-                                            <th className="p-3 text-left border w-[25%] font-black uppercase text-[9px]">No. Surat Jalan (SJ)</th>
+                                            <th className="p-3 text-left border w-[22%] font-black uppercase text-[9px]">No. SAR (Manual)</th>
+                                            <th className="p-3 text-left border w-[22%] font-black uppercase text-[9px]">ERP Reference</th>
                                             <th className="p-3 text-left border font-black uppercase text-[9px]">Customer Name</th>
-                                            <th className="p-3 text-center border w-[18%] font-black uppercase text-[9px]">Signature / Stamp</th>
+                                            <th className="p-3 text-center border w-[15%] font-black uppercase text-[9px]">Signature</th>
                                         </tr>
                                     </thead>
                                     <tbody>
@@ -163,16 +163,12 @@ export default function SpdPreviewPage() {
                                                 <tr key={invIdx} className="hover:bg-slate-50 transition-colors h-16">
                                                     <td className="p-3 text-center border font-bold text-slate-500">{invIdx + 1}</td>
                                                     <td className="p-3 font-mono font-black border text-indigo-700 bg-indigo-50/20">{inv.invoiceId}</td>
-                                                    <td className="p-3 font-mono border text-slate-600 bg-slate-50/20">
-                                                        {inv.sjNumbers && inv.sjNumbers.length > 0 ? (
-                                                            <div className="flex flex-wrap gap-1">
-                                                                {inv.sjNumbers.map((sj, i) => (
-                                                                    <span key={i} className="bg-white border px-1.5 py-0.5 rounded text-[10px]">{sj}</span>
-                                                                ))}
+                                                    <td className="p-3 font-mono border text-slate-600 bg-slate-50/20 italic">
+                                                        {fullData?.erpInvoiceId ? (
+                                                            <div className="flex items-center gap-1 text-[10px]">
+                                                                <Cpu className="h-3 w-3" /> {fullData.erpInvoiceId}
                                                             </div>
-                                                        ) : (
-                                                            <span className="text-[9px] italic text-rose-500 font-bold">Tanpa SJ</span>
-                                                        )}
+                                                        ) : '-'}
                                                     </td>
                                                     <td className="p-3 font-black uppercase border text-slate-800">{inv.customer}</td>
                                                     <td className="p-3 border relative overflow-hidden group">
@@ -214,8 +210,8 @@ export default function SpdPreviewPage() {
                             <p className="font-black uppercase mb-2 flex items-center gap-2">
                                 <Info className="h-4 w-4" /> Syarat & Ketentuan Penyerahan Dokumen:
                             </p>
-                            <p>1. Penerima wajib memastikan nomor invoice dan nomor surat jalan fisik sesuai dengan daftar di atas sebelum menandatangani SPD ini.</p>
-                            <p>2. SPD Summary ini adalah bukti digital yang sah dalam sistem ERP Dakota. Salinan fisik hanya berlaku dengan stempel basah asli.</p>
+                            <p>1. Penerima wajib memastikan nomor invoice SAR dan nomor referensi ERP fisik sesuai dengan daftar di atas sebelum menandatangani SPD ini.</p>
+                            <p>2. SPD Summary ini adalah bukti digital yang sah dalam sistem Dakota. Salinan fisik hanya berlaku dengan stempel basah asli.</p>
                         </div>
 
                         <div className="mt-8 text-center text-[8px] font-bold text-slate-400 uppercase tracking-[0.3em]">

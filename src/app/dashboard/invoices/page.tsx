@@ -45,7 +45,6 @@ import {
   import { DateRangePicker } from '@/app/components/date-range-picker';
   import { isWithinInterval, parseISO, startOfToday, format } from 'date-fns';
 
-
   export default function InvoiceListPage() {
     const router = useRouter();
     const [activeTab, setActiveTab] = useState('all');
@@ -71,7 +70,6 @@ import {
     const { data: userProfile } = useDoc<UserProfile>(userProfileRef);
 
     const isSuperAdmin = user?.email?.toLowerCase() === 'fa@gmail.com' || userProfile?.email?.toLowerCase() === 'fa@gmail.com';
-    const isAdmin = isSuperAdmin || userProfile?.role === 'admin';
 
     const invoicesCollection = useMemoFirebase(() => {
         if (!firestore) return null;
@@ -112,10 +110,8 @@ import {
 
     const handleVoidInvoice = async () => {
         if (!firestore || !targetInvoiceId || !voidReason || !user) return;
-
         const safeId = targetInvoiceId.replace(/\//g, '_');
         const docRef = doc(firestore, 'invoices', safeId);
-        
         const timestamp = new Date().toISOString();
         const updateData = {
             status: 'cancelled',
@@ -128,7 +124,6 @@ import {
                 action: `Invoice VOIDED: ${voidReason}`
             })
         };
-
         try {
             await updateDoc(docRef, updateData);
             toast({ title: "Invoice Dibatalkan", description: `Invoice ${targetInvoiceId} kini berstatus VOID.` });
@@ -155,7 +150,6 @@ import {
         if (!firestore || !isSuperAdmin || !user) return;
         const safeId = invoiceId.replace(/\//g, '_');
         const docRef = doc(firestore, 'invoices', safeId);
-        
         try {
             await updateDoc(docRef, { 
                 status: 'finalized',
@@ -213,7 +207,7 @@ import {
                             <TableHeader className="bg-muted/30">
                                 <TableRow>
                                     <TableHead className="w-[40px]"><Checkbox onCheckedChange={(c) => c ? setSelectedInvoices(new Set(filteredInvoices.map(i => i.id))) : setSelectedInvoices(new Set())} /></TableHead>
-                                    <TableHead className="text-[10px] font-black uppercase tracking-widest">Invoice Numbers</TableHead>
+                                    <TableHead className="text-[10px] font-black uppercase tracking-widest">Dual Invoice Identity</TableHead>
                                     <TableHead className="text-[10px] font-black uppercase tracking-widest">Customer & PO</TableHead>
                                     <TableHead className="text-[10px] font-black uppercase tracking-widest">SPD INFO</TableHead>
                                     <TableHead className="text-[10px] font-black uppercase tracking-widest">Amount</TableHead>
@@ -291,14 +285,6 @@ import {
                 </Tabs>
             </CardContent>
         </Card>
-
-        {selectedInvoices.size > 0 && (
-            <div className="fixed bottom-6 right-6 z-50">
-                <Button size="lg" onClick={handleCreateSpdFromSelected} className="bg-indigo-600 hover:bg-indigo-700 shadow-2xl rounded-full px-8 py-6 font-black uppercase tracking-widest">
-                    <Truck className="mr-3 h-5 w-5" /> Buat SPD ({selectedInvoices.size})
-                </Button>
-            </div>
-        )}
 
         <Dialog open={voidDialogOpen} onOpenChange={setVoidDialogOpen}>
             <DialogContent className="sm:max-w-[400px]">

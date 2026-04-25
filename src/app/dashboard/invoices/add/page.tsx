@@ -35,19 +35,16 @@ import {
   ChevronLeft,
   Plus,
   Send,
-  History,
   ShieldCheck,
-  Banknote,
   ReceiptText,
   AlertTriangle,
-  Info,
-  PackageCheck,
   Cpu,
+  Info,
 } from 'lucide-react';
 import { type Invoice, type SalesOrder, type UserProfile, type SalesListItem, type Customer, type InvoiceItem } from '@/app/lib/data';
 import { useToast } from '@/hooks/use-toast';
 import { useFirestore, useCollection, useMemoFirebase, useUser, useDoc, errorEmitter, FirestorePermissionError } from '@/firebase';
-import { collection, query, doc, setDoc, arrayUnion, where } from 'firebase/firestore';
+import { collection, query, doc, setDoc, arrayUnion } from 'firebase/firestore';
 import { Badge } from '@/components/ui/badge';
 
 export default function AddInvoicePage() {
@@ -79,16 +76,12 @@ export default function AddInvoicePage() {
   const [subtotal, setSubtotal] = useState(0);
   const [negotiationValue, setNegotiationValue] = useState<string | number>('');
   const [negotiationMode, setNegotiationMode] = useState<'percent' | 'nominal'>('nominal');
-  
   const [dpValue, setDpValue] = useState<string | number>('');
   const [dpMode, setDpMode] = useState<'percent' | 'nominal'>('nominal');
-  
   const [retentionValue, setRetentionValue] = useState<string | number>('');
   const [retentionMode, setRetentionMode] = useState<'percent' | 'nominal'>('nominal');
-
   const [dpDeductionValue, setDpDeductionValue] = useState<string | number>('');
   const [dpDeductionMode, setDpDeductionMode] = useState<'percent' | 'nominal'>('nominal');
-
   const [isTaxManual, setIsTaxManual] = useState(false);
   const [dppVat, setDppVat] = useState<string | number>(0);
   const [vat12, setVat12] = useState<string | number>(0);
@@ -126,11 +119,9 @@ export default function AddInvoicePage() {
   const itemTracking = useMemo(() => {
     if (!poNumber || !allSoItems) return {};
     const tracking: Record<string, { poQty: number; invoiced: number }> = {};
-    
     allSoItems.filter(so => so.poNumber === poNumber).forEach(item => {
         tracking[item.productName] = { poQty: item.quantity, invoiced: 0 };
     });
-
     poRelatedInvoices.forEach(inv => {
         inv.items?.forEach(item => {
             if (tracking[item.name]) {
@@ -138,17 +129,15 @@ export default function AddInvoicePage() {
             }
         });
     });
-
     return tracking;
   }, [poNumber, allSoItems, poRelatedInvoices]);
 
-  // --- LOGIC: AUTO-GENERATE DUAL NUMBERS ---
+  // --- LOGIC: AUTO-GENERATE DUAL NUMBERS (SMART SEQUENCE) ---
   useEffect(() => {
     if (!editInvoiceId && allInvoices && !invoiceId) {
         const now = new Date();
         const yy = format(now, 'yy');
         
-        // Filter by prefix
         const prefix = isDpInvoice ? 'KW' : 'SAR';
         const currentYearDocs = allInvoices.filter(inv => {
             if (isDpInvoice) return inv.id.startsWith('KW/') && inv.id.includes(`/${yy}`);
@@ -174,14 +163,12 @@ export default function AddInvoicePage() {
             setPoNumber(foundSale.poNumber);
             setSoNumber(foundSale.soNumber || '');
             setCustomerName(foundSale.customer);
-            
             const cust = customerListData.find(c => c.name === foundSale.customer);
             if (cust) {
                 const defAddr = cust.addresses?.find(a => a.isDefault) || cust.addresses?.[0];
                 setBillingAddress(defAddr?.address || '');
                 setBillingNpwp(defAddr?.npwp || '');
             }
-
             const relatedItems = allSoItems.filter(item => item.poNumber === poNumberParam);
             setItems(relatedItems.map((item, idx) => {
                 const track = itemTracking[item.productName] || { poQty: item.quantity, invoiced: 0 };
@@ -228,31 +215,23 @@ export default function AddInvoicePage() {
   useEffect(() => {
     const currentSubtotal = items.reduce((acc, item) => acc + (item.quantity * item.price), 0);
     setSubtotal(currentSubtotal);
-  
     const negInputVal = parseFormattedNumber(String(negotiationValue));
     const negNominal = negotiationMode === 'percent' ? (currentSubtotal * (negInputVal / 100)) : negInputVal;
-
     const baseAfterNeg = currentSubtotal - negNominal;
-
     const dpInputVal = parseFormattedNumber(String(dpValue));
     const dpNominal = dpMode === 'percent' ? (baseAfterNeg * (dpInputVal / 100)) : dpInputVal;
-
     const retInputVal = parseFormattedNumber(String(retentionValue));
     const retNominal = retentionMode === 'percent' ? (baseAfterNeg * (retInputVal / 100)) : retInputVal;
-
     const dpDedInputVal = parseFormattedNumber(String(dpDeductionValue));
     const dpDedNominal = dpDeductionMode === 'percent' ? (baseAfterNeg * (dpDedInputVal / 100)) : dpDedInputVal;
-
     if (!isTaxManual) {
         const calculatedDpp = baseAfterNeg;
         const calculatedVat = calculatedDpp * 0.12;
         setDppVat(formatNumberWithCommas(calculatedDpp));
         setVat12(formatNumberWithCommas(calculatedVat));
     }
-
     const currentDpp = parseFormattedNumber(String(dppVat));
     const currentVat = parseFormattedNumber(String(vat12));
-    
     const grand = isDpInvoice ? dpNominal : (currentDpp + currentVat - dpDedNominal - retNominal);
     setTotalAmount(formatNumberWithCommas(grand));
   }, [items, negotiationValue, negotiationMode, dpValue, dpMode, retentionValue, retentionMode, dpDeductionValue, dpDeductionMode, isTaxManual, dppVat, vat12, isDpInvoice]);
@@ -263,9 +242,17 @@ export default function AddInvoicePage() {
         return;
     }
 
+    // ANTI-DUPLICATE ERP CHECK
+    if (erpInvoiceId) {
+        const isDuplicateErp = allInvoices?.some(inv => inv.erpInvoiceId === erpInvoiceId && inv.id !== invoiceId);
+        if (isDuplicateErp) {
+            toast({ variant: "destructive", title: "Nomor ERP Duplikat", description: "Nomor ERP ini sudah terdaftar di sistem. Gunakan nomor lain." });
+            return;
+        }
+    }
+
     const safeInvoiceId = invoiceId.replace(/\//g, '_');
     const invoiceDocRef = doc(firestore, 'invoices', safeInvoiceId);
-    
     const timestamp = new Date().toISOString();
     const updater = userProfile?.displayName || user.email || 'System';
 
@@ -324,7 +311,9 @@ export default function AddInvoicePage() {
             </Button>
             <div>
                 <h1 className="text-2xl font-black tracking-tight uppercase">Invoice Constructor</h1>
-                <p className="text-muted-foreground text-xs font-bold uppercase tracking-widest">Dual-Numbering & ERP Reconciliation Active.</p>
+                <p className="text-muted-foreground text-xs font-bold uppercase tracking-widest flex items-center gap-1.5">
+                    Dual-Numbering System <Badge variant="secondary" className="text-[8px] bg-indigo-100 text-indigo-700 h-3.5">Active</Badge>
+                </p>
             </div>
         </div>
         <div className="flex items-center gap-3 bg-indigo-50 px-4 py-2 rounded-xl border border-indigo-100">
@@ -342,21 +331,26 @@ export default function AddInvoicePage() {
           <Card className={cn("shadow-sm border-none ring-1 ring-border", isLocked && "opacity-60 pointer-events-none")}>
             <CardHeader className="bg-muted/30 border-b py-4">
                 <CardTitle className="text-sm font-black uppercase flex items-center gap-2">
-                    <ReceiptText className="h-4 w-4 text-primary" /> Identitas Penagihan
+                    <ReceiptText className="h-4 w-4 text-primary" /> Identitas Penagihan (Dual-ID)
                 </CardTitle>
             </CardHeader>
             <CardContent className="p-6">
               <div className="grid gap-6 md:grid-cols-2">
                   <div className="grid grid-cols-2 gap-4">
                       <div className="space-y-2">
-                          <Label className="text-[10px] font-black uppercase text-muted-foreground">No. Invoice (Manual)</Label>
-                          <Input value={invoiceId} onChange={e => setInvoiceId(e.target.value)} className="font-black text-indigo-700 bg-indigo-50/30" placeholder="SAR/..." />
+                          <Label className="text-[10px] font-black uppercase text-muted-foreground">No. Invoice SAR (Auto)</Label>
+                          <Input value={invoiceId} readOnly className="font-black text-indigo-700 bg-indigo-50/50 border-indigo-100" />
                       </div>
                       <div className="space-y-2">
                           <Label className="text-[10px] font-black uppercase text-muted-foreground flex items-center gap-1">
                               ERP Reference <Cpu className="h-2.5 w-2.5" />
                           </Label>
-                          <Input value={erpInvoiceId} onChange={e => setErpInvoiceId(e.target.value)} className="font-mono text-xs border-indigo-200" placeholder="ERPSAR/..." />
+                          <Input 
+                            value={erpInvoiceId} 
+                            onChange={e => setErpInvoiceId(e.target.value)} 
+                            className="font-mono text-xs border-indigo-200" 
+                            placeholder="ERPSAR/26..." 
+                          />
                       </div>
                   </div>
                   <div className="space-y-2">
