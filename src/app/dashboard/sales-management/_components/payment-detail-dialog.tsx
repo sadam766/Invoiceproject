@@ -17,7 +17,7 @@ import {
 import { Badge } from '@/components/ui/badge';
 import type { SalesListItem, Invoice, TaxInvoice } from '@/app/lib/data';
 import { cn } from '@/lib/utils';
-import { History, CreditCard, ExternalLink, ReceiptText, Calendar, CheckCircle2, Wallet, Banknote } from 'lucide-react';
+import { History, CreditCard, ExternalLink, ReceiptText, Calendar, CheckCircle2, Wallet, Banknote, AlertCircle } from 'lucide-react';
 import Link from 'next/link';
 
 type ExtendedInvoice = Invoice & {
