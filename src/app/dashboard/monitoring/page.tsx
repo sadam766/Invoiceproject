@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useMemo } from 'react';
@@ -32,9 +31,10 @@ import {
   ReceiptText
 } from 'lucide-react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { useFirestore, useCollection, useMemoFirebase } from '@/firebase';
 import { collection, query } from 'firebase/firestore';
-import { type SalesListItem, type SalesOrder, type Invoice, type TaxInvoice, type SpdData } from '@/app/lib/data';
+import { type SalesListItem, type SalesOrder, type Invoice, type TaxInvoice } from '@/app/lib/data';
 import { cn } from '@/lib/utils';
 import { isBefore, parseISO, startOfToday } from 'date-fns';
 
@@ -52,6 +52,7 @@ type GlobalTrackRecord = {
 };
 
 export default function SalesMonitoringPage() {
+  const router = useRouter();
   const firestore = useFirestore();
   const [activeTab, setActiveTab] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
