@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useEffect, useState, useMemo } from 'react';
@@ -75,7 +74,7 @@ export default function AddInvoicePage() {
       if (!firestore || !editInvoiceId) return null;
       return doc(firestore, 'invoices', editInvoiceId);
   }, [firestore, editInvoiceId]);
-  const { data: existingInvoiceData } = useDoc<Invoice>(existingInvoiceRef);
+  const { data: existingInvoiceData, isLoading: isExistingLoading } = useDoc<Invoice>(existingInvoiceRef);
 
   const userProfileRef = useMemoFirebase(() => (!firestore || !user) ? null : doc(firestore, 'users', user.uid), [firestore, user]);
   const { data: userProfile } = useDoc<UserProfile>(userProfileRef);
@@ -130,11 +129,13 @@ export default function AddInvoicePage() {
     return Math.max(0, totalDpInvoiced - totalDpUsed);
   }, [allInvoices, identityData]);
 
+  // RELAXED REDIRECT: Ensure we only redirect if we've explicitly finished loading and have no data
   useEffect(() => {
-      if (!isIdentityLoading && !identityData && !editInvoiceId) {
+      const isInitialLoad = (invoiceNumberIdParam && isIdentityLoading) || (editInvoiceId && isExistingLoading);
+      if (!isInitialLoad && !identityData && !existingInvoiceData && !editInvoiceId && !invoiceNumberIdParam) {
           router.replace('/dashboard/invoices/number');
       }
-  }, [identityData, isIdentityLoading, editInvoiceId, router]);
+  }, [identityData, existingInvoiceData, isIdentityLoading, isExistingLoading, editInvoiceId, invoiceNumberIdParam, router]);
 
   useEffect(() => {
       if (identityData && customerListData && items.length === 0 && !editInvoiceId) {
@@ -302,7 +303,9 @@ export default function AddInvoicePage() {
   };
 
   const activeIdentity = existingInvoiceData || identityData;
-  if (isIdentityLoading || (!activeIdentity && !editInvoiceId)) {
+  const isLoading = (invoiceNumberIdParam && isIdentityLoading) || (editInvoiceId && isExistingLoading);
+
+  if (isLoading || (!activeIdentity && (invoiceNumberIdParam || editInvoiceId))) {
       return <div className="flex h-[80vh] items-center justify-center font-bold text-slate-400 animate-pulse uppercase tracking-widest">Architectural Handshake in Progress...</div>;
   }
 
