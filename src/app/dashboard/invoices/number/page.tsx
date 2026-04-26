@@ -22,6 +22,7 @@ import {
   } from '@/components/ui/dropdown-menu';
   import { Input } from '@/components/ui/input';
   import { Button } from '@/components/ui/button';
+  import { Badge } from '@/components/ui/badge';
   import { type InvoiceNumber, type Invoice } from '@/app/lib/data';
   import { Search, Upload, Download, MoreHorizontal, Edit, Trash2, Lock, Database, Hash, Info, FilePlus } from 'lucide-react';
   import { AddInvoiceNumberDialog } from './_components/add-invoice-number-dialog';
