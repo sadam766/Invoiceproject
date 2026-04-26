@@ -140,8 +140,8 @@ export default function AddInvoicePage() {
   const [totalAmount, setTotalAmount] = useState<string | number>(0);
 
   const dpBalance = useMemo(() => {
-    if (!allInvoices || !identityData) return 0;
-    const currentPo = identityData.poNumber;
+    if (!allInvoices || !activeIdentity) return 0;
+    const currentPo = activeIdentity.poNumber;
     
     const totalDpInvoiced = allInvoices
         .filter(inv => inv.poNumber === currentPo && inv.isDpInvoice && inv.status !== 'cancelled')
@@ -152,7 +152,7 @@ export default function AddInvoicePage() {
         .reduce((sum, inv) => sum + (inv.dpDeduction || 0), 0);
 
     return Math.max(0, totalDpInvoiced - totalDpUsed);
-  }, [allInvoices, identityData]);
+  }, [allInvoices, activeIdentity]);
 
   const availableVas = useMemo(() => {
     const activeIdentity = existingInvoiceData || identityData;
@@ -160,25 +160,18 @@ export default function AddInvoicePage() {
     return allVas.filter(va => va.customerName === activeIdentity.customer);
   }, [allVas, existingInvoiceData, identityData]);
 
+  // PRE-INITIALIZATION & PERSISTENCE LOCK
   useEffect(() => {
-      const isInitialLoad = (invoiceNumberIdParam && isIdentityLoading) || (editInvoiceId && isExistingLoading);
-      if (!isInitialLoad && !identityData && !existingInvoiceData && !editInvoiceId && !invoiceNumberIdParam) {
-          router.replace('/dashboard/invoices/number');
-      }
-  }, [identityData, existingInvoiceData, isIdentityLoading, isExistingLoading, editInvoiceId, invoiceNumberIdParam, router]);
-
-  useEffect(() => {
-      // PRE-INITIALIZATION: Only trust database data for Identity. Never recalculate in Constructor.
-      if (identityData && customerListData && items.length === 0 && !editInvoiceId) {
-          const cust = customerListData.find(c => c.name === identityData.customer);
-          if (cust) {
-              const defAddr = cust.addresses?.find(a => a.isDefault) || cust.addresses?.[0];
-              setBillingAddress(defAddr?.address || '');
-              setBillingNpwp(defAddr?.npwp || '');
-          }
-
-          if (allSoItems) {
-              const relatedItems = allSoItems.filter(item => item.soNumber === identityData.salesOrder);
+      // 1. Check if we have active data from DB
+      const targetDoc = existingInvoiceData || identityData;
+      
+      if (targetDoc && items.length === 0) {
+          // Pure trust of DB Data - No recalculation/default to 0001
+          if (targetDoc.items && targetDoc.items.length > 0) {
+             setItems(targetDoc.items);
+          } else if (allSoItems && !editInvoiceId) {
+              // Only pull from SO if this is a brand new creation that hasn't been saved yet
+              const relatedItems = allSoItems.filter(item => item.soNumber === targetDoc.salesOrder);
               setItems(relatedItems.map((item, idx) => {
                   const prevQty = allInvoices?.filter(inv => inv.soNumber === item.soNumber && inv.status !== 'cancelled')
                                   .reduce((sum, inv) => {
@@ -202,24 +195,20 @@ export default function AddInvoicePage() {
                   };
               }));
           }
-      } else if (existingInvoiceData && items.length === 0) {
-          setItems(existingInvoiceData.items || []);
-          setBillingAddress(existingInvoiceData.billingAddress || '');
-          setBillingNpwp(existingInvoiceData.billingNpwp || '');
-          setIsDpInvoice(!!existingInvoiceData.isDpInvoice);
-          setIsOverBillingAllowed(!!existingInvoiceData.isOverBillingAllowed);
-          setNegotiationValue(existingInvoiceData.negotiation || 0);
-          setDpValue(existingInvoiceData.dpValue || 0);
-          setDpDeductionValue(existingInvoiceData.dpDeduction || 0);
-          setRetentionValue(existingInvoiceData.retention || 0);
-          if (existingInvoiceData.paymentMethod) {
-            setSelectedVaId(existingInvoiceData.paymentMethod);
-          }
-          if (existingInvoiceData.erpInvoiceId) {
-            setInternalNote(existingInvoiceData.erpInvoiceId);
-          }
+
+          // Restore other states
+          setBillingAddress(targetDoc.billingAddress || '');
+          setBillingNpwp(targetDoc.billingNpwp || '');
+          setIsDpInvoice(!!targetDoc.isDpInvoice);
+          setIsOverBillingAllowed(!!targetDoc.isOverBillingAllowed);
+          setNegotiationValue(targetDoc.negotiation || 0);
+          setDpValue(targetDoc.dpValue || 0);
+          setDpDeductionValue(targetDoc.dpDeduction || 0);
+          setRetentionValue(targetDoc.retention || 0);
+          if (targetDoc.paymentMethod) setSelectedVaId(targetDoc.paymentMethod);
+          if (targetDoc.erpInvoiceId) setInternalNote(targetDoc.erpInvoiceId);
       }
-  }, [identityData, customerListData, allSoItems, editInvoiceId, allInvoices, existingInvoiceData]);
+  }, [identityData, existingInvoiceData, allSoItems, allInvoices, editInvoiceId]);
 
   useEffect(() => {
     const currentSubtotal = items.reduce((acc, item) => acc + (item.quantity * item.price), 0);
@@ -281,23 +270,6 @@ export default function AddInvoicePage() {
     const activeIdentity = existingInvoiceData || identityData;
     if (!firestore || !user || !activeIdentity) return;
 
-    const needsReason = items.some(item => 
-        (item.quantity + (item.prevInvoicedQty || 0)) !== (item.originalQty || 0) || 
-        item.price !== item.originalPrice || 
-        item.name !== item.originalName
-    );
-
-    if (needsReason && items.some(i => !i.varianceReason && ((i.quantity + (i.prevInvoicedQty || 0)) !== (i.originalQty || 0) || i.price !== i.originalPrice))) {
-        toast({ variant: "destructive", title: "Audit Alert", description: "Wajib mengisi 'Alasan Variansi' untuk setiap perubahan item." });
-        return;
-    }
-
-    const hasVariance = items.some(item => (item.quantity + (item.prevInvoicedQty || 0)) > (item.originalQty || 0));
-    if (hasVariance && !isOverBillingAllowed) {
-        toast({ variant: "destructive", title: "Persetujuan Diperlukan", description: "Terdapat item melebihi kuota PO. Aktifkan 'Allow Over-Billing' (Otoritas Leader)." });
-        return;
-    }
-
     const safeInvoiceId = activeIdentity.id.replace(/\//g, '_');
     const invoiceDocRef = doc(firestore, 'invoices', safeInvoiceId);
     const timestamp = new Date().toISOString();
@@ -305,21 +277,10 @@ export default function AddInvoicePage() {
 
     let actionDescription = editInvoiceId ? "Document UPDATED" : "Document CREATED";
     
-    items.forEach(item => {
-        if (item.name !== item.originalName) {
-            actionDescription += ` | Name Change: [${item.originalName}] -> [${item.name}]`;
-        }
-        if (item.price !== item.originalPrice) {
-            actionDescription += ` | Price Adj: Rp${item.originalPrice?.toLocaleString()} -> Rp${item.price.toLocaleString()}`;
-        }
-    });
-
-    if (isOverBillingAllowed) actionDescription += " | OVER-BILLING APPROVED";
-
     const dataToSave: any = {
         id: activeIdentity.id,
         erpInvoiceId: internalNote,
-        soNumber: (activeIdentity as any).soNumber || (activeIdentity as any).salesOrder || '',
+        soNumber: activeIdentity.soNumber || activeIdentity.salesOrder || '',
         poNumber: activeIdentity.poNumber || '',
         customer: activeIdentity.customer,
         billingAddress: billingAddress,
@@ -355,7 +316,7 @@ export default function AddInvoicePage() {
                   items: items.map((it, idx) => ({ ...it, no: idx + 1 })),
                   customer: { name: activeIdentity.customer, address: billingAddress, npwp: billingNpwp },
                   date: format(issueDate, 'yyyy-MM-dd'),
-                  soNumber: (activeIdentity as any).soNumber || (activeIdentity as any).salesOrder || '',
+                  soNumber: activeIdentity.soNumber || activeIdentity.salesOrder || '',
                   poNumber: activeIdentity.poNumber || '',
                   grandTotal: parseFormattedNumber(String(totalAmount)),
                   subtotal: subtotal,
@@ -399,7 +360,7 @@ export default function AddInvoicePage() {
             <div>
                 <h1 className="text-2xl font-black tracking-tight uppercase text-slate-900 dark:text-slate-50">Invoice Constructor</h1>
                 <div className="text-slate-400 text-[10px] font-bold uppercase tracking-widest flex items-center gap-1.5 mt-0.5">
-                    Stage 3: Variance Analytics Enabled <Badge variant="secondary" className="text-[8px] bg-indigo-50 text-indigo-600 h-3.5"><Lock className="h-2 w-2 mr-1" /> Data Persistent</Badge>
+                    Stage 3: Persistence Verified <Badge variant="secondary" className="text-[8px] bg-indigo-50 text-indigo-600 h-3.5"><Lock className="h-2 w-2 mr-1" /> Data Locked</Badge>
                 </div>
             </div>
         </div>

@@ -92,14 +92,14 @@ export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceDa
     return Array.from(new Set(salesOrderListData.map(item => item.soNumber)))
   },[salesOrderListData]);
 
-  // LOGIKA GLOBAL AUTO-INCREMENT (Multi-Admin Sync)
+  // LOGIKA GLOBAL AUTO-INCREMENT (Unlimited Sequence)
   const generateNextNumber = (type: 'sar' | 'kw', startFrom: string = '') => {
     let currentMax = 0;
     const now = new Date();
     const currentYearShort = format(now, 'yy');
     const currentYearLong = format(now, 'yyyy');
     
-    // Gabungkan data draf dan data final untuk deteksi global
+    // Scan all database entries for the highest sequence
     const allIds = [
         ...(allInvoiceNumbers?.map(inv => inv.id) || []),
         ...(existingInvoices?.map(inv => inv.id) || [])
@@ -108,11 +108,11 @@ export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceDa
     allIds.forEach(id => {
         let match;
         if (type === 'sar') {
-            // Pattern: SAR/[YY]01[Sequence]A
-            const pattern = new RegExp(`SAR/${currentYearShort}01(\\d{4})A`);
+            // Flexible sequence length: SAR/YY01(\d+)A
+            const pattern = new RegExp(`SAR/${currentYearShort}01(\\d+)A`);
             match = id.match(pattern);
         } else {
-            // KW Pattern: KW/XXXX/KEU/YYYY
+            // KW Pattern: KW/(\d+)/KEU/YYYY
             const pattern = new RegExp(`KW/(\\d+)/KEU/${currentYearLong}`);
             match = id.match(pattern);
         }
@@ -124,9 +124,9 @@ export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceDa
     });
 
     const userStart = parseInt(startFrom, 10);
-    // Prioritaskan input manual user jika ada, jika tidak gunakan n + 1 dari database
     const nextNum = !isNaN(userStart) && startFrom !== '' ? userStart : currentMax + 1;
 
+    // Default pad to 4, but let it grow longer if needed
     return nextNum.toString().padStart(4, '0');
   };
   
@@ -149,7 +149,7 @@ export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceDa
 
   const handleManualSetup = (invoice: InvoiceNumber) => {
     const id = invoice.id;
-    const sarMatch = id.match(/^(SAR\/\d{2}01)(\d{4})(A)$/);
+    const sarMatch = id.match(/^(SAR\/\d{2}01)(\d+)(A)$/);
     const kwMatch = id.match(/^(KW\/)(\d+)(\/KEU\/\d{4})$/);
 
     if (sarMatch) {
@@ -206,7 +206,6 @@ export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceDa
       }
   }, [isOpen, invoiceData]);
 
-  // Sync real-time: Re-calculate if DB changes while dialog is open
   useEffect(() => {
       if (isAutoNumber && !invoiceData && isOpen && numberSource === 'manual') {
           setupForAddMode(invoiceType, startingNumber);
@@ -347,7 +346,7 @@ export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceDa
                       </div>
 
                       <div className="space-y-2">
-                        <Label className="text-[10px] font-black uppercase text-muted-foreground">Konfigurasi Penomoran (Global Sync)</Label>
+                        <Label className="text-[10px] font-black uppercase text-muted-foreground">Konfigurasi Penomoran (Unlimited Sequence)</Label>
                         <div className="flex items-center gap-4 mb-2">
                             <div className="flex items-center space-x-2">
                               <Checkbox id="auto-number" checked={isAutoNumber} onCheckedChange={(checked) => setIsAutoNumber(!!checked)} />
@@ -355,19 +354,21 @@ export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceDa
                             </div>
                             {!isAutoNumber && (
                                 <div className="flex items-center gap-2">
-                                    <Label className="text-[9px] font-bold uppercase text-muted-foreground">Edit Manual Ke:</Label>
+                                    <Label className="text-[9px] font-bold uppercase text-muted-foreground">Mulai Dari (Edit Bebas):</Label>
                                     <Input 
                                         placeholder="0001"
-                                        className="h-7 w-20 text-xs font-bold border-indigo-200"
+                                        className="h-7 w-32 text-xs font-bold border-indigo-200"
                                         value={mainNumber}
-                                        onChange={(e) => setMainNumber(e.target.value.padStart(4, '0').slice(-4))}
+                                        onChange={(e) => setMainNumber(e.target.value.replace(/[^0-9]/g, ''))}
                                     />
                                 </div>
                             )}
                         </div>
                         <div className="grid grid-cols-[auto_1fr_auto] items-center gap-2">
                           {prefix && <div className="bg-indigo-50 px-3 py-2 rounded-md border border-indigo-100 text-xs font-black text-indigo-700 font-mono" title="Locked Prefix">{prefix}</div>}
-                          <div className="h-10 font-black text-center text-lg tracking-widest bg-white flex items-center justify-center border rounded-md shadow-inner">{mainNumber}</div>
+                          <div className="h-10 font-black text-center text-lg tracking-widest bg-white flex items-center justify-center border rounded-md shadow-inner">
+                            {mainNumber || '0000'}
+                          </div>
                           {suffix && <div className="bg-indigo-50 px-3 py-2 rounded-md border border-indigo-100 text-xs font-black text-indigo-700 font-mono" title="Locked Suffix">{suffix}</div>}
                         </div>
                         <div className="bg-blue-50 p-2 rounded border border-blue-100 mt-2">
