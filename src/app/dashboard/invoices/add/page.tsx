@@ -41,7 +41,9 @@ import {
   AlertCircle,
   TrendingUp,
   Wallet,
-  History
+  Scale,
+  RefreshCw,
+  AlertTriangle
 } from 'lucide-react';
 import { type Invoice, type SalesOrder, type UserProfile, type Customer, type InvoiceItem, type InvoiceNumber } from '@/app/lib/data';
 import { useToast } from '@/hooks/use-toast';
@@ -74,7 +76,7 @@ export default function AddInvoicePage() {
 
   const userProfileRef = useMemoFirebase(() => (!firestore || !user) ? null : doc(firestore, 'users', user.uid), [firestore, user]);
   const { data: userProfile } = useDoc<UserProfile>(userProfileRef);
-  const isSuperAdmin = user?.email?.toLowerCase() === 'fa@gmail.com' || userProfile?.role === 'admin';
+  const isAdmin = user?.email?.toLowerCase() === 'fa@gmail.com' || userProfile?.role === 'admin';
 
   const soItemsCollection = useMemoFirebase(() => firestore ? query(collection(firestore, 'salesOrders')) : null, [firestore]);
   const { data: allSoItems } = useCollection<SalesOrder>(soItemsCollection);
@@ -93,6 +95,7 @@ export default function AddInvoicePage() {
   const [issueDate, setIssueDate] = useState<Date>(new Date());
   const [dueDate, setDueDate] = useState<Date>(addDays(new Date(), 30));
   const [isDpInvoice, setIsDpInvoice] = useState(false);
+  const [isOverBillingAllowed, setIsOverBillingAllowed] = useState(false);
 
   // --- CALCULATION STATES ---
   const [subtotal, setSubtotal] = useState(0);
@@ -109,17 +112,15 @@ export default function AddInvoicePage() {
   const [vat12, setVat12] = useState<string | number>(0);
   const [totalAmount, setTotalAmount] = useState<string | number>(0);
 
-  // --- REFINEMENT: DP TRACKING LOGIC ---
+  // --- REFINEMENT: DP & CREDIT TRACKING ---
   const dpBalance = useMemo(() => {
     if (!allInvoices || !identityData) return 0;
     const currentPo = identityData.poNumber;
     
-    // Sum all paid/sent DP Invoices
     const totalDpInvoiced = allInvoices
         .filter(inv => inv.poNumber === currentPo && inv.isDpInvoice && inv.status !== 'cancelled')
         .reduce((sum, inv) => sum + inv.amount, 0);
     
-    // Sum all deductions in goods invoices
     const totalDpUsed = allInvoices
         .filter(inv => inv.poNumber === currentPo && !inv.isDpInvoice && inv.status !== 'cancelled')
         .reduce((sum, inv) => sum + (inv.dpDeduction || 0), 0);
@@ -127,14 +128,14 @@ export default function AddInvoicePage() {
     return Math.max(0, totalDpInvoiced - totalDpUsed);
   }, [allInvoices, identityData]);
 
-  // --- PROTEKSI & REDIRECT ---
+  // --- LOGIC: REDIRECT PROTECTION ---
   useEffect(() => {
       if (!isIdentityLoading && !identityData && !editInvoiceId) {
           router.replace('/dashboard/invoices/number');
       }
   }, [identityData, isIdentityLoading, editInvoiceId, router]);
 
-  // --- LOGIC: POPULATE DATA FROM IDENTITY ---
+  // --- LOGIC: POPULATE FROM IDENTITY ---
   useEffect(() => {
       if (identityData && customerListData && items.length === 0 && !editInvoiceId) {
           const cust = customerListData.find(c => c.name === identityData.customer);
@@ -161,31 +162,15 @@ export default function AddInvoicePage() {
                       price: item.price,
                       total: Math.max(0, (item.quantity - prevQty) * item.price),
                       originalQty: item.quantity,
-                      prevInvoicedQty: prevQty
+                      prevInvoicedQty: prevQty,
+                      varianceQty: 0
                   };
               }));
           }
       }
   }, [identityData, customerListData, allSoItems, editInvoiceId, allInvoices]);
 
-  // --- LOGIC: EDIT MODE POPULATION ---
-  useEffect(() => {
-      if (existingInvoiceData) {
-          setItems(existingInvoiceData.items || []);
-          setBillingAddress(existingInvoiceData.billingAddress || '');
-          setBillingNpwp(existingInvoiceData.billingNpwp || '');
-          setInternalNote(existingInvoiceData.erpInvoiceId || '');
-          setIsDpInvoice(!!existingInvoiceData.isDpInvoice);
-          setNegotiationValue(existingInvoiceData.negotiation || '');
-          setDpValue(existingInvoiceData.dpValue || '');
-          setRetentionValue(existingInvoiceData.retention || '');
-          setDpDeductionValue(existingInvoiceData.dpDeduction || '');
-          setIssueDate(existingInvoiceData.date ? new Date(existingInvoiceData.date) : new Date());
-          setIsTaxManual(existingInvoiceData.revisionLogs?.some(log => log.action.includes('Manual Tax Override')) || false);
-      }
-  }, [existingInvoiceData]);
-
-  // --- LOGIC: CALCULATIONS ---
+  // --- LOGIC: CALCULATIONS & VARIANCE ---
   useEffect(() => {
     const currentSubtotal = items.reduce((acc, item) => acc + (item.quantity * item.price), 0);
     setSubtotal(currentSubtotal);
@@ -204,7 +189,6 @@ export default function AddInvoicePage() {
     const dpDedInputVal = parseFormattedNumber(String(dpDeductionValue));
     const dpDedNominal = dpDeductionMode === 'percent' ? (baseAfterNeg * (dpDedInputVal / 100)) : dpDedInputVal;
     
-    // Validation Guard: Deduction cannot exceed balance
     if (dpDedNominal > dpBalance && !isDpInvoice) {
         setDpDeductionValue(0);
         toast({ variant: "destructive", title: "Limit Saldo DP", description: "Potongan melebihi saldo DP yang tersedia." });
@@ -220,10 +204,7 @@ export default function AddInvoicePage() {
     const currentDpp = parseFormattedNumber(String(dppVat));
     const currentVat = parseFormattedNumber(String(vat12));
     
-    // Grand Total Logic
     let grand = isDpInvoice ? dpNominal : (currentDpp + currentVat - dpDedNominal - retNominal);
-    
-    // Negative Value Guard
     grand = Math.max(0, grand);
     
     setTotalAmount(formatNumberWithCommas(grand));
@@ -231,8 +212,12 @@ export default function AddInvoicePage() {
 
   const handleSaveInvoice = async (invoiceStatus: any = 'sent') => {
     const activeIdentity = existingInvoiceData || identityData;
-    if (!firestore || !user || !activeIdentity) {
-        toast({ variant: "destructive", title: "Gagal Simpan", description: "Identitas Invoice tidak valid." });
+    if (!firestore || !user || !activeIdentity) return;
+
+    // VALIDASI: Check Variance tanpa ijin
+    const hasVariance = items.some(item => (item.quantity + (item.prevInvoicedQty || 0)) > (item.originalQty || 0));
+    if (hasVariance && !isOverBillingAllowed) {
+        toast({ variant: "destructive", title: "Persetujuan Diperlukan", description: "Terdapat item melebihi kuota PO. Aktifkan 'Allow Over-Billing' (Otoritas Leader)." });
         return;
     }
 
@@ -241,11 +226,8 @@ export default function AddInvoicePage() {
     const timestamp = new Date().toISOString();
     const updater = userProfile?.displayName || user.email || 'System';
 
-    // Audit Log for Tax Override
     let actionDescription = editInvoiceId ? "Document UPDATED" : "Document CREATED";
-    if (isTaxManual) {
-        actionDescription += ` | Manual Tax Override Applied: DPP ${dppVat}, VAT ${vat12}`;
-    }
+    if (isOverBillingAllowed) actionDescription += " | OVER-BILLING APPROVED";
 
     const dataToSave: any = {
         id: activeIdentity.id,
@@ -260,6 +242,7 @@ export default function AddInvoicePage() {
         amount: parseFormattedNumber(String(totalAmount)),
         status: invoiceStatus,
         isDpInvoice: isDpInvoice,
+        isOverBillingAllowed: isOverBillingAllowed,
         negotiation: parseFormattedNumber(String(negotiationValue)),
         dpValue: parseFormattedNumber(String(dpValue)),
         dpDeduction: parseFormattedNumber(String(dpDeductionValue)),
@@ -274,11 +257,6 @@ export default function AddInvoicePage() {
         })
     };
 
-    if (!editInvoiceId) {
-        dataToSave.ownerId = user.uid;
-        dataToSave.createdBy = updater;
-    }
-
     setDoc(invoiceDocRef, dataToSave, { merge: true })
         .then(() => {
             toast({ title: "Invoice Berhasil Disimpan" });
@@ -286,7 +264,7 @@ export default function AddInvoicePage() {
         })
         .catch(err => {
             errorEmitter.emit('permission-error', new FirestorePermissionError({
-                path: invoiceDocRef.path, operation: editInvoiceId ? 'update' : 'create', requestResourceData: dataToSave
+                path: invoiceDocRef.path, operation: 'write', requestResourceData: dataToSave
             }));
         });
   };
@@ -296,7 +274,7 @@ export default function AddInvoicePage() {
       return <div className="flex h-[80vh] items-center justify-center font-bold text-slate-400 animate-pulse uppercase tracking-widest">Architectural Handshake in Progress...</div>;
   }
 
-  const isLocked = (existingInvoiceData?.status === 'finalized' || existingInvoiceData?.status === 'paid' || existingInvoiceData?.status === 'received') && !isSuperAdmin;
+  const isLocked = (existingInvoiceData?.status === 'finalized' || existingInvoiceData?.status === 'paid' || existingInvoiceData?.status === 'received') && !isAdmin;
 
   return (
     <main className="flex flex-1 flex-col gap-4 p-4 md:gap-8 md:p-8 max-w-[1600px] mx-auto bg-background">
@@ -312,16 +290,27 @@ export default function AddInvoicePage() {
                 </div>
             </div>
         </div>
-        <div className="flex items-center gap-3 bg-indigo-50/50 px-4 py-2 rounded-xl border border-indigo-100/50">
-            <div className="flex items-center gap-2">
-                <Label className="text-[10px] font-black uppercase text-indigo-600 tracking-widest">Mode Penagihan:</Label>
-                <Badge 
-                    variant={isDpInvoice ? "default" : "outline"} 
-                    className={cn("text-[9px] uppercase cursor-pointer transition-all", isDpInvoice ? "bg-indigo-600 shadow-md" : "text-indigo-600 border-indigo-200")} 
-                    onClick={() => !isLocked && setIsDpInvoice(!isDpInvoice)}
-                >
-                   {isDpInvoice ? "Down Payment (DP)" : "Tagihan Barang / Progres"}
-                </Badge>
+        
+        <div className="flex items-center gap-4">
+            {isAdmin && !isDpInvoice && (
+                <div className="flex items-center gap-2 bg-amber-50 px-4 py-2 rounded-xl border border-amber-200 shadow-sm">
+                    <Label className="text-[10px] font-black uppercase text-amber-700 tracking-widest flex items-center gap-1.5">
+                        <ShieldCheck className="h-3.5 w-3.5" /> Allow Over-Billing
+                    </Label>
+                    <Switch checked={isOverBillingAllowed} onCheckedChange={setIsOverBillingAllowed} disabled={isLocked} />
+                </div>
+            )}
+            <div className="flex items-center gap-3 bg-indigo-50/50 px-4 py-2 rounded-xl border border-indigo-100/50">
+                <div className="flex items-center gap-2">
+                    <Label className="text-[10px] font-black uppercase text-indigo-600 tracking-widest">Mode Penagihan:</Label>
+                    <Badge 
+                        variant={isDpInvoice ? "default" : "outline"} 
+                        className={cn("text-[9px] uppercase cursor-pointer transition-all", isDpInvoice ? "bg-indigo-600 shadow-md" : "text-indigo-600 border-indigo-200")} 
+                        onClick={() => !isLocked && setIsDpInvoice(!isDpInvoice)}
+                    >
+                    {isDpInvoice ? "Down Payment (DP)" : "Tagihan Barang / Progres"}
+                    </Badge>
+                </div>
             </div>
         </div>
       </div>
@@ -379,7 +368,7 @@ export default function AddInvoicePage() {
           <Card className={cn("shadow-sm border-none ring-1 ring-slate-200 dark:ring-slate-800 bg-white dark:bg-slate-900", isLocked && "opacity-60", isDpInvoice && "opacity-40 grayscale pointer-events-none")}>
             <CardHeader className="bg-slate-50/50 dark:bg-slate-800/50 border-b py-4">
                 <div className="flex justify-between items-center">
-                    <CardTitle className="text-sm font-black uppercase tracking-tight text-slate-800 dark:text-slate-200">Item Progress Tracking</CardTitle>
+                    <CardTitle className="text-sm font-black uppercase tracking-tight text-slate-800 dark:text-slate-200">Item Progress & Material Variance</CardTitle>
                     {isDpInvoice && <Badge variant="secondary" className="text-[8px] uppercase">Disabled in DP Mode</Badge>}
                 </div>
             </CardHeader>
@@ -390,7 +379,7 @@ export default function AddInvoicePage() {
                             <TableHead className="text-[10px] font-black uppercase py-2 text-slate-400 tracking-widest">Nama Produk / Jasa</TableHead>
                             <TableHead className="w-[100px] text-center text-[10px] font-black uppercase py-2 text-slate-400 tracking-widest">Now Billing</TableHead>
                             <TableHead className="w-[100px] text-center text-[10px] font-black uppercase py-2 text-slate-400 tracking-widest">Prev. Invoiced</TableHead>
-                            <TableHead className="w-[80px] text-center text-[10px] font-black uppercase py-2 text-slate-400 tracking-widest">Unit</TableHead>
+                            <TableHead className="w-[100px] text-center text-[10px] font-black uppercase py-2 text-slate-400 tracking-widest">Status Kuota</TableHead>
                             <TableHead className="w-[140px] text-right text-[10px] font-black uppercase py-2 text-slate-400 tracking-widest">Total (IDR)</TableHead>
                         </TableRow>
                     </TableHeader>
@@ -400,11 +389,11 @@ export default function AddInvoicePage() {
                         ) : items.map(item => {
                             const isOverInvoiced = (item.quantity + (item.prevInvoicedQty || 0)) > (item.originalQty || 0);
                             return (
-                                <TableRow key={item.id} className={cn("border-b-slate-100 dark:border-b-slate-800 transition-colors", isOverInvoiced && "bg-red-50/50")}>
+                                <TableRow key={item.id} className={cn("border-b-slate-100 dark:border-b-slate-800 transition-colors", isOverInvoiced && !isOverBillingAllowed && "bg-red-50/50")}>
                                     <TableCell>
                                         <div className="flex flex-col">
                                             <span className="text-[11px] font-bold text-slate-700 dark:text-slate-300">{item.name}</span>
-                                            <span className="text-[8px] font-black uppercase text-slate-400">Quota Total: {item.originalQty}</span>
+                                            <span className="text-[8px] font-black uppercase text-slate-400">Kontrak PO: {item.originalQty} {item.unit}</span>
                                         </div>
                                     </TableCell>
                                     <TableCell>
@@ -414,12 +403,22 @@ export default function AddInvoicePage() {
                                                 const val = parseFormattedNumber(e.target.value);
                                                 setItems(items.map(it => it.id === item.id ? { ...it, quantity: val, total: val * it.price } : it));
                                             }} 
-                                            className={cn("text-center text-xs h-8 font-black shadow-none", isOverInvoiced ? "border-red-500 ring-1 ring-red-200" : "border-slate-200")} 
+                                            className={cn("text-center text-xs h-8 font-black shadow-none", isOverInvoiced && !isOverBillingAllowed ? "border-red-500 ring-1 ring-red-200" : "border-slate-200")} 
                                             disabled={isLocked}
                                         />
                                     </TableCell>
                                     <TableCell className="text-center text-[10px] font-black text-slate-400">{item.prevInvoicedQty || 0}</TableCell>
-                                    <TableCell className="text-center text-[10px] font-bold uppercase text-slate-500">{item.unit}</TableCell>
+                                    <TableCell className="text-center">
+                                        {isOverInvoiced ? (
+                                            <Badge variant="destructive" className="text-[8px] h-4 uppercase font-black">
+                                                <TrendingUp className="h-2 w-2 mr-1" /> Variance +{Math.max(0, (item.quantity + (item.prevInvoicedQty || 0)) - (item.originalQty || 0))}
+                                            </Badge>
+                                        ) : (
+                                            <Badge variant="outline" className="text-[8px] h-4 uppercase font-bold text-emerald-600 border-emerald-200 bg-emerald-50/30">
+                                                Sisa: {Math.max(0, (item.originalQty || 0) - (item.prevInvoicedQty || 0) - item.quantity)}
+                                            </Badge>
+                                        )}
+                                    </TableCell>
                                     <TableCell className="text-right font-black text-xs text-slate-900 dark:text-slate-100">Rp {formatNumberWithCommas(item.total)}</TableCell>
                                 </TableRow>
                             );
@@ -486,7 +485,7 @@ export default function AddInvoicePage() {
                         </div>
                         <Input value={dpDeductionValue} onChange={e => setDpDeductionValue(e.target.value)} className="h-8 text-right font-black border-emerald-200 text-emerald-700 bg-white dark:bg-slate-900" placeholder="0" disabled={isLocked} />
                         <div className="flex items-center justify-between text-[8px] font-bold text-emerald-600 mt-1 uppercase tracking-tighter">
-                            <span>Sisa Saldo DP:</span>
+                            <span className="flex items-center gap-1"><RefreshCw className="h-2.5 w-2.5" /> Sisa Saldo DP:</span>
                             <span>Rp {formatNumberWithCommas(dpBalance)}</span>
                         </div>
                     </div>
@@ -532,7 +531,7 @@ export default function AddInvoicePage() {
                         <Send className="mr-2 h-4 w-4" /> SIMPAN & TERBITKAN
                       </Button>
                   )}
-                  {isSuperAdmin && existingInvoiceData?.status !== 'finalized' && existingInvoiceData?.status !== 'paid' && existingInvoiceData?.status !== 'received' && (
+                  {isAdmin && existingInvoiceData?.status !== 'finalized' && existingInvoiceData?.status !== 'paid' && (
                       <Button variant="outline" className="w-full h-11 border-indigo-600 text-indigo-600 font-black uppercase text-[10px] tracking-widest hover:bg-indigo-50" onClick={() => handleSaveInvoice('finalized')}>
                         <ShieldCheck className="mr-2 h-4 w-4" /> FINALIZE & LOCK ARCHIVE
                       </Button>

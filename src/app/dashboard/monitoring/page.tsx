@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useMemo } from 'react';
@@ -28,21 +29,24 @@ import {
   Hash,
   TrendingUp,
   ReceiptText,
-  AlertCircle
+  AlertCircle,
+  Scale
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useFirestore, useCollection, useMemoFirebase } from '@/firebase';
 import { collection, query } from 'firebase/firestore';
-import { type SalesListItem, type SalesOrder, type Invoice, type TaxInvoice, type SpdData } from '@/app/lib/data';
+import { type SalesListItem, type SalesOrder, type Invoice, type TaxInvoice } from '@/app/lib/data';
 import { exportToExcel } from '@/lib/utils';
 import { isBefore, parseISO, startOfToday, isWithinInterval, format } from 'date-fns';
 import { DateRangePicker } from '@/app/components/date-range-picker';
+import { cn } from '@/lib/utils';
 
 type GlobalTrackRecord = {
   poNumber: string;
   customer: string;
   sales: string;
-  poAmount: number;
+  poAmount: number; // Nilai kontrak PO asli
+  actualDeliveryValue: number; // Nilai barang yang benar-benar terkirim (termasuk variance)
   paidOffline: number;
   soNumber: string;
   invoices: (Invoice & { taxInfo?: TaxInvoice })[];
@@ -60,7 +64,6 @@ export default function SalesMonitoringPage() {
     to: startOfToday(),
   });
 
-  // 1. Data Fetching
   const salesQuery = useMemoFirebase(() => (firestore ? query(collection(firestore, 'sales')) : null), [firestore]);
   const { data: salesList, isLoading: isSalesLoading } = useCollection<SalesListItem>(salesQuery);
 
@@ -75,7 +78,6 @@ export default function SalesMonitoringPage() {
 
   const isLoading = isSalesLoading || isSoLoading || isInvLoading;
 
-  // 2. Logic: Global Tracking Mapping
   const trackedData = useMemo((): GlobalTrackRecord[] => {
     if (!salesList || !invoiceList) return [];
 
@@ -90,11 +92,13 @@ export default function SalesMonitoringPage() {
           taxInfo: taxList?.find(t => t.invoiceNumber === inv.id)
         }));
 
-      // Item Tracking Logic (Progres Barang)
       const totalUnits = linkedSos.reduce((sum, s) => sum + s.quantity, 0);
       const invoicedUnits = relatedInvoices.reduce((sum, inv) => {
           return sum + (inv.items?.reduce((s, i) => s + (Number(i.quantity) || 0), 0) || 0);
       }, 0);
+
+      // ACTUAL VALUE: Sum of all invoices (including variance)
+      const actualValue = relatedInvoices.filter(i => !i.isDpInvoice).reduce((sum, inv) => sum + inv.amount, 0);
 
       const systemPaid = relatedInvoices.reduce((sum, inv) => {
           const paidOnInv = inv.payments?.reduce((s, p) => s + p.amount, 0) || (inv.status === 'paid' ? inv.amount : 0);
@@ -111,6 +115,7 @@ export default function SalesMonitoringPage() {
         customer: sale.customer,
         sales: sale.sales,
         poAmount: sale.amount,
+        actualDeliveryValue: actualValue,
         paidOffline: sale.paidOffline || 0,
         soNumber: sale.soNumber || linkedSos[0]?.soNumber || '',
         invoices: relatedInvoices,
@@ -137,12 +142,12 @@ export default function SalesMonitoringPage() {
 
   const stats = useMemo(() => {
     const invoicesCreated = trackedData.reduce((sum, item) => sum + item.invoices.length, 0);
-    const totalValue = trackedData.reduce((sum, item) => 
+    const actualTotalValue = trackedData.reduce((sum, item) => 
         sum + item.invoices.reduce((s, i) => s + i.amount, 0), 0);
     const taxPending = trackedData.reduce((sum, item) => 
         sum + item.invoices.filter(i => !i.taxInfo).length, 0);
 
-    return { invoicesCreated, totalValue, taxPending };
+    return { invoicesCreated, actualTotalValue, taxPending };
   }, [trackedData]);
 
   return (
@@ -151,14 +156,14 @@ export default function SalesMonitoringPage() {
         <div>
           <h1 className="text-2xl font-black tracking-tighter uppercase text-slate-900 dark:text-slate-50">Global Hub Audit</h1>
           <div className="text-slate-400 font-medium flex items-center gap-2 text-sm">
-            Real-time tracking of documents & financial progress.
+            Actual delivery tracking & financial health.
             <Badge variant="secondary" className="bg-indigo-50 text-indigo-600 text-[10px] font-black uppercase tracking-widest">
                 {format(dateRange.from, 'dd MMM')} - {format(dateRange.to, 'dd MMM')}
             </Badge>
           </div>
         </div>
         <div className="flex items-center gap-2">
-            <Button variant="outline" size="sm" onClick={() => exportToExcel(trackedData, 'Audit-Report')} className="h-9 font-bold text-[10px] uppercase tracking-widest border-slate-200">
+            <Button variant="outline" size="sm" onClick={() => exportToExcel(trackedData, 'Actual-Audit-Report')} className="h-9 font-bold text-[10px] uppercase tracking-widest border-slate-200">
                 <FileSpreadsheet className="mr-2 h-4 w-4 text-emerald-600" /> Export Audit
             </Button>
             <DateRangePicker onRangeChange={setDateRange} />
@@ -173,17 +178,17 @@ export default function SalesMonitoringPage() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-black text-slate-900 dark:text-slate-50">{stats.invoicesCreated} <span className="text-xs font-normal">Documents</span></div>
+            <div className="text-2xl font-black text-slate-900 dark:text-slate-50">{stats.invoicesCreated} <span className="text-xs font-normal text-slate-400">Docs</span></div>
           </CardContent>
         </Card>
         <Card className="border-none shadow-sm ring-1 ring-slate-200 dark:ring-slate-800 bg-white dark:bg-slate-900">
           <CardHeader className="pb-2">
             <CardTitle className="text-[9px] font-black uppercase text-slate-400 tracking-widest flex items-center gap-2">
-                <TrendingUp className="h-3 w-3 text-emerald-600" /> Billing Value
+                <TrendingUp className="h-3 w-3 text-emerald-600" /> Actual Billing Value
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-black text-slate-900 dark:text-slate-50">Rp {stats.totalValue.toLocaleString('id-ID')}</div>
+            <div className="text-2xl font-black text-slate-900 dark:text-slate-50">Rp {stats.actualTotalValue.toLocaleString('id-ID')}</div>
           </CardContent>
         </Card>
         <Card className="border-none shadow-sm ring-1 ring-slate-200 dark:ring-slate-800 bg-white dark:bg-slate-900">
@@ -218,7 +223,7 @@ export default function SalesMonitoringPage() {
                     <TableRow>
                         <TableHead className="text-[10px] font-black uppercase tracking-widest py-4 text-slate-400">PO & Customer Hub</TableHead>
                         <TableHead className="text-[10px] font-black uppercase tracking-widest py-4 text-slate-400">Physical Progress</TableHead>
-                        <TableHead className="text-[10px] font-black uppercase tracking-widest py-4 text-slate-400">Active Invoices</TableHead>
+                        <TableHead className="text-[10px] font-black uppercase tracking-widest py-4 text-slate-400">Actual vs PO Value</TableHead>
                         <TableHead className="w-[200px] text-[10px] font-black uppercase tracking-widest py-4 text-slate-400">Financial Health</TableHead>
                         <TableHead className="text-right py-4"></TableHead>
                     </TableRow>
@@ -228,7 +233,9 @@ export default function SalesMonitoringPage() {
                         <TableRow><TableCell colSpan={5} className="text-center py-20 font-black uppercase text-slate-400 animate-pulse tracking-widest">Syncing Global Matrix...</TableCell></TableRow>
                     ) : trackedData.length === 0 ? (
                         <TableRow><TableCell colSpan={5} className="text-center py-20 font-black uppercase text-slate-400 opacity-30 tracking-widest italic">No data found for this period.</TableCell></TableRow>
-                    ) : trackedData.map((item) => (
+                    ) : trackedData.map((item) => {
+                        const hasValueVariance = Math.abs(item.actualDeliveryValue - item.poAmount) > 1000;
+                        return (
                         <TableRow key={item.poNumber} className="hover:bg-indigo-50/10 border-b last:border-0 transition-colors">
                         <TableCell className="py-4">
                             <div className="flex flex-col gap-1">
@@ -240,39 +247,38 @@ export default function SalesMonitoringPage() {
                             <div className="space-y-2 max-w-[180px]">
                                 <div className="flex justify-between text-[9px] font-black uppercase tracking-tighter text-slate-500">
                                     <span>{item.itemProgress.invoiced} / {item.itemProgress.total} Items</span>
-                                    <span className={cn(item.itemProgress.percent >= 100 ? "text-emerald-600" : "")}>{item.itemProgress.percent.toFixed(0)}%</span>
+                                    <span className={cn(item.itemProgress.percent > 100 ? "text-amber-600 font-black" : item.itemProgress.percent === 100 ? "text-emerald-600" : "")}>
+                                        {item.itemProgress.percent.toFixed(0)}%
+                                    </span>
                                 </div>
-                                <Progress value={item.itemProgress.percent} className="h-1 bg-slate-100 dark:bg-slate-800" />
+                                <Progress 
+                                    value={Math.min(100, item.itemProgress.percent)} 
+                                    className={cn("h-1 bg-slate-100 dark:bg-slate-800", item.itemProgress.percent > 100 ? "bg-amber-100" : "")} 
+                                />
                             </div>
                         </TableCell>
                         <TableCell className="py-4">
-                            <div className="flex flex-wrap gap-2">
-                                {item.invoices.map(inv => {
-                                    const isERP = !(inv.id.startsWith('SAR') || inv.id.startsWith('KW'));
-                                    return (
-                                        <div key={inv.id} className="flex flex-col gap-0.5 bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 p-2 rounded-md shadow-sm min-w-[90px]">
-                                            <div className="flex items-center justify-between">
-                                                <span className="text-[9px] font-black text-indigo-600">{inv.id.split('/').pop()}</span>
-                                                {inv.status === 'paid' && <CheckCircle2 className="h-2 w-2 text-emerald-500" />}
-                                            </div>
-                                            <div className="flex items-center gap-1 opacity-50">
-                                                {isERP ? <Database className="h-2 w-2" /> : <Hash className="h-2 w-2" />}
-                                                <span className="text-[7px] font-black uppercase">{isERP ? 'ERP' : 'SAR'}</span>
-                                            </div>
-                                        </div>
-                                    );
-                                })}
+                            <div className="flex flex-col gap-1">
+                                <span className="text-xs font-black">Rp {item.actualDeliveryValue.toLocaleString('id-ID')}</span>
+                                {hasValueVariance && (
+                                    <div className="flex items-center gap-1">
+                                        <Scale className="h-2.5 w-2.5 text-amber-600" />
+                                        <span className="text-[8px] font-black uppercase text-amber-600">
+                                            Variance: Rp {(item.actualDeliveryValue - item.poAmount).toLocaleString('id-ID')}
+                                        </span>
+                                    </div>
+                                )}
                             </div>
                         </TableCell>
                         <TableCell className="py-4">
                             <div className="space-y-2">
                                 <div className="flex justify-between text-[9px] font-black uppercase tracking-tighter">
-                                <span className="text-slate-500">{((item.totalPaid / item.poAmount) * 100 || 0).toFixed(0)}% Collected</span>
-                                <span className={item.totalPaid < item.poAmount ? "text-amber-600" : "text-emerald-600"}>
-                                    Bal: Rp {(item.poAmount - item.totalPaid).toLocaleString('id-ID')}
+                                <span className="text-slate-500">{((item.totalPaid / (item.actualDeliveryValue || 1)) * 100).toFixed(0)}% Collected</span>
+                                <span className={item.totalPaid < item.actualDeliveryValue ? "text-rose-600" : "text-emerald-600"}>
+                                    Bal: Rp {(item.actualDeliveryValue - item.totalPaid).toLocaleString('id-ID')}
                                 </span>
                                 </div>
-                                <Progress value={(item.totalPaid / item.poAmount) * 100 || 0} className="h-1" />
+                                <Progress value={(item.totalPaid / (item.actualDeliveryValue || 1)) * 100} className="h-1" />
                             </div>
                         </TableCell>
                         <TableCell className="text-right py-4">
@@ -284,7 +290,8 @@ export default function SalesMonitoringPage() {
                             </Button>
                         </TableCell>
                         </TableRow>
-                    ))}
+                        );
+                    })}
                     </TableBody>
                 </Table>
             </div>

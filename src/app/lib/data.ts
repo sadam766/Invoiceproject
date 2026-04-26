@@ -33,6 +33,9 @@ export type InvoiceItem = {
     unit: string;
     price: number;
     total: number;
+    originalQty?: number;
+    prevInvoicedQty?: number;
+    varianceQty?: number; // Selisih kirim vs PO
 };
 
 export type Invoice = {
@@ -58,8 +61,10 @@ export type Invoice = {
   sjNumbers?: string[]; 
   negotiation?: number;
   negotiationMode?: 'percent' | 'nominal';
-  dpValue?: number; // Nilai DP yang ditagih (Jika ini Invoice DP)
-  dpDeduction?: number; // Nilai DP yang dipotong (Jika ini Invoice Barang)
+  dpValue?: number; // Nilai DP yang ditagih
+  dpDeduction?: number; // Nilai DP yang dipotong
+  unusedDpCredit?: number; // Kredit dari retur/pembatalan sebelumnya
+  isOverBillingAllowed?: boolean; // Persetujuan kelebihan kirim
   retention?: number;
   payments?: PaymentRecord[];
   items?: InvoiceItem[];
