@@ -7,10 +7,14 @@ service cloud.firestore {
       return request.auth != null;
     }
 
+    // PENGUATAN: isAdmin sekarang lebih toleran terhadap email unverified dan memverifikasi role dari dokumen user
     function isAdmin() {
       return isSignedIn() && (
-        request.auth.token.email.toLowerCase() == 'fa@gmail.com' ||
-        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin'
+        (request.auth.token.email != null && request.auth.token.email.toLowerCase() == 'fa@gmail.com') ||
+        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && (
+          get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin' ||
+          get(/databases/$(database)/documents/users/$(request.auth.uid)).data.email.toLowerCase() == 'fa@gmail.com'
+        ))
       );
     }
 
