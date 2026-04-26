@@ -27,7 +27,7 @@ service cloud.firestore {
       allow delete: if isAdmin();
     }
 
-    // Shared Business Collections
+    // Shared Business Collections: Diperlukan akses tulis penuh untuk sinkronisasi multi-user
     match /customers/{id} { allow read, write: if isSignedIn(); }
     match /products/{id} { allow read, write: if isSignedIn(); }
     match /sales/{id} { allow read, write: if isSignedIn(); }

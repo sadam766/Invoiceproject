@@ -32,24 +32,17 @@ import { format, addDays } from 'date-fns';
 import {
   ChevronLeft,
   Plus,
-  Send,
   ShieldCheck,
   ReceiptText,
   Lock,
   Hash,
-  AlertCircle,
-  TrendingUp,
   Wallet,
   Scale,
   RefreshCw,
-  AlertTriangle,
-  History,
   Tag,
   MessageSquare,
   CreditCard,
   Eye,
-  Search,
-  Check
 } from 'lucide-react';
 import { type Invoice, type SalesOrder, type UserProfile, type Customer, type InvoiceItem, type InvoiceNumber, type VirtualAccount, type ProductListItem } from '@/app/lib/data';
 import { useToast } from '@/hooks/use-toast';
@@ -80,7 +73,7 @@ export default function AddInvoicePage() {
   const editInvoiceId = searchParams.get('editInvoiceId');
   const invoiceNumberIdParam = searchParams.get('invoiceNumberId');
   
-  // --- DATA FETCHING ---
+  // --- DATA FETCHING (REAL-TIME CLOUD ONLY) ---
   const identityRef = useMemoFirebase(() => {
       if (!firestore || !invoiceNumberIdParam) return null;
       return doc(firestore, 'invoiceNumbers', invoiceNumberIdParam);
@@ -93,7 +86,7 @@ export default function AddInvoicePage() {
   }, [firestore, editInvoiceId]);
   const { data: existingInvoiceData, isLoading: isExistingLoading } = useDoc<Invoice>(existingInvoiceRef);
 
-  // KRITIKAL: Definisikan activeIdentity lebih awal agar tersedia untuk useMemo di bawahnya
+  // KRITIKAL: Definisikan activeIdentity sebagai satu-satunya sumber kebenaran ID
   const activeIdentity = existingInvoiceData || identityData;
 
   const userProfileRef = useMemoFirebase(() => (!firestore || !user) ? null : doc(firestore, 'users', user.uid), [firestore, user]);
@@ -162,18 +155,14 @@ export default function AddInvoicePage() {
     return allVas.filter(va => va.customerName === activeIdentity.customer);
   }, [allVas, activeIdentity]);
 
-  // PRE-INITIALIZATION & PERSISTENCE LOCK
+  // PRE-INITIALIZATION & CLOUD PERSISTENCE SYNC
   useEffect(() => {
-      // 1. Check if we have active data from DB
-      const targetDoc = existingInvoiceData || identityData;
-      
-      if (targetDoc && items.length === 0) {
-          // Pure trust of DB Data
-          if (targetDoc.items && targetDoc.items.length > 0) {
-             setItems(targetDoc.items);
+      if (activeIdentity && items.length === 0) {
+          // Hanya gunakan data dari database. DILARANG reset ke 0001.
+          if (activeIdentity.items && activeIdentity.items.length > 0) {
+             setItems(activeIdentity.items);
           } else if (allSoItems && !editInvoiceId) {
-              // Only pull from SO if this is a brand new creation that hasn't been saved yet
-              const relatedItems = allSoItems.filter(item => item.soNumber === targetDoc.salesOrder);
+              const relatedItems = allSoItems.filter(item => item.soNumber === activeIdentity.salesOrder);
               setItems(relatedItems.map((item, idx) => {
                   const prevQty = allInvoices?.filter(inv => inv.soNumber === item.soNumber && inv.status !== 'cancelled')
                                   .reduce((sum, inv) => {
@@ -198,19 +187,18 @@ export default function AddInvoicePage() {
               }));
           }
 
-          // Restore other states
-          setBillingAddress(targetDoc.billingAddress || '');
-          setBillingNpwp(targetDoc.billingNpwp || '');
-          setIsDpInvoice(!!targetDoc.isDpInvoice);
-          setIsOverBillingAllowed(!!targetDoc.isOverBillingAllowed);
-          setNegotiationValue(targetDoc.negotiation || 0);
-          setDpValue(targetDoc.dpValue || 0);
-          setDpDeductionValue(targetDoc.dpDeduction || 0);
-          setRetentionValue(targetDoc.retention || 0);
-          if (targetDoc.paymentMethod) setSelectedVaId(targetDoc.paymentMethod);
-          if (targetDoc.erpInvoiceId) setInternalNote(targetDoc.erpInvoiceId);
+          setBillingAddress(activeIdentity.billingAddress || '');
+          setBillingNpwp(activeIdentity.billingNpwp || '');
+          setIsDpInvoice(!!(activeIdentity as Invoice).isDpInvoice);
+          setIsOverBillingAllowed(!!(activeIdentity as Invoice).isOverBillingAllowed);
+          setNegotiationValue((activeIdentity as Invoice).negotiation || 0);
+          setDpValue((activeIdentity as Invoice).dpValue || 0);
+          setDpDeductionValue((activeIdentity as Invoice).dpDeduction || 0);
+          setRetentionValue((activeIdentity as Invoice).retention || 0);
+          if ((activeIdentity as Invoice).paymentMethod) setSelectedVaId((activeIdentity as Invoice).paymentMethod!);
+          if (activeIdentity.erpInvoiceId) setInternalNote(activeIdentity.erpInvoiceId);
       }
-  }, [identityData, existingInvoiceData, allSoItems, allInvoices, editInvoiceId]);
+  }, [activeIdentity, allSoItems, allInvoices, editInvoiceId]);
 
   useEffect(() => {
     const currentSubtotal = items.reduce((acc, item) => acc + (item.quantity * item.price), 0);
@@ -265,7 +253,6 @@ export default function AddInvoicePage() {
       };
       setItems([...items, newItem]);
       setProductPopoverOpen(false);
-      toast({ title: "Item Ditambahkan", description: `${product.name} telah ditambahkan ke invoice.` });
   };
 
   const handleSaveInvoice = async (invoiceStatus: any = 'sent', redirectToPreview = false) => {
@@ -281,7 +268,7 @@ export default function AddInvoicePage() {
     const dataToSave: any = {
         id: activeIdentity.id,
         erpInvoiceId: internalNote,
-        soNumber: activeIdentity.soNumber || (activeIdentity as any).salesOrder || '',
+        soNumber: activeIdentity.salesOrder || (activeIdentity as any).soNumber || '',
         poNumber: activeIdentity.poNumber || '',
         customer: activeIdentity.customer,
         billingAddress: billingAddress,
@@ -317,7 +304,7 @@ export default function AddInvoicePage() {
                   items: items.map((it, idx) => ({ ...it, no: idx + 1 })),
                   customer: { name: activeIdentity.customer, address: billingAddress, npwp: billingNpwp },
                   date: format(issueDate, 'yyyy-MM-dd'),
-                  soNumber: activeIdentity.soNumber || (activeIdentity as any).salesOrder || '',
+                  soNumber: activeIdentity.salesOrder || (activeIdentity as any).soNumber || '',
                   poNumber: activeIdentity.poNumber || '',
                   grandTotal: parseFormattedNumber(String(totalAmount)),
                   subtotal: subtotal,
@@ -415,7 +402,7 @@ export default function AddInvoicePage() {
                   <div className="space-y-1.5">
                       <Label className="text-[9px] font-black uppercase text-slate-400 tracking-widest">Ref PO / SO Hub</Label>
                       <div className="bg-slate-50 dark:bg-slate-800 px-3 py-2 rounded-md border border-slate-200 text-xs font-mono font-bold truncate">
-                          {activeIdentity?.poNumber} {(activeIdentity?.soNumber || (activeIdentity as any)?.salesOrder) && `• ${activeIdentity?.soNumber || (activeIdentity as any)?.salesOrder}`}
+                          {activeIdentity?.poNumber} {(activeIdentity?.salesOrder || (activeIdentity as any)?.soNumber) && `• ${activeIdentity?.salesOrder || (activeIdentity as any)?.soNumber}`}
                       </div>
                   </div>
 
@@ -494,7 +481,7 @@ export default function AddInvoicePage() {
                                                         value={item.varianceReason} 
                                                         onChange={e => setItems(items.map(it => it.id === item.id ? { ...it, varianceReason: e.target.value } : it))}
                                                         className="h-6 text-[10px] bg-indigo-50/30 border-indigo-100 italic placeholder:text-slate-300"
-                                                        placeholder="Contoh: Over-delivery atas permintaan proyek / Penyesuaian harga pasar..."
+                                                        placeholder="Contoh: Over-delivery atas permintaan proyek..."
                                                     />
                                                 </div>
                                             )}
@@ -722,7 +709,7 @@ export default function AddInvoicePage() {
                         </Button>
                       </>
                   )}
-                  {isAdmin && existingInvoiceData?.status !== 'finalized' && existingInvoiceData?.status !== 'paid' && (
+                  {isAdmin && (existingInvoiceData?.status === 'sent' || existingInvoiceData?.status === 'draft') && (
                       <Button variant="outline" className="w-full h-11 border-indigo-600 text-indigo-600 font-black uppercase text-[10px] tracking-widest hover:bg-indigo-50" onClick={() => handleSaveInvoice('finalized')}>
                         <ShieldCheck className="mr-2 h-4 w-4" /> FINALIZE & LOCK ARCHIVE
                       </Button>

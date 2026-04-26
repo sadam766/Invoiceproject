@@ -10,7 +10,7 @@ import {
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Plus, Calendar as CalendarIcon, Check, ChevronsUpDown, Database, Hash, FilePlus, AlertCircle } from 'lucide-react';
+import { Plus, Calendar as CalendarIcon, Check, ChevronsUpDown, Database, Hash, FilePlus, Info } from 'lucide-react';
 import { Checkbox } from '@/components/ui/checkbox';
 import {
   Popover,
@@ -52,7 +52,6 @@ export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceDa
   const [erpNumberInput, setErpNumberInput] = useState('');
   
   const [isAutoNumber, setIsAutoNumber] = useState(true);
-  const [startingNumber, setStartingNumber] = useState<string>('');
   
   const [prefix, setPrefix] = useState('');
   const [mainNumber, setMainNumber] = useState('');
@@ -92,14 +91,14 @@ export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceDa
     return Array.from(new Set(salesOrderListData.map(item => item.soNumber)))
   },[salesOrderListData]);
 
-  // LOGIKA GLOBAL AUTO-INCREMENT (Unlimited Sequence)
-  const generateNextNumber = (type: 'sar' | 'kw', startFrom: string = '') => {
+  // LOGIKA GLOBAL AUTO-INCREMENT: Memindai seluruh database secara real-time (UNLIMITED DIGIT)
+  const generateNextNumber = (type: 'sar' | 'kw') => {
     let currentMax = 0;
     const now = new Date();
     const currentYearShort = format(now, 'yy');
     const currentYearLong = format(now, 'yyyy');
     
-    // Scan all database entries for the highest sequence
+    // Scan all database entries (Draft Identitas & Invoice Final)
     const allIds = [
         ...(allInvoiceNumbers?.map(inv => inv.id) || []),
         ...(existingInvoices?.map(inv => inv.id) || [])
@@ -108,13 +107,13 @@ export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceDa
     allIds.forEach(id => {
         let match;
         if (type === 'sar') {
-            // Flexible sequence length: SAR/YY01(\d+)A
-            const pattern = new RegExp(`SAR/${currentYearShort}01(\\d+)A`);
-            match = id.match(pattern);
+            // Pattern SAR/YY01(Digits)A - Mendukung digit tak terbatas
+            const pattern = new RegExp(`SAR/${currentYearShort}01(\\d+)A`, 'i');
+            match = id.replace(/_/g, '/').match(pattern);
         } else {
-            // KW Pattern: KW/(\d+)/KEU/YYYY
-            const pattern = new RegExp(`KW/(\\d+)/KEU/${currentYearLong}`);
-            match = id.match(pattern);
+            // Pattern KW/(Digits)/KEU/YYYY
+            const pattern = new RegExp(`KW/(\\d+)/KEU/${currentYearLong}`, 'i');
+            match = id.replace(/_/g, '/').match(pattern);
         }
 
         if (match && match[1]) {
@@ -123,15 +122,13 @@ export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceDa
         }
     });
 
-    const userStart = parseInt(startFrom, 10);
-    const nextNum = !isNaN(userStart) && startFrom !== '' ? userStart : currentMax + 1;
-
-    // Default pad to 4, but let it grow longer if needed
+    const nextNum = currentMax + 1;
+    // Default pad 4 digit (0001), tapi akan melebar otomatis jika lebih besar
     return nextNum.toString().padStart(4, '0');
   };
   
-  const setupForAddMode = (type: 'sar' | 'kw', startVal: string = '') => {
-    const nextNumStr = generateNextNumber(type, startVal);
+  const setupForAddMode = (type: 'sar' | 'kw') => {
+    const nextNumStr = generateNextNumber(type);
     const now = new Date();
     const currentYearShort = format(now, 'yy');
     const currentYearLong = format(now, 'yyyy');
@@ -148,9 +145,9 @@ export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceDa
   };
 
   const handleManualSetup = (invoice: InvoiceNumber) => {
-    const id = invoice.id;
-    const sarMatch = id.match(/^(SAR\/\d{2}01)(\d+)(A)$/);
-    const kwMatch = id.match(/^(KW\/)(\d+)(\/KEU\/\d{4})$/);
+    const id = invoice.id.replace(/_/g, '/');
+    const sarMatch = id.match(/^(SAR\/\d{2}01)(\d+)(A)$/i);
+    const kwMatch = id.match(/^(KW\/)(\d+)(\/KEU\/\d{4})$/i);
 
     if (sarMatch) {
         setNumberSource('manual');
@@ -195,25 +192,26 @@ export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceDa
           setNumberSource('manual');
           setInvoiceType('sar');
           setIsAutoNumber(true);
-          setupForAddMode('sar', '');
+          setupForAddMode('sar');
           
           setCustomer('');
           setSalesOrder('');
           setPoNumber('');
           setDate(new Date());
           setErpNumberInput('');
-          setStartingNumber('');
       }
   }, [isOpen, invoiceData]);
 
+  // Real-time synchronization: Update suggestion when database changes
   useEffect(() => {
       if (isAutoNumber && !invoiceData && isOpen && numberSource === 'manual') {
-          setupForAddMode(invoiceType, startingNumber);
+          setupForAddMode(invoiceType);
       }
-  }, [startingNumber, invoiceType, isAutoNumber, isOpen, numberSource, existingInvoices, allInvoiceNumbers]);
+  }, [invoiceType, isAutoNumber, isOpen, numberSource, existingInvoices, allInvoiceNumbers]);
 
   useEffect(() => {
     if (numberSource === 'manual') {
+        // Gabungkan prefix, urutan manual (tanpa batas digit), dan suffix
         setFullInvoiceNumber(`${prefix}${mainNumber}${suffix}`);
     } else {
         setFullInvoiceNumber(erpNumberInput);
@@ -245,22 +243,22 @@ export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceDa
         return;
     }
 
-    if (!salesOrder && !poNumber) {
-        toast({ variant: "destructive", title: "Validation Error", description: "Nomor PO wajib diisi jika SO belum tersedia." });
-        return;
-    }
-
     const finalInvoiceNumber = fullInvoiceNumber;
-    const existsInNumberList = allInvoiceNumbers?.some(inv => inv.id === finalInvoiceNumber);
-    const existsInInvoiceList = existingInvoices?.some(inv => inv.id === finalInvoiceNumber);
-    const isChangingId = invoiceData && invoiceData.id !== finalInvoiceNumber;
     
-    if ((!invoiceData || isChangingId) && (existsInNumberList || existsInInvoiceList)) {
+    // Atomic Check: Pastikan nomor belum terpakai Admin lain saat tombol diklik
+    const isTaken = [
+        ...(allInvoiceNumbers?.map(inv => inv.id.replace(/\//g, '_')) || []),
+        ...(existingInvoices?.map(inv => inv.id.replace(/\//g, '_')) || [])
+    ].includes(finalInvoiceNumber.replace(/\//g, '_'));
+
+    if (!invoiceData && isTaken) {
       toast({
         variant: "destructive",
         title: "Nomor Faktur Duplikat",
-        description: `Nomor "${finalInvoiceNumber}" sudah terdaftar dalam sistem Dakota.`,
+        description: `Nomor "${finalInvoiceNumber}" baru saja digunakan oleh admin lain.`,
       });
+      // Refresh urutan otomatis
+      setupForAddMode(invoiceType);
       return; 
     }
 
@@ -352,27 +350,22 @@ export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceDa
                               <Checkbox id="auto-number" checked={isAutoNumber} onCheckedChange={(checked) => setIsAutoNumber(!!checked)} />
                               <Label htmlFor="auto-number" className="text-xs font-bold uppercase cursor-pointer">Gunakan Nomor Urut Sistem</Label>
                             </div>
-                            {!isAutoNumber && (
-                                <div className="flex items-center gap-2">
-                                    <Label className="text-[9px] font-bold uppercase text-muted-foreground">Mulai Dari (Edit Bebas):</Label>
-                                    <Input 
-                                        placeholder="0001"
-                                        className="h-7 w-32 text-xs font-bold border-indigo-200"
-                                        value={mainNumber}
-                                        onChange={(e) => setMainNumber(e.target.value.replace(/[^0-9]/g, ''))}
-                                    />
-                                </div>
-                            )}
                         </div>
                         <div className="grid grid-cols-[auto_1fr_auto] items-center gap-2">
-                          {prefix && <div className="bg-indigo-50 px-3 py-2 rounded-md border border-indigo-100 text-xs font-black text-indigo-700 font-mono" title="Locked Prefix">{prefix}</div>}
-                          <div className="h-10 font-black text-center text-lg tracking-widest bg-white flex items-center justify-center border rounded-md shadow-inner">
-                            {mainNumber || '0000'}
-                          </div>
-                          {suffix && <div className="bg-indigo-50 px-3 py-2 rounded-md border border-indigo-100 text-xs font-black text-indigo-700 font-mono" title="Locked Suffix">{suffix}</div>}
+                          <div className="bg-indigo-50 px-3 py-2 rounded-md border border-indigo-100 text-xs font-black text-indigo-700 font-mono" title="Prefix Locked">{prefix}</div>
+                          <Input 
+                            placeholder="0001"
+                            className="h-10 font-black text-center text-lg tracking-widest bg-white border-indigo-200 shadow-inner"
+                            value={mainNumber}
+                            onChange={(e) => {
+                                setMainNumber(e.target.value.replace(/[^0-9]/g, ''));
+                                setIsAutoNumber(false); // Otomatis matikan auto jika user edit manual
+                            }}
+                          />
+                          <div className="bg-indigo-50 px-3 py-2 rounded-md border border-indigo-100 text-xs font-black text-indigo-700 font-mono" title="Suffix Locked">{suffix}</div>
                         </div>
                         <div className="bg-blue-50 p-2 rounded border border-blue-100 mt-2">
-                             <p className="text-[9px] font-black text-blue-700 uppercase tracking-tight">Pratinjau Hasil: <span className="underline">{fullInvoiceNumber}</span></p>
+                             <p className="text-[9px] font-black text-blue-700 uppercase tracking-tight">Pratinjau Hasil: <span className="underline font-mono">{fullInvoiceNumber}</span></p>
                         </div>
                       </div>
                   </div>
