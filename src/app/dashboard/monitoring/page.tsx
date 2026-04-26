@@ -30,7 +30,9 @@ import {
   TrendingUp,
   ReceiptText,
   AlertCircle,
-  Scale
+  Scale,
+  Tag,
+  ArrowRightLeft
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useFirestore, useCollection, useMemoFirebase } from '@/firebase';
@@ -45,13 +47,15 @@ type GlobalTrackRecord = {
   poNumber: string;
   customer: string;
   sales: string;
-  poAmount: number; // Nilai kontrak PO asli
-  actualDeliveryValue: number; // Nilai barang yang benar-benar terkirim (termasuk variance)
+  poAmount: number;
+  actualDeliveryValue: number;
+  priceVariance: number;
   paidOffline: number;
   soNumber: string;
   invoices: (Invoice & { taxInfo?: TaxInvoice })[];
   totalPaid: number;
   isOverdue: boolean;
+  hasItemVariance: boolean;
   itemProgress: { invoiced: number; total: number; percent: number };
 };
 
@@ -97,8 +101,21 @@ export default function SalesMonitoringPage() {
           return sum + (inv.items?.reduce((s, i) => s + (Number(i.quantity) || 0), 0) || 0);
       }, 0);
 
-      // ACTUAL VALUE: Sum of all invoices (including variance)
       const actualValue = relatedInvoices.filter(i => !i.isDpInvoice).reduce((sum, inv) => sum + inv.amount, 0);
+      
+      // TRIPLE VARIANCE DETECTION: Price Variance Calculation
+      let totalAdjustedPriceImpact = 0;
+      let hasItemVariance = false;
+      relatedInvoices.forEach(inv => {
+          inv.items?.forEach(item => {
+              if (item.originalPrice && item.price !== item.originalPrice) {
+                  totalAdjustedPriceImpact += (item.price - item.originalPrice) * item.quantity;
+              }
+              if (item.originalName && item.name !== item.originalName) {
+                  hasItemVariance = true;
+              }
+          });
+      });
 
       const systemPaid = relatedInvoices.reduce((sum, inv) => {
           const paidOnInv = inv.payments?.reduce((s, p) => s + p.amount, 0) || (inv.status === 'paid' ? inv.amount : 0);
@@ -116,6 +133,8 @@ export default function SalesMonitoringPage() {
         sales: sale.sales,
         poAmount: sale.amount,
         actualDeliveryValue: actualValue,
+        priceVariance: totalAdjustedPriceImpact,
+        hasItemVariance: hasItemVariance,
         paidOffline: sale.paidOffline || 0,
         soNumber: sale.soNumber || linkedSos[0]?.soNumber || '',
         invoices: relatedInvoices,
@@ -144,10 +163,9 @@ export default function SalesMonitoringPage() {
     const invoicesCreated = trackedData.reduce((sum, item) => sum + item.invoices.length, 0);
     const actualTotalValue = trackedData.reduce((sum, item) => 
         sum + item.invoices.reduce((s, i) => s + i.amount, 0), 0);
-    const taxPending = trackedData.reduce((sum, item) => 
-        sum + item.invoices.filter(i => !i.taxInfo).length, 0);
+    const totalVariance = trackedData.reduce((sum, item) => sum + item.priceVariance, 0);
 
-    return { invoicesCreated, actualTotalValue, taxPending };
+    return { invoicesCreated, actualTotalValue, totalVariance };
   }, [trackedData]);
 
   return (
@@ -156,7 +174,7 @@ export default function SalesMonitoringPage() {
         <div>
           <h1 className="text-2xl font-black tracking-tighter uppercase text-slate-900 dark:text-slate-50">Global Hub Audit</h1>
           <div className="text-slate-400 font-medium flex items-center gap-2 text-sm">
-            Actual delivery tracking & financial health.
+            Triple Variance Monitoring: Name, Qty, & Price Audit.
             <Badge variant="secondary" className="bg-indigo-50 text-indigo-600 text-[10px] font-black uppercase tracking-widest">
                 {format(dateRange.from, 'dd MMM')} - {format(dateRange.to, 'dd MMM')}
             </Badge>
@@ -194,11 +212,13 @@ export default function SalesMonitoringPage() {
         <Card className="border-none shadow-sm ring-1 ring-slate-200 dark:ring-slate-800 bg-white dark:bg-slate-900">
           <CardHeader className="pb-2">
             <CardTitle className="text-[9px] font-black uppercase text-slate-400 tracking-widest flex items-center gap-2">
-                <AlertCircle className="h-3 w-3 text-rose-600" /> Missing Tax Records
+                <ArrowRightLeft className="h-3 w-3 text-amber-600" /> Global Price Variance
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-black text-rose-600">{stats.taxPending} <span className="text-xs font-normal opacity-50">Drafts</span></div>
+            <div className={cn("text-2xl font-black", stats.totalVariance < 0 ? "text-rose-600" : "text-emerald-600")}>
+                {stats.totalVariance > 0 ? '+' : ''} Rp {stats.totalVariance.toLocaleString('id-ID')}
+            </div>
           </CardContent>
         </Card>
       </div>
@@ -221,20 +241,21 @@ export default function SalesMonitoringPage() {
                 <Table>
                     <TableHeader className="bg-slate-50 dark:bg-slate-800/50">
                     <TableRow>
-                        <TableHead className="text-[10px] font-black uppercase tracking-widest py-4 text-slate-400">PO & Customer Hub</TableHead>
-                        <TableHead className="text-[10px] font-black uppercase tracking-widest py-4 text-slate-400">Physical Progress</TableHead>
-                        <TableHead className="text-[10px] font-black uppercase tracking-widest py-4 text-slate-400">Actual vs PO Value</TableHead>
-                        <TableHead className="w-[200px] text-[10px] font-black uppercase tracking-widest py-4 text-slate-400">Financial Health</TableHead>
+                        <TableHead className="text-[10px] font-black uppercase tracking-widest py-4 text-slate-400">PO & Hub Identity</TableHead>
+                        <TableHead className="text-[10px] font-black uppercase tracking-widest py-4 text-slate-400">Physical Flow</TableHead>
+                        <TableHead className="text-[10px] font-black uppercase tracking-widest py-4 text-slate-400">Variance Audit</TableHead>
+                        <TableHead className="w-[200px] text-[10px] font-black uppercase tracking-widest py-4 text-slate-400">Financial Progress</TableHead>
                         <TableHead className="text-right py-4"></TableHead>
                     </TableRow>
                     </TableHeader>
                     <TableBody>
                     {isLoading ? (
-                        <TableRow><TableCell colSpan={5} className="text-center py-20 font-black uppercase text-slate-400 animate-pulse tracking-widest">Syncing Global Matrix...</TableCell></TableRow>
+                        <TableRow><TableCell colSpan={5} className="text-center py-20 font-black uppercase text-slate-400 animate-pulse tracking-widest">Syncing Triple Variance Matrix...</TableCell></TableRow>
                     ) : trackedData.length === 0 ? (
-                        <TableRow><TableCell colSpan={5} className="text-center py-20 font-black uppercase text-slate-400 opacity-30 tracking-widest italic">No data found for this period.</TableCell></TableRow>
+                        <TableRow><TableCell colSpan={5} className="text-center py-20 font-black uppercase text-slate-400 opacity-30 tracking-widest italic">No data found.</TableCell></TableRow>
                     ) : trackedData.map((item) => {
-                        const hasValueVariance = Math.abs(item.actualDeliveryValue - item.poAmount) > 1000;
+                        const hasQtyVariance = item.itemProgress.percent > 100 || item.itemProgress.percent < 100;
+                        const hasPriceVariance = Math.abs(item.priceVariance) > 0;
                         return (
                         <TableRow key={item.poNumber} className="hover:bg-indigo-50/10 border-b last:border-0 transition-colors">
                         <TableCell className="py-4">
@@ -246,7 +267,10 @@ export default function SalesMonitoringPage() {
                         <TableCell className="py-4">
                             <div className="space-y-2 max-w-[180px]">
                                 <div className="flex justify-between text-[9px] font-black uppercase tracking-tighter text-slate-500">
-                                    <span>{item.itemProgress.invoiced} / {item.itemProgress.total} Items</span>
+                                    <span className="flex items-center gap-1">
+                                        {item.hasItemVariance && <Tag className="h-2.5 w-2.5 text-indigo-600" />}
+                                        {item.itemProgress.invoiced} / {item.itemProgress.total} Items
+                                    </span>
                                     <span className={cn(item.itemProgress.percent > 100 ? "text-amber-600 font-black" : item.itemProgress.percent === 100 ? "text-emerald-600" : "")}>
                                         {item.itemProgress.percent.toFixed(0)}%
                                     </span>
@@ -259,15 +283,28 @@ export default function SalesMonitoringPage() {
                         </TableCell>
                         <TableCell className="py-4">
                             <div className="flex flex-col gap-1">
-                                <span className="text-xs font-black">Rp {item.actualDeliveryValue.toLocaleString('id-ID')}</span>
-                                {hasValueVariance && (
-                                    <div className="flex items-center gap-1">
-                                        <Scale className="h-2.5 w-2.5 text-amber-600" />
-                                        <span className="text-[8px] font-black uppercase text-amber-600">
-                                            Variance: Rp {(item.actualDeliveryValue - item.poAmount).toLocaleString('id-ID')}
-                                        </span>
-                                    </div>
-                                )}
+                                <div className="flex items-center gap-2">
+                                    <span className="text-xs font-black">Rp {item.actualDeliveryValue.toLocaleString('id-ID')}</span>
+                                    {item.hasItemVariance && <Badge className="text-[7px] bg-indigo-50 text-indigo-600 border-indigo-100 h-3.5">Specs Change</Badge>}
+                                </div>
+                                <div className="space-y-0.5">
+                                    {Math.abs(item.actualDeliveryValue - item.poAmount) > 1000 && (
+                                        <div className="flex items-center gap-1">
+                                            <Scale className="h-2.5 w-2.5 text-amber-600" />
+                                            <span className="text-[8px] font-black uppercase text-amber-600">
+                                                Qty Variance: Rp {(item.actualDeliveryValue - item.poAmount - item.priceVariance).toLocaleString('id-ID')}
+                                            </span>
+                                        </div>
+                                    )}
+                                    {hasPriceVariance && (
+                                        <div className="flex items-center gap-1">
+                                            <Tag className="h-2.5 w-2.5 text-indigo-600" />
+                                            <span className="text-[8px] font-black uppercase text-indigo-600">
+                                                Price Variance: Rp {item.priceVariance.toLocaleString('id-ID')}
+                                            </span>
+                                        </div>
+                                    )}
+                                </div>
                             </div>
                         </TableCell>
                         <TableCell className="py-4">

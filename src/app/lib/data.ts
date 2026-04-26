@@ -33,9 +33,11 @@ export type InvoiceItem = {
     unit: string;
     price: number;
     total: number;
+    originalName?: string;
     originalQty?: number;
+    originalPrice?: number;
     prevInvoicedQty?: number;
-    varianceQty?: number; // Selisih kirim vs PO
+    varianceQty?: number;
 };
 
 export type Invoice = {
