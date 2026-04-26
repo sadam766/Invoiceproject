@@ -155,15 +155,15 @@ export function PaymentDetailDialog({ isOpen, onOpenChange, sale, invoices }: Pa
                                                     variant={inv.status === 'paid' ? 'outline' : 'secondary'} 
                                                     className={cn(
                                                         "text-[8px] h-4 px-2 font-black uppercase", 
-                                                        inv.status === 'paid' ? 'bg-emerald-50 text-emerald-700 border-emerald-100' : 'bg-rose-50 text-rose-600 border-rose-100'
+                                                        inv.status === 'paid' ? "bg-emerald-50 text-emerald-700 border-emerald-100" : "bg-rose-50 text-rose-600 border-rose-100"
                                                     )}
                                                 >
                                                     {inv.status}
                                                 </Badge>
                                             </TableCell>
                                             <TableCell>
-                                                <Button variant="ghost" size="icon" className="h-7 w-7 rounded-full hover:bg-indigo-50" asChild>
-                                                    <Link href={`/dashboard/invoices`}><ExternalLink className="h-3 w-3 text-indigo-600" /></Link>
+                                                <Button variant="ghost" size="icon" className="h-7 w-7 rounded-full" asChild>
+                                                    <Link href={`/dashboard/invoices`}><ExternalLink className="h-3 w-3" /></Link>
                                                 </Button>
                                             </TableCell>
                                         </TableRow>
