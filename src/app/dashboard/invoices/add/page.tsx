@@ -265,7 +265,7 @@ export default function AddInvoicePage() {
     const dataToSave: any = {
         id: activeIdentity.id,
         erpInvoiceId: internalNote,
-        soNumber: activeIdentity.soNumber || (activeIdentity as any).salesOrder,
+        soNumber: (activeIdentity as any).soNumber || (activeIdentity as any).salesOrder || '',
         poNumber: activeIdentity.poNumber || '',
         customer: activeIdentity.customer,
         billingAddress: billingAddress,
@@ -376,7 +376,7 @@ export default function AddInvoicePage() {
                   <div className="space-y-1.5">
                       <Label className="text-[9px] font-black uppercase text-slate-400 tracking-widest">Ref PO / SO Hub</Label>
                       <div className="bg-slate-50 dark:bg-slate-800 px-3 py-2 rounded-md border border-slate-200 text-xs font-mono font-bold truncate">
-                          {activeIdentity?.poNumber} {((activeIdentity as any).salesOrder || activeIdentity?.soNumber) && `• ${(activeIdentity as any).salesOrder || activeIdentity?.soNumber}`}
+                          {activeIdentity?.poNumber} {(activeIdentity as any)?.salesOrder || (activeIdentity as any)?.soNumber ? `• ${(activeIdentity as any)?.salesOrder || (activeIdentity as any)?.soNumber}` : ''}
                       </div>
                   </div>
 
