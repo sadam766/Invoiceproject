@@ -205,7 +205,7 @@ export default function DashboardLayout({
               <SidebarMenuButton 
                 asChild 
                 isActive={pathname === '/dashboard'} 
-                tooltip="Ringkasan performa penjualan, invoice, dan status pembayaran secara visual."
+                tooltip="Menampilkan ringkasan data statistik invoice, status pembayaran, dan grafik monitoring secara keseluruhan."
               >
                 <Link href="/dashboard"><LayoutDashboard /> <span>Dashboard</span></Link>
               </SidebarMenuButton>
@@ -215,7 +215,7 @@ export default function DashboardLayout({
               <SidebarMenuButton 
                 asChild 
                 isActive={pathname === '/dashboard/monitoring'} 
-                tooltip="Memantau pergerakan data transaksi dan log aktivitas sistem secara real-time."
+                tooltip="Memantau aktivitas log sistem dan status antrean data transaksi secara real-time."
               >
                 <Link href="/dashboard/monitoring"><Eye /> <span>Monitoring</span></Link>
               </SidebarMenuButton>
@@ -236,7 +236,7 @@ export default function DashboardLayout({
                       <SidebarMenuSubButton 
                         asChild 
                         isActive={pathname === '/dashboard/invoices'}
-                        tooltip="Daftar seluruh invoice yang sudah dibuat (Status: Draft, Final, atau Cancel)."
+                        tooltip="Daftar seluruh invoice (Draft, Final, Cancel) untuk pengecekan dan cetak ulang."
                       >
                         <Link href="/dashboard/invoices">Invoice List</Link>
                       </SidebarMenuSubButton>
@@ -245,7 +245,7 @@ export default function DashboardLayout({
                       <SidebarMenuSubButton 
                         asChild 
                         isActive={pathname.startsWith('/dashboard/invoices/add')}
-                        tooltip="Membuat draf tagihan baru (Hanya aktif jika sudah ada nomor di Invoice Number)."
+                        tooltip="Membuat draf invoice baru (Akses terbuka otomatis setelah registrasi nomor di Invoice Number)."
                       >
                         <Link href="/dashboard/invoices/number">Add Invoice</Link>
                       </SidebarMenuSubButton>
@@ -254,7 +254,7 @@ export default function DashboardLayout({
                       <SidebarMenuSubButton 
                         asChild 
                         isActive={pathname === '/dashboard/invoices/number'}
-                        tooltip="Tempat mendaftarkan nomor urut invoice sebelum membuat tagihan."
+                        tooltip="Wajib diisi pertama kali untuk mendaftarkan dan mengunci nomor urut invoice sebelum penagihan."
                       >
                         <Link href="/dashboard/invoices/number">Invoice Number</Link>
                       </SidebarMenuSubButton>
@@ -297,7 +297,7 @@ export default function DashboardLayout({
               <SidebarMenuButton 
                 asChild 
                 isActive={pathname.startsWith('/dashboard/products')} 
-                tooltip="Manajemen master data barang, jasa, dan harga satuan."
+                tooltip="Mengelola master data barang, jasa, kode produk, dan pengaturan harga satuan."
               >
                 <Link href="/dashboard/products"><Package /> <span>Products</span></Link>
               </SidebarMenuButton>
@@ -306,7 +306,7 @@ export default function DashboardLayout({
               <SidebarMenuButton 
                 asChild 
                 isActive={pathname === '/dashboard/sales-orders'} 
-                tooltip="Mengelola kontrak atau pesanan dari pelanggan sebelum ditagih."
+                tooltip="Manajemen dokumen pesanan pelanggan yang menjadi dasar pembuatan tagihan/invoice."
               >
                 <Link href="/dashboard/sales-orders"><ShoppingCart /> <span>Sales Orders</span></Link>
               </SidebarMenuButton>
@@ -315,7 +315,7 @@ export default function DashboardLayout({
               <SidebarMenuButton 
                 asChild 
                 isActive={pathname.startsWith('/dashboard/customers')} 
-                tooltip="Database profil pelanggan, alamat, dan kontak penagihan."
+                tooltip="Database profil pelanggan, alamat kirim, dan informasi detail kontak penagihan."
               >
                 <Link href="/dashboard/customers"><Users /> <span>Customers</span></Link>
               </SidebarMenuButton>
@@ -325,7 +325,7 @@ export default function DashboardLayout({
                 <SidebarMenuButton 
                   asChild 
                   isActive={pathname.startsWith('/dashboard/sales')} 
-                  tooltip="Daftar kontrak PO/SO yang siap ditagih."
+                  tooltip="Laporan rekapitulasi seluruh transaksi penjualan yang telah dilakukan."
                 >
                     <Link href="/dashboard/sales"><ShoppingCart /> <span>Sales List</span></Link>
                 </SidebarMenuButton>
@@ -336,7 +336,7 @@ export default function DashboardLayout({
                   <SidebarMenuButton 
                     asChild 
                     isActive={pathname === '/dashboard/sales-management'} 
-                    tooltip="Mencatat pelunasan invoice dan mencocokkan dengan data bank."
+                    tooltip="Mencatat pelunasan, verifikasi bukti bayar, dan update status pembayaran invoice."
                   >
                       <Link href="/dashboard/sales-management"><BarChart /> <span>Payment & Receivables</span></Link>
                   </SidebarMenuButton>
@@ -348,7 +348,7 @@ export default function DashboardLayout({
                   <SidebarMenuButton 
                     asChild 
                     isActive={pathname === '/dashboard/users'} 
-                    tooltip="Mengatur hak akses admin, leader, dan staf sistem."
+                    tooltip="Mengatur hak akses pengguna (Admin, Leader, Staff) dan keamanan akun."
                   >
                       <Link href="/dashboard/users"><UserCog /> <span>User Management</span></Link>
                   </SidebarMenuButton>
@@ -359,7 +359,7 @@ export default function DashboardLayout({
               <SidebarMenuButton 
                 asChild 
                 isActive={pathname === '/dashboard/calendar'} 
-                tooltip="Jadwal jatuh tempo invoice dan agenda penagihan rutin."
+                tooltip="Menampilkan jadwal jatuh tempo penagihan dan pengingat aktivitas harian."
               >
                 <Link href="/dashboard/calendar"><Calendar /> <span>Calendar</span></Link>
               </SidebarMenuButton>
@@ -373,7 +373,7 @@ export default function DashboardLayout({
                         <SidebarMenuButton 
                           asChild 
                           isActive={pathname === '/dashboard/settings'} 
-                          tooltip="Mengatur profil perusahaan, logo, dan nomor rekening/VA."
+                          tooltip="Konfigurasi profil perusahaan, nomor rekening/VA, logo, dan tanda tangan digital."
                         >
                             <Link href="/dashboard/settings"><Settings /> <span>Pengaturan</span></Link>
                         </SidebarMenuButton>

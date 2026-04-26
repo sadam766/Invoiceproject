@@ -494,7 +494,7 @@ export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceDa
                 </Button>
               </TooltipTrigger>
               <TooltipContent className="bg-slate-900 text-white border-none text-[10px]">
-                Membuka halaman pengisian detail barang/item untuk invoice yang dipilih.
+                Masuk ke halaman input detail barang dan kalkulasi nilai invoice.
               </TooltipContent>
             </Tooltip>
           </TooltipProvider>
