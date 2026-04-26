@@ -1,4 +1,3 @@
-
 'use client';
 import {
   SidebarProvider,
@@ -232,7 +231,11 @@ export default function DashboardLayout({
                     </SidebarMenuSubItem>
                     <SidebarMenuSubItem>
                       <SidebarMenuSubButton asChild isActive={pathname.startsWith('/dashboard/invoices/add')}>
-                        <Link href="/dashboard/invoices/add">Add Invoice</Link>
+                        {/* 
+                          MANDATORY FLOW: Menu 'Add Invoice' dialihkan ke 'Number' 
+                          untuk memastikan admin meregistrasikan nomor identitas terlebih dahulu.
+                        */}
+                        <Link href="/dashboard/invoices/number">Add Invoice</Link>
                       </SidebarMenuSubButton>
                     </SidebarMenuSubItem>
                     <SidebarMenuSubItem>

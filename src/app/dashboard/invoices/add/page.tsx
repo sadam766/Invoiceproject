@@ -87,8 +87,22 @@ export default function AddInvoicePage() {
   }, [firestore, editInvoiceId]);
   const { data: existingInvoiceData, isLoading: isExistingLoading } = useDoc<Invoice>(existingInvoiceRef);
 
-  // AUDIT FIX: Stable identity source
   const activeIdentity = existingInvoiceData || identityData;
+
+  // --- MANDATORY WORKFLOW GATEKEEPING ---
+  const isLoading = (invoiceNumberIdParam && isIdentityLoading) || (editInvoiceId && isExistingLoading);
+
+  useEffect(() => {
+    // Jika tidak sedang loading dan tidak ada ID yang dibawa, alihkan ke tahap registrasi nomor
+    if (!isLoading && !invoiceNumberIdParam && !editInvoiceId) {
+        toast({
+            variant: "destructive",
+            title: "Akses Ditolak",
+            description: "Mohon daftarkan Nomor Invoice terlebih dahulu di menu Invoice Number sebelum melanjutkan ke pembuatan invoice."
+        });
+        router.replace('/dashboard/invoices/number');
+    }
+  }, [isLoading, invoiceNumberIdParam, editInvoiceId, router, toast]);
 
   const userProfileRef = useMemoFirebase(() => (!firestore || !user) ? null : doc(firestore, 'users', user.uid), [firestore, user]);
   const { data: userProfile } = useDoc<UserProfile>(userProfileRef);
@@ -157,7 +171,7 @@ export default function AddInvoicePage() {
     return allVas.filter(va => va.customerName === activeIdentity.customer);
   }, [allVas, activeIdentity]);
 
-  // AUDIT FIX: Strict Database Dependency (No Reset to 0001)
+  // AUDIT FIX: Persistent Database Sync (Constructor is Read-Only to Identity)
   useEffect(() => {
       if (activeIdentity && items.length === 0) {
           if (activeIdentity.items && activeIdentity.items.length > 0) {
@@ -199,7 +213,7 @@ export default function AddInvoicePage() {
           if ((activeIdentity as Invoice).paymentMethod) setSelectedVaId((activeIdentity as Invoice).paymentMethod!);
           if (activeIdentity.erpInvoiceId) setInternalNote(activeIdentity.erpInvoiceId);
       }
-  }, [activeIdentity, allSoItems, allInvoices, editInvoiceId]);
+  }, [activeIdentity, allSoItems, allInvoices, editInvoiceId, items.length]);
 
   useEffect(() => {
     const currentSubtotal = items.reduce((acc, item) => acc + (item.quantity * item.price), 0);
@@ -262,7 +276,7 @@ export default function AddInvoicePage() {
     const dataToSave: any = {
         id: activeIdentity.id,
         erpInvoiceId: internalNote,
-        soNumber: activeIdentity.salesOrder || (activeIdentity as any).soNumber || '',
+        soNumber: activeIdentity.salesOrder || (activeIdentity as any).soNumber || (activeIdentity as any).salesOrder || '',
         poNumber: activeIdentity.poNumber || '',
         customer: activeIdentity.customer,
         billingAddress: billingAddress,
@@ -292,25 +306,6 @@ export default function AddInvoicePage() {
         .then(() => {
             toast({ title: "Invoice Berhasil Disimpan" });
             if (redirectToPreview) {
-                const previewData = {
-                  id: activeIdentity.id,
-                  erpInvoiceId: internalNote,
-                  items: items.map((it, idx) => ({ ...it, no: idx + 1 })),
-                  customer: { name: activeIdentity.customer, address: billingAddress, npwp: billingNpwp },
-                  date: format(issueDate, 'yyyy-MM-dd'),
-                  soNumber: activeIdentity.salesOrder || (activeIdentity as any).soNumber || '',
-                  poNumber: activeIdentity.poNumber || '',
-                  grandTotal: parseFormattedNumber(String(totalAmount)),
-                  subtotal: subtotal,
-                  dppVat: parseFormattedNumber(String(dppVat)),
-                  vat12: parseFormattedNumber(String(vat12)),
-                  paymentTerms: '30 Days',
-                  printType: 'original',
-                  negotiation: parseFormattedNumber(String(negotiationValue)),
-                  dpValue: isDpInvoice ? parseFormattedNumber(String(dpValue)) : (parseFormattedNumber(String(dpDeductionValue)) + parseFormattedNumber(String(retentionValue))),
-                  virtualAccount: selectedVaId !== 'manual' ? availableVas.find(v => v.id === selectedVaId) : undefined
-                };
-                sessionStorage.setItem('invoicePreviewData', JSON.stringify(previewData));
                 router.push(`/dashboard/invoices/preview/${encodeURIComponent(activeIdentity.id)}`);
             } else {
                 router.push('/dashboard/invoices');
@@ -324,10 +319,13 @@ export default function AddInvoicePage() {
         .finally(() => setIsSaving(false));
   };
 
-  const isLoading = (invoiceNumberIdParam && isIdentityLoading) || (editInvoiceId && isExistingLoading);
-
   if (isLoading || (!activeIdentity && (invoiceNumberIdParam || editInvoiceId))) {
       return <div className="flex h-[80vh] items-center justify-center font-bold text-slate-400 animate-pulse uppercase tracking-widest">Architectural Handshake...</div>;
+  }
+
+  // Jika tidak ada ID, jangan render apa pun sebelum redirect berjalan
+  if (!activeIdentity && !editInvoiceId && !invoiceNumberIdParam) {
+      return null;
   }
 
   const isLocked = (existingInvoiceData?.status === 'finalized' || existingInvoiceData?.status === 'paid' || existingInvoiceData?.status === 'received') && !isAdmin;
@@ -390,9 +388,9 @@ export default function AddInvoicePage() {
                   </div>
 
                   <div className="space-y-1.5">
-                      <Label className="text-[9px] font-black uppercase text-slate-400">PO / SO Reference</Label>
-                      <div className="bg-slate-50 px-3 py-2 rounded-md border border-slate-200 text-xs font-mono font-bold truncate">
-                          {activeIdentity?.poNumber} {(activeIdentity as any)?.salesOrder && `• ${(activeIdentity as any).salesOrder}`}
+                      <Label className="text-[9px] font-black uppercase text-slate-400">Ref PO / SO Hub</Label>
+                      <div className="bg-slate-50 dark:bg-slate-800 px-3 py-2 rounded-md border border-slate-200 text-xs font-mono font-bold truncate">
+                          {activeIdentity?.poNumber} {(activeIdentity?.salesOrder || (activeIdentity as any)?.soNumber || (activeIdentity as any)?.salesOrder) && `• ${activeIdentity?.salesOrder || (activeIdentity as any)?.soNumber || (activeIdentity as any)?.salesOrder}`}
                       </div>
                   </div>
 
@@ -403,7 +401,7 @@ export default function AddInvoicePage() {
                   </div>
 
                   <div className="space-y-1.5">
-                      <Label className="text-[9px] font-black uppercase text-slate-400">System Note</Label>
+                      <Label className="text-[9px] font-black uppercase text-slate-400">ERP Sync Reference</Label>
                       <Input value={internalNote} onChange={e => setInternalNote(e.target.value)} className="font-mono text-[10px] h-9" placeholder="Note..." disabled={isLocked} />
                   </div>
               </div>
@@ -485,12 +483,12 @@ export default function AddInvoicePage() {
                     <Popover open={productPopoverOpen} onOpenChange={setProductPopoverOpen}>
                         <PopoverTrigger asChild>
                             <Button variant="outline" size="sm" className="border-dashed h-8 text-[9px] font-black uppercase text-indigo-600" disabled={isLocked}>
-                                <Plus className="mr-2 h-3 w-3" /> Tambah Baris Manual
+                                <Plus className="mr-2 h-3 w-3" /> Tambah Baris Manual (Master Catalog)
                             </Button>
                         </PopoverTrigger>
                         <PopoverContent className="w-[400px] p-0 shadow-2xl" align="start">
                             <Command>
-                                <CommandInput placeholder="Cari Produk..." className="h-10" />
+                                <CommandInput placeholder="Cari Produk di Master Database..." className="h-10" />
                                 <CommandList>
                                     <CommandEmpty>Produk tidak ditemukan.</CommandEmpty>
                                     <CommandGroup>
@@ -566,7 +564,7 @@ export default function AddInvoicePage() {
 
               <div className="bg-blue-50/30 p-4 rounded-xl space-y-4 border border-blue-100">
                   <Label className="text-[9px] font-black uppercase text-blue-600 flex items-center gap-1.5">
-                    <CreditCard className="h-3.5 w-3.5" /> Payment & VA
+                    <CreditCard className="h-3.5 w-3.5" /> Payment Identity & VA
                   </Label>
                   <Select value={selectedVaId} onValueChange={setSelectedVaId} disabled={isLocked}>
                       <SelectTrigger className="h-9 text-xs font-bold bg-white">
