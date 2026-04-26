@@ -114,7 +114,6 @@ export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceDa
     const currentYearShort = format(now, 'yy');
     const currentYearLong = format(now, 'yyyy');
     
-    // Scan all existing documents for the absolute max number
     const allIds = [
         ...(allInvoiceNumbers?.map(inv => inv.id) || []),
         ...(existingInvoices?.map(inv => inv.id) || [])
@@ -123,11 +122,11 @@ export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceDa
     allIds.forEach(id => {
         let match;
         if (type === 'sar') {
-            // Regex tailored for SAR/25XXA
+            // Regex tailored for SAR/YY[Sequence]A (Contoh: SAR/2601A)
             const pattern = new RegExp(`SAR/${currentYearShort}(\\d+)A`);
             match = id.match(pattern);
         } else {
-            // Regex tailored for KW/XXXX/KEU/2025
+            // Regex tailored for KW/XXXX/KEU/YYYY
             const pattern = new RegExp(`KW/(\\d+)/KEU/${currentYearLong}`);
             match = id.match(pattern);
         }
@@ -142,6 +141,7 @@ export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceDa
     const baseNumber = !isNaN(userStart) ? Math.max(currentMax, userStart - 1) : currentMax;
     const nextNum = baseNumber + 1;
 
+    // SAR Manual menggunakan 2 digit sequence (01, 02, dst)
     return type === 'sar' 
         ? nextNum.toString().padStart(2, '0') 
         : nextNum.toString().padStart(4, '0');
@@ -166,6 +166,7 @@ export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceDa
 
   const handleManualSetup = (invoice: InvoiceNumber) => {
     const id = invoice.id;
+    // SAR/2601A Match
     const sarMatch = id.match(/^(SAR\/\d{2})(\d+)(A)$/);
     const kwMatch = id.match(/^(KW\/)(\d+)(\/KEU\/\d{4})$/);
 
