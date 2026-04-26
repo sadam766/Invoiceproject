@@ -22,14 +22,9 @@ import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { 
   Search, 
-  Eye, 
-  CheckCircle2, 
   FileSpreadsheet,
-  Database,
-  Hash,
   TrendingUp,
   ReceiptText,
-  AlertCircle,
   Scale,
   Tag,
   ArrowRightLeft,
@@ -46,11 +41,7 @@ import { exportToExcel } from '@/lib/utils';
 import { isBefore, parseISO, startOfToday, isWithinInterval, format } from 'date-fns';
 import { DateRangePicker } from '@/app/components/date-range-picker';
 import { cn } from '@/lib/utils';
-import {
-    Collapsible,
-    CollapsibleContent,
-    CollapsibleTrigger,
-} from '@/components/ui/collapsible';
+import * as React from 'react';
 
 type GlobalTrackRecord = {
   poNumber: string;
@@ -74,6 +65,7 @@ export default function SalesMonitoringPage() {
   const router = useRouter();
   const firestore = useFirestore();
   const [searchQuery, setSearchQuery] = useState('');
+  const [expandedPo, setExpandedPo] = useState<string | null>(null);
   const [dateRange, setDateRange] = useState<{ from: Date; to: Date }>({
     from: startOfToday(),
     to: startOfToday(),
@@ -301,10 +293,10 @@ export default function SalesMonitoringPage() {
                         const totalVar = item.priceVariance + item.volumeVariance;
                         const lossPercent = (Math.abs(Math.min(0, totalVar)) / (item.poAmount || 1)) * 100;
                         const isRedFlag = lossPercent > 10;
+                        const isExpanded = expandedPo === item.poNumber;
 
                         return (
-                        <Collapsible key={item.poNumber} asChild>
-                            <>
+                            <React.Fragment key={item.poNumber}>
                                 <TableRow className={cn("hover:bg-indigo-50/10 border-b last:border-0 transition-colors", isRedFlag && "bg-rose-50/20")}>
                                 <TableCell className="py-4">
                                     <div className="flex flex-col gap-1">
@@ -356,17 +348,20 @@ export default function SalesMonitoringPage() {
                                     </Badge>
                                 </TableCell>
                                 <TableCell className="text-right py-4">
-                                    <CollapsibleTrigger asChild>
-                                        <Button variant="ghost" size="icon" className="rounded-full hover:bg-indigo-50">
-                                            <ChevronDown className="h-4 w-4 text-slate-400" />
-                                        </Button>
-                                    </CollapsibleTrigger>
+                                    <Button 
+                                        variant="ghost" 
+                                        size="icon" 
+                                        className="rounded-full hover:bg-indigo-50"
+                                        onClick={() => setExpandedPo(isExpanded ? null : item.poNumber)}
+                                    >
+                                        <ChevronDown className={cn("h-4 w-4 text-slate-400 transition-transform duration-200", isExpanded && "rotate-180")} />
+                                    </Button>
                                 </TableCell>
                                 </TableRow>
 
-                                <CollapsibleContent asChild>
+                                {isExpanded && (
                                     <TableRow className="bg-slate-50/30 dark:bg-slate-900/30">
-                                        <TableCell colSpan={5} className="p-0">
+                                        <TableCell colSpan={5} className="p-0 border-b">
                                             <div className="p-6 space-y-4">
                                                 <div className="flex items-center gap-2 text-[10px] font-black uppercase text-slate-400 tracking-widest border-b pb-2">
                                                     <Tag className="h-3 w-3 text-indigo-600" /> Detail Variansi Per Item (Audit Trail)
@@ -424,9 +419,8 @@ export default function SalesMonitoringPage() {
                                             </div>
                                         </TableCell>
                                     </TableRow>
-                                </CollapsibleContent>
-                            </>
-                        </Collapsible>
+                                )}
+                            </React.Fragment>
                         );
                     })}
                     </TableBody>
