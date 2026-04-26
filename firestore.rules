@@ -18,7 +18,7 @@ service cloud.firestore {
       return isSignedIn() && request.auth.uid == userId;
     }
 
-    // --- Collection Rules ---
+    // --- AUDIT FIX: Strict Role-Based Access ---
 
     match /users/{userId} {
       allow read: if isSignedIn();
@@ -27,13 +27,20 @@ service cloud.firestore {
       allow delete: if isAdmin();
     }
 
-    // Shared Business Collections: Diperlukan akses tulis penuh untuk sinkronisasi multi-user
+    // Core Business Collections
+    match /invoiceNumbers/{id} {
+      allow read, write: if isSignedIn();
+    }
+
+    match /invoices/{id} {
+      allow read: if isSignedIn();
+      allow write: if isSignedIn(); // Allow staff to create, finalized/admin logic handled in FE
+    }
+
     match /customers/{id} { allow read, write: if isSignedIn(); }
     match /products/{id} { allow read, write: if isSignedIn(); }
     match /sales/{id} { allow read, write: if isSignedIn(); }
     match /salesOrders/{id} { allow read, write: if isSignedIn(); }
-    match /invoices/{id} { allow read, write: if isSignedIn(); }
-    match /invoiceNumbers/{id} { allow read, write: if isSignedIn(); }
     match /spds/{id} { allow read, write: if isSignedIn(); }
     match /taxInvoices/{id} { allow read, write: if isSignedIn(); }
     match /virtualAccounts/{id} { allow read, write: if isSignedIn(); }

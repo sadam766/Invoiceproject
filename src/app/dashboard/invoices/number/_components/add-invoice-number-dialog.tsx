@@ -91,14 +91,13 @@ export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceDa
     return Array.from(new Set(salesOrderListData.map(item => item.soNumber)))
   },[salesOrderListData]);
 
-  // LOGIKA GLOBAL AUTO-INCREMENT: Memindai seluruh database secara real-time (UNLIMITED DIGIT)
+  // AUDIT FIX: Unlimited sequence regex support (\d+)
   const generateNextNumber = (type: 'sar' | 'kw') => {
     let currentMax = 0;
     const now = new Date();
     const currentYearShort = format(now, 'yy');
     const currentYearLong = format(now, 'yyyy');
     
-    // Scan all database entries (Draft Identitas & Invoice Final)
     const allIds = [
         ...(allInvoiceNumbers?.map(inv => inv.id) || []),
         ...(existingInvoices?.map(inv => inv.id) || [])
@@ -106,14 +105,13 @@ export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceDa
 
     allIds.forEach(id => {
         let match;
+        const cleanId = id.replace(/_/g, '/');
         if (type === 'sar') {
-            // Pattern SAR/YY01(Digits)A - Mendukung digit tak terbatas
             const pattern = new RegExp(`SAR/${currentYearShort}01(\\d+)A`, 'i');
-            match = id.replace(/_/g, '/').match(pattern);
+            match = cleanId.match(pattern);
         } else {
-            // Pattern KW/(Digits)/KEU/YYYY
             const pattern = new RegExp(`KW/(\\d+)/KEU/${currentYearLong}`, 'i');
-            match = id.replace(/_/g, '/').match(pattern);
+            match = cleanId.match(pattern);
         }
 
         if (match && match[1]) {
@@ -123,7 +121,6 @@ export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceDa
     });
 
     const nextNum = currentMax + 1;
-    // Default pad 4 digit (0001), tapi akan melebar otomatis jika lebih besar
     return nextNum.toString().padStart(4, '0');
   };
   
@@ -202,7 +199,6 @@ export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceDa
       }
   }, [isOpen, invoiceData]);
 
-  // Real-time synchronization: Update suggestion when database changes
   useEffect(() => {
       if (isAutoNumber && !invoiceData && isOpen && numberSource === 'manual') {
           setupForAddMode(invoiceType);
@@ -211,7 +207,6 @@ export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceDa
 
   useEffect(() => {
     if (numberSource === 'manual') {
-        // Gabungkan prefix, urutan manual (tanpa batas digit), dan suffix
         setFullInvoiceNumber(`${prefix}${mainNumber}${suffix}`);
     } else {
         setFullInvoiceNumber(erpNumberInput);
@@ -245,7 +240,7 @@ export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceDa
 
     const finalInvoiceNumber = fullInvoiceNumber;
     
-    // Atomic Check: Pastikan nomor belum terpakai Admin lain saat tombol diklik
+    // AUDIT FIX: Atomic Duplicate Check
     const isTaken = [
         ...(allInvoiceNumbers?.map(inv => inv.id.replace(/\//g, '_')) || []),
         ...(existingInvoices?.map(inv => inv.id.replace(/\//g, '_')) || [])
@@ -254,10 +249,9 @@ export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceDa
     if (!invoiceData && isTaken) {
       toast({
         variant: "destructive",
-        title: "Nomor Faktur Duplikat",
-        description: `Nomor "${finalInvoiceNumber}" baru saja digunakan oleh admin lain.`,
+        title: "Nomor Faktur Terpakai",
+        description: `Nomor "${finalInvoiceNumber}" baru saja dipesan oleh admin lain.`,
       });
-      // Refresh urutan otomatis
       setupForAddMode(invoiceType);
       return; 
     }
@@ -281,8 +275,6 @@ export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceDa
     }
   }
 
-  const dialogTitle = invoiceData ? "Edit Identitas Penagihan" : "Registrasi Identitas Penagihan Baru";
-
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
       <DialogTrigger asChild>
@@ -292,13 +284,13 @@ export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceDa
       </DialogTrigger>
       <DialogContent className="sm:max-w-2xl">
         <DialogHeader>
-          <DialogTitle className="uppercase font-black tracking-tight">{dialogTitle}</DialogTitle>
+          <DialogTitle className="uppercase font-black tracking-tight">{invoiceData ? "Edit Identitas" : "Registrasi Identitas Baru"}</DialogTitle>
         </DialogHeader>
         <div className="grid gap-6 py-4 max-h-[70vh] overflow-y-auto pr-4">
           
           <div className="p-4 bg-muted/20 rounded-xl border border-dashed">
               <div className="flex items-center justify-between mb-4">
-                  <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Pilih Sumber Nomor (Identitas Tunggal)</Label>
+                  <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Sumber Nomor</Label>
                   <div className="flex bg-white rounded-md p-0.5 border shadow-sm">
                       <Button 
                         variant={numberSource === 'manual' ? 'default' : 'ghost'} 
@@ -306,7 +298,7 @@ export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceDa
                         className="h-7 text-[9px] font-black uppercase"
                         onClick={() => setNumberSource('manual')}
                       >
-                          <Hash className="h-3 w-3 mr-1" /> Otomatis Manual (SAR/KW)
+                          <Hash className="h-3 w-3 mr-1" /> SAR/KW Manual
                       </Button>
                       <Button 
                         variant={numberSource === 'erp' ? 'default' : 'ghost'} 
@@ -314,7 +306,7 @@ export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceDa
                         className="h-7 text-[9px] font-black uppercase"
                         onClick={() => setNumberSource('erp')}
                       >
-                          <Database className="h-3 w-3 mr-1" /> Input ERP Pusat
+                          <Database className="h-3 w-3 mr-1" /> ERP Pusat
                       </Button>
                   </div>
               </div>
@@ -330,7 +322,7 @@ export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceDa
                                 className="flex-1 h-8 text-[10px] font-bold uppercase"
                                 disabled={!!invoiceData}
                             >
-                                SAR (Tagihan Barang)
+                                SAR (Tagihan)
                             </Button>
                             <Button
                                 variant={invoiceType === 'kw' ? 'default' : 'ghost'}
@@ -338,40 +330,38 @@ export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceDa
                                 className="flex-1 h-8 text-[10px] font-bold uppercase"
                                 disabled={!!invoiceData}
                             >
-                                KW (DP / Proforma)
+                                KW (DP)
                             </Button>
                         </div>
                       </div>
 
                       <div className="space-y-2">
-                        <Label className="text-[10px] font-black uppercase text-muted-foreground">Konfigurasi Penomoran (Unlimited Sequence)</Label>
-                        <div className="flex items-center gap-4 mb-2">
-                            <div className="flex items-center space-x-2">
-                              <Checkbox id="auto-number" checked={isAutoNumber} onCheckedChange={(checked) => setIsAutoNumber(!!checked)} />
-                              <Label htmlFor="auto-number" className="text-xs font-bold uppercase cursor-pointer">Gunakan Nomor Urut Sistem</Label>
-                            </div>
+                        <Label className="text-[10px] font-black uppercase text-muted-foreground">Input Nomor (Unlimited Digit)</Label>
+                        <div className="flex items-center space-x-2 mb-2">
+                            <Checkbox id="auto-number" checked={isAutoNumber} onCheckedChange={(checked) => setIsAutoNumber(!!checked)} />
+                            <Label htmlFor="auto-number" className="text-xs font-bold uppercase">Lanjutkan Otomatis</Label>
                         </div>
                         <div className="grid grid-cols-[auto_1fr_auto] items-center gap-2">
-                          <div className="bg-indigo-50 px-3 py-2 rounded-md border border-indigo-100 text-xs font-black text-indigo-700 font-mono" title="Prefix Locked">{prefix}</div>
+                          <div className="bg-indigo-50 px-3 py-2 rounded-md border border-indigo-100 text-xs font-black text-indigo-700 font-mono">{prefix}</div>
                           <Input 
                             placeholder="0001"
-                            className="h-10 font-black text-center text-lg tracking-widest bg-white border-indigo-200 shadow-inner"
+                            className="h-10 font-black text-center text-lg tracking-widest bg-white border-indigo-200"
                             value={mainNumber}
                             onChange={(e) => {
                                 setMainNumber(e.target.value.replace(/[^0-9]/g, ''));
-                                setIsAutoNumber(false); // Otomatis matikan auto jika user edit manual
+                                setIsAutoNumber(false);
                             }}
                           />
-                          <div className="bg-indigo-50 px-3 py-2 rounded-md border border-indigo-100 text-xs font-black text-indigo-700 font-mono" title="Suffix Locked">{suffix}</div>
+                          <div className="bg-indigo-50 px-3 py-2 rounded-md border border-indigo-100 text-xs font-black text-indigo-700 font-mono">{suffix}</div>
                         </div>
                         <div className="bg-blue-50 p-2 rounded border border-blue-100 mt-2">
-                             <p className="text-[9px] font-black text-blue-700 uppercase tracking-tight">Pratinjau Hasil: <span className="underline font-mono">{fullInvoiceNumber}</span></p>
+                             <p className="text-[9px] font-black text-blue-700 uppercase">Preview: <span className="underline font-mono">{fullInvoiceNumber}</span></p>
                         </div>
                       </div>
                   </div>
               ) : (
                   <div className="space-y-2">
-                      <Label className="text-[10px] font-black uppercase text-muted-foreground">Nomor ERP Resmi (Sistem Pusat)</Label>
+                      <Label className="text-[10px] font-black uppercase text-muted-foreground">Nomor ERP (Pusat)</Label>
                       <Input 
                         value={erpNumberInput} 
                         onChange={e => setErpNumberInput(e.target.value)} 
@@ -383,25 +373,18 @@ export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceDa
           </div>
 
            <div className="space-y-2">
-            <Label htmlFor="sales-order" className="text-[10px] font-black uppercase text-muted-foreground">Sales Order / SO Asal</Label>
+            <Label className="text-[10px] font-black uppercase text-muted-foreground">Sales Order Asal</Label>
             <Popover open={soPopoverOpen} onOpenChange={setSoPopoverOpen}>
                 <PopoverTrigger asChild>
-                    <Button
-                    variant="outline"
-                    role="combobox"
-                    aria-expanded={soPopoverOpen}
-                    className="w-full justify-between h-10 font-bold border-indigo-100"
-                    >
-                    {salesOrder
-                        ? uniqueSalesOrders.find((so) => so === salesOrder)
-                        : "Cari Nomor SO..."}
-                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                    <Button variant="outline" className="w-full justify-between h-10 font-bold border-indigo-100">
+                    {salesOrder || "Cari Nomor SO..."}
+                    <ChevronsUpDown className="ml-2 h-4 w-4 opacity-50" />
                     </Button>
                 </PopoverTrigger>
-                <PopoverContent className="w-[500px] p-0 shadow-2xl border-indigo-200 overflow-hidden">
+                <PopoverContent className="w-[500px] p-0 shadow-2xl">
                     <Command>
-                    <CommandInput placeholder="Cari No. SO atau Customer..." className="h-11" />
-                    <CommandList className="max-h-[300px]">
+                    <CommandInput placeholder="Cari No. SO..." className="h-11" />
+                    <CommandList>
                       <CommandEmpty />
                       <CommandGroup>
                           {salesOrderListData?.map((so, idx) => (
@@ -409,16 +392,11 @@ export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceDa
                               key={`${so.soNumber}-${idx}`}
                               value={`${so.soNumber}|${so.customer}`}
                               onSelect={handleSalesOrderSelect}
-                              className="flex flex-col items-start gap-1 p-3 border-b last:border-0"
+                              className="p-3 border-b"
                           >
-                              <div className="flex items-center justify-between w-full">
+                              <div className="flex flex-col">
                                 <span className="font-black text-indigo-700">{so.soNumber}</span>
-                                <Check className={cn("h-4 w-4", salesOrder === so.soNumber ? "opacity-100" : "opacity-0")} />
-                              </div>
-                              <div className="flex items-center gap-2 text-[10px] font-bold text-muted-foreground uppercase">
-                                  <span>{so.customer}</span>
-                                  <span>•</span>
-                                  <span>PO: {so.poNumber}</span>
+                                <span className="text-[10px] font-bold text-muted-foreground uppercase">{so.customer} • PO: {so.poNumber}</span>
                               </div>
                           </CommandItem>
                           ))}
@@ -431,9 +409,8 @@ export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceDa
 
           <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="po-number" className="text-[10px] font-black uppercase text-muted-foreground">Nomor PO Customer</Label>
+                <Label className="text-[10px] font-black uppercase text-muted-foreground">PO Customer</Label>
                 <Input 
-                    id="po-number" 
                     value={poNumber} 
                     onChange={e => setPoNumber(e.target.value)} 
                     placeholder="PO-ABC-2024" 
@@ -442,48 +419,31 @@ export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceDa
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="date" className="text-[10px] font-black uppercase text-muted-foreground">Tanggal Registrasi</Label>
+                <Label className="text-[10px] font-black uppercase text-muted-foreground">Tgl Registrasi</Label>
                  <Popover>
                   <PopoverTrigger asChild>
-                    <Button
-                      variant={'outline'}
-                      className={cn(
-                        'w-full justify-start text-left font-bold h-10',
-                        !date && 'text-muted-foreground'
-                      )}
-                    >
+                    <Button variant={'outline'} className="w-full justify-start text-left font-bold h-10">
                       <CalendarIcon className="mr-2 h-4 w-4 text-indigo-600" />
                       {date ? format(date, 'dd/MM/yyyy') : <span>Pilih Tanggal</span>}
                     </Button>
                   </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0 shadow-xl border-indigo-100">
-                    <Calendar
-                      mode="single"
-                      selected={date}
-                      onSelect={setDate}
-                      initialFocus
-                    />
+                  <PopoverContent className="w-auto p-0">
+                    <Calendar mode="single" selected={date} onSelect={setDate} initialFocus />
                   </PopoverContent>
                 </Popover>
               </div>
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="customer" className="text-[10px] font-black uppercase text-muted-foreground">Nama Pelanggan (PT/CV)</Label>
+            <Label className="text-[10px] font-black uppercase text-muted-foreground">Pelanggan (PT/CV)</Label>
             <Popover open={customerPopoverOpen} onOpenChange={setCustomerPopoverOpen}>
                 <PopoverTrigger asChild>
-                    <Button
-                    variant="outline"
-                    role="combobox"
-                    aria-expanded={customerPopoverOpen}
-                    className="w-full justify-between h-10 font-black uppercase border-indigo-100"
-                    disabled={!!salesOrder}
-                    >
-                    {customer ? customer : "Pilih Pelanggan..."}
-                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                    <Button variant="outline" className="w-full justify-between h-10 font-black uppercase border-indigo-100" disabled={!!salesOrder}>
+                    {customer || "Pilih Pelanggan..."}
+                    <ChevronsUpDown className="ml-2 h-4 w-4 opacity-50" />
                     </Button>
                 </PopoverTrigger>
-                <PopoverContent className="w-[500px] p-0 shadow-2xl border-indigo-200" align="start">
+                <PopoverContent className="w-[500px] p-0 shadow-2xl" align="start">
                     <Command>
                     <CommandInput placeholder="Cari pelanggan..." className="h-11" />
                      <CommandList>
@@ -498,12 +458,9 @@ export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceDa
                                     setCustomer(name);
                                     setCustomerPopoverOpen(false);
                                 }}
-                                className="flex flex-col items-start gap-1 p-3 border-b last:border-0"
+                                className="p-3 border-b"
                             >
-                                <div className="flex items-center justify-between w-full">
-                                  <span className="font-bold text-slate-800 uppercase">{c.name}</span>
-                                  <Check className={cn("h-4 w-4", customer === c.name ? "opacity-100" : "opacity-0")} />
-                                </div>
+                                <span className="font-bold text-slate-800 uppercase">{c.name}</span>
                             </CommandItem>
                             ))}
                         </CommandGroup>
@@ -515,12 +472,12 @@ export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceDa
         </div>
         
         <div className="pt-6 border-t flex justify-end gap-3 bg-muted/10 -mx-6 -mb-6 p-6">
-          <Button variant="ghost" onClick={() => onOpenChange(false)} className="font-bold uppercase text-xs" disabled={isSaving}>Batal</Button>
-          <Button variant="outline" onClick={() => handleSave('save')} className="font-bold uppercase text-xs border-indigo-200 text-indigo-700" disabled={isSaving || !fullInvoiceNumber}>
+          <Button variant="ghost" onClick={() => onOpenChange(false)} disabled={isSaving}>Batal</Button>
+          <Button variant="outline" onClick={() => handleSave('save')} className="border-indigo-200 text-indigo-700" disabled={isSaving || !fullInvoiceNumber}>
             {isSaving ? "Syncing..." : "Simpan Identitas"}
           </Button>
-          <Button type="button" onClick={() => handleSave('create')} className="bg-indigo-600 hover:bg-indigo-700 font-black uppercase text-xs px-8 shadow-lg" disabled={isSaving || !fullInvoiceNumber}>
-              <FilePlus className="mr-2 h-4 w-4" /> {isSaving ? "Locking Number..." : "Buka Constructor"}
+          <Button type="button" onClick={() => handleSave('create')} className="bg-indigo-600 hover:bg-indigo-700 font-black" disabled={isSaving || !fullInvoiceNumber}>
+              <FilePlus className="mr-2 h-4 w-4" /> {isSaving ? "Locking..." : "Buka Constructor"}
           </Button>
         </div>
       </DialogContent>
