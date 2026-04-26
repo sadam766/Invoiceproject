@@ -7,13 +7,13 @@ service cloud.firestore {
       return request.auth != null;
     }
 
-    // PENGUATAN: isAdmin sekarang lebih toleran terhadap email unverified dan memverifikasi role dari dokumen user
+    // isAdmin: Memverifikasi otoritas leader atau administrator
     function isAdmin() {
       return isSignedIn() && (
-        (request.auth.token.email != null && request.auth.token.email.toLowerCase() == 'fa@gmail.com') ||
+        (request.auth.token.email != null && request.auth.token.email == 'fa@gmail.com') ||
         (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && (
           get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin' ||
-          get(/databases/$(database)/documents/users/$(request.auth.uid)).data.email.toLowerCase() == 'fa@gmail.com'
+          get(/databases/$(database)/documents/users/$(request.auth.uid)).data.email == 'fa@gmail.com'
         ))
       );
     }
@@ -22,7 +22,7 @@ service cloud.firestore {
       return isSignedIn() && request.auth.uid == userId;
     }
 
-    // --- AUDIT FIX: Strict Role-Based Access ---
+    // --- Role-Based Access Control ---
 
     match /users/{userId} {
       allow read: if isSignedIn();
@@ -44,7 +44,7 @@ service cloud.firestore {
     match /customers/{id} { allow read, write: if isSignedIn(); }
     match /products/{id} { allow read, write: if isSignedIn(); }
     
-    // AUDIT FIX: Restrict hard delete to leaders only
+    // Sales: Izin hapus dibatasi khusus untuk Leader/Admin
     match /sales/{id} { 
       allow read, create, update: if isSignedIn(); 
       allow delete: if isAdmin(); 
