@@ -45,9 +45,11 @@ import {
   AlertTriangle,
   History,
   Tag,
-  MessageSquare
+  MessageSquare,
+  CreditCard,
+  Eye
 } from 'lucide-react';
-import { type Invoice, type SalesOrder, type UserProfile, type Customer, type InvoiceItem, type InvoiceNumber } from '@/app/lib/data';
+import { type Invoice, type SalesOrder, type UserProfile, type Customer, type InvoiceItem, type InvoiceNumber, type VirtualAccount } from '@/app/lib/data';
 import { useToast } from '@/hooks/use-toast';
 import { useFirestore, useCollection, useMemoFirebase, useUser, useDoc, errorEmitter, FirestorePermissionError } from '@/firebase';
 import { collection, query, doc, setDoc, arrayUnion } from 'firebase/firestore';
@@ -89,6 +91,9 @@ export default function AddInvoicePage() {
   const customersCollection = useMemoFirebase(() => firestore ? query(collection(firestore, 'customers')) : null, [firestore]);
   const { data: customerListData } = useCollection<Customer>(customersCollection);
 
+  const vaCollection = useMemoFirebase(() => firestore ? query(collection(firestore, 'virtualAccounts')) : null, [firestore]);
+  const { data: allVas } = useCollection<VirtualAccount>(vaCollection);
+
   // --- FORM STATES ---
   const [items, setItems] = useState<InvoiceItem[]>([]);
   const [billingAddress, setBillingAddress] = useState('');
@@ -98,6 +103,7 @@ export default function AddInvoicePage() {
   const [dueDate, setDueDate] = useState<Date>(addDays(new Date(), 30));
   const [isDpInvoice, setIsDpInvoice] = useState(false);
   const [isOverBillingAllowed, setIsOverBillingAllowed] = useState(false);
+  const [selectedVaId, setSelectedVaId] = useState<string>('manual');
 
   // --- CALCULATION STATES ---
   const [subtotal, setSubtotal] = useState(0);
@@ -129,7 +135,14 @@ export default function AddInvoicePage() {
     return Math.max(0, totalDpInvoiced - totalDpUsed);
   }, [allInvoices, identityData]);
 
-  // RELAXED REDIRECT: Ensure we only redirect if we've explicitly finished loading and have no data
+  // Available VAs for current customer
+  const availableVas = useMemo(() => {
+    const activeIdentity = existingInvoiceData || identityData;
+    if (!allVas || !activeIdentity) return [];
+    return allVas.filter(va => va.customerName === activeIdentity.customer);
+  }, [allVas, existingInvoiceData, identityData]);
+
+  // RELAXED REDIRECT
   useEffect(() => {
       const isInitialLoad = (invoiceNumberIdParam && isIdentityLoading) || (editInvoiceId && isExistingLoading);
       if (!isInitialLoad && !identityData && !existingInvoiceData && !editInvoiceId && !invoiceNumberIdParam) {
@@ -181,6 +194,9 @@ export default function AddInvoicePage() {
           setDpValue(existingInvoiceData.dpValue || 0);
           setDpDeductionValue(existingInvoiceData.dpDeduction || 0);
           setRetentionValue(existingInvoiceData.retention || 0);
+          if (existingInvoiceData.paymentMethod) {
+            setSelectedVaId(existingInvoiceData.paymentMethod);
+          }
       }
   }, [identityData, customerListData, allSoItems, editInvoiceId, allInvoices, existingInvoiceData]);
 
@@ -222,7 +238,7 @@ export default function AddInvoicePage() {
     setTotalAmount(formatNumberWithCommas(grand));
   }, [items, negotiationValue, negotiationMode, dpValue, dpMode, retentionValue, retentionMode, dpDeductionValue, dpDeductionMode, isTaxManual, dppVat, vat12, isDpInvoice, dpBalance, toast]);
 
-  const handleSaveInvoice = async (invoiceStatus: any = 'sent') => {
+  const handleSaveInvoice = async (invoiceStatus: any = 'sent', redirectToPreview = false) => {
     const activeIdentity = existingInvoiceData || identityData;
     if (!firestore || !user || !activeIdentity) return;
 
@@ -280,6 +296,7 @@ export default function AddInvoicePage() {
         dpValue: parseFormattedNumber(String(dpValue)),
         dpDeduction: parseFormattedNumber(String(dpDeductionValue)),
         retention: parseFormattedNumber(String(retentionValue)),
+        paymentMethod: selectedVaId,
         items: items,
         lastUpdatedAt: timestamp,
         lastUpdatedBy: updater,
@@ -293,7 +310,31 @@ export default function AddInvoicePage() {
     setDoc(invoiceDocRef, dataToSave, { merge: true })
         .then(() => {
             toast({ title: "Invoice Berhasil Disimpan" });
-            router.push('/dashboard/invoices');
+            if (redirectToPreview) {
+                // Prepare session storage for immediate preview feel
+                const previewData = {
+                  id: activeIdentity.id,
+                  erpInvoiceId: internalNote,
+                  items: items.map((it, idx) => ({ ...it, no: idx + 1 })),
+                  customer: { name: activeIdentity.customer, address: billingAddress, npwp: billingNpwp },
+                  date: format(issueDate, 'yyyy-MM-dd'),
+                  soNumber: (activeIdentity as any).soNumber || (activeIdentity as any).salesOrder || '',
+                  poNumber: activeIdentity.poNumber || '',
+                  grandTotal: parseFormattedNumber(String(totalAmount)),
+                  subtotal: subtotal,
+                  dppVat: parseFormattedNumber(String(dppVat)),
+                  vat12: parseFormattedNumber(String(vat12)),
+                  paymentTerms: '30 Days',
+                  printType: 'original',
+                  negotiation: parseFormattedNumber(String(negotiationValue)),
+                  dpValue: isDpInvoice ? parseFormattedNumber(String(dpValue)) : (parseFormattedNumber(String(dpDeductionValue)) + parseFormattedNumber(String(retentionValue))),
+                  virtualAccount: selectedVaId !== 'manual' ? availableVas.find(v => v.id === selectedVaId) : undefined
+                };
+                sessionStorage.setItem('invoicePreviewData', JSON.stringify(previewData));
+                router.push(`/dashboard/invoices/preview/${encodeURIComponent(activeIdentity.id)}`);
+            } else {
+                router.push('/dashboard/invoices');
+            }
         })
         .catch(err => {
             errorEmitter.emit('permission-error', new FirestorePermissionError({
@@ -588,6 +629,33 @@ export default function AddInvoicePage() {
                 </div>
               </div>
 
+              {/* Payment Identity & VA Selection */}
+              <div className="bg-blue-50/30 dark:bg-blue-900/10 p-4 rounded-xl space-y-4 border border-blue-100 dark:border-blue-900/50">
+                  <div className="flex justify-between items-center">
+                      <Label className="text-[9px] font-black uppercase text-blue-600 tracking-widest flex items-center gap-1.5">
+                        <CreditCard className="h-3.5 w-3.5" /> Payment Identity & VA
+                      </Label>
+                  </div>
+                  <div className="space-y-2">
+                    <Select value={selectedVaId} onValueChange={setSelectedVaId} disabled={isLocked}>
+                        <SelectTrigger className="h-9 text-xs font-bold bg-white dark:bg-slate-900">
+                            <SelectValue placeholder="Pilih Akun Pembayaran..." />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value="manual">Rekening Utama (Standard)</SelectItem>
+                            {availableVas.map(va => (
+                                <SelectItem key={va.id} value={va.id!}>{va.bankName} - {va.vaNumber}</SelectItem>
+                            ))}
+                        </SelectContent>
+                    </Select>
+                    {selectedVaId !== 'manual' && (
+                        <div className="bg-white/50 dark:bg-black/20 p-2 rounded-lg text-[10px] font-bold text-blue-700 italic border border-blue-100">
+                             Ditujukan ke VA: {availableVas.find(v => v.id === selectedVaId)?.vaNumber}
+                        </div>
+                    )}
+                  </div>
+              </div>
+
               <div className="bg-slate-50 dark:bg-slate-800/30 p-4 rounded-xl space-y-4 border border-slate-100 dark:border-slate-800">
                 <div className="flex justify-between items-center">
                     <Label className="text-[9px] font-black uppercase text-indigo-600 tracking-widest">Manual Tax Override (VAT)</Label>
@@ -612,9 +680,14 @@ export default function AddInvoicePage() {
 
               <div className="space-y-3 pt-4">
                   {!isLocked && (
-                      <Button className="w-full h-11 bg-indigo-600 hover:bg-indigo-700 font-black uppercase shadow-lg text-white tracking-widest" onClick={() => handleSaveInvoice('sent')}>
-                        <Send className="mr-2 h-4 w-4" /> SIMPAN & TERBITKAN
-                      </Button>
+                      <>
+                        <Button className="w-full h-11 bg-indigo-600 hover:bg-indigo-700 font-black uppercase shadow-lg text-white tracking-widest" onClick={() => handleSaveInvoice('sent', true)}>
+                          <Eye className="mr-2 h-4 w-4" /> SIMPAN & PRATINJAU
+                        </Button>
+                        <Button variant="ghost" className="w-full text-[10px] font-black uppercase text-slate-400" onClick={() => handleSaveInvoice('sent')}>
+                          Hanya Simpan (Draft)
+                        </Button>
+                      </>
                   )}
                   {isAdmin && existingInvoiceData?.status !== 'finalized' && existingInvoiceData?.status !== 'paid' && (
                       <Button variant="outline" className="w-full h-11 border-indigo-600 text-indigo-600 font-black uppercase text-[10px] tracking-widest hover:bg-indigo-50" onClick={() => handleSaveInvoice('finalized')}>

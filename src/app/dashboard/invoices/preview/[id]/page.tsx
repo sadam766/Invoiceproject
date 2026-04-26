@@ -1,11 +1,14 @@
 'use client';
 import React, { useRef, useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useParams } from 'next/navigation';
 import { Download, Upload, ArrowLeft, Cpu } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { exportToExcel, parseFormattedNumber } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
+import { useFirestore, useDoc, useMemoFirebase } from '@/firebase';
+import { doc } from 'firebase/firestore';
 import html2pdf from 'html2pdf.js';
+import type { Invoice, VirtualAccount } from '@/app/lib/data';
 
 // --- DEFINISI TIPE DATA ---
 interface Item {
@@ -73,19 +76,65 @@ const InvoicePreviewPage = () => {
     const [invoiceData, setInvoiceData] = useState<InvoiceData | null>(null);
     const { toast } = useToast();
     const router = useRouter();
+    const params = useParams();
+    const firestore = useFirestore();
+    const invoiceIdParam = decodeURIComponent(params.id as string).replace(/\//g, '_');
+
+    // Firestore Fetching for fallback
+    const invoiceRef = useMemoFirebase(() => (!firestore || !invoiceIdParam) ? null : doc(firestore, 'invoices', invoiceIdParam), [firestore, invoiceIdParam]);
+    const { data: dbInvoice, isLoading: isDbLoading } = useDoc<Invoice>(invoiceRef);
 
     useEffect(() => {
+        // Try session storage first for immediate load
         try {
             const dataFromSession = sessionStorage.getItem('invoicePreviewData');
             if (dataFromSession) {
                 const parsedData = JSON.parse(dataFromSession);
-                setInvoiceData(parsedData);
+                if (parsedData.id.replace(/\//g, '_') === invoiceIdParam) {
+                    setInvoiceData(parsedData);
+                    return;
+                }
             }
         } catch (error) {
-            console.error("Failed to load or parse invoice data:", error);
-            setInvoiceData(null);
+            console.error("Failed to load session data:", error);
         }
-    }, []);
+
+        // If DB data is available, use it as fallback
+        if (dbInvoice && !isDbLoading) {
+            const mappedData: InvoiceData = {
+                id: dbInvoice.id,
+                erpInvoiceId: dbInvoice.erpInvoiceId,
+                items: (dbInvoice.items || []).map((it, idx) => ({
+                    id: String(it.id),
+                    no: idx + 1,
+                    name: it.name,
+                    quantity: it.quantity,
+                    unit: it.unit,
+                    price: it.price,
+                    total: it.total
+                })),
+                customer: {
+                    name: dbInvoice.customer,
+                    address: dbInvoice.billingAddress,
+                    npwp: dbInvoice.billingNpwp
+                },
+                date: dbInvoice.date,
+                soNumber: dbInvoice.soNumber,
+                poNumber: dbInvoice.poNumber,
+                grandTotal: dbInvoice.amount,
+                subtotal: (dbInvoice.items || []).reduce((s, i) => s + i.total, 0),
+                dppVat: dbInvoice.amount / 1.12, // Approximation if not stored
+                vat12: dbInvoice.amount - (dbInvoice.amount / 1.12),
+                paymentTerms: '30 Days',
+                printType: 'original',
+                negotiation: dbInvoice.negotiation || 0,
+                dpValue: dbInvoice.isDpInvoice ? dbInvoice.amount : (dbInvoice.dpDeduction || 0),
+                pelunasan: 0,
+                // Virtual account would need another fetch, but usually stored in preview data
+            };
+            setInvoiceData(mappedData);
+        }
+    }, [dbInvoice, isDbLoading, invoiceIdParam]);
 
     const handleDownloadPdf = () => {
         const element = invoiceContainerRef.current;
@@ -128,7 +177,14 @@ const InvoicePreviewPage = () => {
     };
     
     if (!invoiceData) {
-        return <div className="p-8 text-center font-bold animate-pulse">Loading invoice preview...</div>;
+        return (
+            <div className="flex flex-col items-center justify-center h-[80vh] gap-4">
+                <div className="h-10 w-10 animate-spin rounded-full border-4 border-primary border-t-transparent" />
+                <div className="text-center font-bold text-slate-400 uppercase tracking-widest animate-pulse">
+                    Menganalisa Data Dokumen...
+                </div>
+            </div>
+        );
     }
 
     const {
@@ -157,7 +213,6 @@ const InvoicePreviewPage = () => {
     );
     const totalPages = itemChunks.length;
     
-    const totalRp = grandTotal; // Use the passed grandTotal for accuracy
     const invoiceTitle = invoiceId.startsWith('KW') ? 'PROFORMA INVOICE' : 'INVOICE/OFFICIAL RECEIPT';
 
     return (
@@ -266,7 +321,7 @@ const InvoicePreviewPage = () => {
                                                 <span className="text-right">{formatCurrency(vat12)}</span>
                                                 
                                                 <span className="font-bold border-t border-black mt-1">TOTAL Rp:</span>
-                                                <span className="font-bold border-t border-black mt-1 text-right">{formatCurrency(totalRp)}</span>
+                                                <span className="font-bold border-t border-black mt-1 text-right">{formatCurrency(grandTotal)}</span>
                                             </div>
                                         </div>
                                     </div>
