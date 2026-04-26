@@ -10,7 +10,7 @@ import {
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Plus, Calendar as CalendarIcon, Check, ChevronsUpDown, Database, Hash, FilePlus, Info, Search, AlertTriangle } from 'lucide-react';
+import { Plus, Calendar as CalendarIcon, Check, ChevronsUpDown, Database, Hash, FilePlus, Info, Search, AlertTriangle, Layers } from 'lucide-react';
 import { Checkbox } from '@/components/ui/checkbox';
 import {
   Popover,
@@ -95,12 +95,7 @@ export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceDa
   }, [firestore]);
   const { data: existingInvoices } = useCollection<Invoice>(invoicesCollection);
 
-  const uniqueSalesOrders = useMemo(() => {
-    if (!salesOrderListData) return [];
-    return Array.from(new Set(salesOrderListData.map(item => item.soNumber)))
-  },[salesOrderListData]);
-
-  // TRIGGER: PO Data Fetcher (Logic 1)
+  // TRIGGER: "The Golden Key" Fetcher (Logic 1)
   useEffect(() => {
     if (!poNumber || !masterSalesList || invoiceData) return;
 
@@ -264,21 +259,6 @@ export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceDa
 
     const finalInvoiceNumber = fullInvoiceNumber;
     
-    const isTaken = [
-        ...(allInvoiceNumbers?.map(inv => inv.id.replace(/\//g, '_')) || []),
-        ...(existingInvoices?.map(inv => inv.id.replace(/\//g, '_')) || [])
-    ].includes(finalInvoiceNumber.replace(/\//g, '_'));
-
-    if (!invoiceData && isTaken) {
-      toast({
-        variant: "destructive",
-        title: "Nomor Faktur Terpakai",
-        description: `Nomor "${finalInvoiceNumber}" baru saja dipesan oleh admin lain.`,
-      });
-      setupForAddMode(invoiceType);
-      return; 
-    }
-
     setIsSaving(true);
     try {
         const formattedDate = date ? format(date, 'dd/MM/yyyy') : '';
@@ -297,6 +277,11 @@ export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceDa
         setIsSaving(false);
     }
   }
+
+  const previousInvoicesCount = useMemo(() => {
+    if (!poNumber || !existingInvoices) return 0;
+    return existingInvoices.filter(inv => inv.poNumber === poNumber && inv.status !== 'cancelled').length;
+  }, [poNumber, existingInvoices]);
 
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
@@ -345,7 +330,7 @@ export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceDa
                                 className="flex-1 h-8 text-[10px] font-bold uppercase"
                                 disabled={!!invoiceData}
                             >
-                                SAR (Tagihan)
+                                SAR (Tagihan Progress)
                             </Button>
                             <Button
                                 variant={invoiceType === 'kw' ? 'default' : 'ghost'}
@@ -353,13 +338,13 @@ export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceDa
                                 className="flex-1 h-8 text-[10px] font-bold uppercase"
                                 disabled={!!invoiceData}
                             >
-                                KW (DP)
+                                KW (Uang Muka/DP)
                             </Button>
                         </div>
                       </div>
 
                       <div className="space-y-2">
-                        <Label className="text-[10px] font-black uppercase text-muted-foreground">Input Nomor (Unlimited Digit)</Label>
+                        <Label className="text-[10px] font-black uppercase text-muted-foreground">Konfigurasi Nomor Faktur</Label>
                         <div className="flex items-center space-x-2 mb-2">
                             <Checkbox id="auto-number" checked={isAutoNumber} onCheckedChange={(checked) => setIsAutoNumber(!!checked)} />
                             <Label htmlFor="auto-number" className="text-xs font-bold uppercase">Lanjutkan Otomatis</Label>
@@ -377,9 +362,6 @@ export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceDa
                           />
                           <div className="bg-indigo-50 px-3 py-2 rounded-md border border-indigo-100 text-xs font-black text-indigo-700 font-mono">{suffix}</div>
                         </div>
-                        <div className="bg-blue-50 p-2 rounded border border-blue-100 mt-2">
-                             <p className="text-[9px] font-black text-blue-700 uppercase">Preview: <span className="underline font-mono">{fullInvoiceNumber}</span></p>
-                        </div>
                       </div>
                   </div>
               ) : (
@@ -388,7 +370,7 @@ export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceDa
                       <Input 
                         value={erpNumberInput} 
                         onChange={e => setErpNumberInput(e.target.value)} 
-                        placeholder="Contoh: ERPSAR/2600000" 
+                        placeholder="ERPSAR/2600000" 
                         className="h-12 font-black text-indigo-700 bg-white text-lg border-2 border-indigo-200"
                       />
                   </div>
@@ -397,7 +379,7 @@ export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceDa
 
            <div className="space-y-2">
             <div className="flex justify-between items-center">
-                <Label className="text-[10px] font-black uppercase text-muted-foreground">Opsi A: Tarik Data dari Sales Order</Label>
+                <Label className="text-[10px] font-black uppercase text-muted-foreground">Opsi A: Tarik Data dari Sales Order (ERP)</Label>
                 <Badge variant="outline" className="text-[8px] bg-blue-50 text-blue-600 font-black border-blue-100">Recommended</Badge>
             </div>
             <Popover open={soPopoverOpen} onOpenChange={setSoPopoverOpen}>
@@ -431,22 +413,21 @@ export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceDa
                     </Command>
                 </PopoverContent>
             </Popover>
-            <p className="text-[9px] text-muted-foreground italic">Menarik data Customer & PO secara otomatis untuk meminimalisir kesalahan ketik.</p>
           </div>
 
           <div className="grid grid-cols-2 gap-4 pt-2 border-t">
               <div className="space-y-2">
-                <Label className="text-[10px] font-black uppercase text-muted-foreground">PO Customer (Opsi B: Manual)</Label>
+                <Label className="text-[10px] font-black uppercase text-muted-foreground">Golden Key: PO Number (Hybrid)</Label>
                 <Input 
                     value={poNumber} 
                     onChange={e => setPoNumber(e.target.value)} 
                     placeholder="PO-ABC-2024" 
-                    className="font-bold bg-background"
+                    className="font-bold bg-background border-indigo-300"
                 />
-                {poNumber && existingInvoices?.some(inv => inv.poNumber === poNumber) && (
-                    <div className="flex items-center gap-2 bg-amber-50 p-2 rounded border border-amber-200 mt-1">
-                        <AlertTriangle className="h-3 w-3 text-amber-600" />
-                        <span className="text-[9px] font-bold text-amber-700 uppercase">Peringatan: Invoice untuk PO ini sudah pernah terbit sebelumnya.</span>
+                {previousInvoicesCount > 0 && (
+                    <div className="flex items-center gap-2 bg-blue-50 p-2 rounded border border-blue-200 mt-1">
+                        <Layers className="h-3 w-3 text-blue-600" />
+                        <span className="text-[9px] font-bold text-blue-700 uppercase">PO ini memiliki {previousInvoicesCount} invoice aktif. Saldo DP akan otomatis tersinkron.</span>
                     </div>
                 )}
               </div>
@@ -467,7 +448,7 @@ export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceDa
           </div>
 
           <div className="space-y-2">
-            <Label className="text-[10px] font-black uppercase text-muted-foreground">Pelanggan (Opsi B: Manual)</Label>
+            <Label className="text-[10px] font-black uppercase text-muted-foreground">Nama Legal Pelanggan</Label>
             <Popover open={customerPopoverOpen} onOpenChange={setCustomerPopoverOpen}>
                 <PopoverTrigger asChild>
                     <Button variant="outline" className="w-full justify-between h-10 font-black uppercase border-indigo-100">
@@ -480,7 +461,7 @@ export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceDa
                     <CommandInput placeholder="Cari atau ketik nama pelanggan..." className="h-11" />
                      <CommandList>
                         <CommandEmpty>
-                            <Button variant="ghost" className="w-full text-xs" onClick={() => setCustomerPopoverOpen(false)}>Gunakan input manual di kolom utama</Button>
+                            <Button variant="ghost" className="w-full text-xs" onClick={() => setCustomerPopoverOpen(false)}>Gunakan input manual</Button>
                         </CommandEmpty>
                         <CommandGroup>
                             {customerListData?.map((c) => (
@@ -527,7 +508,7 @@ export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceDa
                 </Button>
               </TooltipTrigger>
               <TooltipContent className="bg-slate-900 text-white border-none text-[10px]">
-                Masuk ke halaman input detail barang dan kalkulasi nilai invoice.
+                Masuk ke halaman input detail barang dan riwayat saldo PO.
               </TooltipContent>
             </Tooltip>
           </TooltipProvider>

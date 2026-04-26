@@ -1,4 +1,3 @@
-
 import type { LucideIcon } from 'lucide-react';
 import { PlaceHolderImages, type ImagePlaceholder } from '@/lib/placeholder-images';
 
@@ -139,6 +138,7 @@ export type Customer = {
 };
 
 export type SalesListItem = {
+  id?: string;
   soNumber: string;
   customer: string;
   sales: string;
