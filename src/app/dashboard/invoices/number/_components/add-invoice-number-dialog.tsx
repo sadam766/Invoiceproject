@@ -122,11 +122,11 @@ export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceDa
     allIds.forEach(id => {
         let match;
         if (type === 'sar') {
-            // Regex tailored for SAR/YY[Sequence]A (Contoh: SAR/2601A)
-            const pattern = new RegExp(`SAR/${currentYearShort}(\\d+)A`);
+            // New Logic: SAR/YY01[Sequence]A
+            const pattern = new RegExp(`SAR/${currentYearShort}01(\\d{4})A`);
             match = id.match(pattern);
         } else {
-            // Regex tailored for KW/XXXX/KEU/YYYY
+            // KW Pattern: KW/XXXX/KEU/YYYY
             const pattern = new RegExp(`KW/(\\d+)/KEU/${currentYearLong}`);
             match = id.match(pattern);
         }
@@ -141,10 +141,8 @@ export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceDa
     const baseNumber = !isNaN(userStart) ? Math.max(currentMax, userStart - 1) : currentMax;
     const nextNum = baseNumber + 1;
 
-    // SAR Manual menggunakan 2 digit sequence (01, 02, dst)
-    return type === 'sar' 
-        ? nextNum.toString().padStart(2, '0') 
-        : nextNum.toString().padStart(4, '0');
+    // Both SAR (now 4 digit) and KW use 4 digit padding
+    return nextNum.toString().padStart(4, '0');
   };
   
   const setupForAddMode = (type: 'sar' | 'kw', startVal: string = '') => {
@@ -154,7 +152,8 @@ export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceDa
     const currentYearLong = format(now, 'yyyy');
 
     if (type === 'sar') {
-      setPrefix(`SAR/${currentYearShort}`);
+      // SAR/[YY][PropertyCode]
+      setPrefix(`SAR/${currentYearShort}01`);
       setSuffix('A');
       setMainNumber(nextNumStr);
     } else {
@@ -166,8 +165,8 @@ export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceDa
 
   const handleManualSetup = (invoice: InvoiceNumber) => {
     const id = invoice.id;
-    // SAR/2601A Match
-    const sarMatch = id.match(/^(SAR\/\d{2})(\d+)(A)$/);
+    // SAR Pattern: SAR/YY01[4-digit]A
+    const sarMatch = id.match(/^(SAR\/\d{2}01)(\d{4})(A)$/);
     const kwMatch = id.match(/^(KW\/)(\d+)(\/KEU\/\d{4})$/);
 
     if (sarMatch) {
@@ -390,7 +389,7 @@ export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceDa
                                 <div className="flex items-center gap-2">
                                     <Label className="text-[9px] font-bold uppercase text-muted-foreground">Mulai:</Label>
                                     <Input 
-                                        placeholder={invoiceType === 'sar' ? "01" : "0001"}
+                                        placeholder="0001"
                                         className="h-7 w-20 text-xs font-bold"
                                         value={startingNumber}
                                         onChange={(e) => setStartingNumber(e.target.value)}
