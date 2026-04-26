@@ -11,7 +11,7 @@ import {
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Plus, Calendar as CalendarIcon, Check, ChevronsUpDown, Database, Hash, FilePlus } from 'lucide-react';
+import { Plus, Calendar as CalendarIcon, Check, ChevronsUpDown, Database, Hash, FilePlus, AlertCircle } from 'lucide-react';
 import { Checkbox } from '@/components/ui/checkbox';
 import {
   Popover,
@@ -32,7 +32,7 @@ import { format } from 'date-fns';
 import type { InvoiceNumber, Customer, SalesOrder, Invoice } from '@/app/lib/data';
 import { useToast } from '@/hooks/use-toast';
 import { useFirestore, useCollection, useMemoFirebase, useUser } from '@/firebase';
-import { collection, query } from 'firebase/firestore';
+import { collection, query, doc, getDoc } from 'firebase/firestore';
 
 
 type AddInvoiceNumberDialogProps = {
@@ -92,6 +92,22 @@ export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceDa
     if (!salesOrderListData) return [];
     return Array.from(new Set(salesOrderListData.map(item => item.soNumber)))
   },[salesOrderListData]);
+
+  // --- REFINEMENT: SO-TO-IDENTITY LOCK ---
+  const isSoExhausted = useMemo(() => {
+    if (!salesOrder || !salesOrderListData || !existingInvoices) return false;
+    
+    const soItems = salesOrderListData.filter(item => item.soNumber === salesOrder);
+    const totalQtyContrak = soItems.reduce((sum, item) => sum + item.quantity, 0);
+    
+    const totalQtyInvoiced = existingInvoices
+        .filter(inv => inv.soNumber === salesOrder && inv.status !== 'cancelled' && !inv.isDpInvoice)
+        .reduce((sum, inv) => {
+            return sum + (inv.items?.reduce((s, i) => s + (Number(i.quantity) || 0), 0) || 0);
+        }, 0);
+    
+    return totalQtyInvoiced >= totalQtyContrak && totalQtyContrak > 0;
+  }, [salesOrder, salesOrderListData, existingInvoices]);
 
   const generateNextNumber = (type: 'sar' | 'kw', startFrom: string = '') => {
     let currentMax = 0;
@@ -242,7 +258,7 @@ export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceDa
     setSoPopoverOpen(false);
   };
   
-  const handleSave = (action: 'save' | 'create') => {
+  const handleSave = async (action: 'save' | 'create') => {
     if (numberSource === 'manual' && !mainNumber) {
         toast({ variant: "destructive", title: "Validation Error", description: "Nomor urut tidak boleh kosong." });
         return;
@@ -254,6 +270,23 @@ export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceDa
 
     if (!salesOrder && !poNumber) {
         toast({ variant: "destructive", title: "Validation Error", description: "Nomor PO wajib diisi jika SO belum tersedia." });
+        return;
+    }
+
+    // --- REFINEMENT: DUPLICATE ERP CHECK (SERVER SIDE) ---
+    if (numberSource === 'erp' && firestore) {
+        const safeId = erpNumberInput.replace(/\//g, '_');
+        const docRef = doc(firestore, 'invoices', safeId);
+        const docSnap = await getDoc(docRef);
+        if (docSnap.exists()) {
+            toast({ variant: "destructive", title: "Nomor ERP Ganda", description: "Nomor ini sudah terdaftar di sistem pusat." });
+            return;
+        }
+    }
+
+    // --- REFINEMENT: FINISHED SO LOCK ---
+    if (isSoExhausted && invoiceType === 'sar') {
+        toast({ variant: "destructive", title: "Kuota SO Habis", description: "Seluruh barang pada SO ini sudah ditagih. Gunakan mode Proforma jika perlu." });
         return;
     }
     
@@ -278,7 +311,7 @@ export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceDa
       salesOrder,
       poNumber,
       date: formattedDate,
-      amount: 0 // Amount will be calculated in constructor
+      amount: 0 
     }, action);
     onOpenChange(false);
   }
@@ -430,6 +463,11 @@ export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceDa
                     </Command>
                 </PopoverContent>
             </Popover>
+            {isSoExhausted && (
+                <div className="flex items-center gap-1 text-[10px] text-red-600 font-bold mt-1 uppercase">
+                    <AlertCircle className="h-3 w-3" /> Kuota SO ini sudah habis. Hanya diperbolehkan mode Proforma (KW).
+                </div>
+            )}
           </div>
 
           <div className="grid grid-cols-2 gap-4">

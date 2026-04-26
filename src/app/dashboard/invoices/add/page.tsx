@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useEffect, useState, useMemo } from 'react';
@@ -35,14 +36,12 @@ import {
   Send,
   ShieldCheck,
   ReceiptText,
-  Cpu,
-  Info,
-  Hash,
-  Database,
   Lock,
-  History,
+  Hash,
   AlertCircle,
-  TrendingUp
+  TrendingUp,
+  Wallet,
+  History
 } from 'lucide-react';
 import { type Invoice, type SalesOrder, type UserProfile, type Customer, type InvoiceItem, type InvoiceNumber } from '@/app/lib/data';
 import { useToast } from '@/hooks/use-toast';
@@ -110,6 +109,24 @@ export default function AddInvoicePage() {
   const [vat12, setVat12] = useState<string | number>(0);
   const [totalAmount, setTotalAmount] = useState<string | number>(0);
 
+  // --- REFINEMENT: DP TRACKING LOGIC ---
+  const dpBalance = useMemo(() => {
+    if (!allInvoices || !identityData) return 0;
+    const currentPo = identityData.poNumber;
+    
+    // Sum all paid/sent DP Invoices
+    const totalDpInvoiced = allInvoices
+        .filter(inv => inv.poNumber === currentPo && inv.isDpInvoice && inv.status !== 'cancelled')
+        .reduce((sum, inv) => sum + inv.amount, 0);
+    
+    // Sum all deductions in goods invoices
+    const totalDpUsed = allInvoices
+        .filter(inv => inv.poNumber === currentPo && !inv.isDpInvoice && inv.status !== 'cancelled')
+        .reduce((sum, inv) => sum + (inv.dpDeduction || 0), 0);
+
+    return Math.max(0, totalDpInvoiced - totalDpUsed);
+  }, [allInvoices, identityData]);
+
   // --- PROTEKSI & REDIRECT ---
   useEffect(() => {
       if (!isIdentityLoading && !identityData && !editInvoiceId) {
@@ -130,7 +147,6 @@ export default function AddInvoicePage() {
           if (allSoItems) {
               const relatedItems = allSoItems.filter(item => item.soNumber === identityData.salesOrder);
               setItems(relatedItems.map((item, idx) => {
-                  // Partial Billing Logic: Find previously invoiced Qty for this item
                   const prevQty = allInvoices?.filter(inv => inv.soNumber === item.soNumber && inv.status !== 'cancelled')
                                   .reduce((sum, inv) => {
                                       const matchingItem = inv.items?.find(i => i.name === item.productName);
@@ -140,10 +156,10 @@ export default function AddInvoicePage() {
                   return {
                       id: item.id || idx.toString(),
                       name: item.productName,
-                      quantity: item.quantity - prevQty, // Default to remaining
+                      quantity: Math.max(0, item.quantity - prevQty),
                       unit: item.unit,
                       price: item.price,
-                      total: (item.quantity - prevQty) * item.price,
+                      total: Math.max(0, (item.quantity - prevQty) * item.price),
                       originalQty: item.quantity,
                       prevInvoicedQty: prevQty
                   };
@@ -165,6 +181,7 @@ export default function AddInvoicePage() {
           setRetentionValue(existingInvoiceData.retention || '');
           setDpDeductionValue(existingInvoiceData.dpDeduction || '');
           setIssueDate(existingInvoiceData.date ? new Date(existingInvoiceData.date) : new Date());
+          setIsTaxManual(existingInvoiceData.revisionLogs?.some(log => log.action.includes('Manual Tax Override')) || false);
       }
   }, [existingInvoiceData]);
 
@@ -172,27 +189,45 @@ export default function AddInvoicePage() {
   useEffect(() => {
     const currentSubtotal = items.reduce((acc, item) => acc + (item.quantity * item.price), 0);
     setSubtotal(currentSubtotal);
+    
     const negInputVal = parseFormattedNumber(String(negotiationValue));
     const negNominal = negotiationMode === 'percent' ? (currentSubtotal * (negInputVal / 100)) : negInputVal;
-    const baseAfterNeg = currentSubtotal - negNominal;
+    
+    const baseAfterNeg = Math.max(0, currentSubtotal - negNominal);
+    
     const dpInputVal = parseFormattedNumber(String(dpValue));
     const dpNominal = dpMode === 'percent' ? (baseAfterNeg * (dpInputVal / 100)) : dpInputVal;
+    
     const retInputVal = parseFormattedNumber(String(retentionValue));
     const retNominal = retentionMode === 'percent' ? (baseAfterNeg * (retInputVal / 100)) : retInputVal;
+    
     const dpDedInputVal = parseFormattedNumber(String(dpDeductionValue));
     const dpDedNominal = dpDeductionMode === 'percent' ? (baseAfterNeg * (dpDedInputVal / 100)) : dpDedInputVal;
     
+    // Validation Guard: Deduction cannot exceed balance
+    if (dpDedNominal > dpBalance && !isDpInvoice) {
+        setDpDeductionValue(0);
+        toast({ variant: "destructive", title: "Limit Saldo DP", description: "Potongan melebihi saldo DP yang tersedia." });
+    }
+
     if (!isTaxManual) {
         const calculatedDpp = baseAfterNeg;
         const calculatedVat = calculatedDpp * 0.12;
         setDppVat(formatNumberWithCommas(calculatedDpp));
         setVat12(formatNumberWithCommas(calculatedVat));
     }
+    
     const currentDpp = parseFormattedNumber(String(dppVat));
     const currentVat = parseFormattedNumber(String(vat12));
-    const grand = isDpInvoice ? dpNominal : (currentDpp + currentVat - dpDedNominal - retNominal);
+    
+    // Grand Total Logic
+    let grand = isDpInvoice ? dpNominal : (currentDpp + currentVat - dpDedNominal - retNominal);
+    
+    // Negative Value Guard
+    grand = Math.max(0, grand);
+    
     setTotalAmount(formatNumberWithCommas(grand));
-  }, [items, negotiationValue, negotiationMode, dpValue, dpMode, retentionValue, retentionMode, dpDeductionValue, dpDeductionMode, isTaxManual, dppVat, vat12, isDpInvoice]);
+  }, [items, negotiationValue, negotiationMode, dpValue, dpMode, retentionValue, retentionMode, dpDeductionValue, dpDeductionMode, isTaxManual, dppVat, vat12, isDpInvoice, dpBalance, toast]);
 
   const handleSaveInvoice = async (invoiceStatus: any = 'sent') => {
     const activeIdentity = existingInvoiceData || identityData;
@@ -205,6 +240,12 @@ export default function AddInvoicePage() {
     const invoiceDocRef = doc(firestore, 'invoices', safeInvoiceId);
     const timestamp = new Date().toISOString();
     const updater = userProfile?.displayName || user.email || 'System';
+
+    // Audit Log for Tax Override
+    let actionDescription = editInvoiceId ? "Document UPDATED" : "Document CREATED";
+    if (isTaxManual) {
+        actionDescription += ` | Manual Tax Override Applied: DPP ${dppVat}, VAT ${vat12}`;
+    }
 
     const dataToSave: any = {
         id: activeIdentity.id,
@@ -229,7 +270,7 @@ export default function AddInvoicePage() {
         revisionLogs: arrayUnion({
             updatedBy: updater,
             updatedAt: timestamp,
-            action: editInvoiceId ? "Document UPDATED" : "Document CREATED"
+            action: actionDescription
         })
     };
 
@@ -255,7 +296,7 @@ export default function AddInvoicePage() {
       return <div className="flex h-[80vh] items-center justify-center font-bold text-slate-400 animate-pulse uppercase tracking-widest">Architectural Handshake in Progress...</div>;
   }
 
-  const isLocked = (existingInvoiceData?.status === 'finalized' || existingInvoiceData?.status === 'paid') && !isSuperAdmin;
+  const isLocked = (existingInvoiceData?.status === 'finalized' || existingInvoiceData?.status === 'paid' || existingInvoiceData?.status === 'received') && !isSuperAdmin;
 
   return (
     <main className="flex flex-1 flex-col gap-4 p-4 md:gap-8 md:p-8 max-w-[1600px] mx-auto bg-background">
@@ -433,15 +474,21 @@ export default function AddInvoicePage() {
                         <Input value={dpValue} onChange={e => setDpValue(e.target.value)} className="h-8 text-right font-black border-indigo-200 bg-white dark:bg-slate-900" placeholder="0" disabled={isLocked} />
                     </div>
                 ) : (
-                    <div className="space-y-1.5 bg-emerald-50/20 p-3 rounded-xl border border-emerald-100 shadow-inner">
-                        <div className="flex justify-between items-center">
-                            <Label className="text-[9px] font-black uppercase text-emerald-700 tracking-tighter">Deduction from DP Balance</Label>
+                    <div className="space-y-2 bg-emerald-50/20 p-3 rounded-xl border border-emerald-100 shadow-inner">
+                        <div className="flex justify-between items-center mb-1">
+                            <Label className="text-[9px] font-black uppercase text-emerald-700 tracking-tighter flex items-center gap-1">
+                                <Wallet className="h-3 w-3" /> Potongan Saldo DP
+                            </Label>
                             <Select value={dpDeductionMode} onValueChange={(v: any) => setDpDeductionMode(v)} disabled={isLocked}>
                                 <SelectTrigger className="h-5 w-14 text-[8px] font-black uppercase bg-white"><SelectValue /></SelectTrigger>
                                 <SelectContent><SelectItem value="nominal">IDR</SelectItem><SelectItem value="percent">%</SelectItem></SelectContent>
                             </Select>
                         </div>
                         <Input value={dpDeductionValue} onChange={e => setDpDeductionValue(e.target.value)} className="h-8 text-right font-black border-emerald-200 text-emerald-700 bg-white dark:bg-slate-900" placeholder="0" disabled={isLocked} />
+                        <div className="flex items-center justify-between text-[8px] font-bold text-emerald-600 mt-1 uppercase tracking-tighter">
+                            <span>Sisa Saldo DP:</span>
+                            <span>Rp {formatNumberWithCommas(dpBalance)}</span>
+                        </div>
                     </div>
                 )}
 
@@ -485,7 +532,7 @@ export default function AddInvoicePage() {
                         <Send className="mr-2 h-4 w-4" /> SIMPAN & TERBITKAN
                       </Button>
                   )}
-                  {isSuperAdmin && existingInvoiceData?.status !== 'finalized' && existingInvoiceData?.status !== 'paid' && (
+                  {isSuperAdmin && existingInvoiceData?.status !== 'finalized' && existingInvoiceData?.status !== 'paid' && existingInvoiceData?.status !== 'received' && (
                       <Button variant="outline" className="w-full h-11 border-indigo-600 text-indigo-600 font-black uppercase text-[10px] tracking-widest hover:bg-indigo-50" onClick={() => handleSaveInvoice('finalized')}>
                         <ShieldCheck className="mr-2 h-4 w-4" /> FINALIZE & LOCK ARCHIVE
                       </Button>

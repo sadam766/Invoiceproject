@@ -30,7 +30,7 @@ import {
   import { Label } from '@/components/ui/label';
   import { Textarea } from '@/components/ui/textarea';
   import { type Invoice, type UserProfile } from '@/app/lib/data';
-  import { Search, MoreHorizontal, Eye, Pencil, Download, Truck, FileSpreadsheet, XCircle, ShieldCheck, Layers, Database, Hash } from 'lucide-react';
+  import { Search, MoreHorizontal, Eye, Pencil, Download, Truck, FileSpreadsheet, XCircle, ShieldCheck, Layers, Database, Hash, History } from 'lucide-react';
   import { Skeleton } from '@/components/ui/skeleton';
   import {
     DropdownMenu,
@@ -89,8 +89,8 @@ import {
         if (activeTab !== 'all') {
             filtered = filtered.filter(i => {
                 if (activeTab === 'paid') return i.status === 'paid';
-                if (activeTab === 'received') return i.status === 'received';
-                if (activeTab === 'unpaid') return i.status === 'sent' || i.status === 'unpaid' || i.status === 'draft';
+                if (activeTab === 'received') return i.status === 'received' || i.status === 'in_transit';
+                if (activeTab === 'unpaid') return i.status === 'sent' || i.status === 'unpaid' || i.status === 'draft' || i.status === 'partial';
                 if (activeTab === 'cancelled') return i.status === 'cancelled';
                 return true;
             });
@@ -108,6 +108,7 @@ import {
         return filtered.sort((a,b) => b.date.localeCompare(a.date));
     }, [invoices, activeTab, searchQuery, dateRange]);
 
+    // --- REFINEMENT: VOID & REVERSAL FLOW ---
     const handleVoidInvoice = async () => {
         if (!firestore || !targetInvoiceId || !voidReason || !user) return;
         const safeId = targetInvoiceId.replace(/\//g, '_');
@@ -121,12 +122,12 @@ import {
             revisionLogs: arrayUnion({
                 updatedBy: userProfile?.displayName || user.email || 'Unknown',
                 updatedAt: timestamp,
-                action: `Invoice VOIDED: ${voidReason}`
+                action: `Invoice VOIDED (Reversal Triggered): ${voidReason}`
             })
         };
         try {
             await updateDoc(docRef, updateData);
-            toast({ title: "Invoice Dibatalkan", description: `Invoice ${targetInvoiceId} kini berstatus VOID.` });
+            toast({ title: "Invoice Dibatalkan", description: `Invoice ${targetInvoiceId} kini berstatus VOID. Saldo PO & DP telah disinkronkan.` });
             setVoidDialogOpen(false);
             setVoidReason('');
             setTargetInvoiceId(null);
@@ -181,7 +182,7 @@ import {
                         <TabsList className="bg-muted/50 p-1">
                             <TabsTrigger value="all" className="text-xs font-bold uppercase">Semua</TabsTrigger>
                             <TabsTrigger value="paid" className="text-xs font-bold uppercase px-4 text-emerald-600">Lunas</TabsTrigger>
-                            <TabsTrigger value="received" className="text-xs font-bold uppercase px-4 text-blue-600">Diterima PT</TabsTrigger>
+                            <TabsTrigger value="received" className="text-xs font-bold uppercase px-4 text-blue-600">Diterima / Transit</TabsTrigger>
                             <TabsTrigger value="unpaid" className="text-xs font-bold uppercase px-4 text-red-600">Unpaid</TabsTrigger>
                             <TabsTrigger value="cancelled" className="text-xs font-bold uppercase px-4 opacity-50">Void</TabsTrigger>
                         </TabsList>
@@ -198,8 +199,8 @@ import {
                                     <TableHead className="w-[40px]"><Checkbox onCheckedChange={(c) => c ? setSelectedInvoices(new Set(filteredInvoices.map(i => i.id))) : setSelectedInvoices(new Set())} /></TableHead>
                                     <TableHead className="text-[10px] font-black uppercase tracking-widest">Invoice Number</TableHead>
                                     <TableHead className="text-[10px] font-black uppercase tracking-widest">Customer & PO</TableHead>
-                                    <TableHead className="text-[10px] font-black uppercase tracking-widest">SPD INFO</TableHead>
-                                    <TableHead className="text-[10px] font-black uppercase tracking-widest">Amount</TableHead>
+                                    <TableHead className="text-[10px] font-black uppercase tracking-widest text-right">Grand Total</TableHead>
+                                    <TableHead className="text-[10px] font-black uppercase tracking-widest text-right">Outstanding</TableHead>
                                     <TableHead className="text-[10px] font-black uppercase tracking-widest">Status</TableHead>
                                     <TableHead className="text-right text-[10px] font-black uppercase tracking-widest">Aksi</TableHead>
                                 </TableRow>
@@ -208,6 +209,15 @@ import {
                                 {isLoading ? <TableRow><TableCell colSpan={7} className="text-center py-20 font-bold animate-pulse text-muted-foreground">Menganalisa Data Invoices...</TableCell></TableRow> : 
                                     filteredInvoices.map((invoice) => {
                                     const isERP = !(invoice.id.startsWith('SAR') || invoice.id.startsWith('KW'));
+                                    
+                                    // --- REFINEMENT: PARTIAL PAYMENT STATUS ---
+                                    const totalPaid = invoice.payments?.reduce((s, p) => s + p.amount, 0) || (invoice.status === 'paid' ? invoice.amount : 0);
+                                    const outstandingDoc = Math.max(0, invoice.amount - totalPaid);
+                                    let displayStatus = invoice.status;
+                                    if (invoice.status !== 'cancelled' && invoice.status !== 'paid' && totalPaid > 0) {
+                                        displayStatus = 'partial';
+                                    }
+
                                     return (
                                         <TableRow key={invoice.id} className={cn("hover:bg-muted/5 transition-colors", invoice.status === 'cancelled' && "opacity-40 grayscale")}>
                                             <TableCell><Checkbox checked={selectedInvoices.has(invoice.id)} onCheckedChange={() => setSelectedInvoices(prev => { const n = new Set(prev); n.has(invoice.id) ? n.delete(invoice.id) : n.add(invoice.id); return n; })} /></TableCell>
@@ -224,27 +234,23 @@ import {
                                                 <div className="font-black uppercase text-slate-800">{invoice.customer}</div>
                                                 <div className="text-[9px] text-muted-foreground truncate max-w-[200px] italic">PO: {invoice.poNumber}</div>
                                             </TableCell>
-                                            <TableCell>
-                                                {invoice.spdNumber ? (
-                                                    <Badge variant="outline" className="bg-indigo-50 text-indigo-700 border-indigo-100 text-[9px] font-black uppercase">
-                                                        <Truck className="h-3 w-3 mr-1" /> {invoice.spdNumber.split('/').pop()}
-                                                    </Badge>
-                                                ) : (
-                                                    <span className="text-[9px] font-bold text-muted-foreground/40 italic">Not Picked</span>
-                                                )}
+                                            <TableCell className="text-xs font-black text-right">Rp {invoice.amount.toLocaleString('id-ID')}</TableCell>
+                                            <TableCell className="text-xs font-black text-right text-red-600">
+                                                {outstandingDoc > 0 ? `Rp ${outstandingDoc.toLocaleString('id-ID')}` : '-'}
                                             </TableCell>
-                                            <TableCell className="text-xs font-black">Rp {invoice.amount.toLocaleString('id-ID')}</TableCell>
                                             <TableCell>
                                                 <Badge 
                                                     variant={invoice.status === 'paid' ? 'outline' : invoice.status === 'cancelled' ? 'destructive' : 'secondary'} 
                                                     className={cn(
                                                         "text-[9px] uppercase font-black px-2 py-0",
-                                                        invoice.status === 'received' ? "bg-blue-50 text-blue-700 border-blue-100" : 
-                                                        invoice.status === 'paid' ? "bg-emerald-50 text-emerald-700 border-emerald-100" : 
-                                                        invoice.status === 'finalized' ? "bg-indigo-600 text-white" : ""
+                                                        displayStatus === 'received' ? "bg-blue-50 text-blue-700 border-blue-100" : 
+                                                        displayStatus === 'in_transit' ? "bg-indigo-50 text-indigo-700 border-indigo-100" : 
+                                                        displayStatus === 'paid' ? "bg-emerald-50 text-emerald-700 border-emerald-100" : 
+                                                        displayStatus === 'partial' ? "bg-amber-50 text-amber-700 border-amber-100" :
+                                                        displayStatus === 'finalized' ? "bg-indigo-600 text-white" : ""
                                                     )}
                                                 >
-                                                    {invoice.status}
+                                                    {displayStatus.replace('_', ' ')}
                                                 </Badge>
                                             </TableCell>
                                             <TableCell className="text-right">
@@ -252,7 +258,7 @@ import {
                                                     <DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8 rounded-full"><MoreHorizontal className="h-4 w-4" /></Button></DropdownMenuTrigger>
                                                     <DropdownMenuContent align="end">
                                                         <DropdownMenuItem onClick={() => router.push(`/dashboard/invoices/preview/${encodeURIComponent(invoice.id)}`)}><Eye className="mr-2 h-4 w-4" /> Pratinjau</DropdownMenuItem>
-                                                        {invoice.status !== 'finalized' && invoice.status !== 'cancelled' && (
+                                                        {invoice.status !== 'finalized' && invoice.status !== 'cancelled' && invoice.status !== 'paid' && (
                                                             <DropdownMenuItem onClick={() => router.push(`/dashboard/invoices/add?editInvoiceId=${invoice.id.replace(/\//g, '_')}`)}><Pencil className="mr-2 h-4 w-4" /> Edit</DropdownMenuItem>
                                                         )}
                                                         {isSuperAdmin && invoice.status !== 'finalized' && invoice.status !== 'cancelled' && (
@@ -280,7 +286,7 @@ import {
             <DialogContent className="sm:max-w-[400px]">
                 <DialogHeader>
                     <DialogTitle>Konfirmasi VOID Invoice</DialogTitle>
-                    <DialogDescription>Data tidak akan dihapus fisik, namun nomor ini akan ditandai sebagai Batal dalam riwayat audit.</DialogDescription>
+                    <DialogDescription>Data tidak akan dihapus fisik, namun kuota barang & saldo DP akan dikembalikan ke PO asal secara otomatis.</DialogDescription>
                 </DialogHeader>
                 <div className="py-4 space-y-4">
                     <div className="space-y-2">

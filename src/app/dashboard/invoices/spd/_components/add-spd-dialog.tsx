@@ -1,3 +1,4 @@
+
 'use client';
 import { Button } from '@/components/ui/button';
 import {
@@ -17,19 +18,17 @@ import { Badge } from '@/components/ui/badge';
 import { 
   Plus, 
   Search, 
-  Truck, 
   MapPin, 
   CheckCircle2, 
   Calendar as CalendarIcon,
   Layers,
-  Info,
   FileText,
   AlertTriangle
 } from 'lucide-react';
 import { useEffect, useState, useMemo } from 'react';
 import type { SpdData, Invoice, SpdInvoiceEntry } from '@/app/lib/data';
-import { useFirestore, useCollection, useMemoFirebase, useUser } from '@/firebase';
-import { collection, query, where } from 'firebase/firestore';
+import { useFirestore, useCollection, useMemoFirebase } from '@/firebase';
+import { collection, query, where, writeBatch, doc } from 'firebase/firestore';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
 
@@ -51,29 +50,25 @@ export function AddSpdDialog({ isOpen, onOpenChange, onSave, spdData, onAddClick
   const [searchInvoice, setSearchInvoice] = useState('');
   const [selectedInvoices, setSelectedInvoices] = useState<SpdInvoiceEntry[]>([]);
 
-  // Local state for SJ additions per selected invoice
   const [localSjAdditions, setLocalSjAdditions] = useState<Record<string, string>>({});
 
-  // SMART PICK: Fetch Invoices that are 'sent' but NOT yet in any SPD
   const availableInvoicesQuery = useMemoFirebase(() => {
     if (!firestore) return null;
     return query(
         collection(firestore, 'invoices'), 
-        where('status', '==', 'sent')
+        where('status', 'in', ['sent', 'partial', 'unpaid'])
     );
   }, [firestore]);
   
   const { data: allSentInvoices, isLoading: isLoadingInvoices } = useCollection<Invoice>(availableInvoicesQuery);
 
-  // Filter out invoices that already have an spdNumber (Status Sync)
   const filteredAvailableInvoices = useMemo(() => {
       if (!allSentInvoices) return [];
       
       return allSentInvoices.filter(inv => {
           const isNotAssigned = !inv.spdNumber || (spdData && inv.spdNumber === spdData.id);
           const matchesSearch = inv.id.toLowerCase().includes(searchInvoice.toLowerCase()) || 
-                                inv.customer.toLowerCase().includes(searchInvoice.toLowerCase()) ||
-                                (inv.sjNumbers && inv.sjNumbers.some(s => s.toLowerCase().includes(searchInvoice.toLowerCase())));
+                                inv.customer.toLowerCase().includes(searchInvoice.toLowerCase());
           return isNotAssigned && matchesSearch;
       });
   }, [allSentInvoices, searchInvoice, spdData]);
@@ -84,8 +79,6 @@ export function AddSpdDialog({ isOpen, onOpenChange, onSave, spdData, onAddClick
       setDate(spdData.date);
       setCourier(spdData.courier);
       setSelectedInvoices(spdData.invoices || []);
-      
-      // Load existing SJs into local state
       const initialSjs: Record<string, string> = {};
       spdData.invoices.forEach(inv => {
           if (inv.sjNumbers) initialSjs[inv.invoiceId] = inv.sjNumbers.join(', ');
@@ -96,8 +89,6 @@ export function AddSpdDialog({ isOpen, onOpenChange, onSave, spdData, onAddClick
         setSpdId(`SPD/${format(now, 'yyyy/MM')}/${Math.floor(100 + Math.random() * 900)}`);
         setDate(format(now, 'yyyy-MM-dd'));
         setSelectedInvoices(initialPreselectedInvoices);
-        
-        // Sync pre-selected SJs
         const initialSjs: Record<string, string> = {};
         initialPreselectedInvoices.forEach(inv => {
             if (inv.sjNumbers) initialSjs[inv.invoiceId] = inv.sjNumbers.join(', ');
@@ -124,10 +115,8 @@ export function AddSpdDialog({ isOpen, onOpenChange, onSave, spdData, onAddClick
             customer: inv.customer,
             address: inv.billingAddress,
             status: 'pending',
-            sjNumbers: inv.sjNumbers || [] // Auto-fetch initial SJs from Invoice
+            sjNumbers: inv.sjNumbers || [] 
         }]);
-        
-        // Sync to local input if SJ exists
         if (inv.sjNumbers && inv.sjNumbers.length > 0) {
             setLocalSjAdditions(prev => ({ ...prev, [inv.id]: inv.sjNumbers!.join(', ') }));
         }
@@ -138,14 +127,24 @@ export function AddSpdDialog({ isOpen, onOpenChange, onSave, spdData, onAddClick
     setLocalSjAdditions(prev => ({ ...prev, [invoiceId]: val }));
   };
 
-  const handleSave = () => {
-    if (!courier || selectedInvoices.length === 0) return;
+  const handleSave = async () => {
+    if (!courier || selectedInvoices.length === 0 || !firestore) return;
     
-    // Process SJ Numbers from local inputs before saving
     const processedInvoices = selectedInvoices.map(inv => {
         const rawSj = localSjAdditions[inv.invoiceId] || '';
         const sjList = rawSj.split(',').map(s => s.trim()).filter(s => s !== '');
         return { ...inv, sjNumbers: sjList };
+    });
+
+    // --- REFINEMENT: AUTO-STATUS "IN TRANSIT" ---
+    const batch = writeBatch(firestore);
+    processedInvoices.forEach(inv => {
+        const invRef = doc(firestore, 'invoices', inv.invoiceId.replace(/\//g, '_'));
+        batch.update(invRef, { 
+            status: 'in_transit',
+            spdNumber: spdId,
+            sjNumbers: inv.sjNumbers
+        });
     });
 
     onSave({
@@ -155,6 +154,8 @@ export function AddSpdDialog({ isOpen, onOpenChange, onSave, spdData, onAddClick
       invoices: processedInvoices,
       status: spdData?.status || 'in_delivery'
     });
+    
+    await batch.commit();
   };
 
   return (
@@ -171,12 +172,11 @@ export function AddSpdDialog({ isOpen, onOpenChange, onSave, spdData, onAddClick
               SPD Multi-Surat Jalan Dispatch
           </DialogTitle>
           <DialogDescription>
-            Pilih invoice dan lengkapi nomor Surat Jalan (SJ) untuk mempermudah serah terima fisik.
+            Pilih invoice dan lengkapi nomor Surat Jalan (SJ). Status invoice akan berubah menjadi 'In Transit'.
           </DialogDescription>
         </DialogHeader>
         
         <div className="grid grid-cols-1 md:grid-cols-5 gap-0 flex-1 overflow-hidden border-t mt-4">
-          {/* Section 1: Header Info */}
           <div className="bg-muted/30 p-6 space-y-6 border-r md:col-span-2">
              <div className="space-y-4">
                 <div className="space-y-2">
@@ -236,13 +236,12 @@ export function AddSpdDialog({ isOpen, onOpenChange, onSave, spdData, onAddClick
              </div>
           </div>
 
-          {/* Section 2: Smart Pick List */}
           <div className="md:col-span-3 flex flex-col bg-background overflow-hidden">
              <div className="p-4 border-b bg-muted/10">
                 <div className="relative">
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                     <Input 
-                        placeholder="Cari Customer, No. Invoice, atau No. SJ..." 
+                        placeholder="Cari Customer atau No. Invoice..." 
                         className="pl-10 h-11 shadow-none border-none focus-visible:ring-0 text-sm"
                         value={searchInvoice}
                         onChange={e => setSearchInvoice(e.target.value)}
@@ -262,11 +261,10 @@ export function AddSpdDialog({ isOpen, onOpenChange, onSave, spdData, onAddClick
                     ) : filteredAvailableInvoices.length === 0 ? (
                         <div className="flex flex-col items-center justify-center py-20 opacity-40 text-center space-y-2">
                             <Layers className="h-10 w-10 mb-2" />
-                            <p className="text-xs font-medium">Data kosong. Pastikan invoice berstatus 'Sent'.</p>
+                            <p className="text-xs font-medium">Data kosong. Pastikan invoice sudah diterbitkan.</p>
                         </div>
                     ) : filteredAvailableInvoices.map((inv) => {
                         const isSelected = selectedInvoices.some(si => si.invoiceId === inv.id);
-                        const hasSJ = inv.sjNumbers && inv.sjNumbers.length > 0;
                         return (
                             <div 
                                 key={inv.id} 
@@ -284,21 +282,12 @@ export function AddSpdDialog({ isOpen, onOpenChange, onSave, spdData, onAddClick
                                 <div className="flex-1 space-y-1.5 min-w-0">
                                     <div className="flex justify-between items-center">
                                         <span className="text-xs font-black font-mono tracking-tight text-indigo-700">{inv.id}</span>
-                                        <Badge variant="outline" className={cn("text-[8px] h-4", hasSJ ? "bg-emerald-50 text-emerald-700 border-emerald-100" : "bg-amber-50 text-amber-700 border-amber-100")}>
-                                            {hasSJ ? "SJ READY" : "NO SJ RECORD"}
-                                        </Badge>
+                                        <Badge variant="outline" className="text-[8px] h-4 uppercase">{inv.status}</Badge>
                                     </div>
                                     <p className="text-sm font-black uppercase leading-none truncate pr-4">{inv.customer}</p>
-                                    <div className="flex flex-col gap-1">
-                                        <div className="flex items-start gap-1.5 text-[10px] text-muted-foreground">
-                                            <MapPin className="h-3 w-3 shrink-0 mt-0.5 text-rose-500" />
-                                            <span className="line-clamp-1 italic">{inv.billingAddress}</span>
-                                        </div>
-                                        {hasSJ && (
-                                            <div className="flex items-center gap-1.5 text-[9px] font-mono text-indigo-600 font-bold bg-indigo-50 px-2 py-0.5 rounded w-fit">
-                                                <FileText className="h-3 w-3" /> SJ: {inv.sjNumbers?.join(', ')}
-                                            </div>
-                                        )}
+                                    <div className="flex items-start gap-1.5 text-[10px] text-muted-foreground">
+                                        <MapPin className="h-3 w-3 shrink-0 mt-0.5 text-rose-500" />
+                                        <span className="line-clamp-1 italic">{inv.billingAddress}</span>
                                     </div>
                                 </div>
                             </div>
