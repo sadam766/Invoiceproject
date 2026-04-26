@@ -241,7 +241,7 @@ import {
                                                 <Button 
                                                     size="sm" 
                                                     className="h-8 bg-indigo-600 hover:bg-indigo-700 font-black uppercase text-[10px] tracking-widest shadow-md"
-                                                    onClick={() => router.push(`/dashboard/invoices/add?poNumber=${encodeURIComponent(sale.poNumber)}`)}
+                                                    onClick={() => router.push(`/dashboard/invoices/number?poNumber=${encodeURIComponent(sale.poNumber)}`)}
                                                 >
                                                     <FilePlus className="mr-1.5 h-3.5 w-3.5" /> Terbitkan Invoice
                                                 </Button>

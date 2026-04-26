@@ -40,8 +40,9 @@ import {
   Info,
   Hash,
   Database,
+  Lock,
 } from 'lucide-react';
-import { type Invoice, type SalesOrder, type UserProfile, type SalesListItem, type Customer, type InvoiceItem } from '@/app/lib/data';
+import { type Invoice, type SalesOrder, type UserProfile, type SalesListItem, type Customer, type InvoiceItem, type InvoiceNumber } from '@/app/lib/data';
 import { useToast } from '@/hooks/use-toast';
 import { useFirestore, useCollection, useMemoFirebase, useUser, useDoc, errorEmitter, FirestorePermissionError } from '@/firebase';
 import { collection, query, doc, setDoc, arrayUnion } from 'firebase/firestore';
@@ -56,6 +57,7 @@ export default function AddInvoicePage() {
 
   const poNumberParam = searchParams.get('poNumber');
   const editInvoiceId = searchParams.get('editInvoiceId');
+  const invoiceNumberIdParam = searchParams.get('invoiceNumberId');
   
   // --- FORM STATES ---
   const [invoiceId, setInvoiceId] = useState('');
@@ -105,6 +107,33 @@ export default function AddInvoicePage() {
   const customersCollection = useMemoFirebase(() => firestore ? query(collection(firestore, 'customers')) : null, [firestore]);
   const { data: customerListData } = useCollection<Customer>(customersCollection);
 
+  // Identity Link Fetch
+  const identityRef = useMemoFirebase(() => {
+      if (!firestore || !invoiceNumberIdParam) return null;
+      return doc(firestore, 'invoiceNumbers', invoiceNumberIdParam);
+  }, [firestore, invoiceNumberIdParam]);
+  const { data: identityData } = useDoc<InvoiceNumber>(identityRef);
+
+  // --- LOGIC: IDENTITY POPULATION ---
+  useEffect(() => {
+      if (identityData) {
+          setInvoiceId(identityData.id);
+          setPoNumber(identityData.poNumber || '');
+          setSoNumber(identityData.salesOrder || '');
+          setCustomerName(identityData.customer);
+          setNumberSource(identityData.id.startsWith('SAR') || identityData.id.startsWith('KW') ? 'manual' : 'erp');
+          
+          if (customerListData) {
+              const cust = customerListData.find(c => c.name === identityData.customer);
+              if (cust) {
+                  const defAddr = cust.addresses?.find(a => a.isDefault) || cust.addresses?.[0];
+                  setBillingAddress(defAddr?.address || '');
+                  setBillingNpwp(defAddr?.npwp || '');
+              }
+          }
+      }
+  }, [identityData, customerListData]);
+
   // --- LOGIC: PARTIAL INVOICING TRACKING ---
   const poRelatedInvoices = useMemo(() => {
     if (!allInvoices || !poNumber) return [];
@@ -133,32 +162,9 @@ export default function AddInvoicePage() {
     return tracking;
   }, [poNumber, allSoItems, poRelatedInvoices]);
 
-  // --- LOGIC: AUTO-GENERATE NUMBER ---
+  // --- LOGIC: INITIAL LOAD FROM PO (FALLBACK) ---
   useEffect(() => {
-    if (!editInvoiceId && allInvoices && numberSource === 'manual' && !invoiceId) {
-        const now = new Date();
-        const yy = format(now, 'yy');
-        const prefix = isDpInvoice ? 'KW' : 'SAR';
-        
-        const currentYearDocs = allInvoices.filter(inv => {
-            if (isDpInvoice) return inv.id.startsWith('KW/') && inv.id.includes(`/${yy}`);
-            return inv.id.startsWith(`SAR/${yy}`);
-        });
-
-        const sequence = currentYearDocs.length + 1;
-        const seqStr = sequence.toString().padStart(isDpInvoice ? 4 : 2, '0');
-
-        if (isDpInvoice) {
-            setInvoiceId(`KW/${seqStr}/KEU/20${yy}`);
-        } else {
-            setInvoiceId(`SAR/${yy}${seqStr}A`);
-        }
-    }
-  }, [allInvoices, editInvoiceId, invoiceId, isDpInvoice, numberSource]);
-
-  // --- LOGIC: INITIAL LOAD FROM PO ---
-  useEffect(() => {
-    if (poNumberParam && allSales && allSoItems && customerListData && Object.keys(itemTracking).length > 0) {
+    if (poNumberParam && !identityData && allSales && allSoItems && customerListData && Object.keys(itemTracking).length > 0) {
         const foundSale = allSales.find(s => s.poNumber === poNumberParam);
         if (foundSale) {
             setPoNumber(foundSale.poNumber);
@@ -184,8 +190,22 @@ export default function AddInvoicePage() {
                 };
             }));
         }
+    } else if (identityData && allSoItems && items.length === 0) {
+        const relatedItems = allSoItems.filter(item => item.poNumber === identityData.poNumber);
+        setItems(relatedItems.map((item, idx) => {
+            const track = itemTracking[item.productName] || { poQty: item.quantity, invoiced: 0 };
+            const remaining = Math.max(0, track.poQty - track.invoiced);
+            return {
+                id: idx.toString(),
+                name: item.productName,
+                quantity: remaining,
+                unit: item.unit,
+                price: item.price,
+                total: remaining * item.price
+            };
+        }));
     }
-  }, [poNumberParam, allSales, allSoItems, customerListData, itemTracking]);
+  }, [poNumberParam, identityData, allSales, allSoItems, customerListData, itemTracking]);
 
   // --- LOGIC: EDIT MODE ---
   useEffect(() => {
@@ -208,7 +228,6 @@ export default function AddInvoicePage() {
             setRetentionValue(found.retention || '');
             setDpDeductionValue(found.dpDeduction || '');
             setItems(found.items || []);
-            // Guess source
             setNumberSource(found.id.startsWith('SAR') || found.id.startsWith('KW') ? 'manual' : 'erp');
         }
     }
@@ -241,7 +260,7 @@ export default function AddInvoicePage() {
 
   const handleSaveInvoice = async (invoiceStatus: any = 'sent') => {
     if (!firestore || !user || !invoiceId || !customerName) {
-        toast({ variant: "destructive", title: "Gagal Simpan", description: "Nomor Invoice dan Customer wajib ada." });
+        toast({ variant: "destructive", title: "Gagal Simpan", description: "Identitas Invoice tidak lengkap." });
         return;
     }
 
@@ -301,20 +320,20 @@ export default function AddInvoicePage() {
     <main className="flex flex-1 flex-col gap-4 p-4 md:gap-8 md:p-8 max-w-[1600px] mx-auto bg-background">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
-            <Button variant="outline" size="icon" onClick={() => router.push('/dashboard/invoices')} className="rounded-full">
+            <Button variant="outline" size="icon" onClick={() => router.push('/dashboard/invoices/number')} className="rounded-full">
                 <ChevronLeft className="h-4 w-4" />
             </Button>
             <div>
                 <h1 className="text-2xl font-black tracking-tight uppercase">Invoice Constructor</h1>
-                <div className="text-muted-foreground text-xs font-bold uppercase tracking-widest flex items-center gap-1.5">
-                    Single Identity Switching <Badge variant="secondary" className="text-[8px] bg-indigo-100 text-indigo-700 h-3.5">Active</Badge>
+                <div className="text-muted-foreground text-[10px] font-bold uppercase tracking-widest flex items-center gap-1.5 mt-0.5">
+                    Identitas Terkunci <Badge variant="secondary" className="text-[8px] bg-emerald-100 text-emerald-700 h-3.5"><Lock className="h-2 w-2 mr-1" /> Finalized Header</Badge>
                 </div>
             </div>
         </div>
         <div className="flex items-center gap-3 bg-indigo-50 px-4 py-2 rounded-xl border border-indigo-100">
             <div className="flex items-center gap-2">
                 <Label className="text-[10px] font-black uppercase text-indigo-700">Mode Tagihan:</Label>
-                <Badge variant={isDpInvoice ? "default" : "outline"} className={cn("text-[9px] uppercase cursor-pointer", isDpInvoice ? "bg-indigo-600" : "text-indigo-600 border-indigo-200")} onClick={() => { setIsDpInvoice(!isDpInvoice); setInvoiceId(''); }}>
+                <Badge variant={isDpInvoice ? "default" : "outline"} className={cn("text-[9px] uppercase cursor-pointer", isDpInvoice ? "bg-indigo-600" : "text-indigo-600 border-indigo-200")} onClick={() => setIsDpInvoice(!isDpInvoice)}>
                    {isDpInvoice ? "Down Payment (DP)" : "Tagihan Barang / Progress"}
                 </Badge>
             </div>
@@ -323,84 +342,58 @@ export default function AddInvoicePage() {
 
       <div className="grid gap-6 lg:grid-cols-7 items-start">
         <div className="lg:col-span-5 space-y-6">
-          <Card className={cn("shadow-sm border-none ring-1 ring-border", isLocked && "opacity-60 pointer-events-none")}>
-            <CardHeader className="bg-muted/30 border-b py-4">
-                <CardTitle className="text-sm font-black uppercase flex items-center gap-2">
-                    <ReceiptText className="h-4 w-4 text-primary" /> Identitas Penagihan
+          <Card className={cn("shadow-sm border-none ring-1 ring-border bg-muted/5", isLocked && "opacity-60")}>
+            <CardHeader className="bg-muted/30 border-b py-3">
+                <CardTitle className="text-[10px] font-black uppercase flex items-center gap-2 text-muted-foreground tracking-widest">
+                    <ReceiptText className="h-4 w-4" /> Identitas Penagihan (ReadOnly)
                 </CardTitle>
             </CardHeader>
             <CardContent className="p-6">
-              <div className="grid gap-6 md:grid-cols-2">
-                  <div className="md:col-span-2 p-4 bg-muted/20 rounded-xl border border-dashed mb-2">
-                      <div className="flex items-center justify-between mb-4">
-                          <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Pilih Sumber Nomor Invoice</Label>
-                          <div className="flex bg-white rounded-md p-0.5 border shadow-sm">
-                              <Button 
-                                variant={numberSource === 'manual' ? 'default' : 'ghost'} 
-                                size="sm" 
-                                className="h-7 text-[9px] font-black uppercase"
-                                onClick={() => { setNumberSource('manual'); setInvoiceId(''); }}
-                              >
-                                  <Hash className="h-3 w-3 mr-1" /> Otomatis SAR
-                              </Button>
-                              <Button 
-                                variant={numberSource === 'erp' ? 'default' : 'ghost'} 
-                                size="sm" 
-                                className="h-7 text-[9px] font-black uppercase"
-                                onClick={() => { setNumberSource('erp'); setInvoiceId(''); }}
-                              >
-                                  <Database className="h-3 w-3 mr-1" /> Input ERP Number
-                              </Button>
-                          </div>
-                      </div>
-                      <div className="grid grid-cols-2 gap-4">
-                          <div className="space-y-2">
-                              <Label className="text-[10px] font-black uppercase text-muted-foreground">Invoice Number (Primary)</Label>
-                              <Input 
-                                value={invoiceId} 
-                                onChange={e => setInvoiceId(e.target.value)}
-                                readOnly={numberSource === 'manual'}
-                                className={cn("font-black text-indigo-700 h-10", numberSource === 'manual' ? "bg-indigo-50/50 border-indigo-100" : "bg-white border-primary ring-1 ring-primary/10")} 
-                                placeholder={numberSource === 'manual' ? "Generating..." : "ERPSAR/2026/..."}
-                              />
-                          </div>
-                          <div className="space-y-2">
-                              <Label className="text-[10px] font-black uppercase text-muted-foreground">Internal Note / Reference</Label>
-                              <Input 
-                                value={internalNote} 
-                                onChange={e => setInternalNote(e.target.value)} 
-                                className="font-mono text-xs h-10" 
-                                placeholder="Catatan internal sistem..." 
-                              />
-                          </div>
+              <div className="grid gap-6 md:grid-cols-3">
+                  <div className="space-y-1.5">
+                      <Label className="text-[9px] font-black uppercase text-muted-foreground tracking-widest">Invoice Number</Label>
+                      <div className="flex items-center gap-2 bg-white px-3 py-2 rounded-md border-2 border-indigo-100 shadow-sm">
+                          {numberSource === 'erp' ? <Database className="h-3.5 w-3.5 text-emerald-600" /> : <Hash className="h-3.5 w-3.5 text-indigo-600" />}
+                          <span className="font-black text-indigo-700">{invoiceId || 'N/A'}</span>
                       </div>
                   </div>
 
-                  <div className="space-y-2">
-                      <Label className="text-[10px] font-black uppercase text-muted-foreground">Customer</Label>
-                      <Input value={customerName} disabled className="font-bold uppercase" />
+                  <div className="space-y-1.5">
+                      <Label className="text-[9px] font-black uppercase text-muted-foreground tracking-widest">Customer</Label>
+                      <div className="bg-white px-3 py-2 rounded-md border border-slate-200 text-xs font-black uppercase truncate">{customerName}</div>
                   </div>
-                  <div className="space-y-2">
-                      <Label className="text-[10px] font-black uppercase text-muted-foreground">Referensi PO</Label>
-                      <Input value={poNumber} disabled className="font-mono" />
+
+                  <div className="space-y-1.5">
+                      <Label className="text-[9px] font-black uppercase text-muted-foreground tracking-widest">Referensi PO / SO</Label>
+                      <div className="bg-white px-3 py-2 rounded-md border border-slate-200 text-xs font-mono font-bold truncate">
+                          {poNumber} {soNumber && `• ${soNumber}`}
+                      </div>
                   </div>
-                  <div className="space-y-2">
-                      <Label className="text-[10px] font-black uppercase text-muted-foreground">No. SO Produksi</Label>
-                      <Input value={soNumber} disabled className="font-mono" />
+
+                  <div className="md:col-span-2 space-y-1.5">
+                      <Label className="text-[9px] font-black uppercase text-muted-foreground tracking-widest">Alamat Penagihan & NPWP</Label>
+                      <Input value={billingAddress} onChange={e => setBillingAddress(e.target.value)} className="font-medium h-9 text-xs" placeholder="Alamat lengkap..." disabled={isLocked} />
+                      <Input value={billingNpwp} onChange={e => setBillingNpwp(e.target.value)} className="font-mono text-[10px] mt-2 h-8 bg-muted/30" placeholder="NPWP..." disabled={isLocked} />
                   </div>
-                  <div className="md:col-span-2 space-y-2">
-                      <Label className="text-[10px] font-black uppercase text-muted-foreground">Alamat Penagihan & NPWP</Label>
-                      <Input value={billingAddress} onChange={e => setBillingAddress(e.target.value)} className="font-medium" placeholder="Alamat lengkap..." />
-                      <Input value={billingNpwp} onChange={e => setBillingNpwp(e.target.value)} className="font-mono text-xs mt-2" placeholder="NPWP..." />
+
+                  <div className="space-y-1.5">
+                      <Label className="text-[9px] font-black uppercase text-muted-foreground tracking-widest">Internal Note</Label>
+                      <Input 
+                        value={internalNote} 
+                        onChange={e => setInternalNote(e.target.value)} 
+                        className="font-mono text-[10px] h-9" 
+                        placeholder="Catatan sistem..." 
+                        disabled={isLocked}
+                      />
                   </div>
               </div>
             </CardContent>
           </Card>
 
-          <Card className={cn("shadow-sm border-none ring-1 ring-border", isLocked && "opacity-60 pointer-events-none", isDpInvoice && "opacity-40 grayscale pointer-events-none")}>
+          <Card className={cn("shadow-sm border-none ring-1 ring-border", isLocked && "opacity-60", isDpInvoice && "opacity-40 grayscale pointer-events-none")}>
             <CardHeader className="bg-muted/30 border-b py-4">
                 <div className="flex justify-between items-center">
-                    <CardTitle className="text-sm font-black uppercase">Item Progress Tracking</CardTitle>
+                    <CardTitle className="text-sm font-black uppercase tracking-tight">Item Progress Tracking</CardTitle>
                     {isDpInvoice && <Badge variant="secondary" className="text-[8px] uppercase">Disabled in DP Mode</Badge>}
                 </div>
             </CardHeader>
@@ -410,14 +403,14 @@ export default function AddInvoicePage() {
                         <TableRow>
                             <TableHead className="text-[10px] font-black uppercase py-2">Nama Produk / Jasa</TableHead>
                             <TableHead className="w-[80px] text-center text-[10px] font-black uppercase py-2">Qty PO</TableHead>
-                            <TableHead className="w-[80px] text-center text-[10px] font-black uppercase py-2">Invoiced</TableHead>
+                            <TableHead className="w-[80px] text-center text-[10px] font-black uppercase py-2">Prev. Invoiced</TableHead>
                             <TableHead className="w-[100px] text-center text-[10px] font-black uppercase py-2">Now Billing</TableHead>
-                            <TableHead className="w-[140px] text-right text-[10px] font-black uppercase py-2">Total</TableHead>
+                            <TableHead className="w-[140px] text-right text-[10px] font-black uppercase py-2">Total (IDR)</TableHead>
                         </TableRow>
                     </TableHeader>
                     <TableBody>
                         {items.length === 0 ? (
-                            <TableRow><TableCell colSpan={5} className="text-center py-10 text-muted-foreground italic">Belum ada item SO terdeteksi.</TableCell></TableRow>
+                            <TableRow><TableCell colSpan={5} className="text-center py-10 text-muted-foreground italic text-xs">Belum ada item SO terdeteksi.</TableCell></TableRow>
                         ) : items.map(item => {
                             const track = itemTracking[item.name] || { poQty: item.quantity, invoiced: 0 };
                             const remaining = track.poQty - track.invoiced;
@@ -425,7 +418,7 @@ export default function AddInvoicePage() {
 
                             return (
                                 <TableRow key={item.id}>
-                                    <TableCell><Input value={item.name} onChange={e => setItems(items.map(it => it.id === item.id ? { ...it, name: e.target.value } : it))} className="h-9 text-xs font-bold" /></TableCell>
+                                    <TableCell><Input value={item.name} onChange={e => setItems(items.map(it => it.id === item.id ? { ...it, name: e.target.value } : it))} className="h-8 text-[11px] font-bold" disabled={isLocked} /></TableCell>
                                     <TableCell className="text-center text-[10px] font-bold text-muted-foreground">{track.poQty}</TableCell>
                                     <TableCell className="text-center text-[10px] font-bold text-blue-600">{track.invoiced}</TableCell>
                                     <TableCell>
@@ -436,9 +429,10 @@ export default function AddInvoicePage() {
                                                     const val = parseFormattedNumber(e.target.value);
                                                     setItems(items.map(it => it.id === item.id ? { ...it, quantity: val, total: val * it.price } : it));
                                                 }} 
-                                                className={cn("text-center text-xs h-9 font-black", isOver ? "border-red-500 bg-red-50 text-red-700" : "bg-blue-50/50")} 
+                                                className={cn("text-center text-xs h-8 font-black", isOver ? "border-red-500 bg-red-50 text-red-700" : "bg-blue-50/50")} 
+                                                disabled={isLocked}
                                             />
-                                            {isOver && <p className="text-[8px] text-red-600 font-bold text-center uppercase tracking-tighter">Over Limit!</p>}
+                                            {isOver && <p className="text-[7px] text-red-600 font-bold text-center uppercase tracking-tighter">Over Limit!</p>}
                                         </div>
                                     </TableCell>
                                     <TableCell className="text-right font-black text-xs text-slate-800">Rp {formatNumberWithCommas(item.total)}</TableCell>
@@ -447,99 +441,100 @@ export default function AddInvoicePage() {
                         })}
                     </TableBody>
                 </Table>
-                <div className="p-4 bg-muted/10 border-t">
-                    <Button variant="outline" size="sm" onClick={() => setItems([...items, { id: Date.now().toString(), name: '', quantity: 1, unit: 'm', price: 0, total: 0 }])} className="border-dashed h-8 text-[10px] font-bold">
-                        <Plus className="mr-2 h-3 w-3" /> TAMBAH BARIS MANUAL
+                <div className="p-4 bg-muted/10 border-t flex justify-between items-center">
+                    <Button variant="outline" size="sm" onClick={() => setItems([...items, { id: Date.now().toString(), name: '', quantity: 1, unit: 'm', price: 0, total: 0 }])} className="border-dashed h-8 text-[9px] font-black uppercase" disabled={isLocked}>
+                        <Plus className="mr-2 h-3 w-3" /> Tambah Baris Manual
                     </Button>
+                    <p className="text-[10px] font-bold text-muted-foreground italic">Total {items.length} Baris Produk</p>
                 </div>
             </CardContent>
           </Card>
         </div>
 
         <div className="lg:col-span-2 space-y-6 sticky top-24">
-          <Card className={cn("shadow-md border-none ring-1 ring-primary/20", isLocked && "opacity-80 pointer-events-none")}>
+          <Card className={cn("shadow-md border-none ring-1 ring-primary/20", isLocked && "opacity-80")}>
             <CardHeader className="bg-primary/5 py-4 border-b">
-                <CardTitle className="text-sm font-black uppercase flex items-center justify-between">
-                    Kalkulasi Finansial
+                <CardTitle className="text-xs font-black uppercase flex items-center justify-between tracking-widest">
+                    Summary Kalkulasi
                     {(isFinalized || isPaid) && <ShieldCheck className="h-4 w-4 text-indigo-600" />}
                 </CardTitle>
             </CardHeader>
             <CardContent className="p-6 space-y-5">
               <div className="space-y-4">
-                <div className="flex justify-between items-center text-xs">
+                <div className="flex justify-between items-center text-[10px]">
                     <span className="text-muted-foreground font-black uppercase tracking-widest">Gross Subtotal</span>
                     <span className="font-black">Rp {formatNumberWithCommas(subtotal)}</span>
                 </div>
                 
-                <div className="space-y-2">
+                <div className="space-y-1.5">
                     <div className="flex justify-between items-center">
-                        <Label className="text-[10px] font-black uppercase text-red-600">Negotiation</Label>
-                        <Select value={negotiationMode} onValueChange={(v: any) => setNegotiationMode(v)}>
-                            <SelectTrigger className="h-6 w-16 text-[9px] font-black uppercase"><SelectValue /></SelectTrigger>
+                        <Label className="text-[9px] font-black uppercase text-red-600 tracking-tighter">Negotiation / Discount</Label>
+                        <Select value={negotiationMode} onValueChange={(v: any) => setNegotiationMode(v)} disabled={isLocked}>
+                            <SelectTrigger className="h-5 w-14 text-[8px] font-black uppercase"><SelectValue /></SelectTrigger>
                             <SelectContent><SelectItem value="nominal">IDR</SelectItem><SelectItem value="percent">%</SelectItem></SelectContent>
                         </Select>
                     </div>
-                    <Input value={negotiationValue} onChange={e => setNegotiationValue(e.target.value)} className="h-8 text-right font-black text-red-600 border-red-100 bg-red-50/30" placeholder="0" />
+                    <Input value={negotiationValue} onChange={e => setNegotiationValue(e.target.value)} className="h-8 text-right font-black text-red-600 border-red-100 bg-red-50/30" placeholder="0" disabled={isLocked} />
                 </div>
 
                 {isDpInvoice ? (
-                    <div className="space-y-2 bg-indigo-50/50 p-3 rounded-xl border border-indigo-100">
+                    <div className="space-y-1.5 bg-indigo-50/50 p-3 rounded-xl border border-indigo-100">
                         <div className="flex justify-between items-center">
-                            <Label className="text-[10px] font-black uppercase text-indigo-700">Tagihan Down Payment</Label>
-                            <Select value={dpMode} onValueChange={(v: any) => setDpMode(v)}>
-                                <SelectTrigger className="h-6 w-16 text-[9px] font-black uppercase"><SelectValue /></SelectTrigger>
+                            <Label className="text-[9px] font-black uppercase text-indigo-700 tracking-tighter">Tagihan Down Payment</Label>
+                            <Select value={dpMode} onValueChange={(v: any) => setDpMode(v)} disabled={isLocked}>
+                                <SelectTrigger className="h-5 w-14 text-[8px] font-black uppercase"><SelectValue /></SelectTrigger>
                                 <SelectContent><SelectItem value="nominal">IDR</SelectItem><SelectItem value="percent">%</SelectItem></SelectContent>
                             </Select>
                         </div>
-                        <Input value={dpValue} onChange={e => setDpValue(e.target.value)} className="h-8 text-right font-black border-indigo-200" placeholder="0" />
+                        <Input value={dpValue} onChange={e => setDpValue(e.target.value)} className="h-8 text-right font-black border-indigo-200" placeholder="0" disabled={isLocked} />
                     </div>
                 ) : (
-                    <div className="space-y-2 bg-emerald-50/30 p-3 rounded-xl border border-emerald-100">
+                    <div className="space-y-1.5 bg-emerald-50/30 p-3 rounded-xl border border-emerald-100">
                         <div className="flex justify-between items-center">
                             <div className="flex flex-col">
-                                <Label className="text-[10px] font-black uppercase text-emerald-700">Deduction from DP</Label>
-                                <span className="text-[8px] font-bold text-emerald-600">Saldo: Rp {formatNumberWithCommas(dpBalance)}</span>
+                                <Label className="text-[9px] font-black uppercase text-emerald-700 tracking-tighter">Deduction from DP</Label>
+                                <span className="text-[7px] font-bold text-emerald-600 uppercase">Available: Rp {formatNumberWithCommas(dpBalance)}</span>
                             </div>
-                            <Select value={dpDeductionMode} onValueChange={(v: any) => setDpDeductionMode(v)}>
-                                <SelectTrigger className="h-6 w-16 text-[9px] font-black uppercase"><SelectValue /></SelectTrigger>
+                            <Select value={dpDeductionMode} onValueChange={(v: any) => setDpDeductionMode(v)} disabled={isLocked}>
+                                <SelectTrigger className="h-5 w-14 text-[8px] font-black uppercase"><SelectValue /></SelectTrigger>
                                 <SelectContent><SelectItem value="nominal">IDR</SelectItem><SelectItem value="percent">%</SelectItem></SelectContent>
                             </Select>
                         </div>
-                        <Input value={dpDeductionValue} onChange={e => setDpDeductionValue(e.target.value)} className="h-8 text-right font-black border-emerald-200 text-emerald-700" placeholder="0" />
+                        <Input value={dpDeductionValue} onChange={e => setDpDeductionValue(e.target.value)} className="h-8 text-right font-black border-emerald-200 text-emerald-700" placeholder="0" disabled={isLocked} />
                     </div>
                 )}
 
-                <div className="space-y-2">
+                <div className="space-y-1.5">
                     <div className="flex justify-between items-center">
-                        <Label className="text-[10px] font-black uppercase text-slate-800">Retention (Safety)</Label>
-                        <Select value={retentionMode} onValueChange={(v: any) => setRetentionMode(v)}>
-                            <SelectTrigger className="h-6 w-16 text-[9px] font-black uppercase"><SelectValue /></SelectTrigger>
+                        <Label className="text-[9px] font-black uppercase text-slate-800 tracking-tighter">Retention (Safety Fund)</Label>
+                        <Select value={retentionMode} onValueChange={(v: any) => setRetentionMode(v)} disabled={isLocked}>
+                            <SelectTrigger className="h-5 w-14 text-[8px] font-black uppercase"><SelectValue /></SelectTrigger>
                             <SelectContent><SelectItem value="nominal">IDR</SelectItem><SelectItem value="percent">%</SelectItem></SelectContent>
                         </Select>
                     </div>
-                    <Input value={retentionValue} onChange={e => setRetentionValue(e.target.value)} className="h-8 text-right font-black border-slate-200" placeholder="0" />
+                    <Input value={retentionValue} onChange={e => setRetentionValue(e.target.value)} className="h-8 text-right font-black border-slate-200" placeholder="0" disabled={isLocked} />
                 </div>
               </div>
 
               <div className="bg-muted/50 p-4 rounded-xl space-y-4 border border-dashed">
                 <div className="flex justify-between items-center">
-                    <Label className="text-[10px] font-black uppercase text-primary">Override Pajak (VAT)</Label>
-                    <Switch checked={isTaxManual} onCheckedChange={setIsTaxManual} />
+                    <Label className="text-[9px] font-black uppercase text-primary">Override Pajak (VAT)</Label>
+                    <Switch checked={isTaxManual} onCheckedChange={setIsTaxManual} disabled={isLocked} />
                 </div>
                 <div className="grid gap-3">
                     <div className="grid gap-1">
                         <span className="text-[8px] font-black uppercase text-muted-foreground">Dasar Pengenaan Pajak (DPP)</span>
-                        <Input value={dppVat} onChange={e => setDppVat(e.target.value)} disabled={!isTaxManual} className="h-8 text-right font-mono text-xs font-bold" />
+                        <Input value={dppVat} onChange={e => setDppVat(e.target.value)} disabled={!isTaxManual || isLocked} className="h-8 text-right font-mono text-xs font-bold" />
                     </div>
                     <div className="grid gap-1">
                         <span className="text-[8px] font-black uppercase text-muted-foreground">PPN (12%)</span>
-                        <Input value={vat12} onChange={e => setVat12(e.target.value)} disabled={!isTaxManual} className="h-8 text-right font-mono text-xs font-bold" />
+                        <Input value={vat12} onChange={e => setVat12(e.target.value)} disabled={!isTaxManual || isLocked} className="h-8 text-right font-mono text-xs font-bold" />
                     </div>
                 </div>
               </div>
 
-              <div className="pt-2 border-t border-dashed">
-                  <span className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Grand Total Tagihan</span>
+              <div className="pt-2 border-t-2 border-primary/20">
+                  <span className="text-[9px] font-black uppercase text-muted-foreground tracking-widest">Grand Total Tagihan</span>
                   <div className="text-2xl font-black text-primary leading-none mt-1">Rp {totalAmount}</div>
               </div>
 
@@ -550,7 +545,7 @@ export default function AddInvoicePage() {
                       </Button>
                   )}
                   {isSuperAdmin && !isFinalized && !isPaid && (
-                      <Button variant="outline" className="w-full h-11 border-indigo-600 text-indigo-600 font-black uppercase text-xs" onClick={() => handleSaveInvoice('finalized')}>
+                      <Button variant="outline" className="w-full h-11 border-indigo-600 text-indigo-600 font-black uppercase text-[10px] tracking-widest" onClick={() => handleSaveInvoice('finalized')}>
                         <ShieldCheck className="mr-2 h-4 w-4" /> FINALIZE & LOCK
                       </Button>
                   )}

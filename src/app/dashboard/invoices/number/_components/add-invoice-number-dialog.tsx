@@ -11,7 +11,7 @@ import {
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Plus, Calendar as CalendarIcon, Check, ChevronsUpDown, Database, Hash } from 'lucide-react';
+import { Plus, Calendar as CalendarIcon, Check, ChevronsUpDown, Database, Hash, FilePlus } from 'lucide-react';
 import { Checkbox } from '@/components/ui/checkbox';
 import {
   Popover,
@@ -27,7 +27,7 @@ import {
   CommandList,
 } from '@/components/ui/command';
 import { Calendar } from '@/components/ui/calendar';
-import { cn, formatNumberWithCommas, parseFormattedNumber } from '@/lib/utils';
+import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
 import type { InvoiceNumber, Customer, SalesOrder, Invoice } from '@/app/lib/data';
 import { useToast } from '@/hooks/use-toast';
@@ -65,7 +65,6 @@ export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceDa
   const [salesOrder, setSalesOrder] = useState('');
   const [poNumber, setPoNumber] = useState('');
   const [customer, setCustomer] = useState('');
-  const [amount, setAmount] = useState<string>('');
 
   const [customerPopoverOpen, setCustomerPopoverOpen] = useState(false);
   const [soPopoverOpen, setSoPopoverOpen] = useState(false);
@@ -108,10 +107,10 @@ export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceDa
     allIds.forEach(id => {
         let match;
         if (type === 'sar') {
-            const pattern = new RegExp(`SAR_${currentYearShort}01(\\d+)A`);
+            const pattern = new RegExp(`SAR/${currentYearShort}(\\d+)A`);
             match = id.match(pattern);
         } else {
-            const pattern = new RegExp(`KW[\\/_](\\d+)[\\/_]KEU[\\/_]${currentYearLong}`);
+            const pattern = new RegExp(`KW/(\\d+)/KEU/${currentYearLong}`);
             match = id.match(pattern);
         }
 
@@ -126,7 +125,7 @@ export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceDa
     const nextNum = baseNumber + 1;
 
     return type === 'sar' 
-        ? nextNum.toString().padStart(3, '0') 
+        ? nextNum.toString().padStart(2, '0') 
         : nextNum.toString().padStart(4, '0');
   };
   
@@ -137,7 +136,7 @@ export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceDa
     const currentYearLong = format(now, 'yyyy');
 
     if (type === 'sar') {
-      setPrefix(`SAR_${currentYearShort}01`);
+      setPrefix(`SAR/${currentYearShort}`);
       setSuffix('A');
       setMainNumber(nextNumStr);
     } else {
@@ -149,8 +148,8 @@ export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceDa
 
   const handleManualSetup = (invoice: InvoiceNumber) => {
     const id = invoice.id;
-    const sarMatch = id.match(/^(SAR_\d{2}01)(\d+)(A)$/);
-    const kwMatch = id.match(/^(KW[\/_])(\d+)([\/_]KEU[\/_]\d{4})$/);
+    const sarMatch = id.match(/^(SAR\/\d{2})(\d+)(A)$/);
+    const kwMatch = id.match(/^(KW\/)(\d+)(\/KEU\/\d{4})$/);
 
     if (sarMatch) {
         setNumberSource('manual');
@@ -184,7 +183,6 @@ export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceDa
     } else {
       setDate(new Date());
     }
-    setAmount(formatNumberWithCommas(invoice.amount));
   }
 
   useEffect(() => {
@@ -202,7 +200,6 @@ export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceDa
           setSalesOrder('');
           setPoNumber('');
           setDate(new Date());
-          setAmount('');
           setErpNumberInput('');
       }
   }, [isOpen, invoiceData]);
@@ -230,36 +227,21 @@ export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceDa
       const soDetails = salesOrderListData.filter(item => item.soNumber === newSalesOrder);
       
       if (soDetails.length > 0) {
-        const totalAmount = soDetails.reduce((sum, item) => sum + (item.quantity * item.price), 0);
-        setAmount(formatNumberWithCommas(totalAmount));
         setCustomer(soDetails[0].customer);
         setPoNumber(soDetails[0].poNumber || '');
       } else {
-        setAmount('');
         setCustomer('');
         setPoNumber('');
       }
 
     } else {
         setCustomer('');
-        setAmount('');
+        setPoNumber('');
     }
 
     setSoPopoverOpen(false);
   };
   
-  const handleAmountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const value = e.target.value.replace(/[^\d.,]/g, '');
-    setAmount(value);
-  };
-
-  const handleBlurAmount = () => {
-    const numeric = parseFormattedNumber(amount);
-    if (!isNaN(numeric) && amount !== '') {
-        setAmount(formatNumberWithCommas(numeric));
-    }
-  };
-
   const handleSave = (action: 'save' | 'create') => {
     if (numberSource === 'manual' && !mainNumber) {
         toast({ variant: "destructive", title: "Validation Error", description: "Nomor urut tidak boleh kosong." });
@@ -290,36 +272,35 @@ export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceDa
     }
 
     const formattedDate = date ? format(date, 'dd/MM/yyyy') : '';
-    const numericAmount = parseFormattedNumber(amount);
     onSave({
       id: finalInvoiceNumber,
       customer,
       salesOrder,
       poNumber,
       date: formattedDate,
-      amount: numericAmount
+      amount: 0 // Amount will be calculated in constructor
     }, action);
     onOpenChange(false);
   }
 
-  const dialogTitle = invoiceData ? "Edit Invoice Identity" : "Add New Invoice Identity";
+  const dialogTitle = invoiceData ? "Edit Identitas Penagihan" : "Registrasi Identitas Penagihan Baru";
 
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
       <DialogTrigger asChild>
-        <Button onClick={onAddClick}>
-          <Plus className="mr-2 h-4 w-4" /> Add Identity
+        <Button onClick={onAddClick} className="bg-indigo-600 hover:bg-indigo-700">
+          <Plus className="mr-2 h-4 w-4" /> Registrasi Nomor
         </Button>
       </DialogTrigger>
       <DialogContent className="sm:max-w-2xl">
         <DialogHeader>
-          <DialogTitle>{dialogTitle}</DialogTitle>
+          <DialogTitle className="uppercase font-black tracking-tight">{dialogTitle}</DialogTitle>
         </DialogHeader>
         <div className="grid gap-6 py-4 max-h-[70vh] overflow-y-auto pr-4">
           
           <div className="p-4 bg-muted/20 rounded-xl border border-dashed">
               <div className="flex items-center justify-between mb-4">
-                  <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Pilih Sumber Nomor</Label>
+                  <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Pilih Sumber Nomor (Identitas Tunggal)</Label>
                   <div className="flex bg-white rounded-md p-0.5 border shadow-sm">
                       <Button 
                         variant={numberSource === 'manual' ? 'default' : 'ghost'} 
@@ -327,7 +308,7 @@ export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceDa
                         className="h-7 text-[9px] font-black uppercase"
                         onClick={() => setNumberSource('manual')}
                       >
-                          <Hash className="h-3 w-3 mr-1" /> Otomatis Manual
+                          <Hash className="h-3 w-3 mr-1" /> Otomatis Manual (SAR/KW)
                       </Button>
                       <Button 
                         variant={numberSource === 'erp' ? 'default' : 'ghost'} 
@@ -335,7 +316,7 @@ export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceDa
                         className="h-7 text-[9px] font-black uppercase"
                         onClick={() => setNumberSource('erp')}
                       >
-                          <Database className="h-3 w-3 mr-1" /> Input ERP
+                          <Database className="h-3 w-3 mr-1" /> Input ERP Pusat
                       </Button>
                   </div>
               </div>
@@ -343,40 +324,40 @@ export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceDa
               {numberSource === 'manual' ? (
                   <div className="space-y-4">
                       <div className="space-y-2">
-                        <Label>Tipe Faktur</Label>
-                         <div className="flex w-full rounded-md border border-input bg-white">
+                        <Label className="text-[10px] font-black uppercase text-muted-foreground">Tipe Dokumen</Label>
+                         <div className="flex w-full rounded-md border border-input bg-white p-1">
                             <Button
                                 variant={invoiceType === 'sar' ? 'default' : 'ghost'}
                                 onClick={() => setInvoiceType('sar')}
-                                className="flex-1 rounded-r-none h-8 text-[10px] font-bold"
+                                className="flex-1 h-8 text-[10px] font-bold uppercase"
                                 disabled={!!invoiceData}
                             >
-                                SAR
+                                SAR (Tagihan Barang)
                             </Button>
                             <Button
                                 variant={invoiceType === 'kw' ? 'default' : 'ghost'}
                                 onClick={() => setInvoiceType('kw')}
-                                className="flex-1 rounded-l-none h-8 text-[10px] font-bold"
+                                className="flex-1 h-8 text-[10px] font-bold uppercase"
                                 disabled={!!invoiceData}
                             >
-                                KW / Proforma
+                                KW (DP / Proforma)
                             </Button>
                         </div>
                       </div>
 
                       <div className="space-y-2">
-                        <Label>Konfigurasi Nomor</Label>
+                        <Label className="text-[10px] font-black uppercase text-muted-foreground">Konfigurasi Penomoran</Label>
                         <div className="flex items-center gap-4 mb-2">
                             <div className="flex items-center space-x-2">
                               <Checkbox id="auto-number" checked={isAutoNumber} onCheckedChange={(checked) => setIsAutoNumber(!!checked)} />
-                              <Label htmlFor="auto-number" className="font-normal">Nomor Otomatis</Label>
+                              <Label htmlFor="auto-number" className="text-xs font-bold uppercase cursor-pointer">Gunakan Nomor Urut Sistem</Label>
                             </div>
                             {isAutoNumber && (
                                 <div className="flex items-center gap-2">
-                                    <Label className="text-xs font-normal text-muted-foreground">Mulai Dari:</Label>
+                                    <Label className="text-[9px] font-bold uppercase text-muted-foreground">Mulai:</Label>
                                     <Input 
-                                        placeholder={invoiceType === 'sar' ? "001" : "0001"}
-                                        className="h-7 w-24 text-xs"
+                                        placeholder={invoiceType === 'sar' ? "01" : "0001"}
+                                        className="h-7 w-20 text-xs font-bold"
                                         value={startingNumber}
                                         onChange={(e) => setStartingNumber(e.target.value)}
                                     />
@@ -384,61 +365,64 @@ export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceDa
                             )}
                         </div>
                         <div className="grid grid-cols-[auto_1fr_auto] items-center gap-2">
-                          {prefix && <div className="bg-white px-3 py-2 rounded-md border text-xs font-mono">{prefix}</div>}
-                          <Input value={mainNumber} onChange={(e) => setMainNumber(e.target.value)} disabled={isAutoNumber} className="h-9 font-bold" />
-                          {suffix && <div className="bg-white px-3 py-2 rounded-md border text-xs font-mono">{suffix}</div>}
+                          {prefix && <div className="bg-indigo-50 px-3 py-2 rounded-md border border-indigo-100 text-xs font-black text-indigo-700 font-mono">{prefix}</div>}
+                          <Input value={mainNumber} onChange={(e) => setMainNumber(e.target.value)} disabled={isAutoNumber} className="h-10 font-black text-center text-lg tracking-widest" />
+                          {suffix && <div className="bg-indigo-50 px-3 py-2 rounded-md border border-indigo-100 text-xs font-black text-indigo-700 font-mono">{suffix}</div>}
                         </div>
                       </div>
                   </div>
               ) : (
                   <div className="space-y-2">
-                      <Label>Nomor ERP Resmi (Pusat)</Label>
+                      <Label className="text-[10px] font-black uppercase text-muted-foreground">Nomor ERP Resmi (Sistem Pusat)</Label>
                       <Input 
                         value={erpNumberInput} 
                         onChange={e => setErpNumberInput(e.target.value)} 
                         placeholder="Contoh: ERPSAR/2600000" 
-                        className="h-10 font-black text-indigo-700 bg-white"
+                        className="h-12 font-black text-indigo-700 bg-white text-lg border-2 border-indigo-200"
                       />
-                      <p className="text-[9px] text-muted-foreground italic mt-1">Gunakan format penomoran yang terbit dari sistem ERP perusahaan.</p>
+                      <p className="text-[9px] text-muted-foreground italic mt-1 font-bold">Pastikan nomor sesuai dengan yang tertera pada sistem ERP pusat.</p>
                   </div>
               )}
           </div>
 
            <div className="space-y-2">
-            <Label htmlFor="sales-order">Sales Order / SO (Opsional)</Label>
+            <Label htmlFor="sales-order" className="text-[10px] font-black uppercase text-muted-foreground">Sales Order / SO Asal</Label>
             <Popover open={soPopoverOpen} onOpenChange={setSoPopoverOpen}>
                 <PopoverTrigger asChild>
                     <Button
                     variant="outline"
                     role="combobox"
                     aria-expanded={soPopoverOpen}
-                    className="w-full justify-between"
+                    className="w-full justify-between h-10 font-bold border-indigo-100"
                     >
                     {salesOrder
                         ? uniqueSalesOrders.find((so) => so === salesOrder)
-                        : "Cari SO (Kosongkan jika hanya penagihan awal/DP)"}
+                        : "Cari Nomor SO..."}
                     <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                     </Button>
                 </PopoverTrigger>
-                <PopoverContent className="w-[375px] p-0 shadow-xl border border-muted overflow-hidden">
+                <PopoverContent className="w-[500px] p-0 shadow-2xl border-indigo-200 overflow-hidden">
                     <Command>
-                    <CommandInput placeholder="Search sales order..." />
-                    <CommandList>
+                    <CommandInput placeholder="Cari No. SO atau Customer..." className="h-11" />
+                    <CommandList className="max-h-[300px]">
                       <CommandEmpty />
                       <CommandGroup>
-                          {uniqueSalesOrders.map((so) => (
+                          {salesOrderListData?.map((so, idx) => (
                           <CommandItem
-                              key={so}
-                              value={`${so}|${so}`}
+                              key={`${so.soNumber}-${idx}`}
+                              value={`${so.soNumber}|${so.customer}`}
                               onSelect={handleSalesOrderSelect}
+                              className="flex flex-col items-start gap-1 p-3 border-b last:border-0"
                           >
-                              <Check
-                              className={cn(
-                                  "mr-2 h-4 w-4",
-                                  salesOrder === so ? "opacity-100" : "opacity-0"
-                              )}
-                              />
-                              {so}
+                              <div className="flex items-center justify-between w-full">
+                                <span className="font-black text-indigo-700">{so.soNumber}</span>
+                                <Check className={cn("h-4 w-4", salesOrder === so.soNumber ? "opacity-100" : "opacity-0")} />
+                              </div>
+                              <div className="flex items-center gap-2 text-[10px] font-bold text-muted-foreground uppercase">
+                                  <span>{so.customer}</span>
+                                  <span>•</span>
+                                  <span>PO: {so.poNumber}</span>
+                              </div>
                           </CommandItem>
                           ))}
                       </CommandGroup>
@@ -447,89 +431,35 @@ export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceDa
                 </PopoverContent>
             </Popover>
           </div>
-          <div className="space-y-2">
-            <Label htmlFor="po-number">Nomor PO Customer { !salesOrder && <span className="text-red-500">*</span> }</Label>
-            <Input 
-                id="po-number" 
-                value={poNumber} 
-                onChange={e => setPoNumber(e.target.value)} 
-                placeholder="Misal: PO-ABC-2024" 
-                disabled={!!salesOrder}
-            />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="customer">Pelanggan</Label>
-            <Popover open={customerPopoverOpen} onOpenChange={setCustomerPopoverOpen}>
-                <PopoverTrigger asChild>
-                    <Button
-                    variant="outline"
-                    role="combobox"
-                    aria-expanded={customerPopoverOpen}
-                    className="w-full justify-between"
-                    disabled={!!salesOrder}
-                    >
-                    {customer && customerListData
-                        ? customerListData.find((c) => c.name.toLowerCase() === customer.toLowerCase())?.name
-                        : "Pilih Pelanggan"}
-                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                    </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-[400px] p-0 shadow-xl border border-muted" align="start">
-                    <Command>
-                    <CommandInput placeholder="Search customer..." />
-                     <CommandList>
-                        <CommandEmpty />
-                        <CommandGroup>
-                            {customerListData?.map((c) => (
-                            <CommandItem
-                                key={c.id}
-                                value={`${c.name}|${c.id}`}
-                                onSelect={(v) => {
-                                    const [name] = v.split('|');
-                                    setCustomer(name === customer ? "" : name);
-                                    setCustomerPopoverOpen(false);
-                                }}
-                                className="flex flex-col items-start gap-1"
-                            >
-                                <div className="flex items-center gap-2">
-                                  <Check
-                                    className={cn(
-                                        "h-4 w-4",
-                                        customer.toLowerCase() === c.name.toLowerCase() ? "opacity-100" : "opacity-0"
-                                    )}
-                                  />
-                                  <span className="font-bold">{c.name}</span>
-                                </div>
-                                <p className="text-[10px] text-muted-foreground ml-6 truncate w-full">{c.address}</p>
-                            </CommandItem>
-                            ))}
-                        </CommandGroup>
-                     </CommandList>
-                    </Command>
-                </PopoverContent>
-            </Popover>
-          </div>
+
           <div className="grid grid-cols-2 gap-4">
-             <div className="space-y-2">
-                <Label htmlFor="date">Tanggal</Label>
+              <div className="space-y-2">
+                <Label htmlFor="po-number" className="text-[10px] font-black uppercase text-muted-foreground">Nomor PO Customer</Label>
+                <Input 
+                    id="po-number" 
+                    value={poNumber} 
+                    onChange={e => setPoNumber(e.target.value)} 
+                    placeholder="PO-ABC-2024" 
+                    disabled={!!salesOrder}
+                    className="font-bold bg-muted/50"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="date" className="text-[10px] font-black uppercase text-muted-foreground">Tanggal Registrasi</Label>
                  <Popover>
                   <PopoverTrigger asChild>
                     <Button
                       variant={'outline'}
                       className={cn(
-                        'w-full justify-start text-left font-normal',
+                        'w-full justify-start text-left font-bold h-10',
                         !date && 'text-muted-foreground'
                       )}
                     >
-                      <CalendarIcon className="mr-2 h-4 w-4" />
-                      {date ? (
-                        format(date, 'dd/MM/yyyy')
-                      ) : (
-                        <span>Pick a date</span>
-                      )}
+                      <CalendarIcon className="mr-2 h-4 w-4 text-indigo-600" />
+                      {date ? format(date, 'dd/MM/yyyy') : <span>Pilih Tanggal</span>}
                     </Button>
                   </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0">
+                  <PopoverContent className="w-auto p-0 shadow-xl border-indigo-100">
                     <Calendar
                       mode="single"
                       selected={date}
@@ -539,23 +469,61 @@ export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceDa
                   </PopoverContent>
                 </Popover>
               </div>
-            <div className="space-y-2">
-              <Label htmlFor="amount">Jumlah Tagihan</Label>
-              <Input 
-                id="amount" 
-                value={amount} 
-                onChange={handleAmountChange} 
-                onBlur={handleBlurAmount}
-                placeholder="0" 
-                disabled={!!salesOrder} 
-              />
-            </div>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="customer" className="text-[10px] font-black uppercase text-muted-foreground">Nama Pelanggan (PT/CV)</Label>
+            <Popover open={customerPopoverOpen} onOpenChange={setCustomerPopoverOpen}>
+                <PopoverTrigger asChild>
+                    <Button
+                    variant="outline"
+                    role="combobox"
+                    aria-expanded={customerPopoverOpen}
+                    className="w-full justify-between h-10 font-black uppercase border-indigo-100"
+                    disabled={!!salesOrder}
+                    >
+                    {customer ? customer : "Pilih Pelanggan..."}
+                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                    </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-[500px] p-0 shadow-2xl border-indigo-200" align="start">
+                    <Command>
+                    <CommandInput placeholder="Cari pelanggan..." className="h-11" />
+                     <CommandList>
+                        <CommandEmpty />
+                        <CommandGroup>
+                            {customerListData?.map((c) => (
+                            <CommandItem
+                                key={c.id}
+                                value={`${c.name}|${c.id}`}
+                                onSelect={(v) => {
+                                    const [name] = v.split('|');
+                                    setCustomer(name);
+                                    setCustomerPopoverOpen(false);
+                                }}
+                                className="flex flex-col items-start gap-1 p-3 border-b last:border-0"
+                            >
+                                <div className="flex items-center justify-between w-full">
+                                  <span className="font-bold text-slate-800 uppercase">{c.name}</span>
+                                  <Check className={cn("h-4 w-4", customer === c.name ? "opacity-100" : "opacity-0")} />
+                                </div>
+                                <p className="text-[10px] text-muted-foreground italic truncate w-full">{c.addresses?.[0]?.address || 'No Address'}</p>
+                            </CommandItem>
+                            ))}
+                        </CommandGroup>
+                     </CommandList>
+                    </Command>
+                </PopoverContent>
+            </Popover>
           </div>
         </div>
-        <div className="pt-6 border-t flex justify-end gap-2">
-          <Button variant="ghost" onClick={() => onOpenChange(false)}>Cancel</Button>
-          <Button variant="outline" onClick={() => handleSave('save')}>Save Logic</Button>
-          <Button type="button" onClick={() => handleSave('create')} className="bg-primary text-primary-foreground">Generate Invoice</Button>
+        
+        <div className="pt-6 border-t flex justify-end gap-3 bg-muted/10 -mx-6 -mb-6 p-6">
+          <Button variant="ghost" onClick={() => onOpenChange(false)} className="font-bold uppercase text-xs">Batal</Button>
+          <Button variant="outline" onClick={() => handleSave('save')} className="font-bold uppercase text-xs border-indigo-200 text-indigo-700">Simpan Identitas</Button>
+          <Button type="button" onClick={() => handleSave('create')} className="bg-indigo-600 hover:bg-indigo-700 font-black uppercase text-xs px-8 shadow-lg">
+              <FilePlus className="mr-2 h-4 w-4" /> Buka Constructor
+          </Button>
         </div>
       </DialogContent>
     </Dialog>
