@@ -315,6 +315,18 @@ export default function AddInvoicePage() {
   const handleSaveInvoice = async (invoiceStatus: any = 'sent', redirectToPreview = false) => {
     if (!firestore || !user || !activeIdentity) return;
 
+    // PROTECTION: Exceeds PO validation
+    const grandTotalNumeric = parseFormattedNumber(String(totalAmount));
+    const totalWithNewInvoice = grandTotalNumeric + totalInvoicedSoFar;
+    if (totalWithNewInvoice > (totalPoValue + 0.01)) {
+        toast({ 
+            variant: "destructive", 
+            title: "Pencegahan Over-Billing", 
+            description: "Nilai tagihan saat ini melebihi sisa plafon PO. Mohon periksa kembali kuantitas atau nominal." 
+        });
+        return;
+    }
+
     setIsSaving(true);
     const safeInvoiceId = activeIdentity.id.replace(/\//g, '_');
     const invoiceDocRef = doc(firestore, 'invoices', safeInvoiceId);
@@ -331,7 +343,7 @@ export default function AddInvoicePage() {
         billingNpwp: billingNpwp,
         date: format(issueDate, 'yyyy-MM-dd'),
         dueDate: format(dueDate, 'yyyy-MM-dd'),
-        amount: parseFormattedNumber(String(totalAmount)),
+        amount: grandTotalNumeric,
         status: invoiceStatus,
         isDpInvoice: isDpInvoice,
         negotiation: parseFormattedNumber(String(negotiationValue)),
@@ -460,7 +472,7 @@ export default function AddInvoicePage() {
 
           <Card className={cn("shadow-sm ring-1 ring-slate-200", isLocked && "opacity-60", isDpInvoice && "opacity-40 grayscale pointer-events-none")}>
             <CardHeader className="bg-slate-50/50 border-b py-4">
-                <CardTitle className="text-sm font-black uppercase text-slate-800">Item Tracking & Variance Report</CardTitle>
+                <CardTitle className="text-sm font-black uppercase text-slate-800">Item Tracking (Input Aktif)</CardTitle>
             </CardHeader>
             <CardContent className="p-0">
                 <Table>
@@ -561,22 +573,22 @@ export default function AddInvoicePage() {
             </CardContent>
           </Card>
 
-          {/* ITEM HISTORY AUDIT TRAIL - INTERACTIVE CLICK TO COPY */}
+          {/* ITEM HISTORY AUDIT TRAIL - QUICK TRANSFER ENABLED */}
           {billedItemsHistory.length > 0 && (
               <Card className="shadow-sm ring-1 ring-slate-200 border-none overflow-hidden">
                 <CardHeader className="bg-slate-50 border-b py-3 flex flex-row items-center justify-between">
                     <CardTitle className="text-[10px] font-black uppercase flex items-center gap-2 text-indigo-600">
-                        <History className="h-4 w-4" /> Riwayat Item Terbit (PO Berjalan)
+                        <History className="h-4 w-4" /> Riwayat Item Terbit (Quick-Transfer)
                     </CardTitle>
-                    <Badge className="text-[8px] bg-indigo-50 text-indigo-700 font-bold uppercase">Click row to Copy/Add</Badge>
+                    <Badge className="text-[8px] bg-indigo-50 text-indigo-700 font-bold uppercase">Klik Baris untuk Menyalin ke Input Aktif</Badge>
                 </CardHeader>
                 <CardContent className="p-0">
                     <Table>
                         <TableHeader className="bg-slate-100/50">
                             <TableRow>
                                 <TableHead className="text-[9px] font-bold uppercase py-2">Invoice #</TableHead>
-                                <TableHead className="text-[9px] font-bold uppercase py-2">Nama Barang (History)</TableHead>
-                                <TableHead className="text-center text-[9px] font-bold uppercase py-2">Qty</TableHead>
+                                <TableHead className="text-[9px] font-bold uppercase py-2">Nama Barang (Lama)</TableHead>
+                                <TableHead className="text-center text-[9px] font-bold uppercase py-2">Qty Terbit</TableHead>
                                 <TableHead className="text-right text-[9px] font-bold uppercase py-2">Unit Price</TableHead>
                                 <TableHead className="w-[40px]"></TableHead>
                             </TableRow>
@@ -610,17 +622,17 @@ export default function AddInvoicePage() {
           <Card className="shadow-md ring-1 ring-slate-200 border-none overflow-hidden">
              <CardHeader className="bg-slate-900 text-white py-3">
                  <CardTitle className="text-[10px] font-black uppercase tracking-widest flex items-center gap-2">
-                     <History className="h-3.5 w-3.5 text-indigo-400" /> PO Billing Ledger
+                     <History className="h-3.5 w-3.5 text-indigo-400" /> PO Billing Ledger (Audit)
                  </CardTitle>
              </CardHeader>
              <CardContent className="p-4 space-y-4 bg-slate-50/50">
                  <div className="grid grid-cols-2 gap-3">
                      <div className="p-3 bg-white rounded-lg border shadow-sm">
-                         <p className="text-[8px] font-black text-slate-400 uppercase">Total PO Value</p>
+                         <p className="text-[8px] font-black text-slate-400 uppercase">Total Nilai PO</p>
                          <p className="text-sm font-black text-slate-900">Rp {formatNumberWithCommas(totalPoValue)}</p>
                      </div>
                      <div className="p-3 bg-white rounded-lg border shadow-sm">
-                         <p className="text-[8px] font-black text-slate-400 uppercase">Billed So Far</p>
+                         <p className="text-[8px] font-black text-slate-400 uppercase">Sudah Ditagih</p>
                          <p className="text-sm font-black text-indigo-600">Rp {formatNumberWithCommas(totalInvoicedSoFar)}</p>
                      </div>
                  </div>
@@ -630,7 +642,7 @@ export default function AddInvoicePage() {
                      remainingPoBalance > 0 ? "bg-indigo-50/50 border-indigo-100" : "bg-red-50 border-red-100"
                  )}>
                     <div className="space-y-0.5">
-                        <p className="text-[8px] font-black text-slate-400 uppercase">Remaining Balance</p>
+                        <p className="text-[8px] font-black text-slate-400 uppercase">Sisa Plafon PO</p>
                         <p className={cn("text-xs font-black", remainingPoBalance > 0 ? "text-indigo-700" : "text-red-600")}>
                             Rp {formatNumberWithCommas(remainingPoBalance)}
                         </p>
@@ -640,7 +652,7 @@ export default function AddInvoicePage() {
 
                  <div className="space-y-2">
                      <p className="text-[9px] font-black uppercase text-slate-500 flex items-center gap-1.5">
-                         <ChevronRight className="h-3 w-3" /> Transaction History
+                         <ChevronRight className="h-3 w-3" /> Riwayat Transaksi PO
                      </p>
                      <div className="space-y-1.5 max-h-[150px] overflow-y-auto pr-1">
                          {poBillingHistory.length === 0 ? (
@@ -661,7 +673,7 @@ export default function AddInvoicePage() {
 
                  <div className={cn("p-3 rounded-lg border-2 border-dashed flex justify-between items-center", dpInvoicedBalance > 0 ? "bg-emerald-50 border-emerald-200" : "bg-slate-100 border-slate-200 opacity-50")}>
                      <div className="space-y-0.5">
-                         <p className="text-[8px] font-black text-slate-400 uppercase">Available DP Balance</p>
+                         <p className="text-[8px] font-black text-slate-400 uppercase">Saldo DP Tersedia (Pengurang)</p>
                          <p className="text-xs font-black text-emerald-700">Rp {formatNumberWithCommas(dpInvoicedBalance)}</p>
                      </div>
                      <Wallet className="h-5 w-5 text-emerald-500" />
