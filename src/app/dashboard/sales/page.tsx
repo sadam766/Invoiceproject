@@ -1,5 +1,5 @@
 'use client';
-import { useState, useMemo, useRef } from 'react';
+import { useState, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import {
     Card,
@@ -28,14 +28,16 @@ import {
   } from '@/components/ui/dialog';
   import { Textarea } from '@/components/ui/textarea';
   import { type SalesListItem, type UserProfile, type Invoice } from '@/app/lib/data';
-  import { Search, MoreHorizontal, Download, Eye, Edit, FileSpreadsheet, RefreshCw, XCircle, FilePlus } from 'lucide-react';
+  import { Search, MoreHorizontal, Download, Eye, Edit, FileSpreadsheet, RefreshCw, XCircle, FilePlus, Trash2 } from 'lucide-react';
   import { AddSaleDialog } from './_components/add-sale-dialog';
   import { useToast } from '@/hooks/use-toast';
   import { cn, exportToExcel } from '@/lib/utils';
   import { useFirestore, useUser, useCollection, useMemoFirebase, errorEmitter, FirestorePermissionError, useDoc } from '@/firebase';
-  import { collection, doc, setDoc, query, updateDoc, writeBatch } from 'firebase/firestore';
+  import { collection, doc, setDoc, query, updateDoc, writeBatch, deleteDoc } from 'firebase/firestore';
   import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-  
+  import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+  import { DeleteConfirmationDialog } from '@/app/components/delete-confirmation-dialog';
+
   export default function SalesListPage() {
     const router = useRouter();
     const { toast } = useToast();
@@ -47,10 +49,11 @@ import {
     const [searchQuery, setSearchQuery] = useState('');
     const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
-    // Void State
+    // Void & Delete State
     const [voidDialogOpen, setVoidDialogOpen] = useState(false);
     const [voidReason, setVoidReason] = useState('');
     const [targetPoId, setTargetPoId] = useState<string | null>(null);
+    const [hardDeleteDialogOpen, setHardDeleteDialogOpen] = useState(false);
 
     // SO Update State
     const [soUpdateState, setSoUpdateState] = useState<{ isOpen: boolean; poNumber?: string; currentSo?: string }>({ isOpen: false });
@@ -120,6 +123,19 @@ import {
         }
     };
 
+    const handleHardDeletePo = async () => {
+        if (!firestore || !targetPoId || !isSuperAdmin) return;
+        const docRef = doc(firestore, 'sales', targetPoId);
+        try {
+            await deleteDoc(docRef);
+            toast({ title: "PO Dihapus Permanen", description: `Data PO ${targetPoId} telah dihapus sepenuhnya dari database.` });
+            setHardDeleteDialogOpen(false);
+            setTargetPoId(null);
+        } catch (e) {
+            toast({ variant: 'destructive', title: "Gagal Menghapus", description: "Anda tidak memiliki otoritas atau terjadi kesalahan koneksi." });
+        }
+    };
+
     const handleUpdateSo = async () => {
         if (!firestore || !soUpdateState.poNumber) return;
         const docRef = doc(firestore, 'sales', soUpdateState.poNumber);
@@ -168,13 +184,24 @@ import {
             </div>
             <div className="flex items-center gap-2">
                 <Button variant="outline" onClick={() => exportToExcel(filteredSales, 'daftar_po')} className="font-bold"><Download className="mr-2 h-4 w-4"/> Export</Button>
-                <AddSaleDialog 
-                    isOpen={isDialogOpen}
-                    onOpenChange={setIsDialogOpen}
-                    onSave={handleSaveSale}
-                    saleData={editingSale}
-                    onAddClick={() => { setEditingSale(undefined); setIsDialogOpen(true); }}
-                />
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <div>
+                        <AddSaleDialog 
+                            isOpen={isDialogOpen}
+                            onOpenChange={setIsDialogOpen}
+                            onSave={handleSaveSale}
+                            saleData={editingSale}
+                            onAddClick={() => { setEditingSale(undefined); setIsDialogOpen(true); }}
+                        />
+                      </div>
+                    </TooltipTrigger>
+                    <TooltipContent className="bg-slate-900 text-white border-none text-[10px] p-3 max-w-[200px]">
+                      Langkah awal untuk membuat Sales Order (SO) baru. Masukkan data pelanggan dan detail barang di sini.
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
             </div>
         </div>
 
@@ -238,23 +265,46 @@ import {
                                     <TableCell className="text-right">
                                         <div className="flex justify-end gap-1">
                                             {sale.status !== 'Cancelled' && (
-                                                <Button 
-                                                    size="sm" 
-                                                    className="h-8 bg-indigo-600 hover:bg-indigo-700 font-black uppercase text-[10px] tracking-widest shadow-md"
-                                                    onClick={() => router.push(`/dashboard/invoices/number?poNumber=${encodeURIComponent(sale.poNumber)}`)}
-                                                >
-                                                    <FilePlus className="mr-1.5 h-3.5 w-3.5" /> Terbitkan Invoice
-                                                </Button>
+                                                <TooltipProvider>
+                                                  <Tooltip>
+                                                    <TooltipTrigger asChild>
+                                                      <Button 
+                                                          size="sm" 
+                                                          className="h-8 bg-indigo-600 hover:bg-indigo-700 font-black uppercase text-[10px] tracking-widest shadow-md"
+                                                          onClick={() => router.push(`/dashboard/invoices/number?poNumber=${encodeURIComponent(sale.poNumber)}`)}
+                                                      >
+                                                          <FilePlus className="mr-1.5 h-3.5 w-3.5" /> Terbitkan Invoice
+                                                      </Button>
+                                                    </TooltipTrigger>
+                                                    <TooltipContent className="bg-slate-900 text-white border-none text-[10px] p-2">
+                                                      Mengirim data SO ke bagian penagihan agar nomor PO muncul saat admin membuat Invoice.
+                                                    </TooltipContent>
+                                                  </Tooltip>
+                                                </TooltipProvider>
                                             )}
                                             <DropdownMenu>
                                                 <DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8 rounded-full"><MoreHorizontal className="h-4 w-4" /></Button></DropdownMenuTrigger>
                                                 <DropdownMenuContent align="end" className="w-48">
-                                                    <DropdownMenuItem onClick={() => { sessionStorage.setItem('activePoPreview', sale.poNumber); router.push('/dashboard/sales-management'); }}><Eye className="mr-2 h-4 w-4" /> Monitoring Piutang</DropdownMenuItem>
+                                                    <DropdownMenuItem onClick={() => { sessionStorage.setItem('activePoPreview', sale.poNumber); router.push('/dashboard/sales-management'); }}>
+                                                        <Eye className="mr-2 h-4 w-4" /> Monitoring Piutang
+                                                    </DropdownMenuItem>
                                                     {isAdmin && sale.status !== 'Cancelled' && (
                                                         <>
-                                                            <DropdownMenuItem onClick={() => { setEditingSale(sale); setIsDialogOpen(true); }}><Edit className="mr-2 h-4 w-4" /> Edit Data PO</DropdownMenuItem>
-                                                            <DropdownMenuItem className="text-destructive font-bold" onClick={() => { setTargetPoId(sale.poNumber); setVoidDialogOpen(true); }}><XCircle className="mr-2 h-4 w-4" /> Void / Batalkan</DropdownMenuItem>
+                                                            <DropdownMenuItem onClick={() => { setEditingSale(sale); setIsDialogOpen(true); }}>
+                                                              <Edit className="mr-2 h-4 w-4" /> Edit Data PO
+                                                            </DropdownMenuItem>
+                                                            <DropdownMenuItem className="text-destructive font-bold" onClick={() => { setTargetPoId(sale.poNumber); setVoidDialogOpen(true); }}>
+                                                              <XCircle className="mr-2 h-4 w-4" /> Void / Batalkan
+                                                            </DropdownMenuItem>
                                                         </>
+                                                    )}
+                                                    {isSuperAdmin && (
+                                                        <DropdownMenuItem 
+                                                            className="text-red-600 font-bold" 
+                                                            onSelect={(e) => { e.preventDefault(); setTargetPoId(sale.poNumber); setHardDeleteDialogOpen(true); }}
+                                                        >
+                                                            <Trash2 className="mr-2 h-4 w-4" /> Hapus Permanen
+                                                        </DropdownMenuItem>
                                                     )}
                                                 </DropdownMenuContent>
                                             </DropdownMenu>
@@ -285,6 +335,15 @@ import {
                 </DialogFooter>
             </DialogContent>
         </Dialog>
+
+        {/* Hard Delete Dialog */}
+        <DeleteConfirmationDialog 
+            open={hardDeleteDialogOpen}
+            onOpenChange={setHardDeleteDialogOpen}
+            onConfirm={handleHardDeletePo}
+        >
+            <div className="hidden" />
+        </DeleteConfirmationDialog>
 
         {/* SO Update Modal */}
         <Dialog open={soUpdateState.isOpen} onOpenChange={(o) => setSoUpdateState(prev => ({...prev, isOpen: o}))}>

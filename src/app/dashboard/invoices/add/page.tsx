@@ -44,6 +44,7 @@ import {
   CreditCard,
   Eye,
   Loader2,
+  Info,
 } from 'lucide-react';
 import { type Invoice, type SalesOrder, type UserProfile, type Customer, type InvoiceItem, type InvoiceNumber, type VirtualAccount, type ProductListItem } from '@/app/lib/data';
 import { useToast } from '@/hooks/use-toast';
@@ -94,7 +95,6 @@ export default function AddInvoicePage() {
   const isLoading = (invoiceNumberIdParam && isIdentityLoading) || (editInvoiceId && isExistingLoading);
 
   useEffect(() => {
-    // Jika tidak sedang loading dan tidak ada ID yang dibawa, alihkan ke tahap registrasi nomor
     if (!isLoading && !invoiceNumberIdParam && !editInvoiceId) {
         toast({
             variant: "destructive",
@@ -114,9 +114,6 @@ export default function AddInvoicePage() {
 
   const invoicesCollection = useMemoFirebase(() => firestore ? query(collection(firestore, 'invoices')) : null, [firestore]);
   const { data: allInvoices } = useCollection<Invoice>(invoicesCollection);
-
-  const customersCollection = useMemoFirebase(() => firestore ? query(collection(firestore, 'customers')) : null, [firestore]);
-  const { data: customerListData } = useCollection<Customer>(customersCollection);
 
   const vaCollection = useMemoFirebase(() => firestore ? query(collection(firestore, 'virtualAccounts')) : null, [firestore]);
   const { data: allVas } = useCollection<VirtualAccount>(vaCollection);
@@ -172,7 +169,6 @@ export default function AddInvoicePage() {
     return allVas.filter(va => va.customerName === activeIdentity.customer);
   }, [allVas, activeIdentity]);
 
-  // AUDIT FIX: Persistent Database Sync (Constructor is Read-Only to Identity)
   useEffect(() => {
       if (activeIdentity && items.length === 0) {
           if (activeIdentity.items && activeIdentity.items.length > 0) {
@@ -324,7 +320,6 @@ export default function AddInvoicePage() {
       return <div className="flex h-[80vh] items-center justify-center font-bold text-slate-400 animate-pulse uppercase tracking-widest">Architectural Handshake...</div>;
   }
 
-  // Jika tidak ada ID, jangan render apa pun sebelum redirect berjalan
   if (!activeIdentity && !editInvoiceId && !invoiceNumberIdParam) {
       return null;
   }
@@ -348,20 +343,39 @@ export default function AddInvoicePage() {
         
         <div className="flex items-center gap-4">
             {isAdmin && !isDpInvoice && (
-                <div className="flex items-center gap-2 bg-amber-50 px-4 py-2 rounded-xl border border-amber-200 shadow-sm">
-                    <Label className="text-[10px] font-black uppercase text-amber-700 tracking-widest flex items-center gap-1.5">
-                        <ShieldCheck className="h-3.5 w-3.5" /> Over-Billing
-                    </Label>
-                    <Switch checked={isOverBillingAllowed} onCheckedChange={setIsOverBillingAllowed} disabled={isLocked} />
-                </div>
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <div className="flex items-center gap-2 bg-amber-50 px-4 py-2 rounded-xl border border-amber-200 shadow-sm cursor-help">
+                        <Label className="text-[10px] font-black uppercase text-amber-700 tracking-widest flex items-center gap-1.5">
+                            <ShieldCheck className="h-3.5 w-3.5" /> Over-Billing
+                        </Label>
+                        <Switch checked={isOverBillingAllowed} onCheckedChange={setIsOverBillingAllowed} disabled={isLocked} />
+                    </div>
+                  </TooltipTrigger>
+                  <TooltipContent className="max-w-xs bg-slate-900 text-white p-3">
+                    <p className="text-xs"><b>Over Billing:</b> Kondisi di mana nilai yang ditagihkan melebihi nilai kontrak awal atau total nilai barang yang dikirim, biasanya digunakan untuk penyesuaian biaya tambahan atau advance payment.</p>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
             )}
-            <Badge 
-                variant={isDpInvoice ? "default" : "outline"} 
-                className={cn("text-[9px] uppercase cursor-pointer py-1.5 px-4", isDpInvoice ? "bg-indigo-600" : "text-indigo-600 border-indigo-200")} 
-                onClick={() => !isLocked && setIsDpInvoice(!isDpInvoice)}
-            >
-                {isDpInvoice ? "Down Payment" : "Progress Billing"}
-            </Badge>
+            
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Badge 
+                      variant={isDpInvoice ? "default" : "outline"} 
+                      className={cn("text-[9px] uppercase cursor-pointer py-1.5 px-4", isDpInvoice ? "bg-indigo-600" : "text-indigo-600 border-indigo-200")} 
+                      onClick={() => !isLocked && setIsDpInvoice(!isDpInvoice)}
+                  >
+                      {isDpInvoice ? "Down Payment" : "Progress Billing"}
+                  </Badge>
+                </TooltipTrigger>
+                <TooltipContent className="max-w-xs bg-slate-900 text-white p-3">
+                  <p className="text-xs"><b>Progress Billing:</b> Penagihan bertahap berdasarkan persentase penyelesaian pekerjaan atau termin yang telah disepakati di Sales Order.</p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
         </div>
       </div>
 
@@ -389,9 +403,9 @@ export default function AddInvoicePage() {
                   </div>
 
                   <div className="space-y-1.5">
-                      <Label className="text-[9px] font-black uppercase text-slate-400">Ref PO / SO Hub</Label>
+                      <Label className="text-[9px] font-black uppercase text-slate-400 tracking-widest">Ref PO / SO Hub</Label>
                       <div className="bg-slate-50 dark:bg-slate-800 px-3 py-2 rounded-md border border-slate-200 text-xs font-mono font-bold truncate">
-                          {activeIdentity?.poNumber} {((activeIdentity as any)?.salesOrder || (activeIdentity as any)?.soNumber) && `• ${(activeIdentity as any)?.salesOrder || (activeIdentity as any)?.soNumber}`}
+                          {activeIdentity?.poNumber} {(activeIdentity as any)?.salesOrder && `• ${(activeIdentity as any).salesOrder}`}
                       </div>
                   </div>
 
