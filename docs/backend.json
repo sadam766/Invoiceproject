@@ -1,4 +1,3 @@
-
 {
   "entities": {
     "User": {
@@ -71,46 +70,6 @@
         "paidOffline": { "type": "number" },
         "status": { "type": "string" }
       }
-    },
-    "Product": {
-      "title": "Product Inventory",
-      "type": "object",
-      "properties": {
-        "name": { "type": "string" },
-        "category": { "type": "string" },
-        "quantity": { "type": "number" },
-        "price": { "type": "number" }
-      }
-    },
-    "SpdData": {
-      "title": "SPD Dispatch",
-      "type": "object",
-      "properties": {
-        "id": { "type": "string" },
-        "date": { "type": "string" },
-        "courier": { "type": "string" },
-        "invoices": { "type": "array" },
-        "status": { "type": "string" }
-      }
-    },
-    "TaxInvoice": {
-      "title": "Tax Document",
-      "type": "object",
-      "properties": {
-        "taxInvoiceNumber": { "type": "string" },
-        "buyerName": { "type": "string" },
-        "invoiceNumber": { "type": "string" },
-        "status": { "type": "string" }
-      }
-    },
-    "VirtualAccount": {
-      "title": "Virtual Account",
-      "type": "object",
-      "properties": {
-        "customerName": { "type": "string" },
-        "bankName": { "type": "string" },
-        "vaNumber": { "type": "string" }
-      }
     }
   },
   "auth": {
@@ -141,21 +100,9 @@
       "schema": "#/entities/SalesListItem",
       "description": "Global PO registry"
     },
-    "/products/{id}": {
-      "schema": "#/entities/Product",
-      "description": "Master product inventory"
-    },
-    "/spds/{id}": {
-      "schema": "#/entities/SpdData",
-      "description": "Document dispatch tracking"
-    },
-    "/taxInvoices/{id}": {
-      "schema": "#/entities/TaxInvoice",
-      "description": "Tax invoice synchronization"
-    },
-    "/virtualAccounts/{id}": {
-      "schema": "#/entities/VirtualAccount",
-      "description": "Customer payment accounts"
-    }
+    "/products/{id}": { "schema": "object", "description": "Master product inventory" },
+    "/spds/{id}": { "schema": "object", "description": "Document dispatch tracking" },
+    "/taxInvoices/{id}": { "schema": "object", "description": "Tax invoice synchronization" },
+    "/virtualAccounts/{id}": { "schema": "object", "description": "Customer payment accounts" }
   }
 }

@@ -22,15 +22,15 @@ import {
   import { Input } from '@/components/ui/input';
   import { Button } from '@/components/ui/button';
   import { Badge } from '@/components/ui/badge';
-  import { type InvoiceNumber, type Invoice } from '@/app/lib/data';
+  import { type InvoiceNumber, type Invoice, type UserProfile } from '@/app/lib/data';
   import { Search, Upload, Download, MoreHorizontal, Edit, Trash2, Lock, Database, Hash, Info, FilePlus } from 'lucide-react';
   import { AddInvoiceNumberDialog } from './_components/add-invoice-number-dialog';
   import { DeleteConfirmationDialog } from '@/app/components/delete-confirmation-dialog';
   import { Skeleton } from '@/components/ui/skeleton';
   import { cn, exportToExcel } from '@/lib/utils';
   import { useToast } from '@/hooks/use-toast';
-  import { useFirestore, useUser, useCollection, useMemoFirebase, errorEmitter, FirestorePermissionError } from '@/firebase';
-  import { collection, doc, deleteDoc, query } from 'firebase/firestore';
+  import { useFirestore, useUser, useCollection, useMemoFirebase, errorEmitter, FirestorePermissionError, useDoc } from '@/firebase';
+  import { collection, doc, deleteDoc, query, setDoc } from 'firebase/firestore';
 
   export default function InvoiceNumberPage() {
     const router = useRouter();
@@ -45,6 +45,13 @@ import {
     const [editingInvoice, setEditingInvoice] = useState<InvoiceNumber | undefined>(undefined);
     const [isDialogOpen, setIsDialogOpen] = useState(false);
     const [deleteDialogState, setDeleteDialogState] = useState<{ isOpen: boolean; invoiceId?: string }>({ isOpen: false });
+
+    // Profile check for audit trail
+    const userProfileRef = useMemoFirebase(() => {
+        if (!firestore || !user) return null;
+        return doc(firestore, 'users', user.uid);
+    }, [firestore, user]);
+    const { data: userProfile } = useDoc<UserProfile>(userProfileRef);
 
     useEffect(() => {
         if (poNumberParam && !isDialogOpen && !editingInvoice) {
@@ -136,9 +143,37 @@ import {
     };
 
     const handleSave = (invoice: Omit<InvoiceNumber, 'id' | 'ownerId'> & {id: string}, action: 'save' | 'create') => {
-      // implementation omitted for focus on styling
-      setIsDialogOpen(false);
-      setEditingInvoice(undefined);
+      if (!firestore || !user) return;
+
+      const safeId = invoice.id.replace(/\//g, '_');
+      const docRef = doc(firestore, 'invoiceNumbers', safeId);
+      
+      const dataToSave = {
+          ...invoice,
+          ownerId: user.uid,
+          createdBy: userProfile?.displayName || user.email || 'System'
+      };
+
+      setDoc(docRef, dataToSave, { merge: true })
+        .then(() => {
+            toast({ 
+                title: editingInvoice ? "Identitas Diperbarui" : "Identitas Terdaftar",
+                description: `Nomor ${invoice.id} berhasil disimpan.`
+            });
+            setIsDialogOpen(false);
+            setEditingInvoice(undefined);
+            
+            if (action === 'create') {
+                router.push(`/dashboard/invoices/add?invoiceNumberId=${safeId}`);
+            }
+        })
+        .catch(err => {
+            errorEmitter.emit('permission-error', new FirestorePermissionError({
+                path: docRef.path,
+                operation: editingInvoice ? 'update' : 'create',
+                requestResourceData: dataToSave
+            }));
+        });
     };
 
     const handleDialogStateChange = (open: boolean) => {
