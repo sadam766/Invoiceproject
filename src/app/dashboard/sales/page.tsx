@@ -106,7 +106,8 @@ import {
 
     const handleVoidPo = async () => {
         if (!firestore || !targetPoId || !voidReason || !user) return;
-        const docRef = doc(firestore, 'sales', targetPoId);
+        const safeId = targetPoId.replace(/\//g, '_');
+        const docRef = doc(firestore, 'sales', safeId);
         
         try {
             await updateDoc(docRef, { 
@@ -125,20 +126,35 @@ import {
 
     const handleHardDeletePo = async () => {
         if (!firestore || !targetPoId || !isSuperAdmin) return;
-        const docRef = doc(firestore, 'sales', targetPoId);
+        
+        // AUDIT FIX: Atomic ID Escaping for Deep Collections
+        const safeId = targetPoId.replace(/\//g, '_');
+        const docRef = doc(firestore, 'sales', safeId);
+        
         try {
+            // Wait for DB confirmation before toast
             await deleteDoc(docRef);
-            toast({ title: "PO Dihapus Permanen", description: `Data PO ${targetPoId} telah dihapus sepenuhnya dari database.` });
+            
+            toast({ 
+                title: "PO Dihapus Permanen", 
+                description: `Data PO ${targetPoId} telah dihapus sepenuhnya dari database.` 
+            });
             setHardDeleteDialogOpen(false);
             setTargetPoId(null);
         } catch (e) {
-            toast({ variant: 'destructive', title: "Gagal Menghapus", description: "Anda tidak memiliki otoritas atau terjadi kesalahan koneksi." });
+            console.error("Delete Error:", e);
+            toast({ 
+                variant: 'destructive', 
+                title: "Gagal Menghapus", 
+                description: "Terjadi kesalahan pada otoritas database atau koneksi." 
+            });
         }
     };
 
     const handleUpdateSo = async () => {
         if (!firestore || !soUpdateState.poNumber) return;
-        const docRef = doc(firestore, 'sales', soUpdateState.poNumber);
+        const safeId = soUpdateState.poNumber.replace(/\//g, '_');
+        const docRef = doc(firestore, 'sales', safeId);
         
         const batch = writeBatch(firestore);
         batch.update(docRef, { soNumber: tempSo });
@@ -156,7 +172,11 @@ import {
 
     const handleSaveSale = (saleData: Omit<SalesListItem, 'ownerId'>) => {
         if (!firestore || !user) return;
-        const docRef = doc(firestore, 'sales', saleData.poNumber);
+        
+        // AUDIT FIX: Use escaped PO number as primary key
+        const safeId = saleData.poNumber.replace(/\//g, '_');
+        const docRef = doc(firestore, 'sales', safeId);
+        
         const dataToSave = { 
             ...saleData, 
             ownerId: user.uid, 

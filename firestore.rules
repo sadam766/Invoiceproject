@@ -34,12 +34,18 @@ service cloud.firestore {
 
     match /invoices/{id} {
       allow read: if isSignedIn();
-      allow write: if isSignedIn(); // Allow staff to create, finalized/admin logic handled in FE
+      allow write: if isSignedIn(); 
     }
 
     match /customers/{id} { allow read, write: if isSignedIn(); }
     match /products/{id} { allow read, write: if isSignedIn(); }
-    match /sales/{id} { allow read, write: if isSignedIn(); }
+    
+    // AUDIT FIX: Restrict hard delete to leaders only
+    match /sales/{id} { 
+      allow read, create, update: if isSignedIn(); 
+      allow delete: if isAdmin(); 
+    }
+    
     match /salesOrders/{id} { allow read, write: if isSignedIn(); }
     match /spds/{id} { allow read, write: if isSignedIn(); }
     match /taxInvoices/{id} { allow read, write: if isSignedIn(); }
