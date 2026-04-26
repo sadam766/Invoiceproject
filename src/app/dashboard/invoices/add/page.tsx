@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useEffect, useState, useMemo } from 'react';
@@ -44,7 +45,8 @@ import {
   RefreshCw,
   AlertTriangle,
   History,
-  Tag
+  Tag,
+  MessageSquare
 } from 'lucide-react';
 import { type Invoice, type SalesOrder, type UserProfile, type Customer, type InvoiceItem, type InvoiceNumber } from '@/app/lib/data';
 import { useToast } from '@/hooks/use-toast';
@@ -163,12 +165,23 @@ export default function AddInvoicePage() {
                       originalPrice: item.price,
                       total: Math.max(0, (item.quantity - prevQty) * item.price),
                       prevInvoicedQty: prevQty,
-                      varianceQty: 0
+                      varianceQty: 0,
+                      varianceReason: ''
                   };
               }));
           }
+      } else if (existingInvoiceData && items.length === 0) {
+          setItems(existingInvoiceData.items || []);
+          setBillingAddress(existingInvoiceData.billingAddress || '');
+          setBillingNpwp(existingInvoiceData.billingNpwp || '');
+          setIsDpInvoice(!!existingInvoiceData.isDpInvoice);
+          setIsOverBillingAllowed(!!existingInvoiceData.isOverBillingAllowed);
+          setNegotiationValue(existingInvoiceData.negotiation || 0);
+          setDpValue(existingInvoiceData.dpValue || 0);
+          setDpDeductionValue(existingInvoiceData.dpDeduction || 0);
+          setRetentionValue(existingInvoiceData.retention || 0);
       }
-  }, [identityData, customerListData, allSoItems, editInvoiceId, allInvoices]);
+  }, [identityData, customerListData, allSoItems, editInvoiceId, allInvoices, existingInvoiceData]);
 
   useEffect(() => {
     const currentSubtotal = items.reduce((acc, item) => acc + (item.quantity * item.price), 0);
@@ -187,7 +200,7 @@ export default function AddInvoicePage() {
     const dpDedInputVal = parseFormattedNumber(String(dpDeductionValue));
     const dpDedNominal = dpDeductionMode === 'percent' ? (baseAfterNeg * (dpDedInputVal / 100)) : dpDedInputVal;
     
-    if (dpDedNominal > dpBalance && !isDpInvoice) {
+    if (dpDedNominal > dpBalance && !isDpInvoice && dpBalance > 0) {
         setDpDeductionValue(0);
         toast({ variant: "destructive", title: "Limit Saldo DP", description: "Potongan melebihi saldo DP yang tersedia." });
     }
@@ -212,6 +225,18 @@ export default function AddInvoicePage() {
     const activeIdentity = existingInvoiceData || identityData;
     if (!firestore || !user || !activeIdentity) return;
 
+    // VALIDATION: Variance Reasons
+    const needsReason = items.some(item => 
+        (item.quantity + (item.prevInvoicedQty || 0)) !== (item.originalQty || 0) || 
+        item.price !== item.originalPrice || 
+        item.name !== item.originalName
+    );
+
+    if (needsReason && items.some(i => !i.varianceReason && ((i.quantity + (i.prevInvoicedQty || 0)) !== (i.originalQty || 0) || i.price !== i.originalPrice))) {
+        toast({ variant: "destructive", title: "Audit Alert", description: "Wajib mengisi 'Alasan Variansi' untuk setiap perubahan item." });
+        return;
+    }
+
     const hasVariance = items.some(item => (item.quantity + (item.prevInvoicedQty || 0)) > (item.originalQty || 0));
     if (hasVariance && !isOverBillingAllowed) {
         toast({ variant: "destructive", title: "Persetujuan Diperlukan", description: "Terdapat item melebihi kuota PO. Aktifkan 'Allow Over-Billing' (Otoritas Leader)." });
@@ -225,7 +250,6 @@ export default function AddInvoicePage() {
 
     let actionDescription = editInvoiceId ? "Document UPDATED" : "Document CREATED";
     
-    // TRIPLE VARIANCE AUDIT LOG
     items.forEach(item => {
         if (item.name !== item.originalName) {
             actionDescription += ` | Name Change: [${item.originalName}] -> [${item.name}]`;
@@ -294,7 +318,7 @@ export default function AddInvoicePage() {
             <div>
                 <h1 className="text-2xl font-black tracking-tight uppercase text-slate-900 dark:text-slate-50">Invoice Constructor</h1>
                 <div className="text-slate-400 text-[10px] font-bold uppercase tracking-widest flex items-center gap-1.5 mt-0.5">
-                    Stage 3: Triple Variance Logic Enabled <Badge variant="secondary" className="text-[8px] bg-indigo-50 text-indigo-600 h-3.5"><Lock className="h-2 w-2 mr-1" /> Data Persistent</Badge>
+                    Stage 3: Variance Analytics Enabled <Badge variant="secondary" className="text-[8px] bg-indigo-50 text-indigo-600 h-3.5"><Lock className="h-2 w-2 mr-1" /> Data Persistent</Badge>
                 </div>
             </div>
         </div>
@@ -313,7 +337,7 @@ export default function AddInvoicePage() {
                     <Label className="text-[10px] font-black uppercase text-indigo-600 tracking-widest">Mode Penagihan:</Label>
                     <Badge 
                         variant={isDpInvoice ? "default" : "outline"} 
-                        className={cn("text-[9px] uppercase cursor-pointer transition-all", isDpInvoice ? "bg-indigo-600 shadow-md" : "text-indigo-600 border-indigo-200")} 
+                        className={cn("text-[9px] uppercase cursor-pointer transition-all", isDpInvoice ? "bg-indigo-600 shadow-md text-white" : "text-indigo-600 border-indigo-200")} 
                         onClick={() => !isLocked && setIsDpInvoice(!isDpInvoice)}
                     >
                     {isDpInvoice ? "Down Payment (DP)" : "Tagihan Barang / Progres"}
@@ -376,7 +400,7 @@ export default function AddInvoicePage() {
           <Card className={cn("shadow-sm border-none ring-1 ring-slate-200 dark:ring-slate-800 bg-white dark:bg-slate-900", isLocked && "opacity-60", isDpInvoice && "opacity-40 grayscale pointer-events-none")}>
             <CardHeader className="bg-slate-50/50 dark:bg-slate-800/50 border-b py-4">
                 <div className="flex justify-between items-center">
-                    <CardTitle className="text-sm font-black uppercase tracking-tight text-slate-800 dark:text-slate-200">Flexible Item Tracking (Triple Variance)</CardTitle>
+                    <CardTitle className="text-sm font-black uppercase tracking-tight text-slate-800 dark:text-slate-200">Variance Report & Item Tracking</CardTitle>
                     {isDpInvoice && <Badge variant="secondary" className="text-[8px] uppercase">Disabled in DP Mode</Badge>}
                 </div>
             </CardHeader>
@@ -384,7 +408,7 @@ export default function AddInvoicePage() {
                 <Table>
                     <TableHeader className="bg-slate-50 dark:bg-slate-800/50">
                         <TableRow>
-                            <TableHead className="text-[10px] font-black uppercase py-2 text-slate-400 tracking-widest">Rincian Item (Editable Name/Price)</TableHead>
+                            <TableHead className="text-[10px] font-black uppercase py-2 text-slate-400 tracking-widest">Detail Item & Alasan Variansi</TableHead>
                             <TableHead className="w-[100px] text-center text-[10px] font-black uppercase py-2 text-slate-400 tracking-widest">Now Billing</TableHead>
                             <TableHead className="w-[100px] text-center text-[10px] font-black uppercase py-2 text-slate-400 tracking-widest">Prev. Invoiced</TableHead>
                             <TableHead className="w-[120px] text-right text-[10px] font-black uppercase py-2 text-slate-400 tracking-widest">Unit Price</TableHead>
@@ -395,14 +419,17 @@ export default function AddInvoicePage() {
                         {items.length === 0 ? (
                             <TableRow><TableCell colSpan={5} className="text-center py-10 text-slate-400 italic text-xs uppercase font-black tracking-widest opacity-30">Belum ada item terdeteksi.</TableCell></TableRow>
                         ) : items.map(item => {
-                            const isOverInvoiced = (item.quantity + (item.prevInvoicedQty || 0)) > (item.originalQty || 0);
+                            const totalBillQty = item.quantity + (item.prevInvoicedQty || 0);
+                            const isOverInvoiced = totalBillQty > (item.originalQty || 0);
+                            const isUnderInvoiced = totalBillQty < (item.originalQty || 0) && item.quantity > 0;
                             const isPriceChanged = item.price !== item.originalPrice;
                             const isNameChanged = item.name !== item.originalName;
+                            const hasVariance = isOverInvoiced || isUnderInvoiced || isPriceChanged || isNameChanged;
 
                             return (
                                 <TableRow key={item.id} className={cn("border-b-slate-100 dark:border-b-slate-800 transition-colors", isOverInvoiced && !isOverBillingAllowed && "bg-red-50/50")}>
                                     <TableCell>
-                                        <div className="flex flex-col gap-1.5 py-1">
+                                        <div className="flex flex-col gap-2 py-2">
                                             <div className="flex items-center gap-2">
                                                 <Input 
                                                     value={item.name} 
@@ -416,6 +443,20 @@ export default function AddInvoicePage() {
                                                 <span className="text-[8px] font-black uppercase text-slate-400">Kontrak PO: {item.originalQty} {item.unit}</span>
                                                 {isNameChanged && <span className="text-[8px] font-bold text-slate-400 italic">PO Ref: {item.originalName}</span>}
                                             </div>
+                                            
+                                            {hasVariance && (
+                                                <div className="px-3 space-y-1">
+                                                    <div className="flex items-center gap-1.5 text-[8px] font-black text-indigo-600 uppercase tracking-widest">
+                                                        <MessageSquare className="h-2.5 w-2.5" /> Alasan Variansi (Wajib Audit):
+                                                    </div>
+                                                    <Input 
+                                                        value={item.varianceReason} 
+                                                        onChange={e => setItems(items.map(it => it.id === item.id ? { ...it, varianceReason: e.target.value } : it))}
+                                                        className="h-6 text-[10px] bg-indigo-50/30 border-indigo-100 italic placeholder:text-slate-300"
+                                                        placeholder="Contoh: Over-delivery atas permintaan proyek / Penyesuaian harga pasar..."
+                                                    />
+                                                </div>
+                                            )}
                                         </div>
                                     </TableCell>
                                     <TableCell>
@@ -430,7 +471,7 @@ export default function AddInvoicePage() {
                                                 disabled={isLocked}
                                             />
                                             {isOverInvoiced && (
-                                                <div className="text-[8px] font-black text-red-600 text-center uppercase">Variance +{Math.max(0, (item.quantity + (item.prevInvoicedQty || 0)) - (item.originalQty || 0))}</div>
+                                                <div className="text-[8px] font-black text-red-600 text-center uppercase">Variance +{Math.max(0, totalBillQty - (item.originalQty || 0))}</div>
                                             )}
                                         </div>
                                     </TableCell>
@@ -438,7 +479,7 @@ export default function AddInvoicePage() {
                                         <div className="flex flex-col items-center">
                                             <span className="text-[10px] font-black text-slate-400">{item.prevInvoicedQty || 0}</span>
                                             <Badge variant="outline" className="text-[7px] h-3 uppercase font-bold text-emerald-600 border-emerald-200 bg-emerald-50/30">
-                                                Sisa: {Math.max(0, (item.originalQty || 0) - (item.prevInvoicedQty || 0) - item.quantity)}
+                                                Sisa: {Math.max(0, (item.originalQty || 0) - totalBillQty)}
                                             </Badge>
                                         </div>
                                     </TableCell>
@@ -465,11 +506,11 @@ export default function AddInvoicePage() {
                     </TableBody>
                 </Table>
                 <div className="p-4 bg-slate-50/30 border-t flex justify-between items-center">
-                    <Button variant="outline" size="sm" onClick={() => setItems([...items, { id: Date.now().toString(), name: 'Item Baru', quantity: 0, unit: 'm', price: 0, total: 0, originalName: 'Manual Entry', originalPrice: 0, originalQty: 0 }])} className="border-dashed h-8 text-[9px] font-black uppercase text-indigo-600 hover:text-indigo-700" disabled={isLocked}>
+                    <Button variant="outline" size="sm" onClick={() => setItems([...items, { id: Date.now().toString(), name: 'Item Baru', quantity: 0, unit: 'm', price: 0, total: 0, originalName: 'Manual Entry', originalPrice: 0, originalQty: 0, varianceReason: 'Manual addition' }])} className="border-dashed h-8 text-[9px] font-black uppercase text-indigo-600 hover:text-indigo-700" disabled={isLocked}>
                         <Plus className="mr-2 h-3 w-3" /> Tambah Baris Manual
                     </Button>
                     <div className="flex items-center gap-2 text-[10px] font-black text-slate-400 italic uppercase tracking-widest opacity-50">
-                        <Scale className="h-3 w-3" /> Constructor Engine Ready
+                        <Scale className="h-3 w-3" /> Financial Audit Ready
                     </div>
                 </div>
             </CardContent>

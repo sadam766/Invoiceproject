@@ -38,6 +38,7 @@ export type InvoiceItem = {
     originalPrice?: number;
     prevInvoicedQty?: number;
     varianceQty?: number;
+    varianceReason?: string;
 };
 
 export type Invoice = {
