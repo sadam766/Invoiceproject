@@ -1,147 +1,48 @@
-/**
- * FIRESTORE SECURITY RULES
- * 
- * Core Philosophy:
- * This ruleset implements a team-based access model suitable for a sales environment. It distinguishes 
- * between private user data (profiles) and shared business entities (customers, products, sales). 
- * Authorization is primarily driven by authentication status and specific user ownership where applicable.
- * 
- * Data Structure:
- * - /users/{userId}: Private user profile data, restricted to the owner.
- * - /admin_roles/{userId}: A restricted collection used for Database Access Control (DBAC).
- * - /customers, /products, /sales: Top-level collections accessible to all authenticated sales staff.
- * - /sales/{saleId}/items: Subcollection of sales, inheriting the parent's shared access model.
- * 
- * Key Security Decisions:
- * 1. Team-Based Access: For core business entities (Customers, Products, Sales), any authenticated 
- *    user is considered "Sales Staff" and granted full CRUD access to facilitate rapid prototyping 
- *    and collaborative workflows.
- * 2. Role-Based Access Control (RBAC): An `isAdmin` helper is provided, checking for the existence 
- *    of a user's UID in the `/admin_roles` collection.
- * 3. Relational Integrity: Critical ID fields (like `customerId` or `saleId`) are validated 
- *    during creation to ensure they match the document's path, preventing orphaned data.
- * 4. Ownership Model: Strict path-based ownership is enforced for the `/users` collection.
- * 
- * Denormalization for Authorization:
- * In this prototype phase, the system relies on the shared authentication state for most entities. 
- * For user-specific data, the {userId} in the path acts as the primary authorization key, 
- * removing the need for `get()` lookups in most rules.
- */
-
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
     // --- Helper Functions ---
-
-    /** @description Checks if the request is from an authenticated user. */
     function isSignedIn() {
       return request.auth != null;
     }
 
-    /** @description Checks if the authenticated user's UID matches the provided userId. */
     function isOwner(userId) {
       return isSignedIn() && request.auth.uid == userId;
     }
 
-    // Removed: isExistingOwner was unused.
-
-    /** @description Checks if the current user has an entry in the admin_roles collection. */
     function isAdmin() {
-      return isSignedIn() && exists(/databases/$(database)/documents/admin_roles/$(request.auth.uid));
+      return isSignedIn() && (
+        exists(/databases/$(database)/documents/admin_roles/$(request.auth.uid)) ||
+        request.auth.token.email.toLowerCase() == 'fa@gmail.com'
+      );
     }
-
-    // Removed: existsForWrite was using 'resource' in a top-level function scope, which is invalid.
-    // Replaced its usage directly with 'resource != null' within the allow rules.
 
     // --- Collection Rules ---
 
-    /**
-     * @description Rules for user profile documents. Restricted to the user themselves.
-     * @path /users/{userId}
-     * @allow (get, list, create, update) if the authenticated user's UID matches {userId}.
-     * @deny (get) if the UID does not match the path.
-     * @principle Restricts access to a user's own data tree and enforces path-to-data consistency.
-     */
     match /users/{userId} {
-      allow get, list: if isOwner(userId);
-      allow create: if isOwner(userId) && request.resource.data.id == userId;
-      allow update: if isOwner(userId) && resource != null && request.resource.data.id == resource.data.id;
-      allow delete: if isOwner(userId) && resource != null;
+      allow get, list: if isOwner(userId) || isAdmin();
+      allow create: if isOwner(userId);
+      allow update: if isOwner(userId) || isAdmin();
+      allow delete: if isAdmin();
     }
 
-    /**
-     * @description Rules for administrative roles. Restricted to admins only.
-     * @path /admin_roles/{userId}
-     * @allow (get) if signed in (to allow UI to check roles), (write) if already an admin.
-     * @deny (create) for non-admins.
-     * @principle DBAC: Existence of document grants privileges; management restricted to existing admins.
-     */
     match /admin_roles/{userId} {
       allow get: if isSignedIn();
-      allow list: if isAdmin();
-      allow create, update, delete: if isAdmin();
+      allow list, write: if isAdmin();
     }
 
-    /**
-     * @description Rules for customer records. Accessible to all authenticated sales staff.
-     * @path /customers/{customerId}
-     * @allow (all) if the user is signed in.
-     * @deny (all) if the user is not signed in.
-     * @principle Shared access model for team-based business entities.
-     */
-    match /customers/{customerId} {
-      allow get, list: if isSignedIn();
-      allow create: if isSignedIn() && request.resource.data.id == customerId;
-      allow update: if isSignedIn() && resource != null && request.resource.data.id == resource.data.id;
-      allow delete: if isSignedIn() && resource != null;
-    }
-
-    /**
-     * @description Rules for product records. Accessible to all authenticated sales staff.
-     * @path /products/{productId}
-     * @allow (all) if the user is signed in.
-     * @deny (all) if the user is not signed in.
-     * @principle Shared access model for team-based business entities.
-     */
-    match /products/{productId} {
-      allow get, list: if isSignedIn();
-      allow create: if isSignedIn() && request.resource.data.id == productId;
-      allow update: if isSignedIn() && resource != null && request.resource.data.id == resource.data.id;
-      allow delete: if isSignedIn() && resource != null;
-    }
-
-    /**
-     * @description Rules for sales transactions (invoices). Accessible to all authenticated sales staff.
-     * @path /sales/{saleId}
-     * @allow (all) if the user is signed in.
-     * @deny (all) if the user is not signed in.
-     * @principle Shared access model for team-based business entities.
-     */
-    match /sales/{saleId} {
-      allow get, list: if isSignedIn();
-      allow create: if isSignedIn() && request.resource.data.id == saleId;
-      allow update: if isSignedIn() && resource != null && request.resource.data.id == resource.data.id;
-      allow delete: if isSignedIn() && resource != null;
-
-      /**
-       * @description Subcollection for items within a sale. Inherits parent's shared access.
-       * @path /sales/{saleId}/items/{saleItemId}
-       * @allow (all) if the user is signed in.
-       * @deny (all) if the user is not signed in.
-       * @principle Hierarchical access and relational integrity via path parameters.
-       */
-      match /items/{saleItemId} {
-        allow get, list: if isSignedIn();
-        allow create: if isSignedIn() 
-                      && request.resource.data.id == saleItemId 
-                      && request.resource.data.saleId == saleId;
-        allow update: if isSignedIn() 
-                      && resource != null
-                      && request.resource.data.id == resource.data.id 
-                      && request.resource.data.saleId == resource.data.saleId;
-        allow delete: if isSignedIn() && resource != null;
-      }
-    }
+    // Koleksi Bisnis (Akses bersama untuk tim yang sudah login)
+    // Termasuk: customers, products, sales, salesOrders, invoices, invoiceNumbers, spds, taxInvoices, virtualAccounts
+    
+    match /customers/{id} { allow read, write: if isSignedIn(); }
+    match /products/{id} { allow read, write: if isSignedIn(); }
+    match /sales/{id} { allow read, write: if isSignedIn(); }
+    match /salesOrders/{id} { allow read, write: if isSignedIn(); }
+    match /invoices/{id} { allow read, write: if isSignedIn(); }
+    match /invoiceNumbers/{id} { allow read, write: if isSignedIn(); }
+    match /spds/{id} { allow read, write: if isSignedIn(); }
+    match /taxInvoices/{id} { allow read, write: if isSignedIn(); }
+    match /virtualAccounts/{id} { allow read, write: if isSignedIn(); }
   }
 }
