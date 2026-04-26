@@ -31,7 +31,7 @@ import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
 import type { InvoiceNumber, Customer, SalesOrder, Invoice } from '@/app/lib/data';
 import { useToast } from '@/hooks/use-toast';
-import { useFirestore, useCollection, useMemoFirebase, useUser } from '@/firebase';
+import { useFirestore, useCollection, useMemoFirebase } from '@/firebase';
 import { collection, query, doc, getDoc } from 'firebase/firestore';
 
 
@@ -47,9 +47,8 @@ type AddInvoiceNumberDialogProps = {
 
 export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceData, onAddClick, allInvoiceNumbers }: AddInvoiceNumberDialogProps) {
   const firestore = useFirestore();
-  const { user } = useUser();
   const [date, setDate] = useState<Date | undefined>(new Date());
-  const [invoiceType, setInvoiceType] = useState<'sar' | 'kw'>('kw');
+  const [invoiceType, setInvoiceType] = useState<'sar' | 'kw'>('sar');
   const [numberSource, setNumberSource] = useState<'manual' | 'erp'>('manual');
   const [erpNumberInput, setErpNumberInput] = useState('');
   
@@ -108,12 +107,14 @@ export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceDa
     return totalQtyInvoiced >= totalQtyContrak && totalQtyContrak > 0;
   }, [salesOrder, salesOrderListData, existingInvoices]);
 
+  // LOGIKA GLOBAL AUTO-INCREMENT (Multi-Admin Sync)
   const generateNextNumber = (type: 'sar' | 'kw', startFrom: string = '') => {
     let currentMax = 0;
     const now = new Date();
     const currentYearShort = format(now, 'yy');
     const currentYearLong = format(now, 'yyyy');
     
+    // Gabungkan data draf dan data final untuk deteksi global
     const allIds = [
         ...(allInvoiceNumbers?.map(inv => inv.id) || []),
         ...(existingInvoices?.map(inv => inv.id) || [])
@@ -122,7 +123,7 @@ export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceDa
     allIds.forEach(id => {
         let match;
         if (type === 'sar') {
-            // New Logic: SAR/YY01[Sequence]A
+            // Pattern: SAR/[YY]01[Sequence]A
             const pattern = new RegExp(`SAR/${currentYearShort}01(\\d{4})A`);
             match = id.match(pattern);
         } else {
@@ -141,7 +142,6 @@ export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceDa
     const baseNumber = !isNaN(userStart) ? Math.max(currentMax, userStart - 1) : currentMax;
     const nextNum = baseNumber + 1;
 
-    // Both SAR (now 4 digit) and KW use 4 digit padding
     return nextNum.toString().padStart(4, '0');
   };
   
@@ -152,7 +152,7 @@ export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceDa
     const currentYearLong = format(now, 'yyyy');
 
     if (type === 'sar') {
-      // SAR/[YY][PropertyCode]
+      // Locked Format: SAR/[YY]01
       setPrefix(`SAR/${currentYearShort}01`);
       setSuffix('A');
       setMainNumber(nextNumStr);
@@ -165,7 +165,6 @@ export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceDa
 
   const handleManualSetup = (invoice: InvoiceNumber) => {
     const id = invoice.id;
-    // SAR Pattern: SAR/YY01[4-digit]A
     const sarMatch = id.match(/^(SAR\/\d{2}01)(\d{4})(A)$/);
     const kwMatch = id.match(/^(KW\/)(\d+)(\/KEU\/\d{4})$/);
 
@@ -243,20 +242,11 @@ export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceDa
 
     if (newSalesOrder && salesOrderListData) {
       const soDetails = salesOrderListData.filter(item => item.soNumber === newSalesOrder);
-      
       if (soDetails.length > 0) {
         setCustomer(soDetails[0].customer);
         setPoNumber(soDetails[0].poNumber || '');
-      } else {
-        setCustomer('');
-        setPoNumber('');
       }
-
-    } else {
-        setCustomer('');
-        setPoNumber('');
     }
-
     setSoPopoverOpen(false);
   };
   
@@ -275,21 +265,6 @@ export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceDa
         return;
     }
 
-    if (numberSource === 'erp' && firestore) {
-        const safeId = erpNumberInput.replace(/\//g, '_');
-        const docRef = doc(firestore, 'invoices', safeId);
-        const docSnap = await getDoc(docRef);
-        if (docSnap.exists()) {
-            toast({ variant: "destructive", title: "Nomor ERP Ganda", description: "Nomor ini sudah terdaftar di sistem pusat." });
-            return;
-        }
-    }
-
-    if (isSoExhausted && invoiceType === 'sar') {
-        toast({ variant: "destructive", title: "Kuota SO Habis", description: "Seluruh barang pada SO ini sudah ditagih. Gunakan mode Proforma jika perlu." });
-        return;
-    }
-    
     const finalInvoiceNumber = fullInvoiceNumber;
     const existsInNumberList = allInvoiceNumbers?.some(inv => inv.id === finalInvoiceNumber);
     const existsInInvoiceList = existingInvoices?.some(inv => inv.id === finalInvoiceNumber);
@@ -379,29 +354,28 @@ export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceDa
                       </div>
 
                       <div className="space-y-2">
-                        <Label className="text-[10px] font-black uppercase text-muted-foreground">Konfigurasi Penomoran</Label>
+                        <Label className="text-[10px] font-black uppercase text-muted-foreground">Konfigurasi Penomoran (Global Sync)</Label>
                         <div className="flex items-center gap-4 mb-2">
                             <div className="flex items-center space-x-2">
                               <Checkbox id="auto-number" checked={isAutoNumber} onCheckedChange={(checked) => setIsAutoNumber(!!checked)} />
                               <Label htmlFor="auto-number" className="text-xs font-bold uppercase cursor-pointer">Gunakan Nomor Urut Sistem</Label>
                             </div>
-                            {isAutoNumber && (
-                                <div className="flex items-center gap-2">
-                                    <Label className="text-[9px] font-bold uppercase text-muted-foreground">Mulai:</Label>
-                                    <Input 
-                                        placeholder="0001"
-                                        className="h-7 w-20 text-xs font-bold"
-                                        value={startingNumber}
-                                        onChange={(e) => setStartingNumber(e.target.value)}
-                                    />
-                                </div>
-                            )}
+                            <div className="flex items-center gap-2">
+                                <Label className="text-[9px] font-bold uppercase text-muted-foreground">Mulai Dari:</Label>
+                                <Input 
+                                    placeholder="0001"
+                                    className="h-7 w-20 text-xs font-bold border-indigo-200"
+                                    value={startingNumber}
+                                    onChange={(e) => setStartingNumber(e.target.value)}
+                                />
+                            </div>
                         </div>
                         <div className="grid grid-cols-[auto_1fr_auto] items-center gap-2">
-                          {prefix && <div className="bg-indigo-50 px-3 py-2 rounded-md border border-indigo-100 text-xs font-black text-indigo-700 font-mono">{prefix}</div>}
-                          <Input value={mainNumber} onChange={(e) => setMainNumber(e.target.value)} disabled={isAutoNumber} className="h-10 font-black text-center text-lg tracking-widest" />
-                          {suffix && <div className="bg-indigo-50 px-3 py-2 rounded-md border border-indigo-100 text-xs font-black text-indigo-700 font-mono">{suffix}</div>}
+                          {prefix && <div className="bg-indigo-50 px-3 py-2 rounded-md border border-indigo-100 text-xs font-black text-indigo-700 font-mono" title="Locked Prefix">{prefix}</div>}
+                          <Input value={mainNumber} onChange={(e) => setMainNumber(e.target.value)} disabled={isAutoNumber} className="h-10 font-black text-center text-lg tracking-widest bg-white" placeholder="0001" />
+                          {suffix && <div className="bg-indigo-50 px-3 py-2 rounded-md border border-indigo-100 text-xs font-black text-indigo-700 font-mono" title="Locked Suffix">{suffix}</div>}
                         </div>
+                        <p className="text-[8px] font-bold text-indigo-600 uppercase mt-1 italic">* Sistem memindai database real-time untuk menyarankan nomor urut berikutnya.</p>
                       </div>
                   </div>
               ) : (
@@ -413,7 +387,6 @@ export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceDa
                         placeholder="Contoh: ERPSAR/2600000" 
                         className="h-12 font-black text-indigo-700 bg-white text-lg border-2 border-indigo-200"
                       />
-                      <p className="text-[9px] text-muted-foreground italic mt-1 font-bold">Pastikan nomor sesuai dengan yang tertera pada sistem ERP pusat.</p>
                   </div>
               )}
           </div>
@@ -463,11 +436,6 @@ export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceDa
                     </Command>
                 </PopoverContent>
             </Popover>
-            {isSoExhausted && (
-                <div className="flex items-center gap-1 text-[10px] text-red-600 font-bold mt-1 uppercase">
-                    <AlertCircle className="h-3 w-3" /> Kuota SO ini sudah habis. Hanya diperbolehkan mode Proforma (KW).
-                </div>
-            )}
           </div>
 
           <div className="grid grid-cols-2 gap-4">
@@ -545,7 +513,6 @@ export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceDa
                                   <span className="font-bold text-slate-800 uppercase">{c.name}</span>
                                   <Check className={cn("h-4 w-4", customer === c.name ? "opacity-100" : "opacity-0")} />
                                 </div>
-                                <p className="text-[10px] text-muted-foreground italic truncate w-full">{c.addresses?.[0]?.address || 'No Address'}</p>
                             </CommandItem>
                             ))}
                         </CommandGroup>

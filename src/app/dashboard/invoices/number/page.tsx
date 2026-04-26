@@ -1,5 +1,6 @@
+
 'use client';
-import { useState, useRef, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import {
     Card,
@@ -23,7 +24,7 @@ import {
   import { Button } from '@/components/ui/button';
   import { Badge } from '@/components/ui/badge';
   import { type InvoiceNumber, type Invoice, type UserProfile } from '@/app/lib/data';
-  import { Search, Upload, Download, MoreHorizontal, Edit, Trash2, Lock, Database, Hash, Info, FilePlus } from 'lucide-react';
+  import { Search, Download, MoreHorizontal, Edit, Trash2, Lock, Database, Hash, Info, FilePlus } from 'lucide-react';
   import { AddInvoiceNumberDialog } from './_components/add-invoice-number-dialog';
   import { DeleteConfirmationDialog } from '@/app/components/delete-confirmation-dialog';
   import { Skeleton } from '@/components/ui/skeleton';
@@ -46,7 +47,6 @@ import {
     const [isDialogOpen, setIsDialogOpen] = useState(false);
     const [deleteDialogState, setDeleteDialogState] = useState<{ isOpen: boolean; invoiceId?: string }>({ isOpen: false });
 
-    // Profile check for audit trail
     const userProfileRef = useMemoFirebase(() => {
         if (!firestore || !user) return null;
         return doc(firestore, 'users', user.uid);
@@ -76,7 +76,7 @@ import {
         
         const sortedInvoices = [...invoices].sort((a, b) => {
             const getNum = (id: string) => {
-                const matchSAR = id.match(/SAR\/\d{2}(\d+)A/);
+                const matchSAR = id.match(/SAR\/\d{2}01(\d+)A/);
                 const matchKW = id.match(/KW\/(\d+)\/KEU\/\d{4}/);
                 if (matchSAR) return parseInt(matchSAR[1], 10);
                 if (matchKW) return parseInt(matchKW[1], 10);
@@ -110,13 +110,8 @@ import {
         if (!firestore || !deleteDialogState.invoiceId) return;
 
         const isLinked = linkedInvoices?.some(inv => inv.id === deleteDialogState.invoiceId);
-        
         if (isLinked) {
-            toast({
-                variant: "destructive",
-                title: "Aksi Ditolak",
-                description: "Nomor ini sudah memiliki data item di Invoice List.",
-            });
+            toast({ variant: "destructive", title: "Aksi Ditolak", description: "Nomor ini sudah memiliki data item di Invoice List." });
             setDeleteDialogState({ isOpen: false, invoiceId: undefined });
             return;
         }
@@ -128,12 +123,8 @@ import {
                 toast({ title: 'Identitas Berhasil Dihapus' });
                 setDeleteDialogState({ isOpen: false, invoiceId: undefined });
             })
-            .catch(async (serverError) => {
-                const permissionError = new FirestorePermissionError({
-                    path: docRef.path,
-                    operation: 'delete',
-                });
-                errorEmitter.emit('permission-error', permissionError);
+            .catch(async () => {
+                errorEmitter.emit('permission-error', new FirestorePermissionError({ path: docRef.path, operation: 'delete' }));
                 setDeleteDialogState({ isOpen: false, invoiceId: undefined });
             });
     };
@@ -142,7 +133,7 @@ import {
         setDeleteDialogState({ isOpen: true, invoiceId: invoiceId });
     };
 
-    const handleSave = (invoice: Omit<InvoiceNumber, 'id' | 'ownerId'> & {id: string}, action: 'save' | 'create') => {
+    const handleSave = async (invoice: Omit<InvoiceNumber, 'id' | 'ownerId'> & {id: string}, action: 'save' | 'create') => {
       if (!firestore || !user) return;
 
       const safeId = invoice.id.replace(/\//g, '_');
@@ -154,34 +145,27 @@ import {
           createdBy: userProfile?.displayName || user.email || 'System'
       };
 
-      setDoc(docRef, dataToSave, { merge: true })
-        .then(() => {
-            toast({ 
-                title: editingInvoice ? "Identitas Diperbarui" : "Identitas Terdaftar",
-                description: `Nomor ${invoice.id} berhasil disimpan.`
-            });
-            setIsDialogOpen(false);
-            setEditingInvoice(undefined);
-            
-            if (action === 'create') {
-                router.push(`/dashboard/invoices/add?invoiceNumberId=${safeId}`);
-            }
-        })
-        .catch(err => {
-            errorEmitter.emit('permission-error', new FirestorePermissionError({
-                path: docRef.path,
-                operation: editingInvoice ? 'update' : 'create',
-                requestResourceData: dataToSave
-            }));
-        });
-    };
-
-    const handleDialogStateChange = (open: boolean) => {
-      setIsDialogOpen(open);
-      if (!open) {
-        setEditingInvoice(undefined);
+      // KRITIKAL: Pastikan data tersimpan di DB sebelum navigasi
+      try {
+          await setDoc(docRef, dataToSave, { merge: true });
+          toast({ 
+              title: editingInvoice ? "Identitas Diperbarui" : "Identitas Terdaftar",
+              description: `Nomor ${invoice.id} berhasil disimpan secara global.`
+          });
+          setIsDialogOpen(false);
+          setEditingInvoice(undefined);
+          
+          if (action === 'create') {
+              router.push(`/dashboard/invoices/add?invoiceNumberId=${safeId}`);
+          }
+      } catch (err) {
+          errorEmitter.emit('permission-error', new FirestorePermissionError({
+              path: docRef.path,
+              operation: editingInvoice ? 'update' : 'create',
+              requestResourceData: dataToSave
+          }));
       }
-    }
+    };
 
     return (
       <main className="flex flex-1 flex-col gap-4 p-4 md:gap-8 md:p-8 bg-background">
@@ -195,7 +179,7 @@ import {
             <div className="flex bg-indigo-600/5 p-3 rounded-xl border border-indigo-600/10 gap-3">
                 <Info className="h-5 w-5 text-indigo-600 shrink-0 mt-0.5" />
                 <p className="text-[10px] text-slate-500 max-w-xs leading-tight font-bold uppercase tracking-tighter">
-                    Begitu nomor didaftarkan, sistem akan mengunci nomor tersebut agar tidak digunakan oleh Admin lain secara bersamaan.
+                    Sinkronisasi Multi-User Aktif. Nomor urut akan otomatis mengikuti input terakhir dari admin manapun.
                 </p>
             </div>
         </div>
@@ -217,7 +201,7 @@ import {
                        <Button variant="outline" onClick={() => invoices && exportToExcel(invoices, 'invoice-identities')} className="font-black uppercase text-[10px] tracking-widest border-slate-200"><Download className="mr-2 h-4 w-4"/> Export</Button>
                        <AddInvoiceNumberDialog
                         isOpen={isDialogOpen}
-                        onOpenChange={handleDialogStateChange}
+                        onOpenChange={(o) => { setIsDialogOpen(o); if(!o) setEditingInvoice(undefined); }}
                         onSave={handleSave}
                         invoiceData={editingInvoice}
                         onAddClick={handleAddClick}
