@@ -93,6 +93,9 @@ export default function AddInvoicePage() {
   }, [firestore, editInvoiceId]);
   const { data: existingInvoiceData, isLoading: isExistingLoading } = useDoc<Invoice>(existingInvoiceRef);
 
+  // KRITIKAL: Definisikan activeIdentity lebih awal agar tersedia untuk useMemo di bawahnya
+  const activeIdentity = existingInvoiceData || identityData;
+
   const userProfileRef = useMemoFirebase(() => (!firestore || !user) ? null : doc(firestore, 'users', user.uid), [firestore, user]);
   const { data: userProfile } = useDoc<UserProfile>(userProfileRef);
   const isAdmin = user?.email?.toLowerCase() === 'fa@gmail.com' || userProfile?.role === 'admin';
@@ -155,10 +158,9 @@ export default function AddInvoicePage() {
   }, [allInvoices, activeIdentity]);
 
   const availableVas = useMemo(() => {
-    const activeIdentity = existingInvoiceData || identityData;
     if (!allVas || !activeIdentity) return [];
     return allVas.filter(va => va.customerName === activeIdentity.customer);
-  }, [allVas, existingInvoiceData, identityData]);
+  }, [allVas, activeIdentity]);
 
   // PRE-INITIALIZATION & PERSISTENCE LOCK
   useEffect(() => {
@@ -166,7 +168,7 @@ export default function AddInvoicePage() {
       const targetDoc = existingInvoiceData || identityData;
       
       if (targetDoc && items.length === 0) {
-          // Pure trust of DB Data - No recalculation/default to 0001
+          // Pure trust of DB Data
           if (targetDoc.items && targetDoc.items.length > 0) {
              setItems(targetDoc.items);
           } else if (allSoItems && !editInvoiceId) {
@@ -267,7 +269,6 @@ export default function AddInvoicePage() {
   };
 
   const handleSaveInvoice = async (invoiceStatus: any = 'sent', redirectToPreview = false) => {
-    const activeIdentity = existingInvoiceData || identityData;
     if (!firestore || !user || !activeIdentity) return;
 
     const safeInvoiceId = activeIdentity.id.replace(/\//g, '_');
@@ -280,7 +281,7 @@ export default function AddInvoicePage() {
     const dataToSave: any = {
         id: activeIdentity.id,
         erpInvoiceId: internalNote,
-        soNumber: activeIdentity.soNumber || activeIdentity.salesOrder || '',
+        soNumber: activeIdentity.soNumber || (activeIdentity as any).salesOrder || '',
         poNumber: activeIdentity.poNumber || '',
         customer: activeIdentity.customer,
         billingAddress: billingAddress,
@@ -316,7 +317,7 @@ export default function AddInvoicePage() {
                   items: items.map((it, idx) => ({ ...it, no: idx + 1 })),
                   customer: { name: activeIdentity.customer, address: billingAddress, npwp: billingNpwp },
                   date: format(issueDate, 'yyyy-MM-dd'),
-                  soNumber: activeIdentity.soNumber || activeIdentity.salesOrder || '',
+                  soNumber: activeIdentity.soNumber || (activeIdentity as any).salesOrder || '',
                   poNumber: activeIdentity.poNumber || '',
                   grandTotal: parseFormattedNumber(String(totalAmount)),
                   subtotal: subtotal,
@@ -341,7 +342,6 @@ export default function AddInvoicePage() {
         });
   };
 
-  const activeIdentity = existingInvoiceData || identityData;
   const isLoading = (invoiceNumberIdParam && isIdentityLoading) || (editInvoiceId && isExistingLoading);
 
   if (isLoading || (!activeIdentity && (invoiceNumberIdParam || editInvoiceId))) {
@@ -415,7 +415,7 @@ export default function AddInvoicePage() {
                   <div className="space-y-1.5">
                       <Label className="text-[9px] font-black uppercase text-slate-400 tracking-widest">Ref PO / SO Hub</Label>
                       <div className="bg-slate-50 dark:bg-slate-800 px-3 py-2 rounded-md border border-slate-200 text-xs font-mono font-bold truncate">
-                          {activeIdentity?.poNumber} {((activeIdentity as any).salesOrder || (activeIdentity as any).soNumber) && `• ${(activeIdentity as any).salesOrder || (activeIdentity as any).soNumber}`}
+                          {activeIdentity?.poNumber} {(activeIdentity?.soNumber || (activeIdentity as any)?.salesOrder) && `• ${activeIdentity?.soNumber || (activeIdentity as any)?.salesOrder}`}
                       </div>
                   </div>
 
