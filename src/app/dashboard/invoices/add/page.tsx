@@ -52,6 +52,8 @@ import {
   ChevronRight,
   TrendingUp,
   FileCheck,
+  Trash2,
+  ListChecks,
 } from 'lucide-react';
 import { type Invoice, type SalesOrder, type UserProfile, type Customer, type InvoiceItem, type InvoiceNumber, type VirtualAccount, type ProductListItem } from '@/app/lib/data';
 import { useToast } from '@/hooks/use-toast';
@@ -120,13 +122,17 @@ export default function AddInvoicePage() {
   // --- LOGIKA "THE GOLDEN KEY" (PO HISTORY) ---
   const poBillingHistory = useMemo(() => {
     if (!allInvoices || !activeIdentity) return [];
-    // Tampilkan riwayat penagihan untuk PO yang sama, kecuali invoice yang sedang diedit saat ini
     return allInvoices.filter(inv => 
         inv.poNumber === activeIdentity.poNumber && 
         inv.id !== activeIdentity.id &&
         inv.status !== 'cancelled'
     ).sort((a, b) => b.date.localeCompare(a.date));
   }, [allInvoices, activeIdentity]);
+
+  const billedItemsHistory = useMemo(() => {
+      if (!poBillingHistory) return [];
+      return poBillingHistory.flatMap(inv => (inv.items || []).map(it => ({ ...it, parentInvoice: inv.id, date: inv.date })));
+  }, [poBillingHistory]);
 
   const dpInvoicedBalance = useMemo(() => {
     if (!poBillingHistory) return 0;
@@ -153,6 +159,8 @@ export default function AddInvoicePage() {
     return poBillingHistory.reduce((sum, inv) => sum + inv.amount, 0);
   }, [poBillingHistory]);
 
+  const remainingPoBalance = Math.max(0, totalPoValue - totalInvoicedSoFar);
+
   // --- FORM STATES ---
   const [items, setItems] = useState<InvoiceItem[]>([]);
   const [billingAddress, setBillingAddress] = useState('');
@@ -171,7 +179,7 @@ export default function AddInvoicePage() {
   const [negotiationValue, setNegotiationValue] = useState<string | number>('');
   const [negotiationMode, setNegotiationMode] = useState<'percent' | 'nominal'>('nominal');
   const [dpValue, setDpValue] = useState<string | number>('');
-  const [dpMode, setDpMode] = useState<'percent' | 'nominal'>('nominal');
+  const [dpMode, setDpMode] = useState<'percent' | 'nominal'>('percent');
   const [retentionValue, setRetentionValue] = useState<string | number>('');
   const [retentionMode, setRetentionMode] = useState<'percent' | 'nominal'>('nominal');
   const [dpDeductionValue, setDpDeductionValue] = useState<string | number>('');
@@ -187,7 +195,6 @@ export default function AddInvoicePage() {
           if (activeIdentity.items && activeIdentity.items.length > 0) {
              setItems(activeIdentity.items);
           } else if (allSoItems && !editInvoiceId) {
-              // Jalur Opsi A: Tarik data dari SO
               const relatedItems = allSoItems.filter(item => item.soNumber === activeIdentity.salesOrder);
               setItems(relatedItems.map((item, idx) => {
                   const prevQty = allInvoices?.filter(inv => inv.soNumber === item.soNumber && inv.status !== 'cancelled')
@@ -224,7 +231,6 @@ export default function AddInvoicePage() {
           if ((activeIdentity as Invoice).paymentMethod) setSelectedVaId((activeIdentity as Invoice).paymentMethod!);
           if (activeIdentity.erpInvoiceId) setInternalNote(activeIdentity.erpInvoiceId);
 
-          // AUTO-FILL DP DEDUCTION if progress billing
           if (!editInvoiceId && !(activeIdentity as Invoice).isDpInvoice && dpInvoicedBalance > 0) {
               setDpDeductionValue(formatNumberWithCommas(dpInvoicedBalance));
           }
@@ -279,6 +285,11 @@ export default function AddInvoicePage() {
       };
       setItems([...items, newItem]);
       setProductPopoverOpen(false);
+  };
+
+  const removeItem = (id: string | number) => {
+      setItems(items.filter(it => it.id !== id));
+      toast({ title: "Baris Item Dihapus", description: "Kalkulasi total telah disesuaikan." });
   };
 
   const handleSaveInvoice = async (invoiceStatus: any = 'sent', redirectToPreview = false) => {
@@ -372,19 +383,32 @@ export default function AddInvoicePage() {
                     </div>
                   </TooltipTrigger>
                   <TooltipContent className="max-w-xs bg-slate-900 text-white p-3">
-                    <p className="text-xs"><b>Over Billing:</b> Kondisi di mana nilai yang ditagihkan melebihi nilai kontrak awal, digunakan untuk penyesuaian biaya tambahan.</p>
+                    <p className="text-xs"><b>Over Billing:</b> Kondisi di mana nilai yang ditagihkan melebihi nilai kontrak awal, biasanya digunakan untuk penyesuaian biaya tambahan atau advance payment.</p>
                   </TooltipContent>
                 </Tooltip>
               </TooltipProvider>
             )}
             
-            <Badge 
-                variant={isDpInvoice ? "default" : "outline"} 
-                className={cn("text-[9px] uppercase cursor-pointer py-1.5 px-4", isDpInvoice ? "bg-indigo-600" : "text-indigo-600 border-indigo-200")} 
-                onClick={() => !isLocked && setIsDpInvoice(!isDpInvoice)}
-            >
-                {isDpInvoice ? "Down Payment" : "Progress Billing"}
-            </Badge>
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Badge 
+                      variant={isDpInvoice ? "default" : "outline"} 
+                      className={cn("text-[9px] uppercase cursor-pointer py-1.5 px-4", isDpInvoice ? "bg-indigo-600" : "text-indigo-600 border-indigo-200")} 
+                      onClick={() => !isLocked && setIsDpInvoice(!isDpInvoice)}
+                  >
+                      {isDpInvoice ? "Down Payment" : "Progress Billing"}
+                  </Badge>
+                </TooltipTrigger>
+                <TooltipContent className="max-w-xs bg-slate-900 text-white p-3">
+                    <p className="text-xs">
+                        {isDpInvoice 
+                            ? "Down Payment: Tagihan uang muka di awal proyek." 
+                            : "Progress Billing: Penagihan bertahap berdasarkan persentase penyelesaian pekerjaan atau termin yang telah disepakati di Sales Order."}
+                    </p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
         </div>
       </div>
 
@@ -446,11 +470,12 @@ export default function AddInvoicePage() {
                             <TableHead className="w-[100px] text-center text-[10px] font-black uppercase py-2">Prev. Bill</TableHead>
                             <TableHead className="w-[120px] text-right text-[10px] font-black uppercase py-2">Unit Price</TableHead>
                             <TableHead className="w-[140px] text-right text-[10px] font-black uppercase py-2">Total (IDR)</TableHead>
+                            <TableHead className="w-[50px]"></TableHead>
                         </TableRow>
                     </TableHeader>
                     <TableBody>
                         {items.length === 0 ? (
-                            <TableRow><TableCell colSpan={5} className="text-center py-10 text-slate-400 italic text-xs uppercase font-black">Belum ada item ditarik.</TableCell></TableRow>
+                            <TableRow><TableCell colSpan={6} className="text-center py-10 text-slate-400 italic text-xs uppercase font-black">Belum ada item ditarik.</TableCell></TableRow>
                         ) : items.map(item => {
                             const totalBillQty = item.quantity + (item.prevInvoicedQty || 0);
                             const isOverInvoiced = totalBillQty > (item.originalQty || 0);
@@ -491,6 +516,11 @@ export default function AddInvoicePage() {
                                         />
                                     </TableCell>
                                     <TableCell className="text-right font-black text-xs">Rp {formatNumberWithCommas(item.total)}</TableCell>
+                                    <TableCell>
+                                        <Button variant="ghost" size="icon" className="h-7 w-7 text-rose-500 hover:text-rose-700 hover:bg-rose-50" onClick={() => removeItem(item.id)} disabled={isLocked}>
+                                            <Trash2 className="h-4 w-4" />
+                                        </Button>
+                                    </TableCell>
                                 </TableRow>
                             );
                         })}
@@ -530,6 +560,39 @@ export default function AddInvoicePage() {
                 </div>
             </CardContent>
           </Card>
+
+          {/* ITEM HISTORY AUDIT TRAIL */}
+          {billedItemsHistory.length > 0 && (
+              <Card className="shadow-sm ring-1 ring-slate-200 border-none overflow-hidden">
+                <CardHeader className="bg-slate-50 border-b py-3">
+                    <CardTitle className="text-[10px] font-black uppercase flex items-center gap-2 text-indigo-600">
+                        <History className="h-4 w-4" /> Riwayat Item Terbit (PO Berjalan)
+                    </CardTitle>
+                </CardHeader>
+                <CardContent className="p-0">
+                    <Table>
+                        <TableHeader className="bg-slate-100/50">
+                            <TableRow>
+                                <TableHead className="text-[9px] font-bold uppercase py-2">Invoice #</TableHead>
+                                <TableHead className="text-[9px] font-bold uppercase py-2">Nama Barang (History)</TableHead>
+                                <TableHead className="text-center text-[9px] font-bold uppercase py-2">Qty</TableHead>
+                                <TableHead className="text-right text-[9px] font-bold uppercase py-2">Unit Price</TableHead>
+                            </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                            {billedItemsHistory.map((h, i) => (
+                                <TableRow key={i} className="hover:bg-slate-50/50">
+                                    <TableCell className="text-[9px] font-black text-slate-400">{h.parentInvoice}</TableCell>
+                                    <TableCell className="text-[10px] font-bold text-slate-600 uppercase">{h.name}</TableCell>
+                                    <TableCell className="text-center text-[10px] font-black">{h.quantity} {h.unit}</TableCell>
+                                    <TableCell className="text-right text-[10px] font-mono">Rp {h.price.toLocaleString()}</TableCell>
+                                </TableRow>
+                            ))}
+                        </TableBody>
+                    </Table>
+                </CardContent>
+              </Card>
+          )}
         </div>
 
         {/* Sidebar: Audit & Calculations */}
@@ -551,6 +614,19 @@ export default function AddInvoicePage() {
                          <p className="text-[8px] font-black text-slate-400 uppercase">Billed So Far</p>
                          <p className="text-sm font-black text-indigo-600">Rp {formatNumberWithCommas(totalInvoicedSoFar)}</p>
                      </div>
+                 </div>
+
+                 <div className={cn(
+                     "p-3 rounded-lg border-2 flex justify-between items-center",
+                     remainingPoBalance > 0 ? "bg-indigo-50/50 border-indigo-100" : "bg-red-50 border-red-100"
+                 )}>
+                    <div className="space-y-0.5">
+                        <p className="text-[8px] font-black text-slate-400 uppercase">Remaining Balance</p>
+                        <p className={cn("text-xs font-black", remainingPoBalance > 0 ? "text-indigo-700" : "text-red-600")}>
+                            Rp {formatNumberWithCommas(remainingPoBalance)}
+                        </p>
+                    </div>
+                    <ListChecks className={cn("h-5 w-5", remainingPoBalance > 0 ? "text-indigo-400" : "text-red-400")} />
                  </div>
 
                  <div className="space-y-2">
@@ -609,15 +685,27 @@ export default function AddInvoicePage() {
 
                 {isDpInvoice ? (
                     <div className="space-y-1.5 bg-indigo-50/30 p-3 rounded-xl border border-indigo-100">
-                        <Label className="text-[9px] font-black uppercase text-indigo-700">Tagihan Down Payment (DP)</Label>
+                        <div className="flex justify-between items-center mb-1">
+                            <Label className="text-[9px] font-black uppercase text-indigo-700">Tagihan Down Payment (DP)</Label>
+                            <Select value={dpMode} onValueChange={(v: any) => setDpMode(v)} disabled={isLocked}>
+                                <SelectTrigger className="h-5 w-14 text-[8px] font-black shadow-none border-none bg-indigo-100 text-indigo-700"><SelectValue /></SelectTrigger>
+                                <SelectContent><SelectItem value="nominal">IDR</SelectItem><SelectItem value="percent">%</SelectItem></SelectContent>
+                            </Select>
+                        </div>
                         <Input value={dpValue} onChange={e => setDpValue(e.target.value)} className="h-8 text-right font-black border-indigo-200" placeholder="0" disabled={isLocked} />
                     </div>
                 ) : (
                     <>
                         <div className="space-y-2 bg-emerald-50/20 p-3 rounded-xl border border-emerald-100">
-                            <Label className="text-[9px] font-black uppercase text-emerald-700 flex items-center gap-1">
-                                <Wallet className="h-3 w-3" /> Potongan Saldo DP (Child Sync)
-                            </Label>
+                            <div className="flex justify-between items-center mb-1">
+                                <Label className="text-[9px] font-black uppercase text-emerald-700 flex items-center gap-1">
+                                    <Wallet className="h-3 w-3" /> Potongan Saldo DP (Child Sync)
+                                </Label>
+                                <Select value={dpDeductionMode} onValueChange={(v: any) => setDpDeductionMode(v)} disabled={isLocked}>
+                                    <SelectTrigger className="h-5 w-14 text-[8px] font-black shadow-none border-none bg-emerald-100 text-emerald-700"><SelectValue /></SelectTrigger>
+                                    <SelectContent><SelectItem value="nominal">IDR</SelectItem><SelectItem value="percent">%</SelectItem></SelectContent>
+                                </Select>
+                            </div>
                             <Input value={dpDeductionValue} onChange={e => setDpDeductionValue(e.target.value)} className="h-8 text-right font-black border-emerald-200 text-emerald-700" placeholder="0" disabled={isLocked} />
                             <div className="flex items-center justify-between text-[8px] font-bold text-emerald-600 mt-1 uppercase">
                                 <span>Sisa Kuota DP:</span>
@@ -626,7 +714,13 @@ export default function AddInvoicePage() {
                         </div>
 
                         <div className="space-y-1.5">
-                            <Label className="text-[9px] font-black uppercase text-slate-400">Retention / Guarantee (Pengurang)</Label>
+                            <div className="flex justify-between items-center">
+                                <Label className="text-[9px] font-black uppercase text-slate-400">Retention / Guarantee (Pengurang)</Label>
+                                <Select value={retentionMode} onValueChange={(v: any) => setRetentionMode(v)} disabled={isLocked}>
+                                    <SelectTrigger className="h-5 w-14 text-[8px] font-black shadow-none border-none bg-slate-100 text-slate-700"><SelectValue /></SelectTrigger>
+                                    <SelectContent><SelectItem value="nominal">IDR</SelectItem><SelectItem value="percent">%</SelectItem></SelectContent>
+                                </Select>
+                            </div>
                             <Input value={retentionValue} onChange={e => setRetentionValue(e.target.value)} className="h-8 text-right font-black border-slate-200" placeholder="0" disabled={isLocked} />
                         </div>
                     </>
