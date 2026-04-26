@@ -202,13 +202,21 @@ export default function DashboardLayout({
         <SidebarContent>
           <SidebarMenu>
             <SidebarMenuItem>
-              <SidebarMenuButton asChild isActive={pathname === '/dashboard'} tooltip="Dashboard">
+              <SidebarMenuButton 
+                asChild 
+                isActive={pathname === '/dashboard'} 
+                tooltip="Ringkasan performa penjualan, invoice, dan status pembayaran secara visual."
+              >
                 <Link href="/dashboard"><LayoutDashboard /> <span>Dashboard</span></Link>
               </SidebarMenuButton>
             </SidebarMenuItem>
 
             <SidebarMenuItem>
-              <SidebarMenuButton asChild isActive={pathname === '/dashboard/monitoring'} tooltip="Monitoring">
+              <SidebarMenuButton 
+                asChild 
+                isActive={pathname === '/dashboard/monitoring'} 
+                tooltip="Memantau pergerakan data transaksi dan log aktivitas sistem secara real-time."
+              >
                 <Link href="/dashboard/monitoring"><Eye /> <span>Monitoring</span></Link>
               </SidebarMenuButton>
             </SidebarMenuItem>
@@ -216,7 +224,7 @@ export default function DashboardLayout({
             <Collapsible asChild defaultOpen={pathname.startsWith('/dashboard/invoices')} className="group/collapsible">
               <SidebarMenuItem>
                 <CollapsibleTrigger asChild>
-                    <SidebarMenuButton tooltip="Invoices">
+                    <SidebarMenuButton tooltip="Manajemen penagihan dokumen.">
                       <FileText /> <span>Invoices</span>
                       <div className="grow" />
                       <ChevronDown className={cn('h-4 w-4 transition-transform', 'group-data-[state=open]/collapsible:rotate-180')} />
@@ -225,38 +233,57 @@ export default function DashboardLayout({
                 <CollapsibleContent asChild>
                   <SidebarMenuSub>
                     <SidebarMenuSubItem>
-                      <SidebarMenuSubButton asChild isActive={pathname === '/dashboard/invoices'}>
+                      <SidebarMenuSubButton 
+                        asChild 
+                        isActive={pathname === '/dashboard/invoices'}
+                        tooltip="Daftar seluruh invoice yang sudah dibuat (Status: Draft, Final, atau Cancel)."
+                      >
                         <Link href="/dashboard/invoices">Invoice List</Link>
                       </SidebarMenuSubButton>
                     </SidebarMenuSubItem>
                     <SidebarMenuSubItem>
-                      <SidebarMenuSubButton asChild isActive={pathname.startsWith('/dashboard/invoices/add')}>
-                        {/* 
-                          MANDATORY FLOW: Menu 'Add Invoice' dialihkan ke 'Number' 
-                          untuk memastikan admin meregistrasikan nomor identitas terlebih dahulu.
-                        */}
+                      <SidebarMenuSubButton 
+                        asChild 
+                        isActive={pathname.startsWith('/dashboard/invoices/add')}
+                        tooltip="Membuat draf tagihan baru (Hanya aktif jika sudah ada nomor di Invoice Number)."
+                      >
                         <Link href="/dashboard/invoices/number">Add Invoice</Link>
                       </SidebarMenuSubButton>
                     </SidebarMenuSubItem>
                     <SidebarMenuSubItem>
-                      <SidebarMenuSubButton asChild isActive={pathname === '/dashboard/invoices/number'}>
+                      <SidebarMenuSubButton 
+                        asChild 
+                        isActive={pathname === '/dashboard/invoices/number'}
+                        tooltip="Tempat mendaftarkan nomor urut invoice sebelum membuat tagihan."
+                      >
                         <Link href="/dashboard/invoices/number">Invoice Number</Link>
                       </SidebarMenuSubButton>
                     </SidebarMenuSubItem>
                      <SidebarMenuSubItem>
-                      <SidebarMenuSubButton asChild isActive={pathname === '/dashboard/invoices/virtual-account'}>
+                      <SidebarMenuSubButton 
+                        asChild 
+                        isActive={pathname === '/dashboard/invoices/virtual-account'}
+                        tooltip="Manajemen akun pembayaran Virtual Account pelanggan."
+                      >
                         <Link href="/dashboard/invoices/virtual-account">Virtual Account List</Link>
                       </SidebarMenuSubButton>
                     </SidebarMenuSubItem>
                      <SidebarMenuSubItem>
-                      <SidebarMenuSubButton asChild isActive={pathname === '/dashboard/invoices/spd'}>
+                      <SidebarMenuSubButton 
+                        asChild 
+                        isActive={pathname === '/dashboard/invoices/spd'}
+                        tooltip="Sinkronisasi data pengiriman barang dengan invoice terkait."
+                      >
                         <Link href="/dashboard/invoices/spd">SPD</Link>
                       </SidebarMenuSubButton>
                     </SidebarMenuSubItem>
-                    {/* Faktur Pajak disembunyikan untuk Staff Biasa */}
                     {isAdmin && (
                         <SidebarMenuSubItem>
-                          <SidebarMenuSubButton asChild isActive={pathname === '/dashboard/invoices/tax'}>
+                          <SidebarMenuSubButton 
+                            asChild 
+                            isActive={pathname === '/dashboard/invoices/tax'}
+                            tooltip="Mengelola nomor seri faktur pajak dan data perpajakan terkait invoice."
+                          >
                             <Link href="/dashboard/invoices/tax">Tax Invoices</Link>
                           </SidebarMenuSubButton>
                         </SidebarMenuSubItem>
@@ -267,31 +294,50 @@ export default function DashboardLayout({
             </Collapsible>
 
             <SidebarMenuItem>
-              <SidebarMenuButton asChild isActive={pathname.startsWith('/dashboard/products')} tooltip="Products">
+              <SidebarMenuButton 
+                asChild 
+                isActive={pathname.startsWith('/dashboard/products')} 
+                tooltip="Manajemen master data barang, jasa, dan harga satuan."
+              >
                 <Link href="/dashboard/products"><Package /> <span>Products</span></Link>
               </SidebarMenuButton>
             </SidebarMenuItem>
             <SidebarMenuItem>
-              <SidebarMenuButton asChild isActive={pathname === '/dashboard/sales-orders'} tooltip="Sales Orders">
-                <Link href="/dashboard/sales-orders"><ShoppingCart /> <span>SalesOrders</span></Link>
+              <SidebarMenuButton 
+                asChild 
+                isActive={pathname === '/dashboard/sales-orders'} 
+                tooltip="Mengelola kontrak atau pesanan dari pelanggan sebelum ditagih."
+              >
+                <Link href="/dashboard/sales-orders"><ShoppingCart /> <span>Sales Orders</span></Link>
               </SidebarMenuButton>
             </SidebarMenuItem>
             <SidebarMenuItem>
-              <SidebarMenuButton asChild isActive={pathname.startsWith('/dashboard/customers')} tooltip="Customers">
+              <SidebarMenuButton 
+                asChild 
+                isActive={pathname.startsWith('/dashboard/customers')} 
+                tooltip="Database profil pelanggan, alamat, dan kontak penagihan."
+              >
                 <Link href="/dashboard/customers"><Users /> <span>Customers</span></Link>
               </SidebarMenuButton>
             </SidebarMenuItem>
 
              <SidebarMenuItem>
-                <SidebarMenuButton asChild isActive={pathname.startsWith('/dashboard/sales')} tooltip="Sales List">
+                <SidebarMenuButton 
+                  asChild 
+                  isActive={pathname.startsWith('/dashboard/sales')} 
+                  tooltip="Daftar kontrak PO/SO yang siap ditagih."
+                >
                     <Link href="/dashboard/sales"><ShoppingCart /> <span>Sales List</span></Link>
                 </SidebarMenuButton>
             </SidebarMenuItem>
 
-            {/* Sales Management & User Management HANYA UNTUK Leader/Admin */}
             {isAdmin && (
                <SidebarMenuItem>
-                  <SidebarMenuButton asChild isActive={pathname === '/dashboard/sales-management'} tooltip="Payment & Receivables">
+                  <SidebarMenuButton 
+                    asChild 
+                    isActive={pathname === '/dashboard/sales-management'} 
+                    tooltip="Mencatat pelunasan invoice dan mencocokkan dengan data bank."
+                  >
                       <Link href="/dashboard/sales-management"><BarChart /> <span>Payment & Receivables</span></Link>
                   </SidebarMenuButton>
               </SidebarMenuItem>
@@ -299,14 +345,22 @@ export default function DashboardLayout({
 
             {isSuperAdmin && (
                <SidebarMenuItem>
-                  <SidebarMenuButton asChild isActive={pathname === '/dashboard/users'} tooltip="User Management">
+                  <SidebarMenuButton 
+                    asChild 
+                    isActive={pathname === '/dashboard/users'} 
+                    tooltip="Mengatur hak akses admin, leader, dan staf sistem."
+                  >
                       <Link href="/dashboard/users"><UserCog /> <span>User Management</span></Link>
                   </SidebarMenuButton>
               </SidebarMenuItem>
             )}
 
              <SidebarMenuItem>
-              <SidebarMenuButton asChild isActive={pathname === '/dashboard/calendar'} tooltip="Calendar">
+              <SidebarMenuButton 
+                asChild 
+                isActive={pathname === '/dashboard/calendar'} 
+                tooltip="Jadwal jatuh tempo invoice dan agenda penagihan rutin."
+              >
                 <Link href="/dashboard/calendar"><Calendar /> <span>Calendar</span></Link>
               </SidebarMenuButton>
             </SidebarMenuItem>
@@ -314,10 +368,13 @@ export default function DashboardLayout({
         </SidebarContent>
         <SidebarFooter>
             <SidebarMenu>
-                {/* Menu Pengaturan disembunyikan untuk Staff */}
                 {isAdmin && (
                     <SidebarMenuItem>
-                        <SidebarMenuButton asChild isActive={pathname === '/dashboard/settings'} tooltip="Pengaturan">
+                        <SidebarMenuButton 
+                          asChild 
+                          isActive={pathname === '/dashboard/settings'} 
+                          tooltip="Mengatur profil perusahaan, logo, dan nomor rekening/VA."
+                        >
                             <Link href="/dashboard/settings"><Settings /> <span>Pengaturan</span></Link>
                         </SidebarMenuButton>
                     </SidebarMenuItem>

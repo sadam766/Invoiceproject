@@ -32,6 +32,7 @@ import type { InvoiceNumber, Customer, SalesOrder, Invoice } from '@/app/lib/dat
 import { useToast } from '@/hooks/use-toast';
 import { useFirestore, useCollection, useMemoFirebase } from '@/firebase';
 import { collection, query } from 'firebase/firestore';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
 
 type AddInvoiceNumberDialogProps = {
@@ -473,12 +474,30 @@ export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceDa
         
         <div className="pt-6 border-t flex justify-end gap-3 bg-muted/10 -mx-6 -mb-6 p-6">
           <Button variant="ghost" onClick={() => onOpenChange(false)} disabled={isSaving}>Batal</Button>
-          <Button variant="outline" onClick={() => handleSave('save')} className="border-indigo-200 text-indigo-700" disabled={isSaving || !fullInvoiceNumber}>
-            {isSaving ? "Syncing..." : "Simpan Identitas"}
-          </Button>
-          <Button type="button" onClick={() => handleSave('create')} className="bg-indigo-600 hover:bg-indigo-700 font-black" disabled={isSaving || !fullInvoiceNumber}>
-              <FilePlus className="mr-2 h-4 w-4" /> {isSaving ? "Locking..." : "Buka Constructor"}
-          </Button>
+          
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button variant="outline" onClick={() => handleSave('save')} className="border-indigo-200 text-indigo-700" disabled={isSaving || !fullInvoiceNumber}>
+                  {isSaving ? "Syncing..." : "Simpan Identitas"}
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent className="bg-slate-900 text-white border-none text-[10px]">
+                Mengunci data nomor invoice dan pelanggan ke database.
+              </TooltipContent>
+            </Tooltip>
+
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button type="button" onClick={() => handleSave('create')} className="bg-indigo-600 hover:bg-indigo-700 font-black" disabled={isSaving || !fullInvoiceNumber}>
+                  <FilePlus className="mr-2 h-4 w-4" /> {isSaving ? "Locking..." : "Buka Constructor"}
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent className="bg-slate-900 text-white border-none text-[10px]">
+                Membuka halaman pengisian detail barang/item untuk invoice yang dipilih.
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
         </div>
       </DialogContent>
     </Dialog>

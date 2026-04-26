@@ -63,6 +63,7 @@ import {
     PopoverContent,
     PopoverTrigger,
 } from '@/components/ui/popover';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
 export default function AddInvoicePage() {
   const router = useRouter();
@@ -390,7 +391,7 @@ export default function AddInvoicePage() {
                   <div className="space-y-1.5">
                       <Label className="text-[9px] font-black uppercase text-slate-400">Ref PO / SO Hub</Label>
                       <div className="bg-slate-50 dark:bg-slate-800 px-3 py-2 rounded-md border border-slate-200 text-xs font-mono font-bold truncate">
-                          {activeIdentity?.poNumber} {(activeIdentity?.salesOrder || (activeIdentity as any)?.soNumber || (activeIdentity as any)?.salesOrder) && `• ${activeIdentity?.salesOrder || (activeIdentity as any)?.soNumber || (activeIdentity as any)?.salesOrder}`}
+                          {activeIdentity?.poNumber} {((activeIdentity as any)?.salesOrder || (activeIdentity as any)?.soNumber) && `• ${(activeIdentity as any)?.salesOrder || (activeIdentity as any)?.soNumber}`}
                       </div>
                   </div>
 
@@ -480,36 +481,45 @@ export default function AddInvoicePage() {
                     </TableBody>
                 </Table>
                 <div className="p-4 bg-slate-50/30 border-t">
-                    <Popover open={productPopoverOpen} onOpenChange={setProductPopoverOpen}>
-                        <PopoverTrigger asChild>
-                            <Button variant="outline" size="sm" className="border-dashed h-8 text-[9px] font-black uppercase text-indigo-600" disabled={isLocked}>
-                                <Plus className="mr-2 h-3 w-3" /> Tambah Baris Manual (Master Catalog)
-                            </Button>
-                        </PopoverTrigger>
-                        <PopoverContent className="w-[400px] p-0 shadow-2xl" align="start">
-                            <Command>
-                                <CommandInput placeholder="Cari Produk di Master Database..." className="h-10" />
-                                <CommandList>
-                                    <CommandEmpty>Produk tidak ditemukan.</CommandEmpty>
-                                    <CommandGroup>
-                                        {masterProducts?.map((p) => (
-                                            <CommandItem
-                                                key={p.id}
-                                                value={`${p.name}|${p.id}`}
-                                                onSelect={() => handleProductSelect(p)}
-                                                className="p-3 border-b"
-                                            >
-                                                <div className="flex justify-between w-full">
-                                                    <span className="font-bold text-slate-800 uppercase text-xs">{p.name}</span>
-                                                    <span className="text-[10px] font-black text-indigo-600">Rp {p.price.toLocaleString()}</span>
-                                                </div>
-                                            </CommandItem>
-                                        ))}
-                                    </CommandGroup>
-                                </CommandList>
-                            </Command>
-                        </PopoverContent>
-                    </Popover>
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Popover open={productPopoverOpen} onOpenChange={setProductPopoverOpen}>
+                            <PopoverTrigger asChild>
+                                <Button variant="outline" size="sm" className="border-dashed h-8 text-[9px] font-black uppercase text-indigo-600" disabled={isLocked}>
+                                    <Plus className="mr-2 h-3 w-3" /> Tambah Baris Manual (Master Catalog)
+                                </Button>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-[400px] p-0 shadow-2xl" align="start">
+                                <Command>
+                                    <CommandInput placeholder="Cari Produk di Master Database..." className="h-10" />
+                                    <CommandList>
+                                        <CommandEmpty>Produk tidak ditemukan.</CommandEmpty>
+                                        <CommandGroup>
+                                            {masterProducts?.map((p) => (
+                                                <CommandItem
+                                                    key={p.id}
+                                                    value={`${p.name}|${p.id}`}
+                                                    onSelect={() => handleProductSelect(p)}
+                                                    className="p-3 border-b"
+                                                >
+                                                    <div className="flex justify-between w-full">
+                                                        <span className="font-bold text-slate-800 uppercase text-xs">{p.name}</span>
+                                                        <span className="text-[10px] font-black text-indigo-600">Rp {p.price.toLocaleString()}</span>
+                                                    </div>
+                                                </CommandItem>
+                                            ))}
+                                        </CommandGroup>
+                                    </CommandList>
+                                </Command>
+                            </PopoverContent>
+                        </Popover>
+                      </TooltipTrigger>
+                      <TooltipContent className="bg-slate-900 text-white border-none text-[10px]">
+                        Menambahkan item tambahan di luar Sales Order secara manual.
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
                 </div>
             </CardContent>
           </Card>
@@ -597,33 +607,50 @@ export default function AddInvoicePage() {
 
               <div className="space-y-3 pt-4">
                   {!isLocked && (
-                      <>
-                        <Button 
-                            className="w-full h-11 bg-indigo-600 hover:bg-indigo-700 font-black uppercase text-white shadow-lg" 
-                            onClick={() => handleSaveInvoice('sent', true)}
-                            disabled={isProcessing}
-                        >
-                          {isProcessing ? <Loader2 className="h-4 w-4 animate-spin" /> : <><Eye className="mr-2 h-4 w-4" /> SIMPAN & PREVIEW</>}
-                        </Button>
-                        <Button 
-                            variant="ghost" 
-                            className="w-full text-[10px] font-black uppercase text-slate-400" 
-                            onClick={() => handleSaveInvoice('sent')}
-                            disabled={isProcessing}
-                        >
-                          {isProcessing ? "Processing..." : "Hanya Simpan (Draft)"}
-                        </Button>
-                      </>
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button 
+                              className="w-full h-11 bg-indigo-600 hover:bg-indigo-700 font-black uppercase text-white shadow-lg" 
+                              onClick={() => handleSaveInvoice('sent', true)}
+                              disabled={isProcessing}
+                          >
+                            {isProcessing ? <Loader2 className="h-4 w-4 animate-spin" /> : <><Eye className="mr-2 h-4 w-4" /> SIMPAN & PREVIEW</>}
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent className="bg-slate-900 text-white border-none text-[10px]">
+                          Melihat tampilan PDF invoice sebelum dikirim ke pelanggan.
+                        </TooltipContent>
+                      </Tooltip>
+
+                      <Button 
+                          variant="ghost" 
+                          className="w-full text-[10px] font-black uppercase text-slate-400" 
+                          onClick={() => handleSaveInvoice('sent')}
+                          disabled={isProcessing}
+                      >
+                        {isProcessing ? "Processing..." : "Hanya Simpan (Draft)"}
+                      </Button>
+                    </TooltipProvider>
                   )}
                   {isAdmin && (existingInvoiceData?.status === 'sent' || existingInvoiceData?.status === 'draft') && (
-                      <Button 
-                        variant="outline" 
-                        className="w-full h-11 border-indigo-600 text-indigo-600 font-black uppercase text-[10px]" 
-                        onClick={() => handleSaveInvoice('finalized')}
-                        disabled={isProcessing}
-                      >
-                        <ShieldCheck className="mr-2 h-4 w-4" /> FINALIZE & LOCK
-                      </Button>
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button 
+                            variant="outline" 
+                            className="w-full h-11 border-indigo-600 text-indigo-600 font-black uppercase text-[10px]" 
+                            onClick={() => handleSaveInvoice('finalized')}
+                            disabled={isProcessing}
+                          >
+                            <ShieldCheck className="mr-2 h-4 w-4" /> FINALIZE & LOCK
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent className="bg-slate-900 text-white border-none text-[10px]">
+                          Memfinalisasi invoice agar tidak bisa diedit lagi (Siap cetak).
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
                   )}
               </div>
             </CardContent>
