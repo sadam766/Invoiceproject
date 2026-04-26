@@ -1,4 +1,3 @@
-
 'use client';
 import { useState, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
@@ -113,7 +112,7 @@ import {
         return filtered.sort((a,b) => b.date.localeCompare(a.date));
     }, [invoices, activeTab, searchQuery, dateRange]);
 
-    const handleVoidInvoice = async () => {
+    const handleVoidInvoice = () => {
         if (!firestore || !targetInvoiceId || !voidReason || !user) return;
         const safeId = targetInvoiceId.replace(/\//g, '_');
         const docRef = doc(firestore, 'invoices', safeId);
@@ -129,54 +128,73 @@ import {
                 action: `Invoice VOIDED (Reversal Triggered): ${voidReason}`
             })
         };
-        try {
-            await updateDoc(docRef, updateData);
-            toast({ title: "Invoice Dibatalkan", description: `Invoice ${targetInvoiceId} kini berstatus VOID. Saldo PO & DP telah disinkronkan.` });
-            setVoidDialogOpen(false);
-            setVoidReason('');
-            setTargetInvoiceId(null);
-        } catch (e) {
-            toast({ variant: 'destructive', title: "Gagal Membatalkan", description: "Kesalahan sistem." });
-        }
+        
+        updateDoc(docRef, updateData)
+            .then(() => {
+                toast({ title: "Invoice Dibatalkan", description: `Invoice ${targetInvoiceId} kini berstatus VOID. Saldo PO & DP telah disinkronkan.` });
+                setVoidDialogOpen(false);
+                setVoidReason('');
+                setTargetInvoiceId(null);
+            })
+            .catch(async (serverError) => {
+                errorEmitter.emit('permission-error', new FirestorePermissionError({
+                    path: docRef.path,
+                    operation: 'update',
+                    requestResourceData: updateData
+                }));
+            });
     };
 
-    const handleHardDelete = async () => {
+    const handleHardDelete = () => {
         if (!firestore || !deleteTargetId || !isSuperAdmin) return;
         
         const safeId = deleteTargetId.replace(/\//g, '_');
         const invoiceRef = doc(firestore, 'invoices', safeId);
         const identityRef = doc(firestore, 'invoiceNumbers', safeId);
 
-        try {
-            // Delete from both collections to fully release the number
-            await deleteDoc(invoiceRef);
-            await deleteDoc(identityRef).catch(() => {}); // Identity might not exist if constructed from ERP direct
-            
-            toast({ 
-                title: "Data Dihapus Permanen", 
-                description: `Nomor ${deleteTargetId} kini telah dilepaskan dan dapat digunakan kembali.` 
+        // Chain the delete from the main collection
+        deleteDoc(invoiceRef)
+            .then(() => {
+                // Background cleanup of identity ref if exists
+                deleteDoc(identityRef).catch(() => {});
+                
+                toast({ 
+                    title: "Data Dihapus Permanen", 
+                    description: `Nomor ${deleteTargetId} kini telah dilepaskan dan dapat digunakan kembali.` 
+                });
+                setDeleteDialogOpen(false);
+                setDeleteTargetId(null);
+            })
+            .catch(async (serverError) => {
+                errorEmitter.emit('permission-error', new FirestorePermissionError({
+                    path: invoiceRef.path,
+                    operation: 'delete',
+                }));
             });
-            setDeleteDialogOpen(false);
-            setDeleteTargetId(null);
-        } catch (e) {
-            toast({ variant: 'destructive', title: "Gagal Menghapus", description: "Anda tidak memiliki izin atau terjadi kesalahan koneksi." });
-        }
     };
 
-    const handleFinalize = async (invoiceId: string) => {
+    const handleFinalize = (invoiceId: string) => {
         if (!firestore || !isSuperAdmin || !user) return;
         const safeId = invoiceId.replace(/\//g, '_');
         const docRef = doc(firestore, 'invoices', safeId);
-        try {
-            await updateDoc(docRef, { 
-                status: 'finalized',
-                lastUpdatedAt: new Date().toISOString(),
-                lastUpdatedBy: userProfile?.displayName || user.email || 'Leader'
+        const timestamp = new Date().toISOString();
+        const updateData = { 
+            status: 'finalized',
+            lastUpdatedAt: timestamp,
+            lastUpdatedBy: userProfile?.displayName || user.email || 'Leader'
+        };
+
+        updateDoc(docRef, updateData)
+            .then(() => {
+                toast({ title: "Invoice Finalized", description: "Data sekarang terkunci untuk audit." });
+            })
+            .catch(async (serverError) => {
+                errorEmitter.emit('permission-error', new FirestorePermissionError({
+                    path: docRef.path,
+                    operation: 'update',
+                    requestResourceData: updateData
+                }));
             });
-            toast({ title: "Invoice Finalized", description: "Data sekarang terkunci untuk audit." });
-        } catch (e) {
-            toast({ variant: 'destructive', title: "Error" });
-        }
     };
 
     return (

@@ -104,54 +104,58 @@ import {
         });
     }, [sales, invoices, searchQuery]);
 
-    const handleVoidPo = async () => {
+    const handleVoidPo = () => {
         if (!firestore || !targetPoId || !voidReason || !user) return;
         const safeId = targetPoId.replace(/\//g, '_');
         const docRef = doc(firestore, 'sales', safeId);
         
-        try {
-            await updateDoc(docRef, { 
-                status: 'Cancelled', 
-                voidReason: voidReason,
-                lastUpdatedAt: new Date().toISOString(),
-                lastUpdatedBy: userProfile?.displayName || user.email || 'System'
+        const timestamp = new Date().toISOString();
+        const updateData = { 
+            status: 'Cancelled', 
+            voidReason: voidReason,
+            lastUpdatedAt: timestamp,
+            lastUpdatedBy: userProfile?.displayName || user.email || 'System'
+        };
+
+        updateDoc(docRef, updateData)
+            .then(() => {
+                toast({ title: "PO Dibatalkan (Void)", description: `PO ${targetPoId} ditandai sebagai Batal.` });
+                setVoidDialogOpen(false);
+                setVoidReason('');
+            })
+            .catch(async (serverError) => {
+                errorEmitter.emit('permission-error', new FirestorePermissionError({
+                    path: docRef.path,
+                    operation: 'update',
+                    requestResourceData: updateData
+                }));
             });
-            toast({ title: "PO Dibatalkan (Void)", description: `PO ${targetPoId} ditandai sebagai Batal.` });
-            setVoidDialogOpen(false);
-            setVoidReason('');
-        } catch (e) {
-            toast({ variant: 'destructive', title: "Error" });
-        }
     };
 
-    const handleHardDeletePo = async () => {
+    const handleHardDeletePo = () => {
         if (!firestore || !targetPoId || !isSuperAdmin) return;
         
-        // AUDIT FIX: Atomic ID Escaping for Deep Collections
         const safeId = targetPoId.replace(/\//g, '_');
         const docRef = doc(firestore, 'sales', safeId);
         
-        try {
-            // Wait for DB confirmation before toast
-            await deleteDoc(docRef);
-            
-            toast({ 
-                title: "PO Dihapus Permanen", 
-                description: `Data PO ${targetPoId} telah dihapus sepenuhnya dari database.` 
+        deleteDoc(docRef)
+            .then(() => {
+                toast({ 
+                    title: "PO Dihapus Permanen", 
+                    description: `Data PO ${targetPoId} telah dihapus sepenuhnya dari database.` 
+                });
+                setHardDeleteDialogOpen(false);
+                setTargetPoId(null);
+            })
+            .catch(async (serverError) => {
+                errorEmitter.emit('permission-error', new FirestorePermissionError({
+                    path: docRef.path,
+                    operation: 'delete',
+                }));
             });
-            setHardDeleteDialogOpen(false);
-            setTargetPoId(null);
-        } catch (e) {
-            console.error("Delete Error:", e);
-            toast({ 
-                variant: 'destructive', 
-                title: "Gagal Menghapus", 
-                description: "Terjadi kesalahan pada otoritas database atau koneksi." 
-            });
-        }
     };
 
-    const handleUpdateSo = async () => {
+    const handleUpdateSo = () => {
         if (!firestore || !soUpdateState.poNumber) return;
         const safeId = soUpdateState.poNumber.replace(/\//g, '_');
         const docRef = doc(firestore, 'sales', safeId);
@@ -165,15 +169,24 @@ import {
             batch.update(invRef, { soNumber: tempSo });
         });
 
-        await batch.commit();
-        toast({ title: "SO Number Updated" });
-        setSoUpdateState({ isOpen: false });
+        batch.commit()
+            .then(() => {
+                toast({ title: "SO Number Updated" });
+                setSoUpdateState({ isOpen: false });
+            })
+            .catch(async (serverError) => {
+                // Batch errors are harder to contextualize but we'll emit for the main ref
+                errorEmitter.emit('permission-error', new FirestorePermissionError({
+                    path: docRef.path,
+                    operation: 'update',
+                    requestResourceData: { soNumber: tempSo }
+                }));
+            });
     };
 
     const handleSaveSale = (saleData: Omit<SalesListItem, 'ownerId'>) => {
         if (!firestore || !user) return;
         
-        // AUDIT FIX: Use escaped PO number as primary key
         const safeId = saleData.poNumber.replace(/\//g, '_');
         const docRef = doc(firestore, 'sales', safeId);
         
@@ -188,9 +201,11 @@ import {
                 toast({ title: "PO Berhasil Disimpan" });
                 setIsDialogOpen(false);
             })
-            .catch(err => {
+            .catch(async (serverError) => {
                 errorEmitter.emit('permission-error', new FirestorePermissionError({
-                    path: docRef.path, operation: editingSale ? 'update' : 'create', requestResourceData: dataToSave
+                    path: docRef.path, 
+                    operation: editingSale ? 'update' : 'create', 
+                    requestResourceData: dataToSave
                 }));
             });
     };
