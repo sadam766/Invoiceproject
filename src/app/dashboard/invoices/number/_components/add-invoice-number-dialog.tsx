@@ -10,7 +10,7 @@ import {
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Plus, Calendar as CalendarIcon, Check, ChevronsUpDown, Database, Hash, FilePlus, Info } from 'lucide-react';
+import { Plus, Calendar as CalendarIcon, Check, ChevronsUpDown, Database, Hash, FilePlus, Info, Search } from 'lucide-react';
 import { Checkbox } from '@/components/ui/checkbox';
 import {
   Popover,
@@ -92,7 +92,6 @@ export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceDa
     return Array.from(new Set(salesOrderListData.map(item => item.soNumber)))
   },[salesOrderListData]);
 
-  // AUDIT FIX: Unlimited sequence regex support (\d+)
   const generateNextNumber = (type: 'sar' | 'kw') => {
     let currentMax = 0;
     const now = new Date();
@@ -215,15 +214,16 @@ export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceDa
   }, [prefix, mainNumber, suffix, numberSource, erpNumberInput]);
 
   const handleSalesOrderSelect = (currentValue: string) => {
-    const cleanSo = currentValue.split('|')[0];
+    const [cleanSo] = currentValue.split('|');
     const newSalesOrder = cleanSo === salesOrder ? '' : cleanSo;
     setSalesOrder(newSalesOrder);
 
     if (newSalesOrder && salesOrderListData) {
-      const soDetails = salesOrderListData.filter(item => item.soNumber === newSalesOrder);
-      if (soDetails.length > 0) {
-        setCustomer(soDetails[0].customer);
-        setPoNumber(soDetails[0].poNumber || '');
+      const soDetails = salesOrderListData.find(item => item.soNumber === newSalesOrder);
+      if (soDetails) {
+        setCustomer(soDetails.customer);
+        setPoNumber(soDetails.poNumber || '');
+        toast({ title: "Data Tarik Otomatis", description: `Customer & PO berhasil disinkronkan dari SO ${newSalesOrder}` });
       }
     }
     setSoPopoverOpen(false);
@@ -241,7 +241,6 @@ export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceDa
 
     const finalInvoiceNumber = fullInvoiceNumber;
     
-    // AUDIT FIX: Atomic Duplicate Check
     const isTaken = [
         ...(allInvoiceNumbers?.map(inv => inv.id.replace(/\//g, '_')) || []),
         ...(existingInvoices?.map(inv => inv.id.replace(/\//g, '_')) || [])
@@ -374,15 +373,18 @@ export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceDa
           </div>
 
            <div className="space-y-2">
-            <Label className="text-[10px] font-black uppercase text-muted-foreground">Sales Order Asal</Label>
+            <div className="flex justify-between items-center">
+                <Label className="text-[10px] font-black uppercase text-muted-foreground">Opsi A: Tarik Data dari Sales Order</Label>
+                <Badge variant="outline" className="text-[8px] bg-blue-50 text-blue-600 font-black border-blue-100">Recommended</Badge>
+            </div>
             <Popover open={soPopoverOpen} onOpenChange={setSoPopoverOpen}>
                 <PopoverTrigger asChild>
-                    <Button variant="outline" className="w-full justify-between h-10 font-bold border-indigo-100">
-                    {salesOrder || "Cari Nomor SO..."}
+                    <Button variant="outline" className="w-full justify-between h-10 font-bold border-indigo-100 bg-indigo-50/10">
+                    {salesOrder || "Cari Nomor SO untuk Auto-fill..."}
                     <ChevronsUpDown className="ml-2 h-4 w-4 opacity-50" />
                     </Button>
                 </PopoverTrigger>
-                <PopoverContent className="w-[500px] p-0 shadow-2xl">
+                <PopoverContent className="w-[500px] p-0 shadow-2xl" align="start">
                     <Command>
                     <CommandInput placeholder="Cari No. SO..." className="h-11" />
                     <CommandList>
@@ -406,17 +408,17 @@ export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceDa
                     </Command>
                 </PopoverContent>
             </Popover>
+            <p className="text-[9px] text-muted-foreground italic">Menarik data Customer & PO secara otomatis untuk meminimalisir kesalahan ketik.</p>
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-2 gap-4 pt-2 border-t">
               <div className="space-y-2">
-                <Label className="text-[10px] font-black uppercase text-muted-foreground">PO Customer</Label>
+                <Label className="text-[10px] font-black uppercase text-muted-foreground">PO Customer (Opsi B: Manual)</Label>
                 <Input 
                     value={poNumber} 
                     onChange={e => setPoNumber(e.target.value)} 
                     placeholder="PO-ABC-2024" 
-                    disabled={!!salesOrder}
-                    className="font-bold bg-muted/50"
+                    className="font-bold bg-background"
                 />
               </div>
               <div className="space-y-2">
@@ -436,19 +438,21 @@ export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceDa
           </div>
 
           <div className="space-y-2">
-            <Label className="text-[10px] font-black uppercase text-muted-foreground">Pelanggan (PT/CV)</Label>
+            <Label className="text-[10px] font-black uppercase text-muted-foreground">Pelanggan (Opsi B: Manual)</Label>
             <Popover open={customerPopoverOpen} onOpenChange={setCustomerPopoverOpen}>
                 <PopoverTrigger asChild>
-                    <Button variant="outline" className="w-full justify-between h-10 font-black uppercase border-indigo-100" disabled={!!salesOrder}>
-                    {customer || "Pilih Pelanggan..."}
+                    <Button variant="outline" className="w-full justify-between h-10 font-black uppercase border-indigo-100">
+                    {customer || "Pilih/Ketik Nama Pelanggan..."}
                     <ChevronsUpDown className="ml-2 h-4 w-4 opacity-50" />
                     </Button>
                 </PopoverTrigger>
                 <PopoverContent className="w-[500px] p-0 shadow-2xl" align="start">
                     <Command>
-                    <CommandInput placeholder="Cari pelanggan..." className="h-11" />
+                    <CommandInput placeholder="Cari atau ketik nama pelanggan..." className="h-11" />
                      <CommandList>
-                        <CommandEmpty />
+                        <CommandEmpty>
+                            <Button variant="ghost" className="w-full text-xs" onClick={() => setCustomerPopoverOpen(false)}>Gunakan input manual di kolom utama</Button>
+                        </CommandEmpty>
                         <CommandGroup>
                             {customerListData?.map((c) => (
                             <CommandItem
