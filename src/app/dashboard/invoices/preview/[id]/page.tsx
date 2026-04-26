@@ -1,4 +1,3 @@
-
 'use client';
 import React, { useRef, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
@@ -129,7 +128,7 @@ const InvoicePreviewPage = () => {
     };
     
     if (!invoiceData) {
-        return <div className="p-8">Loading invoice preview...</div>;
+        return <div className="p-8 text-center font-bold animate-pulse">Loading invoice preview...</div>;
     }
 
     const {
@@ -158,7 +157,7 @@ const InvoicePreviewPage = () => {
     );
     const totalPages = itemChunks.length;
     
-    const totalRp = parseFormattedNumber(dppVat) + parseFormattedNumber(vat12);
+    const totalRp = grandTotal; // Use the passed grandTotal for accuracy
     const invoiceTitle = invoiceId.startsWith('KW') ? 'PROFORMA INVOICE' : 'INVOICE/OFFICIAL RECEIPT';
 
     return (
@@ -240,59 +239,43 @@ const InvoicePreviewPage = () => {
                             
                             {isLastPage ? (
                                 <footer className="pt-0 text-black mt-auto text-[10px]">
-                                    <div className="w-full flex justify-end items-end leading-normal">
-                                        <div className="text-right w-1/2">
-                                            {chunk.length < 5 && <div className="h-0.5 border-b border-black w-1/4 ml-auto" style={{marginTop: `-${(5 - chunk.length) * 18}px`}}></div>}
-                                            <p className="text-[10px] font-normal">{formatCurrency(subtotal)}</p>
-                                        </div>
-                                    </div>
-                                
-                                    <div className="w-full flex justify-between items-start leading-normal mt-1">
-                                        <div className='w-1/2 text-[10px] space-y-0.5 leading-tight pl-2'>
-                                            {negotiation > 0 && (
-                                                <div className='flex justify-start space-x-2'>
-                                                    <p className='mb-0'>A/Negotiation :</p>
-                                                    <p className='mb-0'>({formatCurrency(negotiation)})</p> 
-                                                </div>
-                                            )}
-                                            {dpValue > 0 && (
-                                                <div className='flex justify-start space-x-2'>
-                                                    <p className='mb-0'>DP :</p>
-                                                    <p className='mb-0'>{formatCurrency(dpValue)}</p>
-                                                </div>
-                                            )}
-                                        </div>
-                                
-                                        <div className="w-1/2 text-right text-xs pr-1">
-                                            {pelunasan > 0 && (
-                                                <p className='mb-0 mt-3 font-semibold'>Pelunasan: {formatCurrency(pelunasan)}</p> 
-                                            )}
+                                    {/* Consolidated Calculation Grid */}
+                                    <div className="w-full flex justify-end mt-1">
+                                        <div className="w-1/2 text-[10px] leading-snug">
+                                            <div className="grid grid-cols-[1fr_auto] gap-x-3 border-t border-black pt-1">
+                                                <span>Subtotal:</span>
+                                                <span className="text-right">{formatCurrency(subtotal)}</span>
+                                                
+                                                {negotiation > 0 && (
+                                                    <>
+                                                        <span>Negotiation:</span>
+                                                        <span className="text-right">({formatCurrency(negotiation)})</span>
+                                                    </>
+                                                )}
+                                                
+                                                {dpValue > 0 && (
+                                                    <>
+                                                        <span>DP / Retensi:</span>
+                                                        <span className="text-right">{formatCurrency(dpValue)}</span>
+                                                    </>
+                                                )}
+
+                                                <span className="text-right">DPP VAT (11/12):</span>
+                                                <span className="text-right">{formatCurrency(dppVat)}</span>
+                                                <span className="text-right">VAT 12%:</span>
+                                                <span className="text-right">{formatCurrency(vat12)}</span>
+                                                
+                                                <span className="font-bold border-t border-black mt-1">TOTAL Rp:</span>
+                                                <span className="font-bold border-t border-black mt-1 text-right">{formatCurrency(totalRp)}</span>
+                                            </div>
                                         </div>
                                     </div>
 
                                     <div className="w-full flex justify-start items-end leading-normal mt-0">
                                         <p>No PO : {poNumber}</p>
                                     </div>
-                                    <div className="border-t border-black w-full my-1"></div>
-                                    <div className="flex justify-end mt-1">
-                                        <div className="w-1/2 text-[10px] leading-snug">
-                                            <div className="grid grid-cols-[1fr_auto] gap-x-3">
-                                                <span className="text-right">Goods:</span>
-                                                <span className="text-right">{formatCurrency(dppVat)}</span>
-                                                <span className="text-right">DPP VAT (11/12):</span>
-                                                <span className="text-right">{formatCurrency(dppVat)}</span>
-                                                <span className="text-right">VAT 12%:</span>
-                                                <span className="text-right">{formatCurrency(vat12)}</span>
-                                            </div>
-                                            <div className="grid grid-cols-[1fr_auto] gap-x-3 font-normal">
-                                                <span className="text-right">Total Rp:</span>
-                                                <span className="text-right">{formatCurrency(totalRp)}</span>
-                                            </div>
-                                        </div>
-                                    </div>
-                                    <div className="border-t border-black w-full my-1"></div>
                                     
-                                    <div className="mt-0 pt-1">
+                                    <div className="mt-2 pt-1 border-t border-black">
                                         <div className="flex">
                                             <div className="w-[55%] pr-4 text-[10px] space-y-0.5 leading-normal"> 
                                                 <div className="flex">
@@ -304,21 +287,22 @@ const InvoicePreviewPage = () => {
                                                     <p className='w-full ml-1 font-bold mb-0'>{displayInvoiceId}</p>
                                                 </div>
                                                 <p className='mt-2 mb-1'>For payment, please transfer to our account:</p>
-                                                <p className="font-semibold text-[10px] mb-1">PT. Jembo Cable Company Tbk</p>
 
                                                 {virtualAccount ? (
-                                                    <div className="space-y-0 leading-tight border border-dashed border-gray-300 p-2 min-h-[85px]">
-                                                        <div className="flex font-bold">
+                                                    <div className="space-y-0 leading-tight border border-dashed border-gray-300 p-2 min-h-[85px] bg-slate-50/50">
+                                                        <div className="flex font-bold text-blue-800">
                                                             <span className="w-1/3 pr-2 mb-0">{virtualAccount.bankName} -</span>
                                                             <span className="flex-1 mb-0 uppercase">VIRTUAL ACCOUNT</span>
                                                         </div>
-                                                        <div className="flex text-lg tracking-wider font-mono mt-1">
+                                                        <div className="flex text-lg tracking-wider font-mono mt-1 text-blue-900">
                                                             <span className="w-full mb-0 font-bold">{virtualAccount.vaNumber}</span>
                                                         </div>
+                                                        <p className="font-semibold text-[9px] mt-1">A/N: PT JEMBO CABLE COMPANY Tbk</p>
                                                         <p className="text-[8px] italic mt-2 text-gray-500">*Konfirmasi otomatis, tidak perlu kirim bukti transfer</p>
                                                     </div>
                                                 ) : (
                                                     <div className="min-h-[85px]">
+                                                        <p className="font-semibold text-[10px] mb-1">PT. JEMBO CABLE COMPANY Tbk</p>
                                                         <div className="space-y-0 leading-tight">
                                                             <div className="flex">
                                                                 <span className="w-1/3 pr-2 mb-0">Bank Mandiri -</span>
