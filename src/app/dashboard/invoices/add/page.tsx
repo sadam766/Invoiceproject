@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useEffect, useState, useMemo } from 'react';
@@ -169,6 +168,7 @@ export default function AddInvoicePage() {
   }, [identityData, existingInvoiceData, isIdentityLoading, isExistingLoading, editInvoiceId, invoiceNumberIdParam, router]);
 
   useEffect(() => {
+      // PRE-INITIALIZATION: Only trust database data for Identity. Never recalculate in Constructor.
       if (identityData && customerListData && items.length === 0 && !editInvoiceId) {
           const cust = customerListData.find(c => c.name === identityData.customer);
           if (cust) {
@@ -454,7 +454,7 @@ export default function AddInvoicePage() {
                   <div className="space-y-1.5">
                       <Label className="text-[9px] font-black uppercase text-slate-400 tracking-widest">Ref PO / SO Hub</Label>
                       <div className="bg-slate-50 dark:bg-slate-800 px-3 py-2 rounded-md border border-slate-200 text-xs font-mono font-bold truncate">
-                          {activeIdentity?.poNumber} {(activeIdentity as any)?.salesOrder || (activeIdentity as any)?.soNumber ? `• ${(activeIdentity as any)?.salesOrder || (activeIdentity as any)?.soNumber}` : ''}
+                          {activeIdentity?.poNumber} {((activeIdentity as any).salesOrder || (activeIdentity as any).soNumber) && `• ${(activeIdentity as any).salesOrder || (activeIdentity as any).soNumber}`}
                       </div>
                   </div>
 

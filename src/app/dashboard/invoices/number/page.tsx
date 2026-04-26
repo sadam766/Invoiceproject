@@ -1,4 +1,3 @@
-
 'use client';
 import { useState, useMemo, useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
@@ -145,18 +144,29 @@ import {
           createdBy: userProfile?.displayName || user.email || 'System'
       };
 
-      // KRITIKAL: Pastikan data tersimpan di DB sebelum navigasi
+      // KRITIKAL: Atomic Booking. Pastikan data tersimpan di DB sebelum navigasi Constructor
       try {
           await setDoc(docRef, dataToSave, { merge: true });
-          toast({ 
-              title: editingInvoice ? "Identitas Diperbarui" : "Identitas Terdaftar",
-              description: `Nomor ${invoice.id} berhasil disimpan secara global.`
-          });
-          setIsDialogOpen(false);
-          setEditingInvoice(undefined);
           
+          // Jika aksi adalah 'create', buat juga entry 'DRAFT' di koleksi invoices utama untuk mengunci nomor secara global
           if (action === 'create') {
+              const invoiceDocRef = doc(firestore, 'invoices', safeId);
+              await setDoc(invoiceDocRef, {
+                  ...dataToSave,
+                  status: 'draft',
+                  amount: 0,
+                  lastUpdatedAt: new Date().toISOString(),
+                  lastUpdatedBy: dataToSave.createdBy
+              }, { merge: true });
+              
               router.push(`/dashboard/invoices/add?invoiceNumberId=${safeId}`);
+          } else {
+              toast({ 
+                  title: editingInvoice ? "Identitas Diperbarui" : "Identitas Terdaftar",
+                  description: `Nomor ${invoice.id} berhasil dikunci secara global.`
+              });
+              setIsDialogOpen(false);
+              setEditingInvoice(undefined);
           }
       } catch (err) {
           errorEmitter.emit('permission-error', new FirestorePermissionError({
@@ -179,7 +189,7 @@ import {
             <div className="flex bg-indigo-600/5 p-3 rounded-xl border border-indigo-600/10 gap-3">
                 <Info className="h-5 w-5 text-indigo-600 shrink-0 mt-0.5" />
                 <p className="text-[10px] text-slate-500 max-w-xs leading-tight font-bold uppercase tracking-tighter">
-                    Sinkronisasi Multi-User Aktif. Nomor urut akan otomatis mengikuti input terakhir dari admin manapun.
+                    Sinkronisasi Multi-User Aktif. Nomor urut akan otomatis mengikuti input terakhir dari admin manapun untuk mencegah duplikasi.
                 </p>
             </div>
         </div>
@@ -236,7 +246,7 @@ import {
                                 <TableRow><TableCell colSpan={5} className="text-center py-20 text-slate-400 italic font-black uppercase tracking-widest opacity-30">Belum ada identitas terdaftar.</TableCell></TableRow>
                             ) : (
                                 filteredInvoices?.map((invoice) => {
-                                    const isLinked = linkedInvoices?.some(inv => inv.id === invoice.id);
+                                    const isLinked = linkedInvoices?.some(inv => inv.id === invoice.id && (inv.status !== 'draft' || inv.amount > 0));
                                     const isERP = !(invoice.id.startsWith('SAR') || invoice.id.startsWith('KW'));
                                     return (
                                         <TableRow key={invoice.id} className={cn("hover:bg-indigo-50/10 border-b last:border-0", isLinked ? "bg-slate-50/50 dark:bg-slate-800/20" : "")}>
@@ -261,7 +271,7 @@ import {
                                             </TableCell>
                                             <TableCell className="text-center">
                                                 <Badge variant={isLinked ? "default" : "secondary"} className={cn("text-[8px] uppercase font-black tracking-widest h-4", isLinked ? "bg-indigo-600" : "bg-slate-100 dark:bg-slate-800 text-slate-500")}>
-                                                    {isLinked ? 'FINALIZED' : 'DRAFT / REGISTERED'}
+                                                    {isLinked ? 'FINALIZED / ACTIVE' : 'DRAFT / REGISTERED'}
                                                 </Badge>
                                             </TableCell>
                                             <TableCell className="text-right py-4">
@@ -270,7 +280,7 @@ import {
                                                         <Button 
                                                             size="sm" 
                                                             className="h-8 bg-indigo-600 hover:bg-indigo-700 font-black uppercase text-[10px] tracking-widest shadow-md"
-                                                            onClick={() => router.push(`/dashboard/invoices/add?invoiceNumberId=${invoice.id.replace(/\//g, '_')}`)}
+                                                            onClick={() => handleSave(invoice, 'create')}
                                                         >
                                                             <FilePlus className="mr-1.5 h-3.5 w-3.5" /> Constructor
                                                         </Button>

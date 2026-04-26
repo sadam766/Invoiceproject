@@ -1,4 +1,3 @@
-
 'use client';
 import { useState, useEffect, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
@@ -32,13 +31,13 @@ import { format } from 'date-fns';
 import type { InvoiceNumber, Customer, SalesOrder, Invoice } from '@/app/lib/data';
 import { useToast } from '@/hooks/use-toast';
 import { useFirestore, useCollection, useMemoFirebase } from '@/firebase';
-import { collection, query, doc, getDoc } from 'firebase/firestore';
+import { collection, query } from 'firebase/firestore';
 
 
 type AddInvoiceNumberDialogProps = {
   isOpen: boolean;
   onOpenChange: (isOpen: boolean) => void;
-  onSave: (invoice: Omit<InvoiceNumber, 'id'> & {id: string}, action: 'save' | 'create') => void;
+  onSave: (invoice: Omit<InvoiceNumber, 'id'> & {id: string}, action: 'save' | 'create') => Promise<void>;
   invoiceData?: InvoiceNumber;
   onAddClick: () => void;
   allInvoiceNumbers: InvoiceNumber[] | null;
@@ -67,6 +66,7 @@ export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceDa
 
   const [customerPopoverOpen, setCustomerPopoverOpen] = useState(false);
   const [soPopoverOpen, setSoPopoverOpen] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
   const { toast } = useToast();
 
   const customersCollection = useMemoFirebase(() => {
@@ -91,21 +91,6 @@ export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceDa
     if (!salesOrderListData) return [];
     return Array.from(new Set(salesOrderListData.map(item => item.soNumber)))
   },[salesOrderListData]);
-
-  const isSoExhausted = useMemo(() => {
-    if (!salesOrder || !salesOrderListData || !existingInvoices) return false;
-    
-    const soItems = salesOrderListData.filter(item => item.soNumber === salesOrder);
-    const totalQtyContrak = soItems.reduce((sum, item) => sum + item.quantity, 0);
-    
-    const totalQtyInvoiced = existingInvoices
-        .filter(inv => inv.soNumber === salesOrder && inv.status !== 'cancelled' && !inv.isDpInvoice)
-        .reduce((sum, inv) => {
-            return sum + (inv.items?.reduce((s, i) => s + (Number(i.quantity) || 0), 0) || 0);
-        }, 0);
-    
-    return totalQtyInvoiced >= totalQtyContrak && totalQtyContrak > 0;
-  }, [salesOrder, salesOrderListData, existingInvoices]);
 
   // LOGIKA GLOBAL AUTO-INCREMENT (Multi-Admin Sync)
   const generateNextNumber = (type: 'sar' | 'kw', startFrom: string = '') => {
@@ -139,8 +124,8 @@ export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceDa
     });
 
     const userStart = parseInt(startFrom, 10);
-    const baseNumber = !isNaN(userStart) ? Math.max(currentMax, userStart - 1) : currentMax;
-    const nextNum = baseNumber + 1;
+    // Prioritaskan input manual user jika ada, jika tidak gunakan n + 1 dari database
+    const nextNum = !isNaN(userStart) && startFrom !== '' ? userStart : currentMax + 1;
 
     return nextNum.toString().padStart(4, '0');
   };
@@ -152,7 +137,6 @@ export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceDa
     const currentYearLong = format(now, 'yyyy');
 
     if (type === 'sar') {
-      // Locked Format: SAR/[YY]01
       setPrefix(`SAR/${currentYearShort}01`);
       setSuffix('A');
       setMainNumber(nextNumStr);
@@ -211,21 +195,23 @@ export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceDa
           setNumberSource('manual');
           setInvoiceType('sar');
           setIsAutoNumber(true);
-          setupForAddMode('sar', startingNumber);
+          setupForAddMode('sar', '');
           
           setCustomer('');
           setSalesOrder('');
           setPoNumber('');
           setDate(new Date());
           setErpNumberInput('');
+          setStartingNumber('');
       }
   }, [isOpen, invoiceData]);
 
+  // Sync real-time: Re-calculate if DB changes while dialog is open
   useEffect(() => {
       if (isAutoNumber && !invoiceData && isOpen && numberSource === 'manual') {
           setupForAddMode(invoiceType, startingNumber);
       }
-  }, [startingNumber, invoiceType, isAutoNumber, isOpen, numberSource]);
+  }, [startingNumber, invoiceType, isAutoNumber, isOpen, numberSource, existingInvoices, allInvoiceNumbers]);
 
   useEffect(() => {
     if (numberSource === 'manual') {
@@ -274,21 +260,28 @@ export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceDa
       toast({
         variant: "destructive",
         title: "Nomor Faktur Duplikat",
-        description: `Nomor "${finalInvoiceNumber}" sudah terdaftar dalam sistem.`,
+        description: `Nomor "${finalInvoiceNumber}" sudah terdaftar dalam sistem Dakota.`,
       });
       return; 
     }
 
-    const formattedDate = date ? format(date, 'dd/MM/yyyy') : '';
-    onSave({
-      id: finalInvoiceNumber,
-      customer,
-      salesOrder,
-      poNumber,
-      date: formattedDate,
-      amount: 0 
-    }, action);
-    onOpenChange(false);
+    setIsSaving(true);
+    try {
+        const formattedDate = date ? format(date, 'dd/MM/yyyy') : '';
+        await onSave({
+            id: finalInvoiceNumber,
+            customer,
+            salesOrder,
+            poNumber,
+            date: formattedDate,
+            amount: 0 
+        }, action);
+        onOpenChange(false);
+    } catch (err) {
+        console.error("Save error:", err);
+    } finally {
+        setIsSaving(false);
+    }
   }
 
   const dialogTitle = invoiceData ? "Edit Identitas Penagihan" : "Registrasi Identitas Penagihan Baru";
@@ -360,22 +353,26 @@ export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceDa
                               <Checkbox id="auto-number" checked={isAutoNumber} onCheckedChange={(checked) => setIsAutoNumber(!!checked)} />
                               <Label htmlFor="auto-number" className="text-xs font-bold uppercase cursor-pointer">Gunakan Nomor Urut Sistem</Label>
                             </div>
-                            <div className="flex items-center gap-2">
-                                <Label className="text-[9px] font-bold uppercase text-muted-foreground">Mulai Dari:</Label>
-                                <Input 
-                                    placeholder="0001"
-                                    className="h-7 w-20 text-xs font-bold border-indigo-200"
-                                    value={startingNumber}
-                                    onChange={(e) => setStartingNumber(e.target.value)}
-                                />
-                            </div>
+                            {!isAutoNumber && (
+                                <div className="flex items-center gap-2">
+                                    <Label className="text-[9px] font-bold uppercase text-muted-foreground">Edit Manual Ke:</Label>
+                                    <Input 
+                                        placeholder="0001"
+                                        className="h-7 w-20 text-xs font-bold border-indigo-200"
+                                        value={mainNumber}
+                                        onChange={(e) => setMainNumber(e.target.value.padStart(4, '0').slice(-4))}
+                                    />
+                                </div>
+                            )}
                         </div>
                         <div className="grid grid-cols-[auto_1fr_auto] items-center gap-2">
                           {prefix && <div className="bg-indigo-50 px-3 py-2 rounded-md border border-indigo-100 text-xs font-black text-indigo-700 font-mono" title="Locked Prefix">{prefix}</div>}
-                          <Input value={mainNumber} onChange={(e) => setMainNumber(e.target.value)} disabled={isAutoNumber} className="h-10 font-black text-center text-lg tracking-widest bg-white" placeholder="0001" />
+                          <div className="h-10 font-black text-center text-lg tracking-widest bg-white flex items-center justify-center border rounded-md shadow-inner">{mainNumber}</div>
                           {suffix && <div className="bg-indigo-50 px-3 py-2 rounded-md border border-indigo-100 text-xs font-black text-indigo-700 font-mono" title="Locked Suffix">{suffix}</div>}
                         </div>
-                        <p className="text-[8px] font-bold text-indigo-600 uppercase mt-1 italic">* Sistem memindai database real-time untuk menyarankan nomor urut berikutnya.</p>
+                        <div className="bg-blue-50 p-2 rounded border border-blue-100 mt-2">
+                             <p className="text-[9px] font-black text-blue-700 uppercase tracking-tight">Pratinjau Hasil: <span className="underline">{fullInvoiceNumber}</span></p>
+                        </div>
                       </div>
                   </div>
               ) : (
@@ -524,10 +521,12 @@ export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceDa
         </div>
         
         <div className="pt-6 border-t flex justify-end gap-3 bg-muted/10 -mx-6 -mb-6 p-6">
-          <Button variant="ghost" onClick={() => onOpenChange(false)} className="font-bold uppercase text-xs">Batal</Button>
-          <Button variant="outline" onClick={() => handleSave('save')} className="font-bold uppercase text-xs border-indigo-200 text-indigo-700">Simpan Identitas</Button>
-          <Button type="button" onClick={() => handleSave('create')} className="bg-indigo-600 hover:bg-indigo-700 font-black uppercase text-xs px-8 shadow-lg">
-              <FilePlus className="mr-2 h-4 w-4" /> Buka Constructor
+          <Button variant="ghost" onClick={() => onOpenChange(false)} className="font-bold uppercase text-xs" disabled={isSaving}>Batal</Button>
+          <Button variant="outline" onClick={() => handleSave('save')} className="font-bold uppercase text-xs border-indigo-200 text-indigo-700" disabled={isSaving || !fullInvoiceNumber}>
+            {isSaving ? "Syncing..." : "Simpan Identitas"}
+          </Button>
+          <Button type="button" onClick={() => handleSave('create')} className="bg-indigo-600 hover:bg-indigo-700 font-black uppercase text-xs px-8 shadow-lg" disabled={isSaving || !fullInvoiceNumber}>
+              <FilePlus className="mr-2 h-4 w-4" /> {isSaving ? "Locking Number..." : "Buka Constructor"}
           </Button>
         </div>
       </DialogContent>
