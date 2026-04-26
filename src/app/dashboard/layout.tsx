@@ -331,18 +331,6 @@ export default function DashboardLayout({
                 </SidebarMenuButton>
             </SidebarMenuItem>
 
-            {isAdmin && (
-               <SidebarMenuItem>
-                  <SidebarMenuButton 
-                    asChild 
-                    isActive={pathname === '/dashboard/sales-management'} 
-                    tooltip="Mencatat pelunasan, verifikasi bukti bayar, dan update status pembayaran invoice."
-                  >
-                      <Link href="/dashboard/sales-management"><BarChart /> <span>Payment & Receivables</span></Link>
-                  </SidebarMenuButton>
-              </SidebarMenuItem>
-            )}
-
             {isSuperAdmin && (
                <SidebarMenuItem>
                   <SidebarMenuButton 

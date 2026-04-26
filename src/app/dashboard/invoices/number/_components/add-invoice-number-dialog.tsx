@@ -28,7 +28,7 @@ import {
 import { Calendar } from '@/components/ui/calendar';
 import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
-import type { InvoiceNumber, Customer, SalesOrder, Invoice } from '@/app/lib/data';
+import type { InvoiceNumber, Customer, SalesOrder, Invoice, SalesListItem } from '@/app/lib/data';
 import { useToast } from '@/hooks/use-toast';
 import { useFirestore, useCollection, useMemoFirebase } from '@/firebase';
 import { collection, query } from 'firebase/firestore';
@@ -82,6 +82,12 @@ export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceDa
   }, [firestore]);
   const { data: salesOrderListData } = useCollection<SalesOrder>(salesOrdersCollection);
 
+  const salesCollection = useMemoFirebase(() => {
+    if (!firestore) return null;
+    return query(collection(firestore, 'sales'));
+  }, [firestore]);
+  const { data: masterSalesList } = useCollection<SalesListItem>(salesCollection);
+
   const invoicesCollection = useMemoFirebase(() => {
     if (!firestore) return null;
     return query(collection(firestore, 'invoices'));
@@ -92,6 +98,22 @@ export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceDa
     if (!salesOrderListData) return [];
     return Array.from(new Set(salesOrderListData.map(item => item.soNumber)))
   },[salesOrderListData]);
+
+  // TRIGGER: PO Data Fetcher (Logic 1)
+  useEffect(() => {
+    if (!poNumber || !masterSalesList || invoiceData) return;
+
+    const matchedPo = masterSalesList.find(s => 
+      s.poNumber.trim().toLowerCase() === poNumber.trim().toLowerCase()
+    );
+
+    if (matchedPo) {
+      setCustomer(matchedPo.customer);
+      if (matchedPo.soNumber) setSalesOrder(matchedPo.soNumber);
+      // Optional toast for user feedback
+      console.log(`PO Match Found: ${matchedPo.customer}`);
+    }
+  }, [poNumber, masterSalesList, invoiceData]);
 
   const generateNextNumber = (type: 'sar' | 'kw') => {
     let currentMax = 0;
