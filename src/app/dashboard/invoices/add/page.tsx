@@ -54,6 +54,8 @@ import {
   FileCheck,
   Trash2,
   ListChecks,
+  ArrowRight,
+  CopyPlus,
 } from 'lucide-react';
 import { type Invoice, type SalesOrder, type UserProfile, type Customer, type InvoiceItem, type InvoiceNumber, type VirtualAccount, type ProductListItem } from '@/app/lib/data';
 import { useToast } from '@/hooks/use-toast';
@@ -169,7 +171,6 @@ export default function AddInvoicePage() {
   const [issueDate, setIssueDate] = useState<Date>(new Date());
   const [dueDate, setDueDate] = useState<Date>(addDays(new Date(), 30));
   const [isDpInvoice, setIsDpInvoice] = useState(false);
-  const [isOverBillingAllowed, setIsOverBillingAllowed] = useState(false);
   const [selectedVaId, setSelectedVaId] = useState<string>('manual');
   const [productPopoverOpen, setProductPopoverOpen] = useState(false);
   const [isProcessing, setIsSaving] = useState(false);
@@ -223,7 +224,6 @@ export default function AddInvoicePage() {
           setBillingAddress(activeIdentity.billingAddress || '');
           setBillingNpwp(activeIdentity.billingNpwp || '');
           setIsDpInvoice(!!(activeIdentity as Invoice).isDpInvoice);
-          setIsOverBillingAllowed(!!(activeIdentity as Invoice).isOverBillingAllowed);
           setNegotiationValue((activeIdentity as Invoice).negotiation || 0);
           setDpValue((activeIdentity as Invoice).dpValue || 0);
           setDpDeductionValue((activeIdentity as Invoice).dpDeduction || 0);
@@ -287,6 +287,26 @@ export default function AddInvoicePage() {
       setProductPopoverOpen(false);
   };
 
+  const handleCopyFromHistory = (histItem: any) => {
+      const newItem: InvoiceItem = {
+          id: `history-copy-${Date.now()}`,
+          name: histItem.name,
+          originalName: histItem.name,
+          quantity: 1,
+          originalQty: 0,
+          unit: histItem.unit,
+          price: histItem.price,
+          originalPrice: histItem.price,
+          total: histItem.price,
+          varianceReason: `Copied from prev. Invoice ${histItem.parentInvoice}`
+      };
+      setItems([...items, newItem]);
+      toast({ 
+        title: "Item Disalin", 
+        description: `${histItem.name} berhasil ditambahkan ke tabel input.` 
+      });
+  };
+
   const removeItem = (id: string | number) => {
       setItems(items.filter(it => it.id !== id));
       toast({ title: "Baris Item Dihapus", description: "Kalkulasi total telah disesuaikan." });
@@ -314,7 +334,6 @@ export default function AddInvoicePage() {
         amount: parseFormattedNumber(String(totalAmount)),
         status: invoiceStatus,
         isDpInvoice: isDpInvoice,
-        isOverBillingAllowed: isOverBillingAllowed,
         negotiation: parseFormattedNumber(String(negotiationValue)),
         dpValue: parseFormattedNumber(String(dpValue)),
         dpDeduction: parseFormattedNumber(String(dpDeductionValue)),
@@ -353,7 +372,7 @@ export default function AddInvoicePage() {
 
   const isLocked = (existingInvoiceData?.status === 'finalized' || existingInvoiceData?.status === 'paid' || existingInvoiceData?.status === 'received') && !isAdmin;
   const grandTotalNumeric = parseFormattedNumber(String(totalAmount));
-  const isExceedingPo = (grandTotalNumeric + totalInvoicedSoFar) > totalPoValue;
+  const isExceedingPo = (grandTotalNumeric + totalInvoicedSoFar) > (totalPoValue + 0.01); // 0.01 tolerance for floats
 
   return (
     <main className="flex flex-1 flex-col gap-4 p-4 md:gap-8 md:p-8 max-w-[1600px] mx-auto bg-background">
@@ -371,24 +390,6 @@ export default function AddInvoicePage() {
         </div>
         
         <div className="flex items-center gap-4">
-            {isAdmin && !isDpInvoice && (
-              <TooltipProvider>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <div className="flex items-center gap-2 bg-amber-50 px-4 py-2 rounded-xl border border-amber-200 shadow-sm cursor-help">
-                        <Label className="text-[10px] font-black uppercase text-amber-700 tracking-widest flex items-center gap-1.5">
-                            <ShieldCheck className="h-3.5 w-3.5" /> Over-Billing
-                        </Label>
-                        <Switch checked={isOverBillingAllowed} onCheckedChange={setIsOverBillingAllowed} disabled={isLocked} />
-                    </div>
-                  </TooltipTrigger>
-                  <TooltipContent className="max-w-xs bg-slate-900 text-white p-3">
-                    <p className="text-xs"><b>Over Billing:</b> Kondisi di mana nilai yang ditagihkan melebihi nilai kontrak awal, biasanya digunakan untuk penyesuaian biaya tambahan atau advance payment.</p>
-                  </TooltipContent>
-                </Tooltip>
-              </TooltipProvider>
-            )}
-            
             <TooltipProvider>
               <Tooltip>
                 <TooltipTrigger asChild>
@@ -459,7 +460,7 @@ export default function AddInvoicePage() {
 
           <Card className={cn("shadow-sm ring-1 ring-slate-200", isLocked && "opacity-60", isDpInvoice && "opacity-40 grayscale pointer-events-none")}>
             <CardHeader className="bg-slate-50/50 border-b py-4">
-                <CardTitle className="text-sm font-black uppercase text-slate-800">Variance Report & Item Tracking</CardTitle>
+                <CardTitle className="text-sm font-black uppercase text-slate-800">Item Tracking & Variance Report</CardTitle>
             </CardHeader>
             <CardContent className="p-0">
                 <Table>
@@ -478,9 +479,8 @@ export default function AddInvoicePage() {
                             <TableRow><TableCell colSpan={6} className="text-center py-10 text-slate-400 italic text-xs uppercase font-black">Belum ada item ditarik.</TableCell></TableRow>
                         ) : items.map(item => {
                             const totalBillQty = item.quantity + (item.prevInvoicedQty || 0);
-                            const isOverInvoiced = totalBillQty > (item.originalQty || 0);
                             return (
-                                <TableRow key={item.id} className={cn("transition-colors", isOverInvoiced && !isOverBillingAllowed && "bg-red-50/50")}>
+                                <TableRow key={item.id} className="transition-colors">
                                     <TableCell>
                                         <div className="flex flex-col gap-1 py-2">
                                             <Input 
@@ -561,13 +561,14 @@ export default function AddInvoicePage() {
             </CardContent>
           </Card>
 
-          {/* ITEM HISTORY AUDIT TRAIL */}
+          {/* ITEM HISTORY AUDIT TRAIL - INTERACTIVE CLICK TO COPY */}
           {billedItemsHistory.length > 0 && (
               <Card className="shadow-sm ring-1 ring-slate-200 border-none overflow-hidden">
-                <CardHeader className="bg-slate-50 border-b py-3">
+                <CardHeader className="bg-slate-50 border-b py-3 flex flex-row items-center justify-between">
                     <CardTitle className="text-[10px] font-black uppercase flex items-center gap-2 text-indigo-600">
                         <History className="h-4 w-4" /> Riwayat Item Terbit (PO Berjalan)
                     </CardTitle>
+                    <Badge className="text-[8px] bg-indigo-50 text-indigo-700 font-bold uppercase">Click row to Copy/Add</Badge>
                 </CardHeader>
                 <CardContent className="p-0">
                     <Table>
@@ -577,15 +578,23 @@ export default function AddInvoicePage() {
                                 <TableHead className="text-[9px] font-bold uppercase py-2">Nama Barang (History)</TableHead>
                                 <TableHead className="text-center text-[9px] font-bold uppercase py-2">Qty</TableHead>
                                 <TableHead className="text-right text-[9px] font-bold uppercase py-2">Unit Price</TableHead>
+                                <TableHead className="w-[40px]"></TableHead>
                             </TableRow>
                         </TableHeader>
                         <TableBody>
                             {billedItemsHistory.map((h, i) => (
-                                <TableRow key={i} className="hover:bg-slate-50/50">
+                                <TableRow 
+                                    key={i} 
+                                    className="hover:bg-indigo-50/50 cursor-pointer group transition-colors"
+                                    onClick={() => !isLocked && handleCopyFromHistory(h)}
+                                >
                                     <TableCell className="text-[9px] font-black text-slate-400">{h.parentInvoice}</TableCell>
                                     <TableCell className="text-[10px] font-bold text-slate-600 uppercase">{h.name}</TableCell>
                                     <TableCell className="text-center text-[10px] font-black">{h.quantity} {h.unit}</TableCell>
                                     <TableCell className="text-right text-[10px] font-mono">Rp {h.price.toLocaleString()}</TableCell>
+                                    <TableCell className="text-center">
+                                        <CopyPlus className="h-3 w-3 text-indigo-400 opacity-0 group-hover:opacity-100 transition-opacity" />
+                                    </TableCell>
                                 </TableRow>
                             ))}
                         </TableBody>
