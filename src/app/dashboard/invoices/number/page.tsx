@@ -23,7 +23,7 @@ import {
   import { Input } from '@/components/ui/input';
   import { Button } from '@/components/ui/button';
   import { type InvoiceNumber, type Invoice } from '@/app/lib/data';
-  import { Search, Upload, Download, MoreHorizontal, Edit, Trash2, Lock, Database, Hash, Info } from 'lucide-react';
+  import { Search, Upload, Download, MoreHorizontal, Edit, Trash2, Lock, Database, Hash, Info, FilePlus } from 'lucide-react';
   import { AddInvoiceNumberDialog } from './_components/add-invoice-number-dialog';
   import { DeleteConfirmationDialog } from '@/app/components/delete-confirmation-dialog';
   import { Skeleton } from '@/components/ui/skeleton';
@@ -110,7 +110,7 @@ import {
             toast({
                 variant: "destructive",
                 title: "Aksi Ditolak",
-                description: "Nomor ini sudah digunakan dalam Invoice List.",
+                description: "Nomor ini sudah memiliki data item di Invoice List.",
             });
             setDeleteDialogState({ isOpen: false, invoiceId: undefined });
             return;
@@ -120,7 +120,7 @@ import {
         const docRef = doc(firestore, 'invoiceNumbers', safeId);
         deleteDoc(docRef)
             .then(() => {
-                toast({ title: 'Nomor Faktur Berhasil Dihapus' });
+                toast({ title: 'Identitas Berhasil Dihapus' });
                 setDeleteDialogState({ isOpen: false, invoiceId: undefined });
             })
             .catch(async (serverError) => {
@@ -143,12 +143,13 @@ import {
       const safePathId = id.replace(/\//g, '_');
       
       const docRef = doc(firestore, 'invoiceNumbers', safePathId);
-      const dataToSave = { ...invoiceData, id: id, ownerId: user.uid };
+      const dataToSave = { ...invoiceData, id: id, ownerId: user.uid, status: 'registered' };
 
       setDoc(docRef, dataToSave, { merge: true })
         .then(() => {
              toast({
                 title: editingInvoice ? 'Identity Updated' : 'Identity Registered',
+                description: `Nomor ${id} telah dipesan di database.`
              });
              if (action === 'create') {
                 router.push(`/dashboard/invoices/add?invoiceNumberId=${safePathId}`);
@@ -192,7 +193,7 @@ import {
             <div className="flex bg-blue-50 p-3 rounded-xl border border-blue-100 gap-3">
                 <Info className="h-5 w-5 text-blue-600 shrink-0 mt-0.5" />
                 <p className="text-[10px] text-blue-900/70 max-w-xs leading-tight font-bold">
-                    Pastikan identitas nomor sudah sah sebelum membuka Constructor untuk menyusun item barang.
+                    Begitu nomor didaftarkan, sistem akan mengunci nomor tersebut agar tidak digunakan oleh Admin lain secara bersamaan.
                 </p>
             </div>
         </div>
@@ -230,7 +231,7 @@ import {
                                 <TableHead className="text-[10px] font-black uppercase tracking-widest py-4">Invoice Number</TableHead>
                                 <TableHead className="text-[10px] font-black uppercase tracking-widest py-4">Customer</TableHead>
                                 <TableHead className="text-[10px] font-black uppercase tracking-widest py-4">PO / SO Reference</TableHead>
-                                <TableHead className="text-[10px] font-black uppercase tracking-widest py-4 text-center">Tgl Registrasi</TableHead>
+                                <TableHead className="text-[10px] font-black uppercase tracking-widest py-4 text-center">Status Identitas</TableHead>
                                 <TableHead className="text-right py-4"></TableHead>
                             </TableRow>
                         </TableHeader>
@@ -272,7 +273,11 @@ import {
                                                     <span className="text-[10px] text-muted-foreground">SO: {invoice.salesOrder || '-'}</span>
                                                 </div>
                                             </TableCell>
-                                            <TableCell className="text-center text-xs font-bold text-slate-500">{invoice.date}</TableCell>
+                                            <TableCell className="text-center">
+                                                <Badge variant={isLinked ? "default" : "secondary"} className="text-[9px] uppercase font-black">
+                                                    {isLinked ? 'FINALIZED' : 'DRAFT / REGISTERED'}
+                                                </Badge>
+                                            </TableCell>
                                             <TableCell className="text-right py-4">
                                                 <div className="flex justify-end gap-2">
                                                     {!isLinked && (
@@ -281,7 +286,7 @@ import {
                                                             className="h-8 bg-indigo-600 hover:bg-indigo-700 font-black uppercase text-[10px] tracking-widest shadow-md"
                                                             onClick={() => router.push(`/dashboard/invoices/add?invoiceNumberId=${invoice.id.replace(/\//g, '_')}`)}
                                                         >
-                                                            Open Constructor
+                                                            <FilePlus className="mr-1.5 h-3.5 w-3.5" /> Open Constructor
                                                         </Button>
                                                     )}
                                                     <DropdownMenu>

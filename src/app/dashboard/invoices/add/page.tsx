@@ -55,24 +55,44 @@ export default function AddInvoicePage() {
   const firestore = useFirestore();
   const { user } = useUser();
 
-  const poNumberParam = searchParams.get('poNumber');
   const editInvoiceId = searchParams.get('editInvoiceId');
   const invoiceNumberIdParam = searchParams.get('invoiceNumberId');
   
+  // --- DATA FETCHING ---
+  // 1. Identity Link Fetch (Source of Truth for the ID)
+  const identityRef = useMemoFirebase(() => {
+      if (!firestore || !invoiceNumberIdParam) return null;
+      return doc(firestore, 'invoiceNumbers', invoiceNumberIdParam);
+  }, [firestore, invoiceNumberIdParam]);
+  const { data: identityData, isLoading: isIdentityLoading } = useDoc<InvoiceNumber>(identityRef);
+
+  // 2. Existing Invoice Fetch (If in Edit Mode)
+  const existingInvoiceRef = useMemoFirebase(() => {
+      if (!firestore || !editInvoiceId) return null;
+      return doc(firestore, 'invoices', editInvoiceId);
+  }, [firestore, editInvoiceId]);
+  const { data: existingInvoiceData } = useDoc<Invoice>(existingInvoiceRef);
+
+  const userProfileRef = useMemoFirebase(() => (!firestore || !user) ? null : doc(firestore, 'users', user.uid), [firestore, user]);
+  const { data: userProfile } = useDoc<UserProfile>(userProfileRef);
+  const isSuperAdmin = user?.email?.toLowerCase() === 'fa@gmail.com' || userProfile?.role === 'admin';
+
+  const soItemsCollection = useMemoFirebase(() => firestore ? query(collection(firestore, 'salesOrders')) : null, [firestore]);
+  const { data: allSoItems } = useCollection<SalesOrder>(soItemsCollection);
+
+  const invoicesCollection = useMemoFirebase(() => firestore ? query(collection(firestore, 'invoices')) : null, [firestore]);
+  const { data: allInvoices } = useCollection<Invoice>(invoicesCollection);
+
+  const customersCollection = useMemoFirebase(() => firestore ? query(collection(firestore, 'customers')) : null, [firestore]);
+  const { data: customerListData } = useCollection<Customer>(customersCollection);
+
   // --- FORM STATES ---
-  const [invoiceId, setInvoiceId] = useState('');
-  const [numberSource, setNumberSource] = useState<'manual' | 'erp'>('manual');
-  const [internalNote, setInternalNote] = useState('');
-  const [soNumber, setSoNumber] = useState('');
-  const [poNumber, setPoNumber] = useState('');
-  const [customerName, setCustomerName] = useState('');
+  const [items, setItems] = useState<InvoiceItem[]>([]);
   const [billingAddress, setBillingAddress] = useState('');
   const [billingNpwp, setBillingNpwp] = useState('');
+  const [internalNote, setInternalNote] = useState('');
   const [issueDate, setIssueDate] = useState<Date>(new Date());
   const [dueDate, setDueDate] = useState<Date>(addDays(new Date(), 30));
-  const [items, setItems] = useState<InvoiceItem[]>([]);
-  const [isFinalized, setIsFinalized] = useState(false);
-  const [isPaid, setIsPaid] = useState(false);
   const [isDpInvoice, setIsDpInvoice] = useState(false);
 
   // --- CALCULATION STATES ---
@@ -90,148 +110,53 @@ export default function AddInvoicePage() {
   const [vat12, setVat12] = useState<string | number>(0);
   const [totalAmount, setTotalAmount] = useState<string | number>(0);
 
-  // --- DATA FETCHING ---
-  const userProfileRef = useMemoFirebase(() => (!firestore || !user) ? null : doc(firestore, 'users', user.uid), [firestore, user]);
-  const { data: userProfile } = useDoc<UserProfile>(userProfileRef);
-  const isSuperAdmin = user?.email?.toLowerCase() === 'fa@gmail.com' || userProfile?.role === 'admin';
-
-  const salesCollection = useMemoFirebase(() => firestore ? query(collection(firestore, 'sales')) : null, [firestore]);
-  const { data: allSales } = useCollection<SalesListItem>(salesCollection);
-
-  const soItemsCollection = useMemoFirebase(() => firestore ? query(collection(firestore, 'salesOrders')) : null, [firestore]);
-  const { data: allSoItems } = useCollection<SalesOrder>(soItemsCollection);
-
-  const invoicesCollection = useMemoFirebase(() => firestore ? query(collection(firestore, 'invoices')) : null, [firestore]);
-  const { data: allInvoices } = useCollection<Invoice>(invoicesCollection);
-
-  const customersCollection = useMemoFirebase(() => firestore ? query(collection(firestore, 'customers')) : null, [firestore]);
-  const { data: customerListData } = useCollection<Customer>(customersCollection);
-
-  // Identity Link Fetch
-  const identityRef = useMemoFirebase(() => {
-      if (!firestore || !invoiceNumberIdParam) return null;
-      return doc(firestore, 'invoiceNumbers', invoiceNumberIdParam);
-  }, [firestore, invoiceNumberIdParam]);
-  const { data: identityData } = useDoc<InvoiceNumber>(identityRef);
-
-  // --- LOGIC: IDENTITY POPULATION ---
+  // --- PROTEKSI & REDIRECT ---
   useEffect(() => {
-      if (identityData) {
-          setInvoiceId(identityData.id);
-          setPoNumber(identityData.poNumber || '');
-          setSoNumber(identityData.salesOrder || '');
-          setCustomerName(identityData.customer);
-          setNumberSource(identityData.id.startsWith('SAR') || identityData.id.startsWith('KW') ? 'manual' : 'erp');
-          
-          if (customerListData) {
-              const cust = customerListData.find(c => c.name === identityData.customer);
-              if (cust) {
-                  const defAddr = cust.addresses?.find(a => a.isDefault) || cust.addresses?.[0];
-                  setBillingAddress(defAddr?.address || '');
-                  setBillingNpwp(defAddr?.npwp || '');
-              }
+      if (!isIdentityLoading && !identityData && !editInvoiceId) {
+          toast({ variant: "destructive", title: "Akses Ditolak", description: "Identitas Invoice tidak ditemukan. Mohon pilih nomor terlebih dahulu." });
+          router.replace('/dashboard/invoices/number');
+      }
+  }, [identityData, isIdentityLoading, editInvoiceId, router]);
+
+  // --- LOGIC: POPULATE DATA FROM IDENTITY ---
+  useEffect(() => {
+      if (identityData && customerListData && items.length === 0 && !editInvoiceId) {
+          const cust = customerListData.find(c => c.name === identityData.customer);
+          if (cust) {
+              const defAddr = cust.addresses?.find(a => a.isDefault) || cust.addresses?.[0];
+              setBillingAddress(defAddr?.address || '');
+              setBillingNpwp(defAddr?.npwp || '');
+          }
+
+          if (allSoItems) {
+              const relatedItems = allSoItems.filter(item => item.soNumber === identityData.salesOrder);
+              setItems(relatedItems.map((item, idx) => ({
+                  id: idx.toString(),
+                  name: item.productName,
+                  quantity: item.quantity,
+                  unit: item.unit,
+                  price: item.price,
+                  total: item.quantity * item.price
+              })));
           }
       }
-  }, [identityData, customerListData]);
+  }, [identityData, customerListData, allSoItems, editInvoiceId]);
 
-  // --- LOGIC: PARTIAL INVOICING TRACKING ---
-  const poRelatedInvoices = useMemo(() => {
-    if (!allInvoices || !poNumber) return [];
-    return allInvoices.filter(inv => inv.poNumber === poNumber && inv.status !== 'cancelled' && inv.id !== invoiceId);
-  }, [allInvoices, poNumber, invoiceId]);
-
-  const dpBalance = useMemo(() => {
-    const totalDpInvoiced = poRelatedInvoices.filter(inv => inv.isDpInvoice).reduce((sum, inv) => sum + inv.amount, 0);
-    const totalDpDeducted = poRelatedInvoices.reduce((sum, inv) => sum + (inv.dpDeduction || 0), 0);
-    return totalDpInvoiced - totalDpDeducted;
-  }, [poRelatedInvoices]);
-
-  const itemTracking = useMemo(() => {
-    if (!poNumber || !allSoItems) return {};
-    const tracking: Record<string, { poQty: number; invoiced: number }> = {};
-    allSoItems.filter(so => so.poNumber === poNumber).forEach(item => {
-        tracking[item.productName] = { poQty: item.quantity, invoiced: 0 };
-    });
-    poRelatedInvoices.forEach(inv => {
-        inv.items?.forEach(item => {
-            if (tracking[item.name]) {
-                tracking[item.name].invoiced += item.quantity;
-            }
-        });
-    });
-    return tracking;
-  }, [poNumber, allSoItems, poRelatedInvoices]);
-
-  // --- LOGIC: INITIAL LOAD FROM PO (FALLBACK) ---
+  // --- LOGIC: EDIT MODE POPULATION ---
   useEffect(() => {
-    if (poNumberParam && !identityData && allSales && allSoItems && customerListData && Object.keys(itemTracking).length > 0) {
-        const foundSale = allSales.find(s => s.poNumber === poNumberParam);
-        if (foundSale) {
-            setPoNumber(foundSale.poNumber);
-            setSoNumber(foundSale.soNumber || '');
-            setCustomerName(foundSale.customer);
-            const cust = customerListData.find(c => c.name === foundSale.customer);
-            if (cust) {
-                const defAddr = cust.addresses?.find(a => a.isDefault) || cust.addresses?.[0];
-                setBillingAddress(defAddr?.address || '');
-                setBillingNpwp(defAddr?.npwp || '');
-            }
-            const relatedItems = allSoItems.filter(item => item.poNumber === poNumberParam);
-            setItems(relatedItems.map((item, idx) => {
-                const track = itemTracking[item.productName] || { poQty: item.quantity, invoiced: 0 };
-                const remaining = Math.max(0, track.poQty - track.invoiced);
-                return {
-                    id: idx.toString(),
-                    name: item.productName,
-                    quantity: remaining,
-                    unit: item.unit,
-                    price: item.price,
-                    total: remaining * item.price
-                };
-            }));
-        }
-    } else if (identityData && allSoItems && items.length === 0) {
-        const relatedItems = allSoItems.filter(item => item.poNumber === identityData.poNumber);
-        setItems(relatedItems.map((item, idx) => {
-            const track = itemTracking[item.productName] || { poQty: item.quantity, invoiced: 0 };
-            const remaining = Math.max(0, track.poQty - track.invoiced);
-            return {
-                id: idx.toString(),
-                name: item.productName,
-                quantity: remaining,
-                unit: item.unit,
-                price: item.price,
-                total: remaining * item.price
-            };
-        }));
-    }
-  }, [poNumberParam, identityData, allSales, allSoItems, customerListData, itemTracking]);
-
-  // --- LOGIC: EDIT MODE ---
-  useEffect(() => {
-    if (editInvoiceId && allInvoices) {
-        const found = allInvoices.find(inv => inv.id.replace(/\//g, '_') === editInvoiceId);
-        if (found) {
-            setInvoiceId(found.id);
-            setInternalNote(found.erpInvoiceId || '');
-            setSoNumber(found.soNumber);
-            setPoNumber(found.poNumber);
-            setCustomerName(found.customer);
-            setBillingAddress(found.billingAddress);
-            setBillingNpwp(found.billingNpwp || '');
-            setIssueDate(found.date ? new Date(found.date) : new Date());
-            setIsFinalized(found.status === 'finalized');
-            setIsPaid(found.status === 'paid');
-            setIsDpInvoice(!!found.isDpInvoice);
-            setNegotiationValue(found.negotiation || '');
-            setDpValue(found.dpValue || '');
-            setRetentionValue(found.retention || '');
-            setDpDeductionValue(found.dpDeduction || '');
-            setItems(found.items || []);
-            setNumberSource(found.id.startsWith('SAR') || found.id.startsWith('KW') ? 'manual' : 'erp');
-        }
-    }
-  }, [editInvoiceId, allInvoices]);
+      if (existingInvoiceData) {
+          setItems(existingInvoiceData.items || []);
+          setBillingAddress(existingInvoiceData.billingAddress || '');
+          setBillingNpwp(existingInvoiceData.billingNpwp || '');
+          setInternalNote(existingInvoiceData.erpInvoiceId || '');
+          setIsDpInvoice(!!existingInvoiceData.isDpInvoice);
+          setNegotiationValue(existingInvoiceData.negotiation || '');
+          setDpValue(existingInvoiceData.dpValue || '');
+          setRetentionValue(existingInvoiceData.retention || '');
+          setDpDeductionValue(existingInvoiceData.dpDeduction || '');
+          setIssueDate(existingInvoiceData.date ? new Date(existingInvoiceData.date) : new Date());
+      }
+  }, [existingInvoiceData]);
 
   // --- LOGIC: CALCULATIONS ---
   useEffect(() => {
@@ -246,6 +171,7 @@ export default function AddInvoicePage() {
     const retNominal = retentionMode === 'percent' ? (baseAfterNeg * (retInputVal / 100)) : retInputVal;
     const dpDedInputVal = parseFormattedNumber(String(dpDeductionValue));
     const dpDedNominal = dpDeductionMode === 'percent' ? (baseAfterNeg * (dpDedInputVal / 100)) : dpDedInputVal;
+    
     if (!isTaxManual) {
         const calculatedDpp = baseAfterNeg;
         const calculatedVat = calculatedDpp * 0.12;
@@ -259,22 +185,23 @@ export default function AddInvoicePage() {
   }, [items, negotiationValue, negotiationMode, dpValue, dpMode, retentionValue, retentionMode, dpDeductionValue, dpDeductionMode, isTaxManual, dppVat, vat12, isDpInvoice]);
 
   const handleSaveInvoice = async (invoiceStatus: any = 'sent') => {
-    if (!firestore || !user || !invoiceId || !customerName) {
-        toast({ variant: "destructive", title: "Gagal Simpan", description: "Identitas Invoice tidak lengkap." });
+    const activeIdentity = existingInvoiceData || identityData;
+    if (!firestore || !user || !activeIdentity) {
+        toast({ variant: "destructive", title: "Gagal Simpan", description: "Identitas Invoice tidak valid." });
         return;
     }
 
-    const safeInvoiceId = invoiceId.replace(/\//g, '_');
+    const safeInvoiceId = activeIdentity.id.replace(/\//g, '_');
     const invoiceDocRef = doc(firestore, 'invoices', safeInvoiceId);
     const timestamp = new Date().toISOString();
     const updater = userProfile?.displayName || user.email || 'System';
 
     const dataToSave: any = {
-        id: invoiceId,
+        id: activeIdentity.id,
         erpInvoiceId: internalNote,
-        soNumber: soNumber,
-        poNumber: poNumber,
-        customer: customerName,
+        soNumber: activeIdentity.soNumber || (activeIdentity as any).salesOrder,
+        poNumber: activeIdentity.poNumber || '',
+        customer: activeIdentity.customer,
         billingAddress: billingAddress,
         billingNpwp: billingNpwp,
         date: format(issueDate, 'yyyy-MM-dd'),
@@ -282,7 +209,6 @@ export default function AddInvoicePage() {
         amount: parseFormattedNumber(String(totalAmount)),
         status: invoiceStatus,
         isDpInvoice: isDpInvoice,
-        numberSource: numberSource,
         negotiation: parseFormattedNumber(String(negotiationValue)),
         dpValue: parseFormattedNumber(String(dpValue)),
         dpDeduction: parseFormattedNumber(String(dpDeductionValue)),
@@ -314,26 +240,31 @@ export default function AddInvoicePage() {
         });
   };
 
-  const isLocked = (isFinalized || isPaid) && !isSuperAdmin;
+  const activeIdentity = existingInvoiceData || identityData;
+  if (isIdentityLoading || (!activeIdentity && !editInvoiceId)) {
+      return <div className="flex h-[80vh] items-center justify-center font-bold text-muted-foreground animate-pulse">Syncing Constructor with Database...</div>;
+  }
+
+  const isLocked = (existingInvoiceData?.status === 'finalized' || existingInvoiceData?.status === 'paid') && !isSuperAdmin;
 
   return (
     <main className="flex flex-1 flex-col gap-4 p-4 md:gap-8 md:p-8 max-w-[1600px] mx-auto bg-background">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
-            <Button variant="outline" size="icon" onClick={() => router.push('/dashboard/invoices/number')} className="rounded-full">
+            <Button variant="outline" size="icon" onClick={() => router.back()} className="rounded-full">
                 <ChevronLeft className="h-4 w-4" />
             </Button>
             <div>
                 <h1 className="text-2xl font-black tracking-tight uppercase">Invoice Constructor</h1>
                 <div className="text-muted-foreground text-[10px] font-bold uppercase tracking-widest flex items-center gap-1.5 mt-0.5">
-                    Identitas Terkunci <Badge variant="secondary" className="text-[8px] bg-emerald-100 text-emerald-700 h-3.5"><Lock className="h-2 w-2 mr-1" /> Finalized Header</Badge>
+                    Identitas Terkunci <Badge variant="secondary" className="text-[8px] bg-emerald-100 text-emerald-700 h-3.5"><Lock className="h-2 w-2 mr-1" /> Database Persistent</Badge>
                 </div>
             </div>
         </div>
         <div className="flex items-center gap-3 bg-indigo-50 px-4 py-2 rounded-xl border border-indigo-100">
             <div className="flex items-center gap-2">
                 <Label className="text-[10px] font-black uppercase text-indigo-700">Mode Tagihan:</Label>
-                <Badge variant={isDpInvoice ? "default" : "outline"} className={cn("text-[9px] uppercase cursor-pointer", isDpInvoice ? "bg-indigo-600" : "text-indigo-600 border-indigo-200")} onClick={() => setIsDpInvoice(!isDpInvoice)}>
+                <Badge variant={isDpInvoice ? "default" : "outline"} className={cn("text-[9px] uppercase cursor-pointer", isDpInvoice ? "bg-indigo-600" : "text-indigo-600 border-indigo-200")} onClick={() => !isLocked && setIsDpInvoice(!isDpInvoice)}>
                    {isDpInvoice ? "Down Payment (DP)" : "Tagihan Barang / Progress"}
                 </Badge>
             </div>
@@ -353,20 +284,20 @@ export default function AddInvoicePage() {
                   <div className="space-y-1.5">
                       <Label className="text-[9px] font-black uppercase text-muted-foreground tracking-widest">Invoice Number</Label>
                       <div className="flex items-center gap-2 bg-white px-3 py-2 rounded-md border-2 border-indigo-100 shadow-sm">
-                          {numberSource === 'erp' ? <Database className="h-3.5 w-3.5 text-emerald-600" /> : <Hash className="h-3.5 w-3.5 text-indigo-600" />}
-                          <span className="font-black text-indigo-700">{invoiceId || 'N/A'}</span>
+                          <Hash className="h-3.5 w-3.5 text-indigo-600" />
+                          <span className="font-black text-indigo-700">{activeIdentity?.id || 'N/A'}</span>
                       </div>
                   </div>
 
                   <div className="space-y-1.5">
                       <Label className="text-[9px] font-black uppercase text-muted-foreground tracking-widest">Customer</Label>
-                      <div className="bg-white px-3 py-2 rounded-md border border-slate-200 text-xs font-black uppercase truncate">{customerName}</div>
+                      <div className="bg-white px-3 py-2 rounded-md border border-slate-200 text-xs font-black uppercase truncate">{activeIdentity?.customer}</div>
                   </div>
 
                   <div className="space-y-1.5">
                       <Label className="text-[9px] font-black uppercase text-muted-foreground tracking-widest">Referensi PO / SO</Label>
                       <div className="bg-white px-3 py-2 rounded-md border border-slate-200 text-xs font-mono font-bold truncate">
-                          {poNumber} {soNumber && `• ${soNumber}`}
+                          {activeIdentity?.poNumber} {((activeIdentity as any).salesOrder || activeIdentity?.soNumber) && `• ${(activeIdentity as any).salesOrder || activeIdentity?.soNumber}`}
                       </div>
                   </div>
 
@@ -377,7 +308,7 @@ export default function AddInvoicePage() {
                   </div>
 
                   <div className="space-y-1.5">
-                      <Label className="text-[9px] font-black uppercase text-muted-foreground tracking-widest">Internal Note</Label>
+                      <Label className="text-[9px] font-black uppercase text-muted-foreground tracking-widest">Internal Note / ERP Ref</Label>
                       <Input 
                         value={internalNote} 
                         onChange={e => setInternalNote(e.target.value)} 
@@ -402,43 +333,32 @@ export default function AddInvoicePage() {
                     <TableHeader className="bg-muted/50">
                         <TableRow>
                             <TableHead className="text-[10px] font-black uppercase py-2">Nama Produk / Jasa</TableHead>
-                            <TableHead className="w-[80px] text-center text-[10px] font-black uppercase py-2">Qty PO</TableHead>
-                            <TableHead className="w-[80px] text-center text-[10px] font-black uppercase py-2">Prev. Invoiced</TableHead>
                             <TableHead className="w-[100px] text-center text-[10px] font-black uppercase py-2">Now Billing</TableHead>
+                            <TableHead className="w-[80px] text-center text-[10px] font-black uppercase py-2">Unit</TableHead>
                             <TableHead className="w-[140px] text-right text-[10px] font-black uppercase py-2">Total (IDR)</TableHead>
                         </TableRow>
                     </TableHeader>
                     <TableBody>
                         {items.length === 0 ? (
-                            <TableRow><TableCell colSpan={5} className="text-center py-10 text-muted-foreground italic text-xs">Belum ada item SO terdeteksi.</TableCell></TableRow>
-                        ) : items.map(item => {
-                            const track = itemTracking[item.name] || { poQty: item.quantity, invoiced: 0 };
-                            const remaining = track.poQty - track.invoiced;
-                            const isOver = item.quantity > remaining;
-
-                            return (
-                                <TableRow key={item.id}>
-                                    <TableCell><Input value={item.name} onChange={e => setItems(items.map(it => it.id === item.id ? { ...it, name: e.target.value } : it))} className="h-8 text-[11px] font-bold" disabled={isLocked} /></TableCell>
-                                    <TableCell className="text-center text-[10px] font-bold text-muted-foreground">{track.poQty}</TableCell>
-                                    <TableCell className="text-center text-[10px] font-bold text-blue-600">{track.invoiced}</TableCell>
-                                    <TableCell>
-                                        <div className="space-y-1">
-                                            <Input 
-                                                value={item.quantity} 
-                                                onChange={e => {
-                                                    const val = parseFormattedNumber(e.target.value);
-                                                    setItems(items.map(it => it.id === item.id ? { ...it, quantity: val, total: val * it.price } : it));
-                                                }} 
-                                                className={cn("text-center text-xs h-8 font-black", isOver ? "border-red-500 bg-red-50 text-red-700" : "bg-blue-50/50")} 
-                                                disabled={isLocked}
-                                            />
-                                            {isOver && <p className="text-[7px] text-red-600 font-bold text-center uppercase tracking-tighter">Over Limit!</p>}
-                                        </div>
-                                    </TableCell>
-                                    <TableCell className="text-right font-black text-xs text-slate-800">Rp {formatNumberWithCommas(item.total)}</TableCell>
-                                </TableRow>
-                            );
-                        })}
+                            <TableRow><TableCell colSpan={4} className="text-center py-10 text-muted-foreground italic text-xs">Belum ada item terdeteksi.</TableCell></TableRow>
+                        ) : items.map(item => (
+                            <TableRow key={item.id}>
+                                <TableCell><Input value={item.name} onChange={e => setItems(items.map(it => it.id === item.id ? { ...it, name: e.target.value } : it))} className="h-8 text-[11px] font-bold" disabled={isLocked} /></TableCell>
+                                <TableCell>
+                                    <Input 
+                                        value={item.quantity} 
+                                        onChange={e => {
+                                            const val = parseFormattedNumber(e.target.value);
+                                            setItems(items.map(it => it.id === item.id ? { ...it, quantity: val, total: val * it.price } : it));
+                                        }} 
+                                        className="text-center text-xs h-8 font-black bg-blue-50/50" 
+                                        disabled={isLocked}
+                                    />
+                                </TableCell>
+                                <TableCell className="text-center text-[10px] font-bold uppercase">{item.unit}</TableCell>
+                                <TableCell className="text-right font-black text-xs text-slate-800">Rp {formatNumberWithCommas(item.total)}</TableCell>
+                            </TableRow>
+                        ))}
                     </TableBody>
                 </Table>
                 <div className="p-4 bg-muted/10 border-t flex justify-between items-center">
@@ -456,7 +376,7 @@ export default function AddInvoicePage() {
             <CardHeader className="bg-primary/5 py-4 border-b">
                 <CardTitle className="text-xs font-black uppercase flex items-center justify-between tracking-widest">
                     Summary Kalkulasi
-                    {(isFinalized || isPaid) && <ShieldCheck className="h-4 w-4 text-indigo-600" />}
+                    {(existingInvoiceData?.status === 'finalized' || existingInvoiceData?.status === 'paid') && <ShieldCheck className="h-4 w-4 text-indigo-600" />}
                 </CardTitle>
             </CardHeader>
             <CardContent className="p-6 space-y-5">
@@ -491,10 +411,7 @@ export default function AddInvoicePage() {
                 ) : (
                     <div className="space-y-1.5 bg-emerald-50/30 p-3 rounded-xl border border-emerald-100">
                         <div className="flex justify-between items-center">
-                            <div className="flex flex-col">
-                                <Label className="text-[9px] font-black uppercase text-emerald-700 tracking-tighter">Deduction from DP</Label>
-                                <span className="text-[7px] font-bold text-emerald-600 uppercase">Available: Rp {formatNumberWithCommas(dpBalance)}</span>
-                            </div>
+                            <Label className="text-[9px] font-black uppercase text-emerald-700 tracking-tighter">Deduction from DP</Label>
                             <Select value={dpDeductionMode} onValueChange={(v: any) => setDpDeductionMode(v)} disabled={isLocked}>
                                 <SelectTrigger className="h-5 w-14 text-[8px] font-black uppercase"><SelectValue /></SelectTrigger>
                                 <SelectContent><SelectItem value="nominal">IDR</SelectItem><SelectItem value="percent">%</SelectItem></SelectContent>
@@ -544,7 +461,7 @@ export default function AddInvoicePage() {
                         <Send className="mr-2 h-4 w-4" /> SIMPAN & TERBITKAN
                       </Button>
                   )}
-                  {isSuperAdmin && !isFinalized && !isPaid && (
+                  {isSuperAdmin && existingInvoiceData?.status !== 'finalized' && existingInvoiceData?.status !== 'paid' && (
                       <Button variant="outline" className="w-full h-11 border-indigo-600 text-indigo-600 font-black uppercase text-[10px] tracking-widest" onClick={() => handleSaveInvoice('finalized')}>
                         <ShieldCheck className="mr-2 h-4 w-4" /> FINALIZE & LOCK
                       </Button>
