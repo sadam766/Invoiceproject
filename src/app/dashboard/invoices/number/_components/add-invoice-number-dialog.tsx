@@ -93,7 +93,6 @@ export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceDa
     return Array.from(new Set(salesOrderListData.map(item => item.soNumber)))
   },[salesOrderListData]);
 
-  // --- REFINEMENT: SO-TO-IDENTITY LOCK ---
   const isSoExhausted = useMemo(() => {
     if (!salesOrder || !salesOrderListData || !existingInvoices) return false;
     
@@ -115,6 +114,7 @@ export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceDa
     const currentYearShort = format(now, 'yy');
     const currentYearLong = format(now, 'yyyy');
     
+    // Scan all existing documents for the absolute max number
     const allIds = [
         ...(allInvoiceNumbers?.map(inv => inv.id) || []),
         ...(existingInvoices?.map(inv => inv.id) || [])
@@ -123,16 +123,18 @@ export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceDa
     allIds.forEach(id => {
         let match;
         if (type === 'sar') {
+            // Regex tailored for SAR/25XXA
             const pattern = new RegExp(`SAR/${currentYearShort}(\\d+)A`);
             match = id.match(pattern);
         } else {
+            // Regex tailored for KW/XXXX/KEU/2025
             const pattern = new RegExp(`KW/(\\d+)/KEU/${currentYearLong}`);
             match = id.match(pattern);
         }
 
         if (match && match[1]) {
             const num = parseInt(match[1], 10);
-            if (num > currentMax) currentMax = num;
+            if (!isNaN(num) && num > currentMax) currentMax = num;
         }
     });
 
@@ -273,7 +275,6 @@ export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceDa
         return;
     }
 
-    // --- REFINEMENT: DUPLICATE ERP CHECK (SERVER SIDE) ---
     if (numberSource === 'erp' && firestore) {
         const safeId = erpNumberInput.replace(/\//g, '_');
         const docRef = doc(firestore, 'invoices', safeId);
@@ -284,7 +285,6 @@ export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceDa
         }
     }
 
-    // --- REFINEMENT: FINISHED SO LOCK ---
     if (isSoExhausted && invoiceType === 'sar') {
         toast({ variant: "destructive", title: "Kuota SO Habis", description: "Seluruh barang pada SO ini sudah ditagih. Gunakan mode Proforma jika perlu." });
         return;

@@ -30,7 +30,7 @@ import {
   import { Label } from '@/components/ui/label';
   import { Textarea } from '@/components/ui/textarea';
   import { type Invoice, type UserProfile } from '@/app/lib/data';
-  import { Search, MoreHorizontal, Eye, Pencil, Download, Truck, FileSpreadsheet, XCircle, ShieldCheck, Layers, Database, Hash, History } from 'lucide-react';
+  import { Search, MoreHorizontal, Eye, Pencil, Download, Truck, FileSpreadsheet, XCircle, ShieldCheck, Layers, Database, Hash, History, Trash2, AlertTriangle } from 'lucide-react';
   import { Skeleton } from '@/components/ui/skeleton';
   import {
     DropdownMenu,
@@ -39,11 +39,12 @@ import {
     DropdownMenuTrigger,
   } from '@/components/ui/dropdown-menu';
   import { useToast } from '@/hooks/use-toast';
-  import { useFirestore, useCollection, useMemoFirebase, useUser, useDoc } from '@/firebase';
-  import { collection, query, doc, updateDoc, arrayUnion } from 'firebase/firestore';
+  import { useFirestore, useCollection, useMemoFirebase, useUser, useDoc, errorEmitter, FirestorePermissionError } from '@/firebase';
+  import { collection, query, doc, updateDoc, arrayUnion, deleteDoc } from 'firebase/firestore';
   import { exportToExcel, cn } from '@/lib/utils';
   import { DateRangePicker } from '@/app/components/date-range-picker';
   import { isWithinInterval, parseISO, startOfToday, format } from 'date-fns';
+  import { DeleteConfirmationDialog } from '@/app/components/delete-confirmation-dialog';
 
   export default function InvoiceListPage() {
     const router = useRouter();
@@ -62,6 +63,10 @@ import {
     const [voidDialogOpen, setVoidDialogOpen] = useState(false);
     const [voidReason, setVoidReason] = useState('');
     const [targetInvoiceId, setTargetInvoiceId] = useState<string | null>(null);
+
+    // Hard Delete State
+    const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+    const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null);
     
     const userProfileRef = useMemoFirebase(() => {
         if (!firestore || !user) return null;
@@ -108,7 +113,6 @@ import {
         return filtered.sort((a,b) => b.date.localeCompare(a.date));
     }, [invoices, activeTab, searchQuery, dateRange]);
 
-    // --- REFINEMENT: VOID & REVERSAL FLOW ---
     const handleVoidInvoice = async () => {
         if (!firestore || !targetInvoiceId || !voidReason || !user) return;
         const safeId = targetInvoiceId.replace(/\//g, '_');
@@ -133,6 +137,29 @@ import {
             setTargetInvoiceId(null);
         } catch (e) {
             toast({ variant: 'destructive', title: "Gagal Membatalkan", description: "Kesalahan sistem." });
+        }
+    };
+
+    const handleHardDelete = async () => {
+        if (!firestore || !deleteTargetId || !isSuperAdmin) return;
+        
+        const safeId = deleteTargetId.replace(/\//g, '_');
+        const invoiceRef = doc(firestore, 'invoices', safeId);
+        const identityRef = doc(firestore, 'invoiceNumbers', safeId);
+
+        try {
+            // Delete from both collections to fully release the number
+            await deleteDoc(invoiceRef);
+            await deleteDoc(identityRef).catch(() => {}); // Identity might not exist if constructed from ERP direct
+            
+            toast({ 
+                title: "Data Dihapus Permanen", 
+                description: `Nomor ${deleteTargetId} kini telah dilepaskan dan dapat digunakan kembali.` 
+            });
+            setDeleteDialogOpen(false);
+            setDeleteTargetId(null);
+        } catch (e) {
+            toast({ variant: 'destructive', title: "Gagal Menghapus", description: "Anda tidak memiliki izin atau terjadi kesalahan koneksi." });
         }
     };
 
@@ -210,7 +237,6 @@ import {
                                     filteredInvoices.map((invoice) => {
                                     const isERP = !(invoice.id.startsWith('SAR') || invoice.id.startsWith('KW'));
                                     
-                                    // --- REFINEMENT: PARTIAL PAYMENT STATUS ---
                                     const totalPaid = invoice.payments?.reduce((s, p) => s + p.amount, 0) || (invoice.status === 'paid' ? invoice.amount : 0);
                                     const outstandingDoc = Math.max(0, invoice.amount - totalPaid);
                                     let displayStatus = invoice.status;
@@ -264,6 +290,14 @@ import {
                                                         {isSuperAdmin && invoice.status !== 'finalized' && invoice.status !== 'cancelled' && (
                                                             <DropdownMenuItem onClick={() => handleFinalize(invoice.id)} className="text-indigo-600 font-bold"><ShieldCheck className="mr-2 h-4 w-4" /> Finalisasi (Lock)</DropdownMenuItem>
                                                         )}
+                                                        {isSuperAdmin && (
+                                                            <DropdownMenuItem 
+                                                                className="text-red-600 font-bold" 
+                                                                onClick={() => { setDeleteTargetId(invoice.id); setDeleteDialogOpen(true); }}
+                                                            >
+                                                                <Trash2 className="mr-2 h-4 w-4" /> Hapus Permanen (Cleansing)
+                                                            </DropdownMenuItem>
+                                                        )}
                                                         {invoice.status !== 'cancelled' && (
                                                             <DropdownMenuItem className="text-destructive font-bold" onClick={() => { setTargetInvoiceId(invoice.id); setVoidDialogOpen(true); }}>
                                                                 <XCircle className="mr-2 h-4 w-4" /> Batal / VOID
@@ -282,6 +316,7 @@ import {
             </CardContent>
         </Card>
 
+        {/* Void Dialog */}
         <Dialog open={voidDialogOpen} onOpenChange={setVoidDialogOpen}>
             <DialogContent className="sm:max-w-[400px]">
                 <DialogHeader>
@@ -301,6 +336,24 @@ import {
                 <DialogFooter>
                     <Button variant="outline" onClick={() => setVoidDialogOpen(false)}>Batal</Button>
                     <Button variant="destructive" onClick={handleVoidInvoice} disabled={!voidReason}>SIMPAN SEBAGAI VOID</Button>
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
+
+        {/* Hard Delete Confirmation */}
+        <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+            <DialogContent className="sm:max-w-[400px]">
+                <DialogHeader>
+                    <DialogTitle className="text-red-600 flex items-center gap-2">
+                        <AlertTriangle className="h-5 w-5" /> Hapus Permanen (Cleansing)
+                    </DialogTitle>
+                    <DialogDescription>
+                        Tindakan ini tidak dapat dibatalkan. Seluruh data invoice <b>{deleteTargetId}</b> akan dihapus total dan nomor tersebut akan dilepaskan agar bisa digunakan kembali.
+                    </DialogDescription>
+                </DialogHeader>
+                <DialogFooter className="mt-4">
+                    <Button variant="outline" onClick={() => setDeleteDialogOpen(false)}>Batal</Button>
+                    <Button variant="destructive" onClick={handleHardDelete} className="font-black uppercase">YA, HAPUS PERMANEN</Button>
                 </DialogFooter>
             </DialogContent>
         </Dialog>

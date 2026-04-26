@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useEffect, useState, useMemo } from 'react';
@@ -47,13 +48,28 @@ import {
   Tag,
   MessageSquare,
   CreditCard,
-  Eye
+  Eye,
+  Search,
+  Check
 } from 'lucide-react';
-import { type Invoice, type SalesOrder, type UserProfile, type Customer, type InvoiceItem, type InvoiceNumber, type VirtualAccount } from '@/app/lib/data';
+import { type Invoice, type SalesOrder, type UserProfile, type Customer, type InvoiceItem, type InvoiceNumber, type VirtualAccount, type ProductListItem } from '@/app/lib/data';
 import { useToast } from '@/hooks/use-toast';
 import { useFirestore, useCollection, useMemoFirebase, useUser, useDoc, errorEmitter, FirestorePermissionError } from '@/firebase';
 import { collection, query, doc, setDoc, arrayUnion } from 'firebase/firestore';
 import { Badge } from '@/components/ui/badge';
+import {
+    Command,
+    CommandEmpty,
+    CommandGroup,
+    CommandInput,
+    CommandItem,
+    CommandList,
+  } from '@/components/ui/command';
+import {
+    Popover,
+    PopoverContent,
+    PopoverTrigger,
+} from '@/components/ui/popover';
 
 export default function AddInvoicePage() {
   const router = useRouter();
@@ -94,6 +110,9 @@ export default function AddInvoicePage() {
   const vaCollection = useMemoFirebase(() => firestore ? query(collection(firestore, 'virtualAccounts')) : null, [firestore]);
   const { data: allVas } = useCollection<VirtualAccount>(vaCollection);
 
+  const productsCollection = useMemoFirebase(() => firestore ? query(collection(firestore, 'products')) : null, [firestore]);
+  const { data: masterProducts } = useCollection<ProductListItem>(productsCollection);
+
   // --- FORM STATES ---
   const [items, setItems] = useState<InvoiceItem[]>([]);
   const [billingAddress, setBillingAddress] = useState('');
@@ -104,6 +123,7 @@ export default function AddInvoicePage() {
   const [isDpInvoice, setIsDpInvoice] = useState(false);
   const [isOverBillingAllowed, setIsOverBillingAllowed] = useState(false);
   const [selectedVaId, setSelectedVaId] = useState<string>('manual');
+  const [productPopoverOpen, setProductPopoverOpen] = useState(false);
 
   // --- CALCULATION STATES ---
   const [subtotal, setSubtotal] = useState(0);
@@ -135,14 +155,12 @@ export default function AddInvoicePage() {
     return Math.max(0, totalDpInvoiced - totalDpUsed);
   }, [allInvoices, identityData]);
 
-  // Available VAs for current customer
   const availableVas = useMemo(() => {
     const activeIdentity = existingInvoiceData || identityData;
     if (!allVas || !activeIdentity) return [];
     return allVas.filter(va => va.customerName === activeIdentity.customer);
   }, [allVas, existingInvoiceData, identityData]);
 
-  // RELAXED REDIRECT
   useEffect(() => {
       const isInitialLoad = (invoiceNumberIdParam && isIdentityLoading) || (editInvoiceId && isExistingLoading);
       if (!isInitialLoad && !identityData && !existingInvoiceData && !editInvoiceId && !invoiceNumberIdParam) {
@@ -197,6 +215,9 @@ export default function AddInvoicePage() {
           if (existingInvoiceData.paymentMethod) {
             setSelectedVaId(existingInvoiceData.paymentMethod);
           }
+          if (existingInvoiceData.erpInvoiceId) {
+            setInternalNote(existingInvoiceData.erpInvoiceId);
+          }
       }
   }, [identityData, customerListData, allSoItems, editInvoiceId, allInvoices, existingInvoiceData]);
 
@@ -238,11 +259,28 @@ export default function AddInvoicePage() {
     setTotalAmount(formatNumberWithCommas(grand));
   }, [items, negotiationValue, negotiationMode, dpValue, dpMode, retentionValue, retentionMode, dpDeductionValue, dpDeductionMode, isTaxManual, dppVat, vat12, isDpInvoice, dpBalance, toast]);
 
+  const handleProductSelect = (product: ProductListItem) => {
+      const newItem: InvoiceItem = {
+          id: `manual-${Date.now()}`,
+          name: product.name,
+          originalName: 'Manual Addition',
+          quantity: 1,
+          originalQty: 0,
+          unit: product.unit,
+          price: product.price,
+          originalPrice: 0,
+          total: product.price,
+          varianceReason: 'Additional charge from master catalog'
+      };
+      setItems([...items, newItem]);
+      setProductPopoverOpen(false);
+      toast({ title: "Item Ditambahkan", description: `${product.name} telah ditambahkan ke invoice.` });
+  };
+
   const handleSaveInvoice = async (invoiceStatus: any = 'sent', redirectToPreview = false) => {
     const activeIdentity = existingInvoiceData || identityData;
     if (!firestore || !user || !activeIdentity) return;
 
-    // VALIDATION: Variance Reasons
     const needsReason = items.some(item => 
         (item.quantity + (item.prevInvoicedQty || 0)) !== (item.originalQty || 0) || 
         item.price !== item.originalPrice || 
@@ -311,7 +349,6 @@ export default function AddInvoicePage() {
         .then(() => {
             toast({ title: "Invoice Berhasil Disimpan" });
             if (redirectToPreview) {
-                // Prepare session storage for immediate preview feel
                 const previewData = {
                   id: activeIdentity.id,
                   erpInvoiceId: internalNote,
@@ -465,10 +502,9 @@ export default function AddInvoicePage() {
                         ) : items.map(item => {
                             const totalBillQty = item.quantity + (item.prevInvoicedQty || 0);
                             const isOverInvoiced = totalBillQty > (item.originalQty || 0);
-                            const isUnderInvoiced = totalBillQty < (item.originalQty || 0) && item.quantity > 0;
                             const isPriceChanged = item.price !== item.originalPrice;
                             const isNameChanged = item.name !== item.originalName;
-                            const hasVariance = isOverInvoiced || isUnderInvoiced || isPriceChanged || isNameChanged;
+                            const hasVariance = isOverInvoiced || isPriceChanged || isNameChanged;
 
                             return (
                                 <TableRow key={item.id} className={cn("border-b-slate-100 dark:border-b-slate-800 transition-colors", isOverInvoiced && !isOverBillingAllowed && "bg-red-50/50")}>
@@ -550,9 +586,46 @@ export default function AddInvoicePage() {
                     </TableBody>
                 </Table>
                 <div className="p-4 bg-slate-50/30 border-t flex justify-between items-center">
-                    <Button variant="outline" size="sm" onClick={() => setItems([...items, { id: Date.now().toString(), name: 'Item Baru', quantity: 0, unit: 'm', price: 0, total: 0, originalName: 'Manual Entry', originalPrice: 0, originalQty: 0, varianceReason: 'Manual addition' }])} className="border-dashed h-8 text-[9px] font-black uppercase text-indigo-600 hover:text-indigo-700" disabled={isLocked}>
-                        <Plus className="mr-2 h-3 w-3" /> Tambah Baris Manual
-                    </Button>
+                    <Popover open={productPopoverOpen} onOpenChange={setProductPopoverOpen}>
+                        <PopoverTrigger asChild>
+                            <Button 
+                                variant="outline" 
+                                size="sm" 
+                                className="border-dashed h-8 text-[9px] font-black uppercase text-indigo-600 hover:text-indigo-700" 
+                                disabled={isLocked}
+                            >
+                                <Plus className="mr-2 h-3 w-3" /> Tambah Baris (Master Produk)
+                            </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-[400px] p-0 shadow-2xl border-indigo-200" align="start">
+                            <Command>
+                                <CommandInput placeholder="Cari di Master Produk..." className="h-10" />
+                                <CommandList className="max-h-[300px]">
+                                    <CommandEmpty>Produk tidak ditemukan.</CommandEmpty>
+                                    <CommandGroup>
+                                        {masterProducts?.map((p) => (
+                                            <CommandItem
+                                                key={p.id}
+                                                value={`${p.name}|${p.id}`}
+                                                onSelect={() => handleProductSelect(p)}
+                                                className="flex flex-col items-start gap-1 p-3 border-b last:border-0"
+                                            >
+                                                <div className="flex items-center justify-between w-full">
+                                                    <span className="font-bold text-slate-800 uppercase text-xs">{p.name}</span>
+                                                    <span className="text-[10px] font-black text-indigo-600">Rp {p.price.toLocaleString()}</span>
+                                                </div>
+                                                <div className="flex gap-2 text-[8px] font-black text-slate-400 uppercase tracking-widest">
+                                                    <span>Stock: {p.quantity} {p.unit}</span>
+                                                    <span>•</span>
+                                                    <span>Cat: {p.category}</span>
+                                                </div>
+                                            </CommandItem>
+                                        ))}
+                                    </CommandGroup>
+                                </CommandList>
+                            </Command>
+                        </PopoverContent>
+                    </Popover>
                     <div className="flex items-center gap-2 text-[10px] font-black text-slate-400 italic uppercase tracking-widest opacity-50">
                         <Scale className="h-3 w-3" /> Financial Audit Ready
                     </div>
@@ -629,7 +702,6 @@ export default function AddInvoicePage() {
                 </div>
               </div>
 
-              {/* Payment Identity & VA Selection */}
               <div className="bg-blue-50/30 dark:bg-blue-900/10 p-4 rounded-xl space-y-4 border border-blue-100 dark:border-blue-900/50">
                   <div className="flex justify-between items-center">
                       <Label className="text-[9px] font-black uppercase text-blue-600 tracking-widest flex items-center gap-1.5">
