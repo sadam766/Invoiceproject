@@ -1,326 +1,180 @@
-
 {
   "entities": {
-    "Product": {
-      "$schema": "http://json-schema.org/draft-07/schema#",
-      "title": "Product",
-      "type": "object",
-      "description": "Represents a product in the sales dashboard.",
-      "properties": {
-        "id": {
-          "type": "string",
-          "description": "Unique identifier for the product."
-        },
-        "name": {
-          "type": "string",
-          "description": "Name of the product."
-        },
-        "description": {
-          "type": "string",
-          "description": "Description of the product."
-        },
-        "price": {
-          "type": "number",
-          "description": "Price of the product."
-        }
-      },
-      "required": [
-        "id",
-        "name",
-        "description",
-        "price"
-      ]
-    },
     "Customer": {
       "$schema": "http://json-schema.org/draft-07/schema#",
       "title": "Customer",
       "type": "object",
-      "description": "Represents a customer with multiple addresses.",
+      "description": "Represents a customer who has made purchases in the sales system.",
       "properties": {
         "id": {
-          "type": "string"
-        },
-        "name": {
           "type": "string",
-          "description": "Legal name of the customer (Pusat)."
+          "description": "Unique identifier for the Customer entity."
+        },
+        "firstName": {
+          "type": "string",
+          "description": "The first name of the customer."
+        },
+        "lastName": {
+          "type": "string",
+          "description": "The last name of the customer."
         },
         "email": {
           "type": "string",
+          "description": "The email address of the customer.",
           "format": "email"
         },
-        "addresses": {
-          "type": "array",
-          "items": {
-            "type": "object",
-            "properties": {
-              "id": { "type": "string" },
-              "label": { "type": "string", "description": "e.g. Kantor Pusat, Gudang A" },
-              "address": { "type": "string" },
-              "npwp": { "type": "string" },
-              "isDefault": { "type": "boolean" }
-            }
-          }
+        "phone": {
+          "type": "string",
+          "description": "The phone number of the customer."
         },
-        "ownerId": {
-          "type": "string"
+        "address": {
+          "type": "string",
+          "description": "The physical address of the customer."
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "Timestamp when the customer record was created.",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "firstName",
+        "lastName",
+        "email",
+        "createdAt"
+      ]
+    },
+    "Product": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Product",
+      "type": "object",
+      "description": "Represents a product available for sale in the sales system.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the Product entity."
+        },
+        "name": {
+          "type": "string",
+          "description": "The name of the product."
+        },
+        "description": {
+          "type": "string",
+          "description": "A detailed description of the product."
+        },
+        "price": {
+          "type": "number",
+          "description": "The current unit price of the product."
+        },
+        "sku": {
+          "type": "string",
+          "description": "Stock Keeping Unit (SKU) for the product."
+        },
+        "imageUrl": {
+          "type": "string",
+          "description": "URL to the product image.",
+          "format": "uri"
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "Timestamp when the product record was created.",
+          "format": "date-time"
         }
       },
       "required": [
         "id",
         "name",
-        "ownerId"
+        "price",
+        "createdAt"
       ]
     },
     "Sale": {
       "$schema": "http://json-schema.org/draft-07/schema#",
       "title": "Sale",
       "type": "object",
-      "description": "Represents a sale transaction in the sales dashboard.",
+      "description": "Represents a single sales transaction or order made by a customer.",
       "properties": {
-        "soNumber": {
+        "id": {
           "type": "string",
-          "description": "Unique identifier for the sale transaction (Sales Order number)."
+          "description": "Unique identifier for the Sale entity (e.g., invoice ID)."
         },
-        "customer": {
+        "customerId": {
           "type": "string",
-          "description": "Name of the customer."
+          "description": "Reference to Customer. (Relationship: Customer 1:N Sale)"
         },
-        "sales": {
+        "saleDate": {
           "type": "string",
-          "description": "Name of the salesperson."
+          "description": "Date and time when the sale occurred.",
+          "format": "date-time"
         },
-        "poNumber": {
-          "type": "string",
-          "description": "Purchase Order number from the customer."
-        },
-        "amount": {
+        "totalAmount": {
           "type": "number",
-          "description": "Total amount of the sale transaction."
+          "description": "The total amount of the sale, including all items and taxes."
         },
         "status": {
           "type": "string",
-          "description": "Status of the sale transaction.",
-          "enum": [
-            "Paid",
-            "Unpaid"
-          ]
+          "description": "The current status of the sale (e.g., 'Pending', 'Completed', 'Canceled')."
         },
-        "paidDate": {
+        "createdAt": {
           "type": "string",
-          "description": "Date the sale was paid.",
-          "format": "date"
+          "description": "Timestamp when the sale record was created.",
+          "format": "date-time"
         },
-        "ownerId": {
+        "updatedAt": {
           "type": "string",
-          "description": "The UID of the user who owns this document."
-        }
-      },
-      "required": [
-        "soNumber",
-        "customer",
-        "sales",
-        "poNumber",
-        "amount",
-        "status",
-        "ownerId"
-      ]
-    },
-    "Invoice": {
-      "title": "Invoice",
-      "description": "Represents an invoice document.",
-      "type": "object",
-      "properties": {
-        "id": {
-          "type": "string"
-        },
-        "soNumber": {
-          "type": "string"
-        },
-        "poNumber": {
-          "type": "string"
-        },
-        "customer": {
-          "type": "string"
-        },
-        "billingAddress": {
-          "type": "string"
-        },
-        "billingNpwp": {
-          "type": "string"
-        },
-        "date": {
-          "type": "string",
-          "format": "date"
-        },
-        "amount": {
-          "type": "number"
-        },
-        "status": {
-          "type": "string",
-          "enum": [
-            "paid",
-            "unpaid",
-            "sent",
-            "draft"
-          ]
-        },
-        "spdNumber": {
-          "type": "string",
-          "description": "Linked SPD number if any."
-        },
-        "ownerId": {
-          "type": "string"
+          "description": "Timestamp when the sale record was last updated.",
+          "format": "date-time"
         }
       },
       "required": [
         "id",
-        "soNumber",
-        "customer",
-        "date",
-        "amount",
+        "customerId",
+        "saleDate",
+        "totalAmount",
         "status",
-        "ownerId"
+        "createdAt"
       ]
     },
-    "SPD": {
-      "title": "SPD",
-      "description": "Surat Pengantar Dokumen (Document Delivery Letter).",
+    "SaleItem": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "SaleItem",
       "type": "object",
+      "description": "Represents an individual product item included within a specific sales transaction.",
       "properties": {
         "id": {
           "type": "string",
-          "description": "The SPD Number (e.g. SPD/2024/05/001)"
+          "description": "Unique identifier for the SaleItem entity."
         },
-        "date": {
+        "saleId": {
           "type": "string",
-          "format": "date"
+          "description": "Reference to Sale. (Relationship: Sale 1:N SaleItem)"
         },
-        "courier": {
+        "productId": {
           "type": "string",
-          "description": "Name of the courier or expedition."
+          "description": "Reference to Product. (Relationship: Product 1:N SaleItem)"
         },
-        "invoices": {
-          "type": "array",
-          "items": {
-            "type": "object",
-            "properties": {
-              "invoiceId": { "type": "string" },
-              "customer": { "type": "string" },
-              "address": { "type": "string" },
-              "status": { "type": "string", "enum": ["pending", "received", "rejected"] }
-            }
-          }
+        "quantity": {
+          "type": "number",
+          "description": "The quantity of the product sold in this item."
         },
-        "status": {
-          "type": "string",
-          "enum": ["in_delivery", "received", "rejected"]
+        "unitPrice": {
+          "type": "number",
+          "description": "The price of a single unit of the product at the time of sale."
         },
-        "ownerId": {
-          "type": "string"
+        "subtotal": {
+          "type": "number",
+          "description": "The subtotal for this item (quantity * unitPrice)."
         }
       },
       "required": [
         "id",
-        "date",
-        "courier",
-        "ownerId"
+        "saleId",
+        "productId",
+        "quantity",
+        "unitPrice",
+        "subtotal"
       ]
-    },
-    "TaxInvoice": {
-      "title": "Tax Invoice",
-      "description": "Represents a tax invoice document.",
-      "type": "object",
-      "properties": {
-        "taxInvoiceNumber": {
-          "type": "string"
-        },
-        "buyerNpwp": {
-          "type": "string"
-        },
-        "buyerName": {
-          "type": "string"
-        },
-        "status": {
-          "type": "string"
-        },
-        "taxInvoiceDate": {
-          "type": "string",
-          "format": "date"
-        },
-        "invoiceNumber": {
-          "type": "string"
-        },
-        "ownerId": {
-          "type": "string"
-        }
-      },
-      "required": [
-        "taxInvoiceNumber",
-        "buyerNpwp",
-        "buyerName",
-        "status",
-        "taxInvoiceDate",
-        "invoiceNumber",
-        "ownerId"
-      ]
-    },
-    "SalesOrder": {
-        "title": "Sales Order Item",
-        "description": "Represents a single line item within a sales order.",
-        "type": "object",
-        "properties": {
-            "id": {
-                "type": "string"
-            },
-            "soNumber": {
-                "type": "string"
-            },
-            "customer": {
-                "type": "string"
-            },
-            "productName": {
-                "type": "string"
-            },
-            "category": {
-                "type": "string"
-            },
-            "quantity": {
-                "type": "number"
-            },
-            "unit": {
-                "type": "string"
-            },
-            "price": {
-                "type": "number"
-            },
-            "ownerId": {
-                "type": "string"
-            }
-        },
-        "required": [
-            "id",
-            "soNumber",
-            "customer",
-            "productName",
-            "quantity",
-            "unit",
-            "price",
-            "ownerId"
-        ]
-    },
-    "VirtualAccount": {
-      "title": "Virtual Account",
-      "description": "Represents a customer's Virtual Account for payments.",
-      "type": "object",
-      "properties": {
-        "id": { "type": "string" },
-        "customerCode": { "type": "string" },
-        "customerName": { "type": "string" },
-        "bankName": { "type": "string" },
-        "vaNumber": { "type": "string" },
-        "ownerId": { "type": "string" }
-      },
-      "required": ["customerName", "bankName", "vaNumber", "ownerId"]
     }
   },
   "auth": {
@@ -330,59 +184,108 @@
     ]
   },
   "firestore": {
-    "/products/{productId}": {
-      "schema": {
-        "$ref": "#/entities/Product"
+    "structure": [
+      {
+        "path": "/users/{userId}",
+        "definition": {
+          "entityName": "User",
+          "schema": {
+            "$ref": "#/backend/entities/User"
+          },
+          "description": "Stores user profile information, associated with `request.auth.uid`. While not explicitly defined in the provided entities, it's a standard pattern for authenticated applications. This could store roles or specific user preferences. The `userId` parameter matches the Firebase Authentication UID.",
+          "params": [
+            {
+              "name": "userId",
+              "description": "The unique identifier of the user, corresponding to Firebase Authentication UID."
+            }
+          ]
+        }
       },
-      "description": "Stores product information."
-    },
-    "/customers/{customerId}": {
-      "schema": {
-        "$ref": "#/entities/Customer"
+      {
+        "path": "/admin_roles/{userId}",
+        "definition": {
+          "entityName": "AdminRole",
+          "schema": {
+            "$ref": "#/backend/entities/AdminRole"
+          },
+          "description": "A collection used for Database Access Control. The existence of a document for a specific `userId` in this collection signifies that the user has administrative privileges within the system. This allows for simple and robust role-based access control without custom claims.",
+          "params": [
+            {
+              "name": "userId",
+              "description": "The unique identifier of the user who is granted an administrator role."
+            }
+          ]
+        }
       },
-      "description": "Stores customer data."
-    },
-    "/sales/{saleId}": {
-      "schema": {
-        "$ref": "#/entities/Sale"
+      {
+        "path": "/customers/{customerId}",
+        "definition": {
+          "entityName": "Customer",
+          "schema": {
+            "$ref": "#/backend/entities/Customer"
+          },
+          "description": "Stores all customer records. Documents in this collection are accessible to all authenticated sales staff. Includes server-side `createdAt` timestamp protection.",
+          "params": [
+            {
+              "name": "customerId",
+              "description": "The unique identifier for a specific customer."
+            }
+          ]
+        }
       },
-      "description": "Stores sale transaction data."
-    },
-    "/invoices/{invoiceId}": {
-      "schema": {
-        "$ref": "#/entities/Invoice"
+      {
+        "path": "/products/{productId}",
+        "definition": {
+          "entityName": "Product",
+          "schema": {
+            "$ref": "#/backend/entities/Product"
+          },
+          "description": "Stores all product records available for sale. Documents in this collection are accessible to all authenticated sales staff. Includes server-side `createdAt` timestamp protection.",
+          "params": [
+            {
+              "name": "productId",
+              "description": "The unique identifier for a specific product."
+            }
+          ]
+        }
       },
-      "description": "Stores invoice documents."
-    },
-    "/users/{uid}": {
-      "description": "Stores user profile information, including their role."
-    },
-    "/salesOrders/{orderId}": {
-      "schema": {
-          "$ref": "#/entities/SalesOrder"
+      {
+        "path": "/sales/{saleId}",
+        "definition": {
+          "entityName": "Sale",
+          "schema": {
+            "$ref": "#/backend/entities/Sale"
+          },
+          "description": "Stores all sales transactions (invoices). Each sale is linked to a `customerId`. Documents in this collection are accessible to all authenticated sales staff. Includes server-side `createdAt` and `updatedAt` timestamp protection.",
+          "params": [
+            {
+              "name": "saleId",
+              "description": "The unique identifier for a specific sales transaction or invoice."
+            }
+          ]
+        }
       },
-      "description": "Stores individual items of a sales order."
-    },
-    "/invoiceNumbers/{invoiceNumberId}": {
-      "description": "Stores generated invoice numbers."
-    },
-    "/spds/{spdId}": {
-      "schema": {
-        "$ref": "#/entities/SPD"
-      },
-      "description": "Stores SPD documents."
-    },
-    "/taxInvoices/{taxInvoiceId}": {
-      "schema": {
-        "$ref": "#/entities/TaxInvoice"
-      },
-      "description": "Stores tax invoice documents."
-    },
-    "/virtualAccounts/{vaId}": {
-      "schema": {
-        "$ref": "#/entities/VirtualAccount"
-      },
-      "description": "Stores customer Virtual Account information."
-    }
+      {
+        "path": "/sales/{saleId}/items/{saleItemId}",
+        "definition": {
+          "entityName": "SaleItem",
+          "schema": {
+            "$ref": "#/backend/entities/SaleItem"
+          },
+          "description": "A subcollection storing individual product items within a specific sales transaction. Each `SaleItem` is linked to a `productId`. Access is inherited from the parent `Sale` document, meaning these items are accessible to all authenticated sales staff without needing additional denormalized authorization fields.",
+          "params": [
+            {
+              "name": "saleId",
+              "description": "The unique identifier of the parent sales transaction."
+            },
+            {
+              "name": "saleItemId",
+              "description": "The unique identifier for a specific item within the sales transaction."
+            }
+          ]
+        }
+      }
+    ],
+    "reasoning": "The recommended Firestore structure is designed to be secure, scalable, and highly debuggable, adhering strictly to the provided CORE DESIGN PRINCIPLES and DESIGN STRATEGY MANDATES. The primary goal is to support a 'Sales Dashboard' application where authenticated users (sales staff) can view and manage sales-related data. \n\n**Authorization Independence (CRITICAL) & QAPs (Rules are not Filters):**\n\nThe structure achieves Authorization Independence by modeling `Customer`, `Product`, and `Sale` as top-level collections. Since the application implies a team-based sales environment where authorized staff generally have access to all sales data, there is no need for granular, user-specific ownership for these core business entities that would require denormalizing owner IDs into every document. Access can be granted simply based on the user's authentication status (`request.auth.uid != null`). This significantly simplifies security rules, eliminating the need for `get()` calls within rules to check parent document permissions.\n\nFor `SaleItem` documents, which are nested under `Sale` documents (e.g., `/sales/{saleId}/items/{saleItemId}`), their authorization is inherently tied to the parent `Sale`. Because `Sale` documents are designed to be accessible by all authorized sales staff, the `SaleItem` documents within them can inherit this access without requiring additional denormalization for authorization purposes. The `saleId` in the path provides direct context for rules without needing to fetch the parent `Sale` document.\n\nThis design directly supports **QAPs (Query as a Permission)** for `list` operations. By ensuring that all documents within a given collection (or subcollection, where the parent's access is uniform) share the same security posture for the target user group (authenticated sales staff), `list` queries will inherently return all documents the user is authorized to see. There are no implicit filters enforced by security rules via `get()` operations, which would break `list` queries. For instance, an authenticated user can `list` all `/customers`, all `/products`, and all `/sales` without issues.\n\n**Structural Segregation & Access Modeling:**\n\nEach collection (`/customers`, `/products`, `/sales`, `/sales/{saleId}/items`) holds documents with a homogeneous security posture. All `Customer` documents are accessible to authorized staff, same for `Product`, `Sale`, and `SaleItem`. This avoids mixing data with different access requirements in the same collection, making security rules straightforward (e.g., `allow read, write: if request.auth != null;`).\n\nPath-based ownership is used for user-specific data (e.g., `/users/{userId}` for profile information) and continues hierarchically for nested entities like `SaleItem`s within `Sale`s. An `admin_roles` collection is included for DBAC, where the existence of a document (`/admin_roles/{userId}`) grants administrative privileges.\n\n**Data Clarity and Predictability:**\n\nStandard fields like `createdAt` and `updatedAt` (implicitly expected for entities) will be protected by rules to ensure server-side timestamps. The `status` field in `Sale` explicitly models the sales state. Wildcards are descriptive (`{customerId}`, `{saleId}`), enhancing readability and debuggability of rules."
   }
 }
