@@ -10,7 +10,7 @@ import {
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Plus, Calendar as CalendarIcon, Check, ChevronsUpDown, Database, Hash, FilePlus, Info, Search } from 'lucide-react';
+import { Plus, Calendar as CalendarIcon, Check, ChevronsUpDown, Database, Hash, FilePlus, Info, Search, AlertTriangle } from 'lucide-react';
 import { Checkbox } from '@/components/ui/checkbox';
 import {
   Popover,
@@ -43,10 +43,11 @@ type AddInvoiceNumberDialogProps = {
   invoiceData?: InvoiceNumber;
   onAddClick: () => void;
   allInvoiceNumbers: InvoiceNumber[] | null;
+  initialPoNumber?: string;
 };
 
 
-export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceData, onAddClick, allInvoiceNumbers }: AddInvoiceNumberDialogProps) {
+export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceData, onAddClick, allInvoiceNumbers, initialPoNumber }: AddInvoiceNumberDialogProps) {
   const firestore = useFirestore();
   const [date, setDate] = useState<Date | undefined>(new Date());
   const [invoiceType, setInvoiceType] = useState<'sar' | 'kw'>('sar');
@@ -110,7 +111,6 @@ export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceDa
     if (matchedPo) {
       setCustomer(matchedPo.customer);
       if (matchedPo.soNumber) setSalesOrder(matchedPo.soNumber);
-      // Optional toast for user feedback
       console.log(`PO Match Found: ${matchedPo.customer}`);
     }
   }, [poNumber, masterSalesList, invoiceData]);
@@ -216,11 +216,11 @@ export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceDa
           
           setCustomer('');
           setSalesOrder('');
-          setPoNumber('');
+          setPoNumber(initialPoNumber || '');
           setDate(new Date());
           setErpNumberInput('');
       }
-  }, [isOpen, invoiceData]);
+  }, [isOpen, invoiceData, initialPoNumber]);
 
   useEffect(() => {
       if (isAutoNumber && !invoiceData && isOpen && numberSource === 'manual') {
@@ -443,6 +443,12 @@ export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceDa
                     placeholder="PO-ABC-2024" 
                     className="font-bold bg-background"
                 />
+                {poNumber && existingInvoices?.some(inv => inv.poNumber === poNumber) && (
+                    <div className="flex items-center gap-2 bg-amber-50 p-2 rounded border border-amber-200 mt-1">
+                        <AlertTriangle className="h-3 w-3 text-amber-600" />
+                        <span className="text-[9px] font-bold text-amber-700 uppercase">Peringatan: Invoice untuk PO ini sudah pernah terbit sebelumnya.</span>
+                    </div>
+                )}
               </div>
               <div className="space-y-2">
                 <Label className="text-[10px] font-black uppercase text-muted-foreground">Tgl Registrasi</Label>

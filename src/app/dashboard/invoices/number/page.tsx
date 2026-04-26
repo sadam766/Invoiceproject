@@ -144,11 +144,9 @@ import {
           createdBy: userProfile?.displayName || user.email || 'System'
       };
 
-      // KRITIKAL: Atomic Booking. Pastikan data tersimpan di DB sebelum navigasi Constructor
       try {
           await setDoc(docRef, dataToSave, { merge: true });
           
-          // Jika aksi adalah 'create', buat juga entry 'DRAFT' di koleksi invoices utama untuk mengunci nomor secara global
           if (action === 'create') {
               const invoiceDocRef = doc(firestore, 'invoices', safeId);
               await setDoc(invoiceDocRef, {
@@ -216,6 +214,7 @@ import {
                         invoiceData={editingInvoice}
                         onAddClick={handleAddClick}
                         allInvoiceNumbers={invoices}
+                        initialPoNumber={poNumberParam || undefined}
                        />
                     </div>
                 </div>
