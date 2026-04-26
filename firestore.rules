@@ -1,3 +1,4 @@
+
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
@@ -7,34 +8,30 @@ service cloud.firestore {
       return request.auth != null;
     }
 
-    function isOwner(userId) {
-      return isSignedIn() && request.auth.uid == userId;
-    }
-
     function isAdmin() {
       return isSignedIn() && (
-        exists(/databases/$(database)/documents/admin_roles/$(request.auth.uid)) ||
-        request.auth.token.email.toLowerCase() == 'fa@gmail.com'
+        request.auth.token.email.toLowerCase() == 'fa@gmail.com' ||
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin'
       );
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
     }
 
     // --- Collection Rules ---
 
     match /users/{userId} {
-      allow get, list: if isOwner(userId) || isAdmin();
-      allow create: if isOwner(userId);
+      // Allow any signed-in user to read profile info for selection/audit logging
+      allow read: if isSignedIn();
+      // Registration is allowed for anyone signed in
+      allow create: if isSignedIn();
+      // Only owner or admin can update status/roles
       allow update: if isOwner(userId) || isAdmin();
       allow delete: if isAdmin();
     }
 
-    match /admin_roles/{userId} {
-      allow get: if isSignedIn();
-      allow list, write: if isAdmin();
-    }
-
-    // Koleksi Bisnis (Akses bersama untuk tim yang sudah login)
-    // Termasuk: customers, products, sales, salesOrders, invoices, invoiceNumbers, spds, taxInvoices, virtualAccounts
-    
+    // Shared Business Collections (Standard Access for Operations Team)
     match /customers/{id} { allow read, write: if isSignedIn(); }
     match /products/{id} { allow read, write: if isSignedIn(); }
     match /sales/{id} { allow read, write: if isSignedIn(); }

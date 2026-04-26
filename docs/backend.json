@@ -1,3 +1,4 @@
+
 {
   "entities": {
     "User": {
@@ -18,7 +19,8 @@
         "id": { "type": "string" },
         "name": { "type": "string" },
         "email": { "type": "string" },
-        "addresses": { "type": "array" }
+        "addresses": { "type": "array" },
+        "createdBy": { "type": "string" }
       }
     },
     "Invoice": {
@@ -26,11 +28,58 @@
       "type": "object",
       "properties": {
         "id": { "type": "string" },
+        "erpInvoiceId": { "type": "string" },
+        "soNumber": { "type": "string" },
         "poNumber": { "type": "string" },
         "customer": { "type": "string" },
         "amount": { "type": "number" },
         "status": { "type": "string" },
+        "date": { "type": "string" },
+        "items": { "type": "array" },
+        "revisionLogs": { "type": "array" }
+      }
+    },
+    "InvoiceNumber": {
+      "title": "Invoice Identity",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "customer": { "type": "string" },
+        "salesOrder": { "type": "string" },
+        "poNumber": { "type": "string" },
         "date": { "type": "string" }
+      }
+    },
+    "SalesOrder": {
+      "title": "Sales Order Item",
+      "type": "object",
+      "properties": {
+        "soNumber": { "type": "string" },
+        "productName": { "type": "string" },
+        "quantity": { "type": "number" },
+        "price": { "type": "number" },
+        "customer": { "type": "string" }
+      }
+    },
+    "SalesListItem": {
+      "title": "Purchase Order Registry",
+      "type": "object",
+      "properties": {
+        "poNumber": { "type": "string" },
+        "customer": { "type": "string" },
+        "amount": { "type": "number" },
+        "paidOffline": { "type": "number" },
+        "status": { "type": "string" }
+      }
+    },
+    "Product": {
+      "title": "Product Inventory",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "category": { "type": "string" },
+        "quantity": { "type": "number" },
+        "price": { "type": "number" }
       }
     },
     "SpdData": {
@@ -40,7 +89,27 @@
         "id": { "type": "string" },
         "date": { "type": "string" },
         "courier": { "type": "string" },
+        "invoices": { "type": "array" },
         "status": { "type": "string" }
+      }
+    },
+    "TaxInvoice": {
+      "title": "Tax Document",
+      "type": "object",
+      "properties": {
+        "taxInvoiceNumber": { "type": "string" },
+        "buyerName": { "type": "string" },
+        "invoiceNumber": { "type": "string" },
+        "status": { "type": "string" }
+      }
+    },
+    "VirtualAccount": {
+      "title": "Virtual Account",
+      "type": "object",
+      "properties": {
+        "customerName": { "type": "string" },
+        "bankName": { "type": "string" },
+        "vaNumber": { "type": "string" }
       }
     }
   },
@@ -58,19 +127,35 @@
     },
     "/invoices/{id}": {
       "schema": "#/entities/Invoice",
-      "description": "Billing documents"
+      "description": "Billing documents with item progress"
+    },
+    "/invoiceNumbers/{id}": {
+      "schema": "#/entities/InvoiceNumber",
+      "description": "Identity registry for SAR/ERP numbers"
+    },
+    "/salesOrders/{id}": {
+      "schema": "#/entities/SalesOrder",
+      "description": "Sales Order contract items"
+    },
+    "/sales/{id}": {
+      "schema": "#/entities/SalesListItem",
+      "description": "Global PO registry"
+    },
+    "/products/{id}": {
+      "schema": "#/entities/Product",
+      "description": "Master product inventory"
     },
     "/spds/{id}": {
       "schema": "#/entities/SpdData",
       "description": "Document dispatch tracking"
     },
-    "/sales/{id}": {
-      "schema": "object",
-      "description": "Purchase Orders registry"
+    "/taxInvoices/{id}": {
+      "schema": "#/entities/TaxInvoice",
+      "description": "Tax invoice synchronization"
     },
-    "/products/{id}": {
-      "schema": "object",
-      "description": "Product inventory"
+    "/virtualAccounts/{id}": {
+      "schema": "#/entities/VirtualAccount",
+      "description": "Customer payment accounts"
     }
   }
 }
