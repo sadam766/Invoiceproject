@@ -1,4 +1,3 @@
-
 'use client';
 import {
   Dialog,
@@ -15,6 +14,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import type { SalesListItem, Invoice, TaxInvoice } from '@/app/lib/data';
 import { cn } from '@/lib/utils';
 import { History, CreditCard, ExternalLink, ReceiptText, Calendar, CheckCircle2, Wallet, Banknote, AlertCircle, RefreshCw } from 'lucide-react';
