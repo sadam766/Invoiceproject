@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useMemo, useState, useEffect } from 'react';
@@ -138,7 +137,6 @@ export default function DashboardPage() {
   const stats = useMemo(() => {
     if (!salesList) return { outstanding: 0, realization: 0, target: 0, taxPending: 0 };
     
-    // Invoices are the primary source for current period outstanding
     const currentOutstanding = filteredInvoices
       .filter(i => i.status !== 'paid' && i.status !== 'cancelled')
       .reduce((sum, i) => {
@@ -146,7 +144,6 @@ export default function DashboardPage() {
           return sum + (i.amount - paidAmount);
       }, 0);
     
-    // Realization = System Paid Invoices + Paid Offline of active POs
     const systemRealization = filteredInvoices
       .filter(i => i.status !== 'cancelled')
       .reduce((sum, i) => {
@@ -154,12 +151,8 @@ export default function DashboardPage() {
           return sum + paidAmount;
       }, 0);
 
-    // Filter active sales in this period (Legacy POs with adjustments count as realized)
     const activeSales = salesList.filter(s => s.status !== 'Cancelled');
     const target = activeSales.reduce((sum, s) => sum + s.amount, 0);
-    
-    // Add Legacy payments to realization if they fall within the filtered period POs
-    // (Simplified: showing current period invoice performance + legacy adjustments for context)
     const legacyPaid = activeSales.reduce((sum, s) => sum + (s.paidOffline || 0), 0);
     
     const taxPending = filteredInvoices.filter(inv => 
@@ -181,13 +174,13 @@ export default function DashboardPage() {
   }, [filteredInvoices, spdList]);
 
   return (
-    <main className="flex flex-1 flex-col gap-4 p-4 md:gap-8 md:p-8 max-w-[1600px] mx-auto">
+    <main className="flex flex-1 flex-col gap-4 p-4 md:gap-8 md:p-8 max-w-[1600px] mx-auto bg-background">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight uppercase font-black">Dakota Command Center</h1>
-          <div className="text-muted-foreground font-medium flex items-center gap-2 text-sm">
+          <h1 className="text-2xl font-black tracking-tighter uppercase text-slate-900 dark:text-slate-50">Dakota Command Center</h1>
+          <div className="text-slate-400 font-medium flex items-center gap-2 text-sm">
             Global overview of Dakota business performance. 
-            <Badge variant="secondary" className="bg-primary/10 text-primary text-[10px] font-black uppercase">
+            <Badge variant="secondary" className="bg-indigo-600/10 text-indigo-600 text-[10px] font-black uppercase tracking-widest border-indigo-100">
                 {format(dateRange.from, 'dd/MM')} - {format(dateRange.to, 'dd/MM/yy')}
             </Badge>
           </div>
@@ -196,49 +189,52 @@ export default function DashboardPage() {
       </div>
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-        <Card className="border-l-4 border-l-red-500 shadow-sm">
+        <Card className="border-none shadow-sm ring-1 ring-slate-200 dark:ring-slate-800 bg-white dark:bg-slate-900 overflow-hidden">
+          <div className="h-1 w-full bg-amber-500" />
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Total Outstanding</CardTitle>
-            <Wallet className="h-4 w-4 text-red-500" />
+            <CardTitle className="text-[10px] font-black uppercase text-slate-400 tracking-widest">Total Outstanding</CardTitle>
+            <Wallet className="h-4 w-4 text-amber-500" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-black">Rp {stats.outstanding.toLocaleString('id-ID')}</div>
-            <p className="text-[10px] text-muted-foreground mt-1 font-bold">Piutang belum tertagih di periode ini.</p>
+            <div className="text-2xl font-black text-slate-900 dark:text-slate-50">Rp {stats.outstanding.toLocaleString('id-ID')}</div>
+            <p className="text-[10px] text-slate-400 mt-1 font-bold uppercase tracking-tight">Piutang belum tertagih (Unpaid)</p>
           </CardContent>
         </Card>
 
-        <Card className="border-l-4 border-l-blue-500 shadow-sm">
+        <Card className="border-none shadow-sm ring-1 ring-slate-200 dark:ring-slate-800 bg-white dark:bg-slate-900 overflow-hidden">
+          <div className="h-1 w-full bg-emerald-500" />
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Realisasi (Paid)</CardTitle>
-            <CheckCircle2 className="h-4 w-4 text-blue-500" />
+            <CardTitle className="text-[10px] font-black uppercase text-slate-400 tracking-widest">Realisasi (Paid)</CardTitle>
+            <CheckCircle2 className="h-4 w-4 text-emerald-500" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-black">Rp {stats.realization.toLocaleString('id-ID')}</div>
-            <p className="text-[10px] text-muted-foreground mt-1 font-bold">Dana masuk (Termasuk Saldo Migrasi).</p>
+            <div className="text-2xl font-black text-slate-900 dark:text-slate-50">Rp {stats.realization.toLocaleString('id-ID')}</div>
+            <p className="text-[10px] text-slate-400 mt-1 font-bold uppercase tracking-tight">Dana Masuk & Saldo Migrasi</p>
           </CardContent>
         </Card>
 
-        <Card className="border-l-4 border-l-teal-500 shadow-sm">
+        <Card className="border-none shadow-sm ring-1 ring-slate-200 dark:ring-slate-800 bg-white dark:bg-slate-900 overflow-hidden">
+          <div className="h-1 w-full bg-indigo-600" />
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Pajak Pending</CardTitle>
-            <ReceiptText className="h-4 w-4 text-teal-500" />
+            <CardTitle className="text-[10px] font-black uppercase text-slate-400 tracking-widest">Pajak Pending</CardTitle>
+            <ReceiptText className="h-4 w-4 text-indigo-600" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-black">{stats.taxPending} <span className="text-xs font-normal">Docs</span></div>
-            <p className="text-[10px] text-muted-foreground mt-1 font-bold">Menunggu input Nomor Faktur Pajak.</p>
+            <div className="text-2xl font-black text-slate-900 dark:text-slate-50">{stats.taxPending} <span className="text-xs font-normal">Docs</span></div>
+            <p className="text-[10px] text-slate-400 mt-1 font-bold uppercase tracking-tight">Menunggu Input Faktur Pajak</p>
           </CardContent>
         </Card>
       </div>
 
       <div className="grid gap-4 lg:grid-cols-7">
-        <Card className="lg:col-span-4 shadow-md">
-          <CardHeader className="border-b bg-muted/5">
+        <Card className="lg:col-span-4 shadow-md border-none ring-1 ring-slate-200 dark:ring-slate-800">
+          <CardHeader className="border-b bg-slate-50/50 dark:bg-slate-900/50">
             <div className="flex items-center justify-between">
                 <div>
-                    <CardTitle className="text-sm font-black uppercase flex items-center gap-2 tracking-tighter">
-                        <BarChart3 className="h-4 w-4 text-primary" /> Daily Activity Chart
+                    <CardTitle className="text-sm font-black uppercase flex items-center gap-2 tracking-widest text-slate-900 dark:text-slate-50">
+                        <BarChart3 className="h-4 w-4 text-indigo-600" /> Daily Activity Chart
                     </CardTitle>
-                    <CardDescription className="text-[10px] font-bold">Volume penerbitan invoice 7 hari terakhir.</CardDescription>
+                    <CardDescription className="text-[10px] font-bold text-slate-400 uppercase tracking-tight mt-1">Volume penerbitan invoice 7 hari terakhir.</CardDescription>
                 </div>
             </div>
           </CardHeader>
@@ -247,14 +243,14 @@ export default function DashboardPage() {
               <ChartContainer config={activityChartConfig}>
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart data={chartData}>
-                    <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--border))" />
                     <XAxis 
                         dataKey="day" 
                         axisLine={false} 
                         tickLine={false} 
-                        style={{ fontSize: '10px', fontWeight: 'bold' }}
+                        style={{ fontSize: '10px', fontWeight: 'bold', fill: 'hsl(var(--muted-foreground))' }}
                     />
-                    <YAxis axisLine={false} tickLine={false} style={{ fontSize: '10px' }} />
+                    <YAxis axisLine={false} tickLine={false} style={{ fontSize: '10px', fill: 'hsl(var(--muted-foreground))' }} />
                     <ChartTooltip content={<ChartTooltipContent />} />
                     <Bar 
                         dataKey="count" 
@@ -269,38 +265,38 @@ export default function DashboardPage() {
           </CardContent>
         </Card>
 
-        <Card className="lg:col-span-3 shadow-md">
-            <CardHeader className="border-b bg-muted/5">
-                <CardTitle className="text-sm font-black uppercase flex items-center gap-2 tracking-tighter">
-                    <Clock className="h-4 w-4 text-orange-500" /> Today's Milestones
+        <Card className="lg:col-span-3 shadow-md border-none ring-1 ring-slate-200 dark:ring-slate-800">
+            <CardHeader className="border-b bg-slate-50/50 dark:bg-slate-900/50">
+                <CardTitle className="text-sm font-black uppercase flex items-center gap-2 tracking-widest text-slate-900 dark:text-slate-50">
+                    <Clock className="h-4 w-4 text-amber-500" /> Today's Milestones
                 </CardTitle>
-                <CardDescription className="text-[10px] font-bold">Invoice terbaru yang diterbitkan hari ini.</CardDescription>
+                <CardDescription className="text-[10px] font-bold text-slate-400 uppercase tracking-tight mt-1">Invoice terbaru yang diterbitkan hari ini.</CardDescription>
             </CardHeader>
             <CardContent className="p-0">
-                <div className="divide-y">
+                <div className="divide-y divide-slate-100 dark:divide-slate-800">
                     {todayMilestones.length > 0 ? todayMilestones.map(inv => (
-                        <div key={inv.id} className="p-4 hover:bg-muted/30 transition-colors flex items-center justify-between group">
+                        <div key={inv.id} className="p-4 hover:bg-indigo-50/20 dark:hover:bg-indigo-900/10 transition-colors flex items-center justify-between group">
                             <div className="flex flex-col gap-0.5">
-                                <span className="text-xs font-black text-primary group-hover:underline cursor-pointer" onClick={() => router.push('/dashboard/invoices')}>
+                                <span className="text-xs font-black text-indigo-600 group-hover:underline cursor-pointer" onClick={() => router.push('/dashboard/invoices')}>
                                     {inv.id}
                                 </span>
-                                <span className="text-[10px] font-bold uppercase truncate max-w-[150px]">{inv.customer}</span>
+                                <span className="text-[10px] font-bold uppercase truncate max-w-[150px] text-slate-600 dark:text-slate-400">{inv.customer}</span>
                             </div>
                             <div className="text-right">
-                                <p className="text-xs font-black">Rp {inv.amount.toLocaleString('id-ID')}</p>
-                                <Badge variant="outline" className="text-[8px] h-3.5 px-1 font-black uppercase">{inv.status}</Badge>
+                                <p className="text-xs font-black text-slate-900 dark:text-slate-50">Rp {inv.amount.toLocaleString('id-ID')}</p>
+                                <Badge variant="outline" className="text-[8px] h-3.5 px-1 font-black uppercase border-slate-200 dark:border-slate-700">{inv.status}</Badge>
                             </div>
                         </div>
                     )) : (
-                        <div className="py-20 text-center text-muted-foreground opacity-30 flex flex-col items-center gap-2">
+                        <div className="py-20 text-center text-slate-400 opacity-30 flex flex-col items-center gap-2">
                             <PackageCheck className="h-10 w-10" />
-                            <p className="text-xs font-bold">Belum ada aktivitas hari ini.</p>
+                            <p className="text-xs font-bold uppercase tracking-widest">Belum ada aktivitas hari ini.</p>
                         </div>
                     )}
                 </div>
                 {todayMilestones.length > 0 && (
-                    <div className="p-3 border-t bg-muted/10 text-center">
-                        <Button variant="ghost" size="sm" className="text-[10px] font-black uppercase h-7" onClick={() => router.push('/dashboard/invoices')}>
+                    <div className="p-3 border-t bg-slate-50/50 dark:bg-slate-900/50 text-center">
+                        <Button variant="ghost" size="sm" className="text-[10px] font-black uppercase h-7 text-indigo-600 tracking-widest" onClick={() => router.push('/dashboard/invoices')}>
                             View All Invoices <ArrowRight className="ml-1 h-3 w-3" />
                         </Button>
                     </div>
@@ -310,26 +306,26 @@ export default function DashboardPage() {
       </div>
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-         <Card className="bg-indigo-50/20 border-indigo-100">
+         <Card className="bg-indigo-50/20 dark:bg-indigo-900/10 border-indigo-100 dark:border-indigo-900/50">
             <CardHeader className="pb-2">
-                <CardTitle className="text-[10px] font-black uppercase text-indigo-700 flex items-center gap-2 tracking-widest">
+                <CardTitle className="text-[10px] font-black uppercase text-indigo-600 flex items-center gap-2 tracking-widest">
                     <Truck className="h-4 w-4" /> Logistic Readiness
                 </CardTitle>
             </CardHeader>
             <CardContent>
-                <div className="text-2xl font-black">{logisticStats.pendingShipment} <span className="text-xs font-normal">Ready to Ship</span></div>
-                <Progress value={(logisticStats.pendingShipment / (filteredInvoices.length || 1)) * 100} className="h-1.5 mt-3" />
+                <div className="text-2xl font-black text-slate-900 dark:text-slate-50">{logisticStats.pendingShipment} <span className="text-xs font-normal text-slate-400">Ready to Ship</span></div>
+                <Progress value={(logisticStats.pendingShipment / (filteredInvoices.length || 1)) * 100} className="h-1.5 mt-3 bg-indigo-100 dark:bg-indigo-900" />
             </CardContent>
          </Card>
-         <Card className="bg-amber-50/20 border-amber-100">
+         <Card className="bg-amber-50/20 dark:bg-amber-900/10 border-amber-100 dark:border-amber-900/50">
             <CardHeader className="pb-2">
-                <CardTitle className="text-[10px] font-black uppercase text-amber-700 flex items-center gap-2 tracking-widest">
+                <CardTitle className="text-[10px] font-black uppercase text-amber-600 flex items-center gap-2 tracking-widest">
                     <AlertTriangle className="h-4 w-4" /> Aging Documents
                 </CardTitle>
             </CardHeader>
             <CardContent>
-                <div className="text-2xl font-black">{logisticStats.inTransit} <span className="text-xs font-normal">On Delivery</span></div>
-                <p className="text-[10px] text-muted-foreground mt-2 font-medium italic">Dokumen fisik sedang dibawa kurir.</p>
+                <div className="text-2xl font-black text-slate-900 dark:text-slate-50">{logisticStats.inTransit} <span className="text-xs font-normal text-slate-400">On Delivery</span></div>
+                <p className="text-[10px] text-slate-500 mt-2 font-medium italic">Dokumen fisik sedang dalam perjalanan kurir.</p>
             </CardContent>
          </Card>
       </div>
