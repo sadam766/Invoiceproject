@@ -44,7 +44,7 @@ import {
     const firestore = useFirestore();
     const { user } = useUser();
 
-    const [editingSale, setEditingSale] = useState<SalesListItem | undefined>(undefined);
+    const [editingSale, setEditingSale] = useState<SalesListItem & { id?: string } | undefined>(undefined);
     const [isDialogOpen, setIsDialogOpen] = useState(false);
     const [searchQuery, setSearchQuery] = useState('');
     const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
@@ -53,7 +53,7 @@ import {
     const [voidDialogOpen, setVoidDialogOpen] = useState(false);
     const [voidReason, setVoidReason] = useState('');
     const [targetPoId, setTargetPoId] = useState<string | null>(null);
-    const [hardDeleteDialogOpen, setHardDeleteDialogOpen] = useState(false);
+    const [hardDeleteState, setHardDeleteState] = useState<{ isOpen: boolean; docId?: string; poNumber?: string }>({ isOpen: false });
 
     // SO Update State
     const [soUpdateState, setSoUpdateState] = useState<{ isOpen: boolean; poNumber?: string; currentSo?: string }>({ isOpen: false });
@@ -132,27 +132,28 @@ import {
             });
     };
 
-    const handleHardDeletePo = () => {
-        if (!firestore || !targetPoId || !isSuperAdmin) return;
+    const handleHardDeletePo = async () => {
+        if (!firestore || !hardDeleteState.docId || !isSuperAdmin) return;
         
-        const safeId = targetPoId.replace(/\//g, '_');
-        const docRef = doc(firestore, 'sales', safeId);
+        const docRef = doc(firestore, 'sales', hardDeleteState.docId);
         
-        deleteDoc(docRef)
-            .then(() => {
-                toast({ 
-                    title: "PO Dihapus Permanen", 
-                    description: `Data PO ${targetPoId} telah dihapus sepenuhnya dari database.` 
-                });
-                setHardDeleteDialogOpen(false);
-                setTargetPoId(null);
-            })
-            .catch(async (serverError) => {
-                errorEmitter.emit('permission-error', new FirestorePermissionError({
-                    path: docRef.path,
-                    operation: 'delete',
-                }));
+        try {
+            // KRITIKAL: Menunggu konfirmasi nyata dari server
+            await deleteDoc(docRef);
+            
+            toast({ 
+                title: "PO Dihapus Permanen", 
+                description: `Data PO ${hardDeleteState.poNumber} telah dihapus sepenuhnya dari database.` 
             });
+            
+            setHardDeleteState({ isOpen: false });
+        } catch (error: any) {
+            // Mengirimkan error ke arsitektur contextual error handling
+            errorEmitter.emit('permission-error', new FirestorePermissionError({
+                path: docRef.path,
+                operation: 'delete',
+            }));
+        }
     };
 
     const handleUpdateSo = () => {
@@ -175,7 +176,6 @@ import {
                 setSoUpdateState({ isOpen: false });
             })
             .catch(async (serverError) => {
-                // Batch errors are harder to contextualize but we'll emit for the main ref
                 errorEmitter.emit('permission-error', new FirestorePermissionError({
                     path: docRef.path,
                     operation: 'update',
@@ -243,7 +243,7 @@ import {
         <Card className="shadow-md border-none ring-1 ring-border">
             <CardContent className="pt-6">
                 <div className="flex justify-between items-center mb-6">
-                    <div className="relative w-1/3">
+                    <div className="relative w-full md:w-1/3">
                         <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
                         <Input placeholder="Cari PO, Customer..." className="pl-8 bg-muted/20 border-none font-medium" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} />
                     </div>
@@ -267,8 +267,8 @@ import {
                                 <TableRow><TableCell colSpan={7} className="text-center py-20 font-bold text-muted-foreground">Memuat Database Sales...</TableCell></TableRow>
                             ) : filteredSales.length === 0 ? (
                                 <TableRow><TableCell colSpan={7} className="text-center py-20 text-muted-foreground font-medium italic">Belum ada data PO terdaftar.</TableCell></TableRow>
-                            ) : filteredSales.map((sale) => (
-                                <TableRow key={sale.poNumber} className={cn("hover:bg-muted/5 border-b last:border-0", selectedIds.has(sale.poNumber) ? "bg-muted/30" : "", sale.status === 'Cancelled' && "opacity-40 grayscale")}>
+                            ) : filteredSales.map((sale: any) => (
+                                <TableRow key={sale.id || sale.poNumber} className={cn("hover:bg-muted/5 border-b last:border-0", selectedIds.has(sale.poNumber) ? "bg-muted/30" : "", sale.status === 'Cancelled' && "opacity-40 grayscale")}>
                                     <TableCell><Checkbox checked={selectedIds.has(sale.poNumber)} onCheckedChange={() => setSelectedIds(prev => { const n = new Set(prev); n.has(sale.poNumber) ? n.delete(sale.poNumber) : n.add(sale.poNumber); return n; })} /></TableCell>
                                     <TableCell className="font-black text-slate-800">{sale.poNumber}</TableCell>
                                     <TableCell className="text-xs font-bold uppercase text-slate-600">{sale.customer}</TableCell>
@@ -336,7 +336,7 @@ import {
                                                     {isSuperAdmin && (
                                                         <DropdownMenuItem 
                                                             className="text-red-600 font-bold" 
-                                                            onSelect={(e) => { e.preventDefault(); setTargetPoId(sale.poNumber); setHardDeleteDialogOpen(true); }}
+                                                            onSelect={(e) => { e.preventDefault(); setHardDeleteState({ isOpen: true, docId: sale.id, poNumber: sale.poNumber }); }}
                                                         >
                                                             <Trash2 className="mr-2 h-4 w-4" /> Hapus Permanen
                                                         </DropdownMenuItem>
@@ -373,8 +373,8 @@ import {
 
         {/* Hard Delete Dialog */}
         <DeleteConfirmationDialog 
-            open={hardDeleteDialogOpen}
-            onOpenChange={setHardDeleteDialogOpen}
+            open={hardDeleteState.isOpen}
+            onOpenChange={(open) => setHardDeleteState(prev => ({ ...prev, isOpen: open }))}
             onConfirm={handleHardDeletePo}
         >
             <div className="hidden" />

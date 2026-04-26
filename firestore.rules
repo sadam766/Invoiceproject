@@ -10,11 +10,9 @@ service cloud.firestore {
     // isAdmin: Memverifikasi otoritas leader atau administrator
     function isAdmin() {
       return isSignedIn() && (
-        (request.auth.token.email != null && request.auth.token.email == 'fa@gmail.com') ||
-        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && (
-          get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin' ||
-          get(/databases/$(database)/documents/users/$(request.auth.uid)).data.email == 'fa@gmail.com'
-        ))
+        request.auth.token.email == 'fa@gmail.com' ||
+        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
+         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin')
       );
     }
 
@@ -44,10 +42,10 @@ service cloud.firestore {
     match /customers/{id} { allow read, write: if isSignedIn(); }
     match /products/{id} { allow read, write: if isSignedIn(); }
     
-    // Sales: Izin hapus dibatasi khusus untuk Leader/Admin
+    // Sales: Akses Hapus diberikan prioritas tinggi untuk Leader Utama
     match /sales/{id} { 
       allow read, create, update: if isSignedIn(); 
-      allow delete: if isAdmin(); 
+      allow delete: if request.auth.token.email == 'fa@gmail.com' || isAdmin(); 
     }
     
     match /salesOrders/{id} { allow read, write: if isSignedIn(); }
