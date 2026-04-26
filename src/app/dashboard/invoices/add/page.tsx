@@ -41,7 +41,8 @@ import {
   Database,
   Lock,
   History,
-  AlertCircle
+  AlertCircle,
+  TrendingUp
 } from 'lucide-react';
 import { type Invoice, type SalesOrder, type UserProfile, type Customer, type InvoiceItem, type InvoiceNumber } from '@/app/lib/data';
 import { useToast } from '@/hooks/use-toast';
@@ -112,7 +113,6 @@ export default function AddInvoicePage() {
   // --- PROTEKSI & REDIRECT ---
   useEffect(() => {
       if (!isIdentityLoading && !identityData && !editInvoiceId) {
-          toast({ variant: "destructive", title: "Akses Ditolak", description: "Identitas Invoice tidak ditemukan. Mohon pilih nomor terlebih dahulu." });
           router.replace('/dashboard/invoices/number');
       }
   }, [identityData, isIdentityLoading, editInvoiceId, router]);
@@ -129,17 +129,28 @@ export default function AddInvoicePage() {
 
           if (allSoItems) {
               const relatedItems = allSoItems.filter(item => item.soNumber === identityData.salesOrder);
-              setItems(relatedItems.map((item, idx) => ({
-                  id: idx.toString(),
-                  name: item.productName,
-                  quantity: item.quantity,
-                  unit: item.unit,
-                  price: item.price,
-                  total: item.quantity * item.price
-              })));
+              setItems(relatedItems.map((item, idx) => {
+                  // Partial Billing Logic: Find previously invoiced Qty for this item
+                  const prevQty = allInvoices?.filter(inv => inv.soNumber === item.soNumber && inv.status !== 'cancelled')
+                                  .reduce((sum, inv) => {
+                                      const matchingItem = inv.items?.find(i => i.name === item.productName);
+                                      return sum + (matchingItem?.quantity || 0);
+                                  }, 0) || 0;
+
+                  return {
+                      id: item.id || idx.toString(),
+                      name: item.productName,
+                      quantity: item.quantity - prevQty, // Default to remaining
+                      unit: item.unit,
+                      price: item.price,
+                      total: (item.quantity - prevQty) * item.price,
+                      originalQty: item.quantity,
+                      prevInvoicedQty: prevQty
+                  };
+              }));
           }
       }
-  }, [identityData, customerListData, allSoItems, editInvoiceId]);
+  }, [identityData, customerListData, allSoItems, editInvoiceId, allInvoices]);
 
   // --- LOGIC: EDIT MODE POPULATION ---
   useEffect(() => {
@@ -241,59 +252,45 @@ export default function AddInvoicePage() {
 
   const activeIdentity = existingInvoiceData || identityData;
   if (isIdentityLoading || (!activeIdentity && !editInvoiceId)) {
-      return <div className="flex h-[80vh] items-center justify-center font-bold text-muted-foreground animate-pulse">Syncing Constructor with Database...</div>;
+      return <div className="flex h-[80vh] items-center justify-center font-bold text-slate-400 animate-pulse uppercase tracking-widest">Architectural Handshake in Progress...</div>;
   }
 
   const isLocked = (existingInvoiceData?.status === 'finalized' || existingInvoiceData?.status === 'paid') && !isSuperAdmin;
-
-  // OVERDUE CHECK LOGIC
-  const customerInvoices = allInvoices?.filter(i => i.customer === activeIdentity?.customer && i.id !== activeIdentity?.id);
-  const overdueCount = customerInvoices?.filter(i => i.status !== 'paid' && i.dueDate && new Date(i.dueDate) < new Date()).length || 0;
 
   return (
     <main className="flex flex-1 flex-col gap-4 p-4 md:gap-8 md:p-8 max-w-[1600px] mx-auto bg-background">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
-            <Button variant="outline" size="icon" onClick={() => router.back()} className="rounded-full">
+            <Button variant="outline" size="icon" onClick={() => router.back()} className="rounded-full border-slate-200">
                 <ChevronLeft className="h-4 w-4" />
             </Button>
             <div>
                 <h1 className="text-2xl font-black tracking-tight uppercase text-slate-900 dark:text-slate-50">Invoice Constructor</h1>
                 <div className="text-slate-400 text-[10px] font-bold uppercase tracking-widest flex items-center gap-1.5 mt-0.5">
-                    Identitas Terkunci <Badge variant="secondary" className="text-[8px] bg-emerald-100 text-emerald-700 h-3.5"><Lock className="h-2 w-2 mr-1" /> Database Persistent</Badge>
+                    Stage 3: Financial Building & Progres <Badge variant="secondary" className="text-[8px] bg-indigo-50 text-indigo-600 h-3.5"><Lock className="h-2 w-2 mr-1" /> Data Persistent</Badge>
                 </div>
             </div>
         </div>
         <div className="flex items-center gap-3 bg-indigo-50/50 px-4 py-2 rounded-xl border border-indigo-100/50">
             <div className="flex items-center gap-2">
-                <Label className="text-[10px] font-black uppercase text-indigo-600 tracking-widest">Mode Tagihan:</Label>
+                <Label className="text-[10px] font-black uppercase text-indigo-600 tracking-widest">Mode Penagihan:</Label>
                 <Badge 
                     variant={isDpInvoice ? "default" : "outline"} 
                     className={cn("text-[9px] uppercase cursor-pointer transition-all", isDpInvoice ? "bg-indigo-600 shadow-md" : "text-indigo-600 border-indigo-200")} 
                     onClick={() => !isLocked && setIsDpInvoice(!isDpInvoice)}
                 >
-                   {isDpInvoice ? "Down Payment (DP)" : "Tagihan Barang / Progress"}
+                   {isDpInvoice ? "Down Payment (DP)" : "Tagihan Barang / Progres"}
                 </Badge>
             </div>
         </div>
       </div>
 
-      {overdueCount > 0 && (
-          <div className="bg-amber-50 border-2 border-amber-200 p-4 rounded-xl flex items-center gap-3 animate-in fade-in slide-in-from-top-4 duration-500">
-              <AlertCircle className="h-6 w-6 text-amber-600" />
-              <div className="flex-1">
-                  <p className="text-sm font-black uppercase text-amber-800 tracking-tight">Credit Warning: Overdue Detected</p>
-                  <p className="text-xs text-amber-700 font-medium">Customer ini memiliki <b>{overdueCount} tagihan</b> yang sudah melewati jatuh tempo. Harap konfirmasi pembayaran sebelum melanjutkan.</p>
-              </div>
-          </div>
-      )}
-
       <div className="grid gap-6 lg:grid-cols-7 items-start">
         <div className="lg:col-span-5 space-y-6">
-          <Card className={cn("shadow-sm border-none ring-1 ring-border bg-muted/5", isLocked && "opacity-60")}>
-            <CardHeader className="bg-muted/30 border-b py-3">
+          <Card className={cn("shadow-sm border-none ring-1 ring-slate-200 dark:ring-slate-800 bg-white dark:bg-slate-900", isLocked && "opacity-60")}>
+            <CardHeader className="bg-slate-50/50 dark:bg-slate-800/50 border-b py-3">
                 <CardTitle className="text-[10px] font-black uppercase flex items-center gap-2 text-slate-400 tracking-widest">
-                    <ReceiptText className="h-4 w-4" /> Identitas Penagihan (ReadOnly)
+                    <ReceiptText className="h-4 w-4" /> Identitas Penagihan (Locked Context)
                 </CardTitle>
             </CardHeader>
             <CardContent className="p-6">
@@ -307,30 +304,30 @@ export default function AddInvoicePage() {
                   </div>
 
                   <div className="space-y-1.5">
-                      <Label className="text-[9px] font-black uppercase text-slate-400 tracking-widest">Customer</Label>
-                      <div className="bg-white dark:bg-slate-900 px-3 py-2 rounded-md border border-slate-200 text-xs font-black uppercase truncate">{activeIdentity?.customer}</div>
+                      <Label className="text-[9px] font-black uppercase text-slate-400 tracking-widest">Customer Profile</Label>
+                      <div className="bg-slate-50 dark:bg-slate-800 px-3 py-2 rounded-md border border-slate-200 text-xs font-black uppercase truncate">{activeIdentity?.customer}</div>
                   </div>
 
                   <div className="space-y-1.5">
-                      <Label className="text-[9px] font-black uppercase text-slate-400 tracking-widest">Referensi PO / SO</Label>
-                      <div className="bg-white dark:bg-slate-900 px-3 py-2 rounded-md border border-slate-200 text-xs font-mono font-bold truncate">
+                      <Label className="text-[9px] font-black uppercase text-slate-400 tracking-widest">Ref PO / SO Hub</Label>
+                      <div className="bg-slate-50 dark:bg-slate-800 px-3 py-2 rounded-md border border-slate-200 text-xs font-mono font-bold truncate">
                           {activeIdentity?.poNumber} {((activeIdentity as any).salesOrder || activeIdentity?.soNumber) && `• ${(activeIdentity as any).salesOrder || activeIdentity?.soNumber}`}
                       </div>
                   </div>
 
                   <div className="md:col-span-2 space-y-1.5">
-                      <Label className="text-[9px] font-black uppercase text-slate-400 tracking-widest">Alamat Penagihan & NPWP</Label>
+                      <Label className="text-[9px] font-black uppercase text-slate-400 tracking-widest">Billing Address & NPWP</Label>
                       <Input value={billingAddress} onChange={e => setBillingAddress(e.target.value)} className="font-medium h-9 text-xs" placeholder="Alamat lengkap..." disabled={isLocked} />
-                      <Input value={billingNpwp} onChange={e => setBillingNpwp(e.target.value)} className="font-mono text-[10px] mt-2 h-8 bg-muted/30 text-slate-500" placeholder="NPWP..." disabled={isLocked} />
+                      <Input value={billingNpwp} onChange={e => setBillingNpwp(e.target.value)} className="font-mono text-[10px] mt-2 h-8 bg-slate-50 dark:bg-slate-800 text-slate-500" placeholder="NPWP..." disabled={isLocked} />
                   </div>
 
                   <div className="space-y-1.5">
-                      <Label className="text-[9px] font-black uppercase text-slate-400 tracking-widest">Internal Note / ERP Ref</Label>
+                      <Label className="text-[9px] font-black uppercase text-slate-400 tracking-widest">Internal System Note</Label>
                       <Input 
                         value={internalNote} 
                         onChange={e => setInternalNote(e.target.value)} 
                         className="font-mono text-[10px] h-9" 
-                        placeholder="Catatan sistem..." 
+                        placeholder="Catatan pelacakan..." 
                         disabled={isLocked}
                       />
                   </div>
@@ -338,8 +335,8 @@ export default function AddInvoicePage() {
             </CardContent>
           </Card>
 
-          <Card className={cn("shadow-sm border-none ring-1 ring-border", isLocked && "opacity-60", isDpInvoice && "opacity-40 grayscale pointer-events-none")}>
-            <CardHeader className="bg-muted/30 border-b py-4">
+          <Card className={cn("shadow-sm border-none ring-1 ring-slate-200 dark:ring-slate-800 bg-white dark:bg-slate-900", isLocked && "opacity-60", isDpInvoice && "opacity-40 grayscale pointer-events-none")}>
+            <CardHeader className="bg-slate-50/50 dark:bg-slate-800/50 border-b py-4">
                 <div className="flex justify-between items-center">
                     <CardTitle className="text-sm font-black uppercase tracking-tight text-slate-800 dark:text-slate-200">Item Progress Tracking</CardTitle>
                     {isDpInvoice && <Badge variant="secondary" className="text-[8px] uppercase">Disabled in DP Mode</Badge>}
@@ -347,67 +344,62 @@ export default function AddInvoicePage() {
             </CardHeader>
             <CardContent className="p-0">
                 <Table>
-                    <TableHeader className="bg-muted/50">
-                        <TableRow className="border-b-slate-800">
+                    <TableHeader className="bg-slate-50 dark:bg-slate-800/50">
+                        <TableRow>
                             <TableHead className="text-[10px] font-black uppercase py-2 text-slate-400 tracking-widest">Nama Produk / Jasa</TableHead>
                             <TableHead className="w-[100px] text-center text-[10px] font-black uppercase py-2 text-slate-400 tracking-widest">Now Billing</TableHead>
+                            <TableHead className="w-[100px] text-center text-[10px] font-black uppercase py-2 text-slate-400 tracking-widest">Prev. Invoiced</TableHead>
                             <TableHead className="w-[80px] text-center text-[10px] font-black uppercase py-2 text-slate-400 tracking-widest">Unit</TableHead>
                             <TableHead className="w-[140px] text-right text-[10px] font-black uppercase py-2 text-slate-400 tracking-widest">Total (IDR)</TableHead>
                         </TableRow>
                     </TableHeader>
                     <TableBody>
                         {items.length === 0 ? (
-                            <TableRow><TableCell colSpan={4} className="text-center py-10 text-slate-400 italic text-xs">Belum ada item terdeteksi.</TableCell></TableRow>
-                        ) : items.map(item => (
-                            <TableRow key={item.id} className="border-b-slate-800/10">
-                                <TableCell><Input value={item.name} onChange={e => setItems(items.map(it => it.id === item.id ? { ...it, name: e.target.value } : it))} className="h-8 text-[11px] font-bold bg-transparent border-none shadow-none focus-visible:ring-0" disabled={isLocked} /></TableCell>
-                                <TableCell>
-                                    <Input 
-                                        value={item.quantity} 
-                                        onChange={e => {
-                                            const val = parseFormattedNumber(e.target.value);
-                                            setItems(items.map(it => it.id === item.id ? { ...it, quantity: val, total: val * it.price } : it));
-                                        }} 
-                                        className="text-center text-xs h-8 font-black bg-indigo-50/30 border-indigo-100" 
-                                        disabled={isLocked}
-                                    />
-                                </TableCell>
-                                <TableCell className="text-center text-[10px] font-bold uppercase text-slate-500">{item.unit}</TableCell>
-                                <TableCell className="text-right font-black text-xs text-slate-700 dark:text-slate-300">Rp {formatNumberWithCommas(item.total)}</TableCell>
-                            </TableRow>
-                        ))}
+                            <TableRow><TableCell colSpan={5} className="text-center py-10 text-slate-400 italic text-xs uppercase font-black tracking-widest opacity-30">Belum ada item terdeteksi.</TableCell></TableRow>
+                        ) : items.map(item => {
+                            const isOverInvoiced = (item.quantity + (item.prevInvoicedQty || 0)) > (item.originalQty || 0);
+                            return (
+                                <TableRow key={item.id} className={cn("border-b-slate-100 dark:border-b-slate-800 transition-colors", isOverInvoiced && "bg-red-50/50")}>
+                                    <TableCell>
+                                        <div className="flex flex-col">
+                                            <span className="text-[11px] font-bold text-slate-700 dark:text-slate-300">{item.name}</span>
+                                            <span className="text-[8px] font-black uppercase text-slate-400">Quota Total: {item.originalQty}</span>
+                                        </div>
+                                    </TableCell>
+                                    <TableCell>
+                                        <Input 
+                                            value={item.quantity} 
+                                            onChange={e => {
+                                                const val = parseFormattedNumber(e.target.value);
+                                                setItems(items.map(it => it.id === item.id ? { ...it, quantity: val, total: val * it.price } : it));
+                                            }} 
+                                            className={cn("text-center text-xs h-8 font-black shadow-none", isOverInvoiced ? "border-red-500 ring-1 ring-red-200" : "border-slate-200")} 
+                                            disabled={isLocked}
+                                        />
+                                    </TableCell>
+                                    <TableCell className="text-center text-[10px] font-black text-slate-400">{item.prevInvoicedQty || 0}</TableCell>
+                                    <TableCell className="text-center text-[10px] font-bold uppercase text-slate-500">{item.unit}</TableCell>
+                                    <TableCell className="text-right font-black text-xs text-slate-900 dark:text-slate-100">Rp {formatNumberWithCommas(item.total)}</TableCell>
+                                </TableRow>
+                            );
+                        })}
                     </TableBody>
                 </Table>
-                <div className="p-4 bg-muted/10 border-t flex justify-between items-center">
-                    <Button variant="outline" size="sm" onClick={() => setItems([...items, { id: Date.now().toString(), name: '', quantity: 1, unit: 'm', price: 0, total: 0 }])} className="border-dashed h-8 text-[9px] font-black uppercase text-indigo-600 hover:text-indigo-700" disabled={isLocked}>
+                <div className="p-4 bg-slate-50/30 border-t flex justify-between items-center">
+                    <Button variant="outline" size="sm" onClick={() => setItems([...items, { id: Date.now().toString(), name: '', quantity: 0, unit: 'm', price: 0, total: 0 }])} className="border-dashed h-8 text-[9px] font-black uppercase text-indigo-600 hover:text-indigo-700" disabled={isLocked}>
                         <Plus className="mr-2 h-3 w-3" /> Tambah Baris Manual
                     </Button>
-                    <p className="text-[10px] font-bold text-slate-400 italic uppercase tracking-tighter">Total {items.length} Baris Produk</p>
+                    <p className="text-[10px] font-black text-slate-400 italic uppercase tracking-widest opacity-50">Constructor Engine Ready</p>
                 </div>
             </CardContent>
           </Card>
-
-          {existingInvoiceData?.revisionLogs && (
-              <Card className="border-dashed bg-muted/5 opacity-60">
-                <CardHeader className="py-3 border-b"><CardTitle className="text-[9px] font-black uppercase flex items-center gap-2 tracking-widest"><History className="h-3 w-3" /> Audit Trail / Log Revisi</CardTitle></CardHeader>
-                <CardContent className="p-4 space-y-2">
-                    {existingInvoiceData.revisionLogs.slice(-3).map((log, i) => (
-                        <div key={i} className="text-[9px] flex justify-between border-b pb-1 last:border-0">
-                            <span className="font-bold text-indigo-600">{log.updatedBy}</span>
-                            <span className="text-slate-400 uppercase italic">{log.action}</span>
-                            <span className="font-mono">{format(new Date(log.updatedAt), 'dd/MM/yy HH:mm')}</span>
-                        </div>
-                    ))}
-                </CardContent>
-              </Card>
-          )}
         </div>
 
         <div className="lg:col-span-2 space-y-6 sticky top-24">
-          <Card className={cn("shadow-md border-none ring-1 ring-primary/20", isLocked && "opacity-80")}>
-            <CardHeader className="bg-primary/5 py-4 border-b">
+          <Card className={cn("shadow-md border-none ring-1 ring-indigo-100 dark:ring-indigo-900/50 bg-white dark:bg-slate-900", isLocked && "opacity-80")}>
+            <CardHeader className="bg-indigo-50/20 dark:bg-indigo-900/10 py-4 border-b">
                 <CardTitle className="text-[10px] font-black uppercase flex items-center justify-between tracking-widest text-slate-400">
-                    Summary Kalkulasi
+                    Audit Kalkulasi
                     {(existingInvoiceData?.status === 'finalized' || existingInvoiceData?.status === 'paid') && <ShieldCheck className="h-4 w-4 text-emerald-600" />}
                 </CardTitle>
             </CardHeader>
@@ -420,32 +412,32 @@ export default function AddInvoicePage() {
                 
                 <div className="space-y-1.5">
                     <div className="flex justify-between items-center">
-                        <Label className="text-[9px] font-black uppercase text-amber-600 tracking-tighter">Negotiation / Discount</Label>
+                        <Label className="text-[9px] font-black uppercase text-amber-600 tracking-tighter">Negotiation / Adjustment</Label>
                         <Select value={negotiationMode} onValueChange={(v: any) => setNegotiationMode(v)} disabled={isLocked}>
-                            <SelectTrigger className="h-5 w-14 text-[8px] font-black uppercase"><SelectValue /></SelectTrigger>
+                            <SelectTrigger className="h-5 w-14 text-[8px] font-black uppercase shadow-none border-none bg-amber-50 text-amber-700"><SelectValue /></SelectTrigger>
                             <SelectContent><SelectItem value="nominal">IDR</SelectItem><SelectItem value="percent">%</SelectItem></SelectContent>
                         </Select>
                     </div>
-                    <Input value={negotiationValue} onChange={e => setNegotiationValue(e.target.value)} className="h-8 text-right font-black text-amber-600 border-amber-100 bg-amber-50/20" placeholder="0" disabled={isLocked} />
+                    <Input value={negotiationValue} onChange={e => setNegotiationValue(e.target.value)} className="h-8 text-right font-black text-amber-600 border-amber-100 bg-amber-50/20 shadow-none" placeholder="0" disabled={isLocked} />
                 </div>
 
                 {isDpInvoice ? (
-                    <div className="space-y-1.5 bg-indigo-50/30 p-3 rounded-xl border border-indigo-100/50 shadow-inner">
+                    <div className="space-y-1.5 bg-indigo-50/30 p-3 rounded-xl border border-indigo-100 shadow-inner">
                         <div className="flex justify-between items-center">
                             <Label className="text-[9px] font-black uppercase text-indigo-700 tracking-tighter">Tagihan Down Payment</Label>
                             <Select value={dpMode} onValueChange={(v: any) => setDpMode(v)} disabled={isLocked}>
-                                <SelectTrigger className="h-5 w-14 text-[8px] font-black uppercase"><SelectValue /></SelectTrigger>
+                                <SelectTrigger className="h-5 w-14 text-[8px] font-black uppercase bg-white"><SelectValue /></SelectTrigger>
                                 <SelectContent><SelectItem value="nominal">IDR</SelectItem><SelectItem value="percent">%</SelectItem></SelectContent>
                             </Select>
                         </div>
                         <Input value={dpValue} onChange={e => setDpValue(e.target.value)} className="h-8 text-right font-black border-indigo-200 bg-white dark:bg-slate-900" placeholder="0" disabled={isLocked} />
                     </div>
                 ) : (
-                    <div className="space-y-1.5 bg-emerald-50/20 p-3 rounded-xl border border-emerald-100/50 shadow-inner">
+                    <div className="space-y-1.5 bg-emerald-50/20 p-3 rounded-xl border border-emerald-100 shadow-inner">
                         <div className="flex justify-between items-center">
-                            <Label className="text-[9px] font-black uppercase text-emerald-700 tracking-tighter">Deduction from DP</Label>
+                            <Label className="text-[9px] font-black uppercase text-emerald-700 tracking-tighter">Deduction from DP Balance</Label>
                             <Select value={dpDeductionMode} onValueChange={(v: any) => setDpDeductionMode(v)} disabled={isLocked}>
-                                <SelectTrigger className="h-5 w-14 text-[8px] font-black uppercase"><SelectValue /></SelectTrigger>
+                                <SelectTrigger className="h-5 w-14 text-[8px] font-black uppercase bg-white"><SelectValue /></SelectTrigger>
                                 <SelectContent><SelectItem value="nominal">IDR</SelectItem><SelectItem value="percent">%</SelectItem></SelectContent>
                             </Select>
                         </div>
@@ -455,9 +447,9 @@ export default function AddInvoicePage() {
 
                 <div className="space-y-1.5">
                     <div className="flex justify-between items-center">
-                        <Label className="text-[9px] font-black uppercase text-slate-400 tracking-tighter">Retention (Safety Fund)</Label>
+                        <Label className="text-[9px] font-black uppercase text-slate-400 tracking-tighter">Retention (Guarantee)</Label>
                         <Select value={retentionMode} onValueChange={(v: any) => setRetentionMode(v)} disabled={isLocked}>
-                            <SelectTrigger className="h-5 w-14 text-[8px] font-black uppercase"><SelectValue /></SelectTrigger>
+                            <SelectTrigger className="h-5 w-14 text-[8px] font-black uppercase bg-slate-50"><SelectValue /></SelectTrigger>
                             <SelectContent><SelectItem value="nominal">IDR</SelectItem><SelectItem value="percent">%</SelectItem></SelectContent>
                         </Select>
                     </div>
@@ -465,25 +457,25 @@ export default function AddInvoicePage() {
                 </div>
               </div>
 
-              <div className="bg-slate-100/50 dark:bg-slate-800/30 p-4 rounded-xl space-y-4 border border-dashed">
+              <div className="bg-slate-50 dark:bg-slate-800/30 p-4 rounded-xl space-y-4 border border-slate-100 dark:border-slate-800">
                 <div className="flex justify-between items-center">
-                    <Label className="text-[9px] font-black uppercase text-indigo-600 tracking-widest">Override Pajak (VAT)</Label>
+                    <Label className="text-[9px] font-black uppercase text-indigo-600 tracking-widest">Manual Tax Override (VAT)</Label>
                     <Switch checked={isTaxManual} onCheckedChange={setIsTaxManual} disabled={isLocked} />
                 </div>
                 <div className="grid gap-3">
                     <div className="grid gap-1">
-                        <span className="text-[8px] font-black uppercase text-slate-400 tracking-tighter">Dasar Pengenaan Pajak (DPP)</span>
-                        <Input value={dppVat} onChange={e => setDppVat(e.target.value)} disabled={!isTaxManual || isLocked} className="h-8 text-right font-mono text-xs font-bold bg-transparent" />
+                        <span className="text-[8px] font-black uppercase text-slate-400 tracking-tighter">DPP (Dasar Pengenaan Pajak)</span>
+                        <Input value={dppVat} onChange={e => setDppVat(e.target.value)} disabled={!isTaxManual || isLocked} className="h-8 text-right font-mono text-xs font-black bg-transparent border-slate-200" />
                     </div>
                     <div className="grid gap-1">
-                        <span className="text-[8px] font-black uppercase text-slate-400 tracking-tighter">PPN (12%)</span>
-                        <Input value={vat12} onChange={e => setVat12(e.target.value)} disabled={!isTaxManual || isLocked} className="h-8 text-right font-mono text-xs font-bold bg-transparent" />
+                        <span className="text-[8px] font-black uppercase text-slate-400 tracking-tighter">PPN (12% Rate)</span>
+                        <Input value={vat12} onChange={e => setVat12(e.target.value)} disabled={!isTaxManual || isLocked} className="h-8 text-right font-mono text-xs font-black bg-transparent border-slate-200" />
                     </div>
                 </div>
               </div>
 
               <div className="pt-2 border-t-2 border-indigo-600/10">
-                  <span className="text-[9px] font-black uppercase text-slate-400 tracking-widest">Grand Total Tagihan</span>
+                  <span className="text-[9px] font-black uppercase text-slate-400 tracking-widest">Grand Total Billing</span>
                   <div className="text-2xl font-black text-slate-900 dark:text-white leading-none mt-1 tracking-tight">Rp {totalAmount}</div>
               </div>
 
@@ -495,7 +487,7 @@ export default function AddInvoicePage() {
                   )}
                   {isSuperAdmin && existingInvoiceData?.status !== 'finalized' && existingInvoiceData?.status !== 'paid' && (
                       <Button variant="outline" className="w-full h-11 border-indigo-600 text-indigo-600 font-black uppercase text-[10px] tracking-widest hover:bg-indigo-50" onClick={() => handleSaveInvoice('finalized')}>
-                        <ShieldCheck className="mr-2 h-4 w-4" /> FINALIZE & LOCK
+                        <ShieldCheck className="mr-2 h-4 w-4" /> FINALIZE & LOCK ARCHIVE
                       </Button>
                   )}
               </div>

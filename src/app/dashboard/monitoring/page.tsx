@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useMemo } from 'react';
@@ -27,6 +26,9 @@ import {
   FileSpreadsheet,
   Database,
   Hash,
+  TrendingUp,
+  ReceiptText,
+  AlertCircle
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useFirestore, useCollection, useMemoFirebase } from '@/firebase';
@@ -44,14 +46,8 @@ type GlobalTrackRecord = {
   paidOffline: number;
   soNumber: string;
   invoices: (Invoice & { taxInfo?: TaxInvoice })[];
-  spdInfo?: SpdData;
   totalPaid: number;
   isOverdue: boolean;
-  isWaitingProduction: boolean;
-  isSpdLate: boolean;
-  hasInvoices: boolean;
-  latestInvoiceDate?: string;
-  invoicesInRange?: (Invoice & { taxInfo?: TaxInvoice })[];
   itemProgress: { invoiced: number; total: number; percent: number };
 };
 
@@ -77,9 +73,6 @@ export default function SalesMonitoringPage() {
   const taxQuery = useMemoFirebase(() => (firestore ? query(collection(firestore, 'taxInvoices')) : null), [firestore]);
   const { data: taxList } = useCollection<TaxInvoice>(taxQuery);
 
-  const spdQuery = useMemoFirebase(() => (firestore ? query(collection(firestore, 'spds')) : null), [firestore]);
-  const { data: spdList } = useCollection<SpdData>(spdQuery);
-
   const isLoading = isSalesLoading || isSoLoading || isInvLoading;
 
   // 2. Logic: Global Tracking Mapping
@@ -90,8 +83,6 @@ export default function SalesMonitoringPage() {
 
     return salesList.map(sale => {
       const linkedSos = soList?.filter(so => so.poNumber === sale.poNumber) || [];
-      const soNumber = linkedSos[0]?.soNumber || sale.soNumber || '';
-      
       const relatedInvoices = invoiceList
         .filter(inv => inv.poNumber === sale.poNumber && inv.status !== 'cancelled')
         .map(inv => ({
@@ -99,15 +90,11 @@ export default function SalesMonitoringPage() {
           taxInfo: taxList?.find(t => t.invoiceNumber === inv.id)
         }));
 
-      // Item Tracking Logic
+      // Item Tracking Logic (Progres Barang)
       const totalUnits = linkedSos.reduce((sum, s) => sum + s.quantity, 0);
       const invoicedUnits = relatedInvoices.reduce((sum, inv) => {
-          return sum + (inv.items?.reduce((s, i) => s + i.quantity, 0) || 0);
+          return sum + (inv.items?.reduce((s, i) => s + (Number(i.quantity) || 0), 0) || 0);
       }, 0);
-
-      const spdForPo = spdList?.find(s => 
-        s.invoices.some(si => relatedInvoices.some(ri => ri.id === si.invoiceId))
-      );
 
       const systemPaid = relatedInvoices.reduce((sum, inv) => {
           const paidOnInv = inv.payments?.reduce((s, p) => s + p.amount, 0) || (inv.status === 'paid' ? inv.amount : 0);
@@ -119,26 +106,16 @@ export default function SalesMonitoringPage() {
         inv.status !== 'paid' && inv.dueDate && isBefore(parseISO(inv.dueDate), today)
       );
 
-      const invoicesInRange = relatedInvoices.filter(inv => 
-        isWithinInterval(parseISO(inv.date), { start: dateRange.from, end: dateRange.to })
-      );
-
       return {
         poNumber: sale.poNumber,
         customer: sale.customer,
         sales: sale.sales,
         poAmount: sale.amount,
         paidOffline: sale.paidOffline || 0,
-        soNumber: soNumber,
+        soNumber: sale.soNumber || linkedSos[0]?.soNumber || '',
         invoices: relatedInvoices,
-        spdInfo: spdForPo,
         totalPaid,
         isOverdue,
-        isSpdLate: false,
-        isWaitingProduction: !soNumber,
-        hasInvoices: relatedInvoices.length > 0,
-        invoicesInRange,
-        latestInvoiceDate: relatedInvoices.sort((a,b) => b.date.localeCompare(a.date))[0]?.date,
         itemProgress: {
             invoiced: invoicedUnits,
             total: totalUnits,
@@ -147,130 +124,140 @@ export default function SalesMonitoringPage() {
       };
     }).filter(item => {
         const searchMatch = item.poNumber.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                            item.customer.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                            item.invoicesInRange?.some(inv => 
-                                inv.id.toLowerCase().includes(searchQuery.toLowerCase())
-                            );
-        if (!searchQuery) {
-            return (item.invoicesInRange?.length || 0) > 0;
-        }
+                            item.customer.toLowerCase().includes(searchQuery.toLowerCase());
+        
+        const hasInvoiceInPeriod = item.invoices.some(inv => 
+            isWithinInterval(parseISO(inv.date), { start: dateRange.from, end: dateRange.to })
+        );
+
+        if (!searchQuery) return hasInvoiceInPeriod;
         return searchMatch;
     });
-  }, [salesList, soList, invoiceList, taxList, spdList, searchQuery, dateRange]);
+  }, [salesList, soList, invoiceList, taxList, searchQuery, dateRange]);
 
-  const quickSummary = useMemo(() => {
-    const invoicesCreated = trackedData.reduce((sum, item) => sum + (item.invoicesInRange?.length || 0), 0);
+  const stats = useMemo(() => {
+    const invoicesCreated = trackedData.reduce((sum, item) => sum + item.invoices.length, 0);
     const totalValue = trackedData.reduce((sum, item) => 
-        sum + (item.invoicesInRange?.reduce((s, i) => s + i.amount, 0) || 0), 0);
+        sum + item.invoices.reduce((s, i) => s + i.amount, 0), 0);
     const taxPending = trackedData.reduce((sum, item) => 
-        sum + (item.invoicesInRange?.filter(i => !i.taxInfo).length || 0), 0);
+        sum + item.invoices.filter(i => !i.taxInfo).length, 0);
 
     return { invoicesCreated, totalValue, taxPending };
   }, [trackedData]);
 
-  const handleExport = () => {
-    const dataToExport = trackedData.map(d => ({
-        'PO Number': d.poNumber,
-        'Customer': d.customer,
-        'Item Progress': `${d.itemProgress.invoiced}/${d.itemProgress.total}`,
-        'PO Amount': d.poAmount,
-        'Total Paid': d.totalPaid,
-        'Status': d.itemProgress.percent >= 100 ? 'Fully Invoiced' : 'Partial'
-    }));
-    exportToExcel(dataToExport, `Dakota-Monitoring-${format(dateRange.from, 'yyyyMMdd')}`);
-  };
-
   return (
-    <main className="flex flex-1 flex-col gap-4 p-4 md:gap-8 md:p-8 max-w-[1600px] mx-auto">
+    <main className="flex flex-1 flex-col gap-4 p-4 md:gap-8 md:p-8 max-w-[1600px] mx-auto bg-background">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-black tracking-tighter uppercase">Global Monitoring Hub</h1>
-          <div className="text-muted-foreground font-medium flex items-center gap-2 text-sm">
-            Pusat pelacakan dokumen harian. 
-            <span className="text-[10px] font-black bg-primary/10 text-primary px-2 py-0.5 rounded">
-                Range: {format(dateRange.from, 'dd MMM')} - {format(dateRange.to, 'dd MMM')}
-            </span>
+          <h1 className="text-2xl font-black tracking-tighter uppercase text-slate-900 dark:text-slate-50">Global Hub Audit</h1>
+          <div className="text-slate-400 font-medium flex items-center gap-2 text-sm">
+            Real-time tracking of documents & financial progress.
+            <Badge variant="secondary" className="bg-indigo-50 text-indigo-600 text-[10px] font-black uppercase tracking-widest">
+                {format(dateRange.from, 'dd MMM')} - {format(dateRange.to, 'dd MMM')}
+            </Badge>
           </div>
         </div>
         <div className="flex items-center gap-2">
-            <Button variant="outline" size="sm" onClick={handleExport} className="h-9 font-bold text-[11px] uppercase tracking-wider">
-                <FileSpreadsheet className="mr-2 h-4 w-4 text-green-600" /> Export Filtered
+            <Button variant="outline" size="sm" onClick={() => exportToExcel(trackedData, 'Audit-Report')} className="h-9 font-bold text-[10px] uppercase tracking-widest border-slate-200">
+                <FileSpreadsheet className="mr-2 h-4 w-4 text-emerald-600" /> Export Audit
             </Button>
             <DateRangePicker onRangeChange={setDateRange} />
         </div>
       </div>
 
       <div className="grid gap-4 md:grid-cols-3">
-        <Card className="bg-primary/5 border-primary/20 shadow-sm border-t-4 border-t-primary">
-          <CardHeader className="pb-2"><CardTitle className="text-[10px] font-black uppercase text-primary">Invoices Created</CardTitle></CardHeader>
-          <CardContent><div className="text-2xl font-black">{quickSummary.invoicesCreated} <span className="text-xs font-normal">Docs</span></div></CardContent>
+        <Card className="border-none shadow-sm ring-1 ring-slate-200 dark:ring-slate-800 bg-white dark:bg-slate-900">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-[9px] font-black uppercase text-slate-400 tracking-widest flex items-center gap-2">
+                <ReceiptText className="h-3 w-3 text-indigo-600" /> Invoices in Period
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-black text-slate-900 dark:text-slate-50">{stats.invoicesCreated} <span className="text-xs font-normal">Documents</span></div>
+          </CardContent>
         </Card>
-        <Card className="bg-emerald-50/50 border-emerald-200 shadow-sm border-t-4 border-t-emerald-500">
-          <CardHeader className="pb-2"><CardTitle className="text-[10px] font-black uppercase text-emerald-700">Total Value</CardTitle></CardHeader>
-          <CardContent><div className="text-2xl font-black">Rp {quickSummary.totalValue.toLocaleString('id-ID')}</div></CardContent>
+        <Card className="border-none shadow-sm ring-1 ring-slate-200 dark:ring-slate-800 bg-white dark:bg-slate-900">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-[9px] font-black uppercase text-slate-400 tracking-widest flex items-center gap-2">
+                <TrendingUp className="h-3 w-3 text-emerald-600" /> Billing Value
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-black text-slate-900 dark:text-slate-50">Rp {stats.totalValue.toLocaleString('id-ID')}</div>
+          </CardContent>
         </Card>
-        <Card className="bg-red-50/50 border-red-200 shadow-sm border-t-4 border-t-red-500">
-          <CardHeader className="pb-2"><CardTitle className="text-[10px] font-black uppercase text-red-700">Pajak Pending</CardTitle></CardHeader>
-          <CardContent><div className="text-2xl font-black">{quickSummary.taxPending} <span className="text-xs font-normal">Docs</span></div></CardContent>
+        <Card className="border-none shadow-sm ring-1 ring-slate-200 dark:ring-slate-800 bg-white dark:bg-slate-900">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-[9px] font-black uppercase text-slate-400 tracking-widest flex items-center gap-2">
+                <AlertCircle className="h-3 w-3 text-rose-600" /> Missing Tax Records
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-black text-rose-600">{stats.taxPending} <span className="text-xs font-normal opacity-50">Drafts</span></div>
+          </CardContent>
         </Card>
       </div>
 
-      <Card className="shadow-md border-none ring-1 ring-border">
+      <Card className="shadow-md border-none ring-1 ring-slate-200 dark:ring-slate-800 bg-white dark:bg-slate-900">
         <CardContent className="pt-6">
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
               <div className="relative w-full md:w-1/3">
-                <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-                <Input placeholder="Cari No. PO, Customer, atau Invoice..." className="pl-8 bg-muted/20 border-none font-medium" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} />
-              </div>
-              <div className="flex gap-2">
-                 <Badge variant="outline" className="text-[9px] font-black uppercase">Switching Logic Tracking</Badge>
+                <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-slate-400" />
+                <Input 
+                    placeholder="Search PO, Customer, or Reference..." 
+                    className="pl-8 bg-slate-50 dark:bg-slate-800 border-none font-medium text-xs" 
+                    value={searchQuery} 
+                    onChange={(e) => setSearchQuery(e.target.value)} 
+                />
               </div>
             </div>
 
-            <div className="rounded-xl border overflow-hidden">
+            <div className="rounded-xl border border-slate-100 dark:border-slate-800 overflow-hidden">
                 <Table>
-                    <TableHeader className="bg-muted/50">
+                    <TableHeader className="bg-slate-50 dark:bg-slate-800/50">
                     <TableRow>
-                        <TableHead className="text-[10px] font-black uppercase tracking-widest py-4">PO & Customer</TableHead>
-                        <TableHead className="text-[10px] font-black uppercase tracking-widest py-4">Item Progress (Partial)</TableHead>
-                        <TableHead className="text-[10px] font-black uppercase tracking-widest py-4">Invoices (Single-ID)</TableHead>
-                        <TableHead className="w-[200px] text-[10px] font-black uppercase tracking-widest py-4">Payment Health</TableHead>
+                        <TableHead className="text-[10px] font-black uppercase tracking-widest py-4 text-slate-400">PO & Customer Hub</TableHead>
+                        <TableHead className="text-[10px] font-black uppercase tracking-widest py-4 text-slate-400">Physical Progress</TableHead>
+                        <TableHead className="text-[10px] font-black uppercase tracking-widest py-4 text-slate-400">Active Invoices</TableHead>
+                        <TableHead className="w-[200px] text-[10px] font-black uppercase tracking-widest py-4 text-slate-400">Financial Health</TableHead>
                         <TableHead className="text-right py-4"></TableHead>
                     </TableRow>
                     </TableHeader>
                     <TableBody>
                     {isLoading ? (
-                        <TableRow><TableCell colSpan={5} className="text-center py-20 font-bold text-muted-foreground">Syncing Database...</TableCell></TableRow>
+                        <TableRow><TableCell colSpan={5} className="text-center py-20 font-black uppercase text-slate-400 animate-pulse tracking-widest">Syncing Global Matrix...</TableCell></TableRow>
+                    ) : trackedData.length === 0 ? (
+                        <TableRow><TableCell colSpan={5} className="text-center py-20 font-black uppercase text-slate-400 opacity-30 tracking-widest italic">No data found for this period.</TableCell></TableRow>
                     ) : trackedData.map((item) => (
-                        <TableRow key={item.poNumber} className="hover:bg-muted/5 border-b last:border-0">
+                        <TableRow key={item.poNumber} className="hover:bg-indigo-50/10 border-b last:border-0 transition-colors">
                         <TableCell className="py-4">
                             <div className="flex flex-col gap-1">
-                                <span className="font-black text-sm text-slate-800">{item.poNumber}</span>
-                                <span className="text-[10px] font-bold uppercase text-muted-foreground">{item.customer}</span>
+                                <span className="font-black text-sm text-slate-900 dark:text-slate-50">{item.poNumber}</span>
+                                <span className="text-[10px] font-black uppercase text-slate-400 tracking-tight truncate max-w-[200px]">{item.customer}</span>
                             </div>
                         </TableCell>
                         <TableCell className="py-4">
                             <div className="space-y-2 max-w-[180px]">
-                                <div className="flex justify-between text-[10px] font-black uppercase tracking-tighter">
-                                    <span>{item.itemProgress.invoiced} / {item.itemProgress.total} Units</span>
-                                    <span>{item.itemProgress.percent.toFixed(0)}%</span>
+                                <div className="flex justify-between text-[9px] font-black uppercase tracking-tighter text-slate-500">
+                                    <span>{item.itemProgress.invoiced} / {item.itemProgress.total} Items</span>
+                                    <span className={cn(item.itemProgress.percent >= 100 ? "text-emerald-600" : "")}>{item.itemProgress.percent.toFixed(0)}%</span>
                                 </div>
-                                <Progress value={item.itemProgress.percent} className="h-1.5 bg-blue-100" />
+                                <Progress value={item.itemProgress.percent} className="h-1 bg-slate-100 dark:bg-slate-800" />
                             </div>
                         </TableCell>
                         <TableCell className="py-4">
                             <div className="flex flex-wrap gap-2">
-                                {item.invoicesInRange?.map(inv => {
+                                {item.invoices.map(inv => {
                                     const isERP = !(inv.id.startsWith('SAR') || inv.id.startsWith('KW'));
                                     return (
-                                        <div key={inv.id} className="flex flex-col gap-0.5 bg-white border p-2 rounded-md shadow-sm min-w-[100px]">
+                                        <div key={inv.id} className="flex flex-col gap-0.5 bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 p-2 rounded-md shadow-sm min-w-[90px]">
                                             <div className="flex items-center justify-between">
-                                                <span className="text-[9px] font-black text-indigo-700">{inv.id.split('/').pop()}</span>
-                                                {inv.status === 'paid' && <CheckCircle2 className="h-2.5 w-2.5 text-emerald-500" />}
+                                                <span className="text-[9px] font-black text-indigo-600">{inv.id.split('/').pop()}</span>
+                                                {inv.status === 'paid' && <CheckCircle2 className="h-2 w-2 text-emerald-500" />}
                                             </div>
-                                            <div className="flex items-center gap-1">
-                                                {isERP ? <Database className="h-2 w-2 text-emerald-600" /> : <Hash className="h-2 w-2 text-indigo-400" />}
-                                                <span className="text-[7px] font-bold text-muted-foreground uppercase">{isERP ? 'ERP' : 'Manual'}</span>
+                                            <div className="flex items-center gap-1 opacity-50">
+                                                {isERP ? <Database className="h-2 w-2" /> : <Hash className="h-2 w-2" />}
+                                                <span className="text-[7px] font-black uppercase">{isERP ? 'ERP' : 'SAR'}</span>
                                             </div>
                                         </div>
                                     );
@@ -279,21 +266,21 @@ export default function SalesMonitoringPage() {
                         </TableCell>
                         <TableCell className="py-4">
                             <div className="space-y-2">
-                                <div className="flex justify-between text-[10px] font-black uppercase tracking-tighter">
-                                <span>{((item.totalPaid / item.poAmount) * 100 || 0).toFixed(0)}% Paid</span>
-                                <span className={item.totalPaid < item.poAmount ? "text-red-600" : "text-emerald-600"}>
-                                    Sisa: Rp {(item.poAmount - item.totalPaid).toLocaleString('id-ID')}
+                                <div className="flex justify-between text-[9px] font-black uppercase tracking-tighter">
+                                <span className="text-slate-500">{((item.totalPaid / item.poAmount) * 100 || 0).toFixed(0)}% Collected</span>
+                                <span className={item.totalPaid < item.poAmount ? "text-amber-600" : "text-emerald-600"}>
+                                    Bal: Rp {(item.poAmount - item.totalPaid).toLocaleString('id-ID')}
                                 </span>
                                 </div>
-                                <Progress value={(item.totalPaid / item.poAmount) * 100 || 0} className="h-1.5" />
+                                <Progress value={(item.totalPaid / item.poAmount) * 100 || 0} className="h-1" />
                             </div>
                         </TableCell>
                         <TableCell className="text-right py-4">
-                            <Button variant="ghost" size="icon" className="rounded-full" onClick={() => {
+                            <Button variant="ghost" size="icon" className="rounded-full hover:bg-indigo-50" onClick={() => {
                                 sessionStorage.setItem('activePoPreview', item.poNumber);
                                 router.push('/dashboard/sales-management');
                             }}>
-                            <Eye className="h-5 w-5 text-slate-600" />
+                            <Eye className="h-4 w-4 text-slate-400" />
                             </Button>
                         </TableCell>
                         </TableRow>
