@@ -3,6 +3,7 @@
 import { useEffect, useState, useRef, useMemo } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
 import { ArrowLeft, Printer, Download, MapPin, UserCheck, Layers, FileText, Globe, Truck, Info, Cpu, Database, Hash, Share2, MessageCircle } from 'lucide-react';
 import { type SpdData, type Invoice } from '@/app/lib/data';
 import { format } from 'date-fns';
@@ -242,17 +243,17 @@ export default function SpdPreviewPage() {
                         <div className="grid grid-cols-3 text-center text-[10px] font-black uppercase tracking-widest">
                             <div className="space-y-24">
                                 <p className="text-slate-400 text-[8px]">Dispatcher System</p>
-                                <div className="border-b-4 border-black w-48 mx-auto shadow-[0_4px_0px_0px_rgba(0,0,0,0.1)]" />
+                                <div className="border-b-4 border-black w-48 mx-auto shadow-[0_4px_0_0_rgba(0,0,0,0.1)]" />
                                 <p className="text-slate-900">( {user?.displayName || 'Finance Lead'} )</p>
                             </div>
                             <div className="space-y-24">
                                 <p className="text-slate-400 text-[8px]">Carrier / Courier</p>
-                                <div className="border-b-4 border-black w-48 mx-auto shadow-[0_4px_0px_0px_rgba(0,0,0,0.1)]" />
+                                <div className="border-b-4 border-black w-48 mx-auto shadow-[0_4px_0_0_rgba(0,0,0,0.1)]" />
                                 <p className="text-slate-900">( {spdItem.courier} )</p>
                             </div>
                             <div className="space-y-24">
                                 <p className="text-slate-400 text-[8px]">Consignee Recipient</p>
-                                <div className="border-b-4 border-black w-48 mx-auto shadow-[0_4px_0px_0px_rgba(0,0,0,0.1)]" />
+                                <div className="border-b-4 border-black w-48 mx-auto shadow-[0_4px_0_0_rgba(0,0,0,0.1)]" />
                                 <p className="text-slate-900">( Name & Official Stamp )</p>
                             </div>
                         </div>
