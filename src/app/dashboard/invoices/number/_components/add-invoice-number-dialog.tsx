@@ -10,7 +10,7 @@ import {
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Plus, Calendar as CalendarIcon, Hash, FilePlus, Database, Layers, ChevronsUpDown } from 'lucide-react';
+import { Plus, Calendar as CalendarIcon, Hash, FilePlus, Database, Layers, ChevronsUpDown, Search, Link as LinkIcon, BadgeCheck, AlertTriangle } from 'lucide-react';
 import { Checkbox } from '@/components/ui/checkbox';
 import {
   Popover,
@@ -95,17 +95,26 @@ export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceDa
   }, [firestore]);
   const { data: existingInvoices } = useCollection<Invoice>(invoicesCollection);
 
-  // TRIGGER: "The Golden Key" Fetcher (Auto-fill Customer & SO from PO)
+  // TRIGGER: SO to PO Automatic Link
   useEffect(() => {
-    if (!poNumber || !masterSalesList || invoiceData) return;
+    if (salesOrder && masterSalesList && !poNumber && !invoiceData) {
+      const matchedPo = masterSalesList.find(s => s.soNumber?.toLowerCase() === salesOrder.toLowerCase());
+      if (matchedPo) {
+        setPoNumber(matchedPo.poNumber);
+        setCustomer(matchedPo.customer);
+        toast({ title: "PO Auto-Linked", description: `Data PO ${matchedPo.poNumber} berhasil ditarik melalui SO Produksi.` });
+      }
+    }
+  }, [salesOrder, masterSalesList, invoiceData]);
 
-    const matchedPo = masterSalesList.find(s => 
-      s.poNumber.trim().toLowerCase() === poNumber.trim().toLowerCase()
-    );
-
-    if (matchedPo) {
-      setCustomer(matchedPo.customer);
-      if (matchedPo.soNumber) setSalesOrder(matchedPo.soNumber);
+  // TRIGGER: PO to SO Automatic Link
+  useEffect(() => {
+    if (poNumber && masterSalesList && !salesOrder && !invoiceData) {
+      const matchedPo = masterSalesList.find(s => s.poNumber.trim().toLowerCase() === poNumber.trim().toLowerCase());
+      if (matchedPo) {
+        setCustomer(matchedPo.customer);
+        if (matchedPo.soNumber) setSalesOrder(matchedPo.soNumber);
+      }
     }
   }, [poNumber, masterSalesList, invoiceData]);
 
@@ -240,7 +249,6 @@ export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceDa
       if (soDetails) {
         setCustomer(soDetails.customer);
         setPoNumber(soDetails.poNumber || '');
-        toast({ title: "Data Tarik Otomatis", description: `Customer & PO berhasil disinkronkan dari SO ${newSalesOrder}` });
       }
     }
     setSoPopoverOpen(false);
@@ -378,8 +386,8 @@ export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceDa
 
            <div className="space-y-2">
             <div className="flex justify-between items-center">
-                <Label className="text-[10px] font-black uppercase text-muted-foreground">Opsi A: Tarik Data dari Sales Order</Label>
-                <Badge variant="outline" className="text-[8px] bg-blue-50 text-blue-600 font-black border-blue-100">Recommended</Badge>
+                <Label className="text-[10px] font-black uppercase text-muted-foreground">Opsi A: Tarik Data dari Sales Order (Produksi)</Label>
+                <Badge variant="outline" className="text-[8px] bg-blue-50 text-blue-600 font-black border-blue-100">Smart Mapping</Badge>
             </div>
             <Popover open={soPopoverOpen} onOpenChange={setSoPopoverOpen}>
                 <PopoverTrigger asChild>
@@ -414,14 +422,21 @@ export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceDa
             </Popover>
           </div>
 
-          <div className="grid grid-cols-2 gap-4 pt-2 border-t">
+          <div className="grid grid-cols-2 gap-4 pt-2 border-t relative">
+              {!poNumber && (
+                <div className="absolute -top-3 left-0 bg-rose-50 text-rose-600 text-[8px] font-black uppercase px-2 py-0.5 rounded border border-rose-100 z-10 flex items-center gap-1">
+                    <AlertTriangle className="h-2 w-2" /> PO Belum Terhubung
+                </div>
+              )}
               <div className="space-y-2">
-                <Label className="text-[10px] font-black uppercase text-muted-foreground">Kunci Utama: Nomor PO</Label>
+                <Label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest flex items-center gap-1">
+                    <LinkIcon className="h-3 w-3" /> Nomor PO Customer
+                </Label>
                 <Input 
                     value={poNumber} 
                     onChange={e => setPoNumber(e.target.value)} 
-                    placeholder="PO-ABC-2024" 
-                    className="font-bold bg-background border-indigo-300"
+                    placeholder="Wajib Terisi untuk Billing" 
+                    className={cn("font-bold bg-background", !poNumber ? "border-rose-300 ring-2 ring-rose-50" : "border-indigo-300")}
                 />
                 {previousInvoicesCount > 0 && (
                     <div className="flex items-center gap-2 bg-blue-50 p-2 rounded border border-blue-200 mt-1">
@@ -431,7 +446,7 @@ export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceDa
                 )}
               </div>
               <div className="space-y-2">
-                <Label className="text-[10px] font-black uppercase text-muted-foreground">Tgl Registrasi</Label>
+                <Label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Tgl Registrasi</Label>
                  <Popover>
                   <PopoverTrigger asChild>
                     <Button variant={'outline'} className="w-full justify-start text-left font-bold h-10">
@@ -447,21 +462,19 @@ export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceDa
           </div>
 
           <div className="space-y-2">
-            <Label className="text-[10px] font-black uppercase text-muted-foreground">Nama Legal Pelanggan</Label>
+            <Label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Nama Legal Pelanggan</Label>
             <Popover open={customerPopoverOpen} onOpenChange={setCustomerPopoverOpen}>
                 <PopoverTrigger asChild>
                     <Button variant="outline" className="w-full justify-between h-10 font-black uppercase border-indigo-100">
-                    {customer || "Pilih/Ketik Nama Pelanggan..."}
+                    {customer || "Pilih Nama Pelanggan..."}
                     <ChevronsUpDown className="ml-2 h-4 w-4 opacity-50" />
                     </Button>
                 </PopoverTrigger>
                 <PopoverContent className="w-[500px] p-0 shadow-2xl" align="start">
                     <Command>
-                    <CommandInput placeholder="Cari atau ketik nama pelanggan..." className="h-11" />
+                    <CommandInput placeholder="Cari PT..." className="h-11" />
                      <CommandList>
-                        <CommandEmpty>
-                            <Button variant="ghost" className="w-full text-xs" onClick={() => setCustomerPopoverOpen(false)}>Gunakan input manual</Button>
-                        </CommandEmpty>
+                        <CommandEmpty>Customer tidak ditemukan.</CommandEmpty>
                         <CommandGroup>
                             {customerListData?.map((c) => (
                             <CommandItem
@@ -491,23 +504,23 @@ export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceDa
           <TooltipProvider>
             <Tooltip>
               <TooltipTrigger asChild>
-                <Button variant="outline" onClick={() => handleSave('save')} className="border-indigo-200 text-indigo-700" disabled={isSaving || !fullInvoiceNumber}>
+                <Button variant="outline" onClick={() => handleSave('save')} className="border-indigo-200 text-indigo-700" disabled={isSaving || !fullInvoiceNumber || !poNumber}>
                   {isSaving ? "Syncing..." : "Simpan Identitas"}
                 </Button>
               </TooltipTrigger>
               <TooltipContent className="bg-slate-900 text-white border-none text-[10px]">
-                Mengunci data nomor invoice dan pelanggan ke database.
+                {!poNumber ? "Hubungkan ke PO terlebih dahulu!" : "Mengunci data nomor invoice dan pelanggan ke database."}
               </TooltipContent>
             </Tooltip>
 
             <Tooltip>
               <TooltipTrigger asChild>
-                <Button type="button" onClick={() => handleSave('create')} className="bg-indigo-600 hover:bg-indigo-700 font-black" disabled={isSaving || !fullInvoiceNumber}>
+                <Button type="button" onClick={() => handleSave('create')} className="bg-indigo-600 hover:bg-indigo-700 font-black" disabled={isSaving || !fullInvoiceNumber || !poNumber}>
                   <FilePlus className="mr-2 h-4 w-4" /> {isSaving ? "Locking..." : "Buka Constructor"}
                 </Button>
               </TooltipTrigger>
               <TooltipContent className="bg-slate-900 text-white border-none text-[10px]">
-                Masuk ke halaman input detail barang dan kalkulasi sisa plafon.
+                {!poNumber ? "Hubungkan ke PO terlebih dahulu!" : "Masuk ke halaman input detail barang dan kalkulasi sisa plafon."}
               </TooltipContent>
             </Tooltip>
           </TooltipProvider>
