@@ -13,12 +13,14 @@ import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import { Badge } from '@/components/ui/badge';
 import { MapPin, Building2, Home, Printer, Loader2 } from 'lucide-react';
 import type { Customer, CustomerAddress } from '@/app/lib/data';
 import { useFirestore } from '@/firebase';
 import { doc, updateDoc } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { useRouter } from 'next/navigation';
+import { cn } from '@/lib/utils';
 
 type AddressSelectorDialogProps = {
     isOpen: boolean;
@@ -38,14 +40,14 @@ export function AddressSelectorDialog({ isOpen, onOpenChange, customer, spdId }:
     useEffect(() => {
         if (customer && isOpen) {
             const defaultId = customer.defaultShippingAddressId || 
-                              customer.addresses.find(a => a.isDefault)?.id || 
-                              customer.addresses[0]?.id || '';
+                              customer.addresses?.find(a => a.isDefault)?.id || 
+                              customer.addresses?.[0]?.id || '';
             setSelectedAddressId(defaultId);
         }
     }, [customer, isOpen]);
 
     const handleContinueToPrint = async () => {
-        if (!customer || !selectedAddressId) return;
+        if (!customer || !selectedAddressId || !spdId) return;
 
         setIsProcessing(true);
         try {
@@ -84,28 +86,44 @@ export function AddressSelectorDialog({ isOpen, onOpenChange, customer, spdId }:
                     <div className="space-y-3">
                         <Label className="text-[10px] font-black uppercase text-slate-400 tracking-widest px-1">Address Book: {customer.name}</Label>
                         <RadioGroup value={selectedAddressId} onValueChange={setSelectedAddressId} className="grid gap-3">
-                            {customer.addresses.map((addr) => (
-                                <Label
-                                    key={addr.id}
-                                    className={cn(
-                                        "flex items-start gap-4 p-4 rounded-2xl border-2 transition-all cursor-pointer group",
-                                        selectedAddressId === addr.id 
-                                            ? "bg-white border-indigo-600 shadow-md ring-4 ring-indigo-50" 
-                                            : "bg-white border-slate-100 hover:border-indigo-200"
-                                    )}
-                                >
-                                    <RadioGroupItem value={addr.id} className="mt-1" />
-                                    <div className="flex-1 space-y-1">
-                                        <div className="flex items-center gap-2">
-                                            {addr.label.toLowerCase().includes('office') ? <Home className="h-3.5 w-3.5 text-indigo-500" /> : <Building2 className="h-3.5 w-3.5 text-amber-500" />}
-                                            <span className="text-[10px] font-black uppercase tracking-tight text-slate-700">{addr.label}</span>
-                                            {addr.id === customer.defaultShippingAddressId && <Badge variant="secondary" className="text-[7px] h-3.5 bg-indigo-50 text-indigo-600 border-none font-black uppercase">DEFAULT</Badge>}
+                            {customer.addresses?.map((addr) => (
+                                <div key={addr.id}>
+                                    <input 
+                                        type="radio" 
+                                        id={addr.id} 
+                                        name="address" 
+                                        value={addr.id} 
+                                        className="peer hidden" 
+                                        checked={selectedAddressId === addr.id}
+                                        onChange={() => setSelectedAddressId(addr.id)}
+                                    />
+                                    <Label
+                                        htmlFor={addr.id}
+                                        className={cn(
+                                            "flex items-start gap-4 p-4 rounded-2xl border-2 transition-all cursor-pointer group",
+                                            selectedAddressId === addr.id 
+                                                ? "bg-white border-indigo-600 shadow-md ring-4 ring-indigo-50" 
+                                                : "bg-white border-slate-100 hover:border-indigo-200"
+                                        )}
+                                    >
+                                        <div className={cn(
+                                            "mt-1 h-4 w-4 rounded-full border-2 flex items-center justify-center transition-all",
+                                            selectedAddressId === addr.id ? "border-indigo-600 bg-indigo-600" : "border-slate-300"
+                                        )}>
+                                            {selectedAddressId === addr.id && <div className="h-1.5 w-1.5 rounded-full bg-white" />}
                                         </div>
-                                        <p className="text-[10px] font-medium text-slate-500 leading-relaxed line-clamp-2 italic">
-                                            {addr.address}
-                                        </p>
-                                    </div>
-                                </Label>
+                                        <div className="flex-1 space-y-1">
+                                            <div className="flex items-center gap-2">
+                                                {addr.label.toLowerCase().includes('office') ? <Home className="h-3.5 w-3.5 text-indigo-500" /> : <Building2 className="h-3.5 w-3.5 text-amber-500" />}
+                                                <span className="text-[10px] font-black uppercase tracking-tight text-slate-700">{addr.label}</span>
+                                                {addr.id === customer.defaultShippingAddressId && <Badge variant="secondary" className="text-[7px] h-3.5 bg-indigo-50 text-indigo-600 border-none font-black uppercase">DEFAULT</Badge>}
+                                            </div>
+                                            <p className="text-[10px] font-medium text-slate-500 leading-relaxed line-clamp-2 italic">
+                                                {addr.address}
+                                            </p>
+                                        </div>
+                                    </Label>
+                                </div>
                             ))}
                         </RadioGroup>
                     </div>
@@ -130,8 +148,4 @@ export function AddressSelectorDialog({ isOpen, onOpenChange, customer, spdId }:
             </DialogContent>
         </Dialog>
     );
-}
-
-function cn(...inputs: any[]) {
-    return inputs.filter(Boolean).join(' ');
 }

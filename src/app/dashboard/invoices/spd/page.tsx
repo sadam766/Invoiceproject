@@ -226,6 +226,24 @@ import {
         });
     };
 
+    // Helper to open address selector with validation
+    const handlePrepareEnvelope = (spd: SpdData) => {
+        setNewSpdRef(spd);
+        const customerName = spd.invoices[0]?.customer;
+        const customerExists = allCustomers?.find(c => c.name.toLowerCase() === customerName?.toLowerCase());
+        
+        if (!customerExists) {
+            toast({
+                variant: "destructive",
+                title: "Data Pelanggan Tidak Ditemukan",
+                description: `Pusat data tidak menemukan profil untuk '${customerName}'. Pastikan nama di invoice sesuai dengan database Customer.`
+            });
+            return;
+        }
+
+        setAddressSelectorOpen(true);
+    };
+
     const statusConfig = {
         in_delivery: { label: 'In Delivery', color: 'bg-yellow-100 text-yellow-800 border-yellow-200', icon: Clock, tooltip: TOOLTIP_CONTENT.spd_status_delivery },
         received: { label: 'Received', color: 'bg-emerald-100 text-emerald-800 border-emerald-200', icon: CheckCircle2, tooltip: TOOLTIP_CONTENT.spd_status_received },
@@ -234,7 +252,8 @@ import {
 
     const currentCustomerForEnvelope = useMemo(() => {
         if (!newSpdRef || !allCustomers) return null;
-        return allCustomers.find(c => c.name === newSpdRef.invoices[0]?.customer) || null;
+        const targetName = newSpdRef.invoices[0]?.customer.toLowerCase();
+        return allCustomers.find(c => c.name.toLowerCase() === targetName) || null;
     }, [newSpdRef, allCustomers]);
 
     return (
@@ -312,7 +331,7 @@ import {
                                     <DropdownMenuItem onClick={() => router.push(`/dashboard/invoices/spd/preview/${encodeURIComponent(spd.id)}`)} className="rounded-lg py-2 cursor-pointer font-bold text-[10px] uppercase">
                                         <FileCheck className="mr-2 h-4 w-4 text-indigo-600" /> Cetak Summary (PDF)
                                     </DropdownMenuItem>
-                                    <DropdownMenuItem onClick={() => { setNewSpdRef(spd); setAddressSelectorOpen(true); }} className="rounded-lg py-2 cursor-pointer font-bold text-[10px] uppercase text-indigo-600">
+                                    <DropdownMenuItem onClick={() => handlePrepareEnvelope(spd)} className="rounded-lg py-2 cursor-pointer font-bold text-[10px] uppercase text-indigo-600">
                                         <Mail className="mr-2 h-4 w-4" /> Cetak Amplop Coklat
                                     </DropdownMenuItem>
                                     <DropdownMenuItem onClick={() => handleEdit(spd)} className="rounded-lg py-2 cursor-pointer font-bold text-[10px] uppercase">
@@ -425,10 +444,7 @@ import {
                                     <TooltipProvider>
                                         <Tooltip>
                                             <TooltipTrigger asChild>
-                                                <Button variant="ghost" size="icon" className="h-6 w-6 rounded-full text-indigo-400" onClick={() => {
-                                                    setNewSpdRef(spd);
-                                                    setAddressSelectorOpen(true);
-                                                }}>
+                                                <Button variant="ghost" size="icon" className="h-6 w-6 rounded-full text-indigo-400" onClick={() => handlePrepareEnvelope(spd)}>
                                                     <Printer className="h-3 w-3" />
                                                 </Button>
                                             </TooltipTrigger>
@@ -468,7 +484,7 @@ import {
                 </AlertDialogHeader>
                 <AlertDialogFooter className="gap-2 sm:gap-0">
                     <AlertDialogCancel onClick={() => setConfirmPrintOpen(false)} className="h-11 rounded-xl font-bold border-slate-200">Tidak, Nanti Saja</AlertDialogCancel>
-                    <AlertDialogAction onClick={() => { setConfirmPrintOpen(false); setAddressSelectorOpen(true); }} className="h-11 rounded-xl bg-indigo-600 hover:bg-indigo-700 font-black uppercase text-[10px] tracking-widest px-6 shadow-lg shadow-indigo-100">
+                    <AlertDialogAction onClick={() => { setConfirmPrintOpen(false); if(newSpdRef) handlePrepareEnvelope(newSpdRef); }} className="h-11 rounded-xl bg-indigo-600 hover:bg-indigo-700 font-black uppercase text-[10px] tracking-widest px-6 shadow-lg shadow-indigo-100">
                         YA, CETAK AMPLOP SEKARANG
                     </AlertDialogAction>
                 </AlertDialogFooter>
