@@ -4,15 +4,15 @@
 
 @layer base {
   :root {
-    /* Mode Terang: Clean & Executive */
-    --background: 210 40% 98%; /* Slate 50 base */
-    --foreground: 222 47% 11%; /* Slate 900 */
+    /* Mode Terang: Modern Dakota V2.0 */
+    --background: 210 40% 98%; /* #F8FAFC - Ghost White */
+    --foreground: 222 47% 11%; /* #1E293B - Deep Slate */
     --card: 0 0% 100%;
     --card-foreground: 222 47% 11%;
     --popover: 0 0% 100%;
     --popover-foreground: 222 47% 11%;
     
-    --primary: 239 84% 67%; /* Indigo 500 */
+    --primary: 217 91% 60%; /* #3B82F6 - Electric Blue */
     --primary-foreground: 0 0% 100%;
     
     --secondary: 210 40% 96.1%;
@@ -31,19 +31,19 @@
     
     --border: 214.3 31.8% 91.4%;
     --input: 214.3 31.8% 91.4%;
-    --ring: 239 84% 67%;
+    --ring: 217 91% 60%;
     
-    --radius: 1rem; /* Global 16px radius */
+    --radius: 1rem; /* 16px untuk cards */
 
-    /* Sidebar Glassmorphism */
-    --sidebar-background: 222 47% 11%;
-    --sidebar-foreground: 210 40% 98%;
-    --sidebar-primary: 239 84% 67%;
+    /* Sidebar Glassmorphism V2.0 */
+    --sidebar-background: 222 47% 11%; /* #1E293B */
+    --sidebar-foreground: 215 20% 65%; /* #94A3B8 */
+    --sidebar-primary: 217 91% 60%; /* #3B82F6 */
     --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 239 84% 67% / 0.1;
-    --sidebar-accent-foreground: 210 40% 98%;
-    --sidebar-border: 217.2 32.6% 17.5%;
-    --sidebar-ring: 239 84% 67%;
+    --sidebar-accent: 217 91% 60% / 0.15;
+    --sidebar-accent-foreground: 0 0% 100%;
+    --sidebar-border: 222 47% 15%;
+    --sidebar-ring: 217 91% 60%;
   }
 
   .dark {
@@ -53,13 +53,13 @@
     --card-foreground: 210 40% 98%;
     --popover: 222 47% 10%;
     --popover-foreground: 210 40% 98%;
-    --primary: 235 89% 74%;
+    --primary: 217 91% 65%;
     --primary-foreground: 222.2 47.4% 11.2%;
     --muted: 217.2 32.6% 17.5%;
     --muted-foreground: 215 20.2% 65.1%;
     --border: 217.2 32.6% 18%;
     --input: 217.2 32.6% 18%;
-    --ring: 235 89% 74%;
+    --ring: 217 91% 65%;
   }
 }
 
@@ -74,20 +74,24 @@
   }
 }
 
-/* Glassmorphism Classes */
+/* Glassmorphism V2.0 */
 .glass-sidebar {
-  @apply bg-slate-950/95 backdrop-blur-md border-r border-slate-800;
+  @apply bg-slate-900/95 backdrop-blur-xl border-r border-slate-800/50;
 }
 
 .shadow-soft {
-  box-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.05), 0 4px 10px -5px rgba(0, 0, 0, 0.02);
+  box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.05), 0 2px 4px -2px rgb(0 0 0 / 0.05);
 }
 
 .shadow-premium {
-  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.08);
+  box-shadow: 0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1);
 }
 
-/* Transitions */
+.floating-topbar {
+  @apply bg-white/80 backdrop-blur-md shadow-sm border-b border-slate-100;
+}
+
+/* Custom Transitions */
 .transition-smooth {
   @apply transition-all duration-300 ease-in-out;
 }
