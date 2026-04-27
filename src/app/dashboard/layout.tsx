@@ -13,6 +13,8 @@ import {
   SidebarMenuSub,
   SidebarMenuSubButton,
   SidebarMenuSubItem,
+  SidebarGroup,
+  SidebarGroupLabel,
 } from '@/components/ui/sidebar';
 import {
   Collapsible,
@@ -42,6 +44,13 @@ import {
   ShieldAlert,
   LogOut,
   BadgeCheck,
+  Plus,
+  ArrowRight,
+  TrendingUp,
+  CreditCard,
+  Layers,
+  History,
+  AlertTriangle,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -61,7 +70,7 @@ import { Badge } from '@/components/ui/badge';
 import React, { useEffect, useMemo } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { ThemeToggle } from '../components/theme-toggle';
+import { ThemeToggle } from '../components/toggle-theme';
 import { cn } from '@/lib/utils';
 import { useAuth, useUser, useFirestore, useDoc, useMemoFirebase, useCollection } from '@/firebase';
 import { signOut } from 'firebase/auth';
@@ -89,41 +98,16 @@ export default function DashboardLayout({
 
   const isSuperAdmin = user?.email?.toLowerCase() === 'fa@gmail.com' || userProfile?.email?.toLowerCase() === 'fa@gmail.com';
   const userRole = isSuperAdmin ? 'Leader' : (userProfile?.role === 'admin' ? 'Admin' : 'Staf');
-  const isAdmin = isSuperAdmin || userProfile?.role === 'admin';
-  const isPending = !isSuperAdmin && userProfile?.status === 'pending';
 
-  // Alerts Monitoring for Bell
-  const invoicesQuery = useMemoFirebase(() => {
-    if (!firestore) return null;
-    return query(collection(firestore, 'invoices'));
-  }, [firestore]);
+  // Alerts for Bell
+  const invoicesQuery = useMemoFirebase(() => (!firestore ? null : query(collection(firestore, 'invoices'))), [firestore]);
   const { data: allInvoices } = useCollection<Invoice>(invoicesQuery);
 
-  const salesQuery = useMemoFirebase(() => {
-    if (!firestore) return null;
-    return query(collection(firestore, 'sales'));
-  }, [firestore]);
-  const { data: allSales } = useCollection<SalesListItem>(salesQuery);
-
-  const pendingUsersQuery = useMemoFirebase(() => {
-      if (!firestore || !isSuperAdmin) return null;
-      return query(collection(firestore, 'users'), where('status', '==', 'pending'));
-  }, [firestore, isSuperAdmin]);
-  const { data: pendingUsers } = useCollection<UserProfile>(pendingUsersQuery);
-
-  const overdueInvoices = useMemo(() => {
-    if (!allInvoices) return [];
+  const overdueCount = useMemo(() => {
+    if (!allInvoices) return 0;
     const today = startOfToday();
-    return allInvoices.filter(inv => {
-        if (inv.status === 'paid' || !inv.dueDate) return false;
-        return isBefore(parseISO(inv.dueDate), today);
-    });
+    return allInvoices.filter(inv => inv.status !== 'paid' && inv.dueDate && isBefore(parseISO(inv.dueDate), today)).length;
   }, [allInvoices]);
-
-  const emptyPoValue = useMemo(() => {
-    if (!allSales) return [];
-    return allSales.filter(s => s.amount <= 0);
-  }, [allSales]);
 
   useEffect(() => {
     if (!isUserLoading && !user) {
@@ -142,330 +126,200 @@ export default function DashboardLayout({
 
   if (isUserLoading || isProfileLoading || !user) {
     return (
-      <div className="flex h-screen w-full items-center justify-center">
-        <div className="flex flex-col items-center gap-2">
-           <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
-           <p className="text-sm text-muted-foreground">Memuat Profil Dakota...</p>
+      <div className="flex h-screen w-full items-center justify-center bg-slate-50">
+        <div className="flex flex-col items-center gap-4">
+           <div className="h-10 w-10 animate-spin rounded-full border-4 border-indigo-600 border-t-transparent" />
+           <p className="text-xs font-black uppercase tracking-[0.3em] text-slate-400">Authenticating Dakota...</p>
         </div>
       </div>
     );
   }
 
-  if (isPending) {
-      return (
-        <div className="flex h-screen w-full flex-col items-center justify-center bg-background p-4">
-            <div className="max-w-md w-full text-center space-y-6">
-                <div className="bg-yellow-100 dark:bg-yellow-900/30 p-4 rounded-full w-20 h-20 flex items-center justify-center mx-auto">
-                    <ShieldAlert className="h-10 w-10 text-yellow-600 dark:text-yellow-50" />
-                </div>
-                <div className="space-y-2">
-                    <h1 className="text-2xl font-bold">Menunggu Persetujuan</h1>
-                    <p className="text-muted-foreground">
-                        Halo <strong>{userProfile?.displayName}</strong>. Akun Anda berhasil dibuat namun saat ini berstatus <strong>Pending</strong>.
-                    </p>
-                    <p className="text-sm text-muted-foreground">
-                        Mohon hubungi Leader (fa@gmail.com) untuk mengaktifkan akses Anda ke sistem.
-                    </p>
-                </div>
-                <div className="pt-4">
-                    <Button variant="outline" className="w-full" onClick={handleLogout}>
-                        <LogOut className="mr-2 h-4 w-4" /> Keluar dari Sistem
-                    </Button>
-                </div>
-            </div>
-        </div>
-      );
-  }
-
   return (
     <SidebarProvider>
-      <Sidebar collapsible="icon">
-        <SidebarHeader className="group-data-[collapsible=icon]:p-0">
-          <div className="flex items-center gap-2 px-2 py-4 group-data-[collapsible=icon]:justify-center transition-all duration-200 overflow-hidden">
-            <Avatar className="w-10 h-10 border-2 border-primary shrink-0">
-              <AvatarImage src={user?.photoURL || ""} />
-              <AvatarFallback className="bg-primary text-white font-bold">
-                {userProfile?.displayName?.charAt(0).toUpperCase() || user?.email?.charAt(0).toUpperCase() || 'U'}
-              </AvatarFallback>
-            </Avatar>
+      <Sidebar collapsible="icon" className="glass-sidebar">
+        <SidebarHeader className="p-4 mb-2">
+          <div className="flex items-center gap-3 transition-all duration-300">
+            <div className="bg-indigo-600 rounded-xl p-2 shadow-lg shadow-indigo-900/20">
+                <TrendingUp className="h-6 w-6 text-white" />
+            </div>
             <div className="flex flex-col overflow-hidden group-data-[collapsible=icon]:hidden">
-              <span className="font-bold text-sm truncate flex items-center gap-1">
-                {userProfile?.displayName || user?.displayName || 'Admin Dakota'}
-                {isSuperAdmin && <BadgeCheck className="h-3 w-3 text-blue-600" />}
-              </span>
-              <span className="text-[10px] text-muted-foreground uppercase font-bold">
-                 {userRole}
-              </span>
+              <span className="font-black text-lg tracking-tighter text-white uppercase italic">Dakota Hub</span>
+              <span className="text-[9px] font-black text-indigo-400 uppercase tracking-widest leading-none">Intelligence v2.0</span>
             </div>
           </div>
         </SidebarHeader>
-        <SidebarContent>
-          <SidebarMenu>
-            <SidebarMenuItem>
-              <SidebarMenuButton 
-                asChild 
-                isActive={pathname === '/dashboard'} 
-                tooltip="Menampilkan ringkasan data statistik invoice, status pembayaran, dan grafik monitoring secara keseluruhan."
-              >
-                <Link href="/dashboard"><LayoutDashboard /> <span>Dashboard</span></Link>
-              </SidebarMenuButton>
-            </SidebarMenuItem>
 
-            <SidebarMenuItem>
-              <SidebarMenuButton 
-                asChild 
-                isActive={pathname === '/dashboard/monitoring'} 
-                tooltip="Memantau aktivitas log sistem dan status antrean data transaksi secara real-time."
-              >
-                <Link href="/dashboard/monitoring"><Eye /> <span>Monitoring</span></Link>
-              </SidebarMenuButton>
-            </SidebarMenuItem>
-            
-            <Collapsible asChild defaultOpen={pathname.startsWith('/dashboard/invoices')} className="group/collapsible">
-              <SidebarMenuItem>
-                <CollapsibleTrigger asChild>
-                    <SidebarMenuButton tooltip="Manajemen penagihan dokumen.">
-                      <FileText /> <span>Invoices</span>
-                      <div className="grow" />
-                      <ChevronDown className={cn('h-4 w-4 transition-transform', 'group-data-[state=open]/collapsible:rotate-180')} />
-                    </SidebarMenuButton>
-                </CollapsibleTrigger>
-                <CollapsibleContent asChild>
-                  <SidebarMenuSub>
-                    <SidebarMenuSubItem>
-                      <SidebarMenuSubButton 
-                        asChild 
-                        isActive={pathname === '/dashboard/invoices'}
-                        tooltip="Daftar seluruh invoice (Draft, Final, Cancel) untuk pengecekan dan cetak ulang."
-                      >
-                        <Link href="/dashboard/invoices">Invoice List</Link>
-                      </SidebarMenuSubButton>
-                    </SidebarMenuSubItem>
-                    <SidebarMenuSubItem>
-                      <SidebarMenuSubButton 
-                        asChild 
-                        isActive={pathname.startsWith('/dashboard/invoices/add')}
-                        tooltip="Membuat draf invoice baru (Akses terbuka otomatis setelah registrasi nomor di Invoice Number)."
-                      >
-                        <Link href="/dashboard/invoices/number">Add Invoice</Link>
-                      </SidebarMenuSubButton>
-                    </SidebarMenuSubItem>
-                    <SidebarMenuSubItem>
-                      <SidebarMenuSubButton 
-                        asChild 
-                        isActive={pathname === '/dashboard/invoices/number'}
-                        tooltip="Wajib diisi pertama kali untuk mendaftarkan dan mengunci nomor urut invoice sebelum penagihan."
-                      >
-                        <Link href="/dashboard/invoices/number">Invoice Number</Link>
-                      </SidebarMenuSubButton>
-                    </SidebarMenuSubItem>
-                     <SidebarMenuSubItem>
-                      <SidebarMenuSubButton 
-                        asChild 
-                        isActive={pathname === '/dashboard/invoices/virtual-account'}
-                        tooltip="Manajemen akun pembayaran Virtual Account pelanggan."
-                      >
-                        <Link href="/dashboard/invoices/virtual-account">Virtual Account List</Link>
-                      </SidebarMenuSubButton>
-                    </SidebarMenuSubItem>
-                     <SidebarMenuSubItem>
-                      <SidebarMenuSubButton 
-                        asChild 
-                        isActive={pathname === '/dashboard/invoices/spd'}
-                        tooltip="Sinkronisasi data pengiriman barang dengan invoice terkait."
-                      >
-                        <Link href="/dashboard/invoices/spd">SPD</Link>
-                      </SidebarMenuSubButton>
-                    </SidebarMenuSubItem>
-                    {isAdmin && (
-                        <SidebarMenuSubItem>
-                          <SidebarMenuSubButton 
-                            asChild 
-                            isActive={pathname === '/dashboard/invoices/tax'}
-                            tooltip="Mengelola nomor seri faktur pajak dan data perpajakan terkait invoice."
-                          >
-                            <Link href="/dashboard/invoices/tax">Tax Invoices</Link>
-                          </SidebarMenuSubButton>
-                        </SidebarMenuSubItem>
-                    )}
-                  </SidebarMenuSub>
-                </CollapsibleContent>
-              </SidebarMenuItem>
-            </Collapsible>
-
-            <SidebarMenuItem>
-              <SidebarMenuButton 
-                asChild 
-                isActive={pathname.startsWith('/dashboard/products')} 
-                tooltip="Mengelola master data barang, jasa, kode produk, dan pengaturan harga satuan."
-              >
-                <Link href="/dashboard/products"><Package /> <span>Products</span></Link>
-              </SidebarMenuButton>
-            </SidebarMenuItem>
-            <SidebarMenuItem>
-              <SidebarMenuButton 
-                asChild 
-                isActive={pathname === '/dashboard/sales-orders'} 
-                tooltip="Manajemen dokumen pesanan pelanggan yang menjadi dasar pembuatan tagihan/invoice."
-              >
-                <Link href="/dashboard/sales-orders"><ShoppingCart /> <span>Sales Orders</span></Link>
-              </SidebarMenuButton>
-            </SidebarMenuItem>
-            <SidebarMenuItem>
-              <SidebarMenuButton 
-                asChild 
-                isActive={pathname.startsWith('/dashboard/customers')} 
-                tooltip="Database profil pelanggan, alamat kirim, dan informasi detail kontak penagihan."
-              >
-                <Link href="/dashboard/customers"><Users /> <span>Customers</span></Link>
-              </SidebarMenuButton>
-            </SidebarMenuItem>
-
-             <SidebarMenuItem>
-                <SidebarMenuButton 
-                  asChild 
-                  isActive={pathname.startsWith('/dashboard/sales')} 
-                  tooltip="Laporan rekapitulasi seluruh transaksi penjualan yang telah dilakukan."
-                >
-                    <Link href="/dashboard/sales"><ShoppingCart /> <span>Sales List</span></Link>
-                </SidebarMenuButton>
-            </SidebarMenuItem>
-
-            {isSuperAdmin && (
-               <SidebarMenuItem>
-                  <SidebarMenuButton 
-                    asChild 
-                    isActive={pathname === '/dashboard/users'} 
-                    tooltip="Mengatur hak akses pengguna (Admin, Leader, Staff) dan keamanan akun."
-                  >
-                      <Link href="/dashboard/users"><UserCog /> <span>User Management</span></Link>
-                  </SidebarMenuButton>
-              </SidebarMenuItem>
-            )}
-
-             <SidebarMenuItem>
-              <SidebarMenuButton 
-                asChild 
-                isActive={pathname === '/dashboard/calendar'} 
-                tooltip="Menampilkan jadwal jatuh tempo penagihan dan pengingat aktivitas harian."
-              >
-                <Link href="/dashboard/calendar"><Calendar /> <span>Calendar</span></Link>
-              </SidebarMenuButton>
-            </SidebarMenuItem>
-          </SidebarMenu>
-        </SidebarContent>
-        <SidebarFooter>
+        <SidebarContent className="px-3">
+          <SidebarGroup>
+            <SidebarGroupLabel className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500 mb-2 px-2">Main Core</SidebarGroupLabel>
             <SidebarMenu>
-                {isAdmin && (
-                    <SidebarMenuItem>
-                        <SidebarMenuButton 
-                          asChild 
-                          isActive={pathname === '/dashboard/settings'} 
-                          tooltip="Konfigurasi profil perusahaan, nomor rekening/VA, logo, dan tanda tangan digital."
-                        >
-                            <Link href="/dashboard/settings"><Settings /> <span>Pengaturan</span></Link>
-                        </SidebarMenuButton>
-                    </SidebarMenuItem>
-                )}
+              <SidebarMenuItem>
+                <SidebarMenuButton asChild isActive={pathname === '/dashboard'} className="hover:bg-slate-800 transition-smooth rounded-xl">
+                  <Link href="/dashboard" className="flex items-center gap-3 py-6">
+                    <LayoutDashboard className={cn("h-5 w-5", pathname === '/dashboard' ? "text-indigo-400" : "text-slate-400")} />
+                    <span className="font-bold text-sm">Overview</span>
+                  </Link>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+              <SidebarMenuItem>
+                <SidebarMenuButton asChild isActive={pathname === '/dashboard/monitoring'} className="hover:bg-slate-800 transition-smooth rounded-xl">
+                  <Link href="/dashboard/monitoring" className="flex items-center gap-3 py-6">
+                    <Eye className={cn("h-5 w-5", pathname === '/dashboard/monitoring' ? "text-amber-400" : "text-slate-400")} />
+                    <span className="font-bold text-sm">Real-time Monitor</span>
+                  </Link>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
             </SidebarMenu>
-            <Button variant="ghost" className="w-full justify-start mt-2 group-data-[collapsible=icon]:px-0 group-data-[collapsible=icon]:justify-center" onClick={handleLogout}>
-                <LogOut className="mr-2 h-4 w-4 shrink-0" />
-                <span className="grow text-left group-data-[collapsible=icon]:hidden">Keluar</span>
+          </SidebarGroup>
+
+          <SidebarGroup className="mt-4">
+            <SidebarGroupLabel className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500 mb-2 px-2">Commercial Pipeline</SidebarGroupLabel>
+            <SidebarMenu>
+              <SidebarMenuItem>
+                <SidebarMenuButton asChild isActive={pathname.startsWith('/dashboard/sales-orders')} className="hover:bg-slate-800 rounded-xl">
+                  <Link href="/dashboard/sales-orders" className="flex items-center gap-3 py-6">
+                    <ShoppingCart className={cn("h-5 w-5", pathname.startsWith('/dashboard/sales-orders') ? "text-blue-400" : "text-slate-400")} />
+                    <span className="font-bold text-sm">Active Orders (SO)</span>
+                  </Link>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+
+              <SidebarMenuItem>
+                <SidebarMenuButton asChild isActive={pathname.startsWith('/dashboard/invoices')} className="hover:bg-slate-800 rounded-xl">
+                    <Link href="/dashboard/invoices" className="flex items-center gap-3 py-6">
+                        <FileText className={cn("h-5 w-5", pathname.startsWith('/dashboard/invoices') ? "text-emerald-400" : "text-slate-400")} />
+                        <span className="font-bold text-sm">Billing Docs</span>
+                    </Link>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+
+              <SidebarMenuItem>
+                <SidebarMenuButton asChild isActive={pathname === '/dashboard/sales-management'} className="hover:bg-slate-800 rounded-xl">
+                    <Link href="/dashboard/sales-management" className="flex items-center gap-3 py-6">
+                        <History className={cn("h-5 w-5", pathname === '/dashboard/sales-management' ? "text-rose-400" : "text-slate-400")} />
+                        <span className="font-bold text-sm">Buku Piutang (AR)</span>
+                    </Link>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+            </SidebarMenu>
+          </SidebarGroup>
+
+          <SidebarGroup className="mt-4">
+            <SidebarGroupLabel className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500 mb-2 px-2">Data Master</SidebarGroupLabel>
+            <SidebarMenu>
+              <SidebarMenuItem>
+                <SidebarMenuButton asChild isActive={pathname.startsWith('/dashboard/customers')} className="hover:bg-slate-800 rounded-xl">
+                  <Link href="/dashboard/customers" className="flex items-center gap-3 py-6">
+                    <Users className={cn("h-5 w-5", pathname.startsWith('/dashboard/customers') ? "text-indigo-400" : "text-slate-400")} />
+                    <span className="font-bold text-sm">Legal Customers</span>
+                  </Link>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+              <SidebarMenuItem>
+                <SidebarMenuButton asChild isActive={pathname.startsWith('/dashboard/products')} className="hover:bg-slate-800 rounded-xl">
+                  <Link href="/dashboard/products" className="flex items-center gap-3 py-6">
+                    <Package className={cn("h-5 w-5", pathname.startsWith('/dashboard/products') ? "text-amber-400" : "text-slate-400")} />
+                    <span className="font-bold text-sm">Material Catalog</span>
+                  </Link>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+            </SidebarMenu>
+          </SidebarGroup>
+        </SidebarContent>
+
+        <SidebarFooter className="p-4 border-t border-slate-800">
+            <div className="flex items-center gap-3 p-2 bg-slate-900 rounded-2xl mb-4">
+                <Avatar className="h-10 w-10 border-2 border-indigo-500/50">
+                    <AvatarImage src={user?.photoURL || ""} />
+                    <AvatarFallback className="bg-indigo-600 text-white font-black">{user?.email?.charAt(0).toUpperCase()}</AvatarFallback>
+                </Avatar>
+                <div className="flex flex-col min-w-0 group-data-[collapsible=icon]:hidden">
+                    <span className="text-[10px] font-black uppercase text-indigo-400 leading-none mb-1">{userRole}</span>
+                    <span className="text-xs font-bold text-white truncate">{userProfile?.displayName || user?.email}</span>
+                </div>
+            </div>
+            <Button variant="ghost" onClick={handleLogout} className="w-full justify-start text-slate-400 hover:text-rose-400 hover:bg-rose-500/10 rounded-xl px-2 h-11 group-data-[collapsible=icon]:justify-center">
+                <LogOut className="h-5 w-5 mr-3 shrink-0" />
+                <span className="font-black text-xs uppercase tracking-widest group-data-[collapsible=icon]:hidden">Sign Out</span>
             </Button>
         </SidebarFooter>
       </Sidebar>
-      <SidebarInset>
-        <header className="flex h-14 items-center gap-4 border-b bg-background px-4 md:px-6 sticky top-0 z-30 transition-all duration-300">
-            <SidebarTrigger className="-ml-1" />
-            <div className="w-full flex-1">
-               <div className="relative">
-                  <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-                  <Input type="search" placeholder="Cari data Dakota..." className="w-full appearance-none bg-background pl-8 shadow-none md:w-2/3 lg:w-1/3" />
+
+      <SidebarInset className="bg-slate-50/50">
+        <header className="flex h-16 items-center gap-6 border-b bg-white/80 backdrop-blur-md px-6 sticky top-0 z-40 shadow-sm transition-all duration-300">
+            <SidebarTrigger className="text-slate-400 hover:text-indigo-600" />
+            
+            <div className="flex-1 max-w-xl">
+               <div className="relative group">
+                  <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 group-focus-within:text-indigo-600 transition-colors" />
+                  <Input 
+                    type="search" 
+                    placeholder="Quick search documents, PO, or customer..." 
+                    className="w-full h-10 bg-slate-50 border-none focus-visible:ring-2 focus-visible:ring-indigo-100 rounded-2xl pl-10 font-medium text-sm transition-all"
+                  />
+                  <div className="absolute right-3 top-1/2 -translate-y-1/2 hidden md:flex items-center gap-1">
+                      <kbd className="px-1.5 py-0.5 rounded border bg-white text-[10px] font-mono text-slate-400">CTRL</kbd>
+                      <kbd className="px-1.5 py-0.5 rounded border bg-white text-[10px] font-mono text-slate-400">K</kbd>
+                  </div>
                 </div>
             </div>
-            <div className="flex items-center gap-4">
+
+            <div className="flex items-center gap-4 ml-auto">
                 <ThemeToggle />
                 
-                <Popover>
-                    <PopoverTrigger asChild>
-                        <Button variant="ghost" size="icon" className="relative">
-                            <Bell className="h-5 w-5" />
-                            {(overdueInvoices.length > 0 || emptyPoValue.length > 0 || (isSuperAdmin && pendingUsers && pendingUsers.length > 0)) && (
-                                <span className="absolute top-2 right-2.5 flex h-2.5 w-2.5">
-                                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
-                                    <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-red-500"></span>
-                                </span>
-                            )}
+                <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                        <Button className="bg-indigo-600 hover:bg-indigo-700 shadow-lg shadow-indigo-100 h-10 px-6 rounded-2xl gap-2 font-black uppercase text-[10px] tracking-widest text-white transition-smooth active:scale-95">
+                            <Plus className="h-4 w-4" /> Quick Add
                         </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-80 p-0" align="end">
-                        <div className="p-4 border-b bg-muted/50"><h3 className="font-bold text-sm">Notifikasi Dakota</h3></div>
-                        <div className="max-h-[350px] overflow-y-auto">
-                            <div className="p-2 space-y-2">
-                                {overdueInvoices.map(inv => (
-                                    <div key={inv.id} className="p-3 rounded-lg border border-red-100 bg-red-50/50 hover:bg-red-50 transition-colors cursor-pointer" onClick={() => router.push('/dashboard/invoices')}>
-                                        <p className="text-sm font-bold text-red-700">Invoice Overdue!</p>
-                                        <p className="text-xs text-red-600 mt-1">{inv.id} - {inv.customer}</p>
-                                    </div>
-                                ))}
-                                {emptyPoValue.map(po => (
-                                    <div key={po.poNumber} className="p-3 rounded-lg border border-yellow-100 bg-yellow-50/50 hover:bg-yellow-50 transition-colors cursor-pointer" onClick={() => router.push('/dashboard/sales')}>
-                                        <p className="text-sm font-bold text-yellow-700">Amount PO Kosong</p>
-                                        <p className="text-xs text-yellow-600 mt-1">PO: {po.poNumber} belum ada nilainya.</p>
-                                    </div>
-                                ))}
-                                {isSuperAdmin && pendingUsers && pendingUsers.map(u => (
-                                    <div key={u.uid} className="p-3 rounded-lg border bg-blue-50/50 hover:bg-blue-100/50 cursor-pointer transition-colors" onClick={() => router.push('/dashboard/users')}>
-                                        <p className="text-sm font-semibold">User Baru Mendaftar</p>
-                                        <p className="text-xs text-muted-foreground mt-1"><strong>{u.displayName || u.email}</strong></p>
-                                        <div className="flex items-center gap-1 text-[10px] text-blue-600 font-bold uppercase mt-2"><UserCog className="h-3 w-3" /> Klik untuk aktivasi</div>
-                                    </div>
-                                ))}
-                                {overdueInvoices.length === 0 && emptyPoValue.length === 0 && (!isSuperAdmin || (pendingUsers && pendingUsers.length === 0)) && (
-                                    <div className="p-8 text-center text-sm text-muted-foreground flex flex-col items-center gap-2">
-                                        <Bell className="h-8 w-8 opacity-20" /><p>Tidak ada pemberitahuan baru.</p>
-                                    </div>
-                                )}
-                            </div>
-                        </div>
-                    </PopoverContent>
-                </Popover>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" className="w-56 p-2 rounded-2xl shadow-premium border-none ring-1 ring-slate-100">
+                        <DropdownMenuItem onClick={() => router.push('/dashboard/sales-orders')} className="rounded-xl py-3 cursor-pointer"><ShoppingCart className="mr-3 h-4 w-4 text-blue-500" /> Buat SO Baru</DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => router.push('/dashboard/sales')} className="rounded-xl py-3 cursor-pointer"><Layers className="mr-3 h-4 w-4 text-indigo-500" /> Daftarkan PO</DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => router.push('/dashboard/customers')} className="rounded-xl py-3 cursor-pointer"><Users className="mr-3 h-4 w-4 text-emerald-500" /> Tambah Customer</DropdownMenuItem>
+                    </DropdownMenuContent>
+                </DropdownMenu>
+
+                <Button variant="ghost" size="icon" className="relative h-10 w-10 rounded-2xl bg-slate-50 text-slate-400 hover:bg-slate-100">
+                    <Bell className="h-5 w-5" />
+                    {overdueCount > 0 && (
+                        <span className="absolute top-2 right-2 flex h-2.5 w-2.5">
+                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-75"></span>
+                            <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-rose-500"></span>
+                        </span>
+                    )}
+                </Button>
+
+                <div className="h-8 w-px bg-slate-200 mx-2" />
 
                 <DropdownMenu>
                     <DropdownMenuTrigger asChild>
-                    <Button variant="ghost" className="relative h-8 w-8 rounded-full border-2 border-muted hover:border-primary transition-all">
-                        <Avatar className="h-8 w-8">
-                        <AvatarImage src={user?.photoURL || ""} alt={userProfile?.displayName || "User"} />
-                        <AvatarFallback>{userProfile?.displayName?.charAt(0).toUpperCase() || user?.email?.charAt(0).toUpperCase() || 'U'}</AvatarFallback>
-                        </Avatar>
-                    </Button>
+                        <Button variant="ghost" className="relative h-10 w-10 rounded-2xl border-2 border-slate-100 p-0 hover:border-indigo-400 transition-all overflow-hidden shadow-sm">
+                            <Avatar className="h-full w-full">
+                                <AvatarImage src={user?.photoURL || ""} />
+                                <AvatarFallback className="bg-slate-50 text-indigo-600 font-black">{user?.email?.charAt(0).toUpperCase()}</AvatarFallback>
+                            </Avatar>
+                        </Button>
                     </DropdownMenuTrigger>
-                    <DropdownMenuContent className="w-56" align="end" forceMount>
-                    <DropdownMenuLabel className="font-normal">
-                        <div className="flex flex-col space-y-1">
-                        <p className="text-sm font-bold leading-none flex items-center gap-1">
-                          {userProfile?.displayName || user?.displayName || "Leader Dakota"}
-                          {isSuperAdmin && <BadgeCheck className="h-3 w-3 text-blue-600" />}
-                        </p>
-                        <p className="text-xs leading-none text-muted-foreground truncate">{user?.email}</p>
-                        <div className="flex gap-1 mt-1">
-                            <Badge variant="secondary" className="text-[10px] py-0">{userRole}</Badge>
+                    <DropdownMenuContent className="w-64 p-2 rounded-2xl shadow-premium border-none ring-1 ring-slate-100" align="end">
+                        <div className="p-4 mb-2 bg-slate-50 rounded-xl">
+                            <p className="text-[10px] font-black uppercase text-indigo-600 mb-1 leading-none tracking-widest">{userRole} AUTHENTICATED</p>
+                            <p className="text-sm font-black text-slate-900 truncate leading-none mt-2">{userProfile?.displayName || user?.email}</p>
                         </div>
-                        </div>
-                    </DropdownMenuLabel>
-                    <DropdownMenuSeparator />
-                    <DropdownMenuItem asChild><Link href="/dashboard/settings">Pengaturan Profil</Link></DropdownMenuItem>
-                    {isSuperAdmin && <DropdownMenuItem asChild><Link href="/dashboard/users">User Management</Link></DropdownMenuItem>}
-                    <DropdownMenuSeparator />
-                    <DropdownMenuItem onClick={handleLogout} className="text-red-600"><LogOut className="mr-2 h-4 w-4" /> Keluar</DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => router.push('/dashboard/settings')} className="rounded-xl py-3"><Settings className="mr-3 h-4 w-4" /> Account Settings</DropdownMenuItem>
+                        {isSuperAdmin && <DropdownMenuItem onClick={() => router.push('/dashboard/users')} className="rounded-xl py-3"><UserCog className="mr-3 h-4 w-4" /> Admin Console</DropdownMenuItem>}
+                        <DropdownMenuSeparator className="my-2" />
+                        <DropdownMenuItem onClick={handleLogout} className="text-rose-600 rounded-xl py-3 focus:bg-rose-50 focus:text-rose-600"><LogOut className="mr-3 h-4 w-4" /> Sign Out</DropdownMenuItem>
                     </DropdownMenuContent>
                 </DropdownMenu>
             </div>
         </header>
-        <div className="flex-1 overflow-auto">
+
+        <div className="flex-1 p-6 md:p-10 animate-in fade-in slide-in-from-bottom-4 duration-700">
           {children}
         </div>
-        </SidebarInset>
+      </SidebarInset>
     </SidebarProvider>
   );
 }

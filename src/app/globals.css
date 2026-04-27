@@ -4,7 +4,7 @@
 
 @layer base {
   :root {
-    /* Mode Terang: Clean & Professional */
+    /* Mode Terang: Clean & Executive */
     --background: 210 40% 98%; /* Slate 50 base */
     --foreground: 222 47% 11%; /* Slate 900 */
     --card: 0 0% 100%;
@@ -24,66 +24,42 @@
     --accent: 210 40% 96.1%;
     --accent-foreground: 222.2 47.4% 11.2%;
     
-    /* Status Colors - Standard Dakota */
-    --success: 142 71% 45%; /* Emerald 500 */
+    /* Status Colors */
+    --success: 142 71% 45%;
     --destructive: 0 84% 60%;
-    --warning: 38 92% 50%; /* Amber 500 */
+    --warning: 38 92% 50%;
     
     --border: 214.3 31.8% 91.4%;
     --input: 214.3 31.8% 91.4%;
     --ring: 239 84% 67%;
     
-    --radius: 0.75rem;
+    --radius: 1rem; /* Global 16px radius */
 
-    --sidebar-background: 0 0% 100%;
-    --sidebar-foreground: 222 47% 11%;
+    /* Sidebar Glassmorphism */
+    --sidebar-background: 222 47% 11%;
+    --sidebar-foreground: 210 40% 98%;
     --sidebar-primary: 239 84% 67%;
     --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 210 40% 96.1%;
-    --sidebar-accent-foreground: 222.2 47.4% 11.2%;
-    --sidebar-border: 214.3 31.8% 91.4%;
+    --sidebar-accent: 239 84% 67% / 0.1;
+    --sidebar-accent-foreground: 210 40% 98%;
+    --sidebar-border: 217.2 32.6% 17.5%;
     --sidebar-ring: 239 84% 67%;
   }
 
   .dark {
-    /* Mode Gelap: Deep & Premium */
-    --background: 222 47% 7%; /* Deeper Slate */
-    --foreground: 210 40% 98%; /* Slate 50 */
-    
-    --card: 222 47% 10%; /* Slate 900-ish */
+    --background: 222 47% 7%;
+    --foreground: 210 40% 98%;
+    --card: 222 47% 10%;
     --card-foreground: 210 40% 98%;
-    
     --popover: 222 47% 10%;
     --popover-foreground: 210 40% 98%;
-    
-    --primary: 235 89% 74%; /* Indigo 400 */
+    --primary: 235 89% 74%;
     --primary-foreground: 222.2 47.4% 11.2%;
-    
-    --secondary: 217.2 32.6% 17.5%;
-    --secondary-foreground: 210 40% 98%;
-    
     --muted: 217.2 32.6% 17.5%;
-    --muted-foreground: 215 20.2% 65.1%; /* Slate 400 */
-    
-    --accent: 217.2 32.6% 17.5%;
-    --accent-foreground: 210 40% 98%;
-    
-    --success: 142 70% 58%; /* Emerald 400 */
-    --destructive: 0 84% 70%;
-    --warning: 45 93% 58%; /* Amber 400 */
-    
+    --muted-foreground: 215 20.2% 65.1%;
     --border: 217.2 32.6% 18%;
     --input: 217.2 32.6% 18%;
     --ring: 235 89% 74%;
-
-    --sidebar-background: 222 47% 10%;
-    --sidebar-foreground: 210 40% 98%;
-    --sidebar-primary: 235 89% 74%;
-    --sidebar-primary-foreground: 222.2 47.4% 11.2%;
-    --sidebar-accent: 217.2 32.6% 18%;
-    --sidebar-accent-foreground: 210 40% 98%;
-    --sidebar-border: 217.2 32.6% 18%;
-    --sidebar-ring: 235 89% 74%;
   }
 }
 
@@ -94,10 +70,24 @@
   body {
     @apply bg-background text-foreground;
     font-feature-settings: "rlig" 1, "calt" 1;
-    line-height: 1.5;
+    line-height: 1.6;
   }
 }
 
-.shadow-sm { box-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.05); }
-.shadow-md { box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.05), 0 2px 4px -2px rgb(0 0 0 / 0.05); }
-.shadow-xl { box-shadow: 0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1); }
+/* Glassmorphism Classes */
+.glass-sidebar {
+  @apply bg-slate-950/95 backdrop-blur-md border-r border-slate-800;
+}
+
+.shadow-soft {
+  box-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.05), 0 4px 10px -5px rgba(0, 0, 0, 0.02);
+}
+
+.shadow-premium {
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.08);
+}
+
+/* Transitions */
+.transition-smooth {
+  @apply transition-all duration-300 ease-in-out;
+}
