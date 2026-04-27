@@ -70,7 +70,7 @@ import { Badge } from '@/components/ui/badge';
 import React, { useEffect, useMemo } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { ThemeToggle } from '../components/toggle-theme';
+import { ThemeToggle } from '../components/theme-toggle';
 import { cn } from '@/lib/utils';
 import { useAuth, useUser, useFirestore, useDoc, useMemoFirebase, useCollection } from '@/firebase';
 import { signOut } from 'firebase/auth';
