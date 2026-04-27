@@ -34,6 +34,15 @@ import {
 } from '@/components/ui/sheet';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+} from '@/components/ui/dialog';
+import { Checkbox } from '@/components/ui/checkbox';
 import { cn, formatNumberWithCommas, parseFormattedNumber } from '@/lib/utils';
 import { format, addDays } from 'date-fns';
 import {
@@ -54,11 +63,12 @@ import {
   Layers,
   MapPin,
   FileText,
+  Pencil,
 } from 'lucide-react';
 import { type Invoice, type SalesOrder, type UserProfile, type InvoiceItem, type InvoiceNumber, type ProductListItem, type SalesListItem, type Customer } from '@/app/lib/data';
 import { useToast } from '@/hooks/use-toast';
 import { useFirestore, useCollection, useMemoFirebase, useUser, useDoc, errorEmitter, FirestorePermissionError } from '@/firebase';
-import { collection, query, doc, setDoc, arrayUnion } from 'firebase/firestore';
+import { collection, query, doc, setDoc, arrayUnion, updateDoc } from 'firebase/firestore';
 import { Badge } from '@/components/ui/badge';
 import {
     Command,
@@ -130,7 +140,6 @@ export default function AddInvoicePage() {
   // --- FORM STATES ---
   const [items, setItems] = useState<InvoiceItem[]>([]);
   const [billingAddress, setBillingAddress] = useState('');
-  const [billingNpwp, setBillingNpwp] = useState('');
   const [issueDate, setIssueDate] = useState<Date>(new Date());
   const [dueDate, setDueDate] = useState<Date>(addDays(new Date(), 30));
   const [isDpInvoice, setIsDpInvoice] = useState(false);
@@ -138,6 +147,13 @@ export default function AddInvoicePage() {
   const [productPopoverOpen, setProductPopoverOpen] = useState(false);
   const [isProcessing, setIsSaving] = useState(false);
   const [historySearch, setHistorySearch] = useState('');
+
+  // QUICK EDIT STATES
+  const [isQuickEditOpen, setIsQuickEditOpen] = useState(false);
+  const [editTarget, setEditTarget] = useState<'name' | 'address'>('name');
+  const [tempName, setTempName] = useState('');
+  const [tempAddress, setTempAddress] = useState('');
+  const [updateMaster, setUpdateMaster] = useState(true);
 
   // --- LOGIKA "THE GOLDEN KEY" (PO HISTORY) ---
   const poBillingHistory = useMemo(() => {
@@ -176,7 +192,7 @@ export default function AddInvoicePage() {
 
   const remainingPoBalance = Math.max(0, totalPoValue - totalInvoicedSoFar);
 
-  // --- AUTO-PULL ADDRESS & NPWP LOGIC ---
+  // --- AUTO-PULL ADDRESS LOGIC ---
   useEffect(() => {
     if (activeIdentity?.customer && allCustomers && !billingAddress && !editInvoiceId) {
       const foundCustomer = allCustomers.find(c => c.name.toLowerCase() === activeIdentity.customer.toLowerCase());
@@ -184,7 +200,6 @@ export default function AddInvoicePage() {
         const defaultAddr = foundCustomer.addresses?.find(a => a.isDefault) || foundCustomer.addresses?.[0];
         if (defaultAddr) {
           setBillingAddress(defaultAddr.address);
-          if (defaultAddr.npwp) setBillingNpwp(defaultAddr.npwp);
         }
       }
     }
@@ -222,7 +237,6 @@ export default function AddInvoicePage() {
           }
 
           if (activeIdentity.billingAddress) setBillingAddress(activeIdentity.billingAddress);
-          if ((activeIdentity as Invoice).billingNpwp) setBillingNpwp((activeIdentity as Invoice).billingNpwp!);
           
           setIsDpInvoice(!!(activeIdentity as Invoice).isDpInvoice);
           setNegotiationValue(formatNumberWithCommas((activeIdentity as Invoice).negotiation || 0));
@@ -338,6 +352,59 @@ export default function AddInvoicePage() {
       toast({ title: "Baris Item Dihapus" });
   };
 
+  // QUICK UPDATE LOGIC
+  const openQuickEdit = (type: 'name' | 'address') => {
+      if (!activeIdentity) return;
+      setEditTarget(type);
+      setTempName(activeIdentity.customer);
+      setTempAddress(billingAddress);
+      setIsQuickEditOpen(true);
+  };
+
+  const handleSaveQuickUpdate = async () => {
+    if (!firestore || !activeIdentity) return;
+    
+    try {
+        const safeId = activeIdentity.id.replace(/\//g, '_');
+        const identityDocRef = doc(firestore, 'invoiceNumbers', safeId);
+        const invoiceDocRef = doc(firestore, 'invoices', safeId);
+
+        const updatePayload: any = {};
+        if (editTarget === 'name') updatePayload.customer = tempName;
+        else updatePayload.billingAddress = tempAddress;
+
+        // 1. Update Current Document(s)
+        await updateDoc(identityDocRef, updatePayload);
+        if (existingInvoiceData) {
+            await updateDoc(invoiceDocRef, updatePayload);
+        }
+
+        // 2. Optional Update Master Customer
+        if (updateMaster && allCustomers) {
+            const masterCustomer = allCustomers.find(c => c.name.toLowerCase() === activeIdentity.customer.toLowerCase());
+            if (masterCustomer?.id) {
+                const masterRef = doc(firestore, 'customers', masterCustomer.id);
+                if (editTarget === 'name') {
+                    updateDoc(masterRef, { name: tempName });
+                } else {
+                    // Update matching or first address
+                    const updatedAddresses = (masterCustomer.addresses || []).map(a => 
+                        a.address === billingAddress || a.isDefault ? { ...a, address: tempAddress } : a
+                    );
+                    updateDoc(masterRef, { addresses: updatedAddresses });
+                }
+            }
+        }
+
+        if (editTarget === 'address') setBillingAddress(tempAddress);
+        
+        toast({ title: "Data Berhasil Diperbarui" });
+        setIsQuickEditOpen(false);
+    } catch (e) {
+        toast({ variant: "destructive", title: "Gagal Update" });
+    }
+  };
+
   const handleSaveInvoice = async (invoiceStatus: any = 'sent', redirectToPreview = false) => {
     if (!firestore || !user || !activeIdentity) return;
 
@@ -364,7 +431,6 @@ export default function AddInvoicePage() {
         poNumber: activeIdentity.poNumber || '',
         customer: activeIdentity.customer,
         billingAddress: billingAddress,
-        billingNpwp: billingNpwp,
         date: format(issueDate, 'yyyy-MM-dd'),
         dueDate: format(dueDate, 'yyyy-MM-dd'),
         amount: grandTotalNumeric,
@@ -480,7 +546,20 @@ export default function AddInvoicePage() {
 
                   <div className="space-y-2">
                       <Label className="text-[10px] font-black uppercase text-slate-400 tracking-widest">Customer</Label>
-                      <div className="bg-slate-50 px-4 py-2.5 rounded-xl border border-slate-200 text-xs font-black uppercase truncate text-slate-700">{activeIdentity?.customer}</div>
+                      <div className="group relative">
+                        <div className="bg-slate-50 px-4 py-2.5 rounded-xl border border-slate-200 text-xs font-black uppercase truncate text-slate-700">
+                            {activeIdentity?.customer}
+                        </div>
+                        <Button 
+                            variant="ghost" 
+                            size="icon" 
+                            className="absolute -right-2 -top-2 h-6 w-6 rounded-full bg-indigo-600 text-white hover:bg-indigo-700 shadow-md opacity-0 group-hover:opacity-100 transition-opacity"
+                            onClick={() => openQuickEdit('name')}
+                            disabled={isLocked}
+                        >
+                            <Pencil className="h-3 w-3" />
+                        </Button>
+                      </div>
                   </div>
 
                   <div className="space-y-2">
@@ -492,16 +571,29 @@ export default function AddInvoicePage() {
                   </div>
 
                   <div className="md:col-span-3 space-y-2">
-                      <Label className="text-[10px] font-black uppercase text-slate-400 tracking-widest flex items-center gap-1">
-                          <MapPin className="h-3 w-3" /> Billing Address (Auto-Pulled from Customer Data)
-                      </Label>
-                      <textarea 
-                          value={billingAddress} 
-                          onChange={e => setBillingAddress(e.target.value)} 
-                          className="w-full min-h-[80px] rounded-xl border border-slate-200 bg-white px-4 py-3 text-xs font-medium focus-visible:ring-1 focus-visible:ring-indigo-500 outline-none"
-                          placeholder="Alamat lengkap penagihan..." 
-                          disabled={isLocked} 
-                      />
+                      <div className="flex justify-between items-center">
+                        <Label className="text-[10px] font-black uppercase text-slate-400 tracking-widest flex items-center gap-1">
+                            <MapPin className="h-3 w-3" /> Billing Address (HO/Site Selection)
+                        </Label>
+                        <Button 
+                            variant="link" 
+                            size="sm" 
+                            className="h-auto p-0 text-[9px] font-black uppercase text-indigo-600"
+                            onClick={() => openQuickEdit('address')}
+                            disabled={isLocked}
+                        >
+                            <Pencil className="h-2.5 w-2.5 mr-1" /> Quick Fix Alamat
+                        </Button>
+                      </div>
+                      <div className="relative group">
+                        <textarea 
+                            value={billingAddress} 
+                            onChange={e => setBillingAddress(e.target.value)} 
+                            className="w-full min-h-[80px] rounded-xl border border-slate-200 bg-white px-4 py-3 text-xs font-medium focus-visible:ring-1 focus-visible:ring-indigo-500 outline-none pr-10"
+                            placeholder="Alamat lengkap penagihan..." 
+                            disabled={isLocked} 
+                        />
+                      </div>
                   </div>
               </div>
             </CardContent>
@@ -793,6 +885,59 @@ export default function AddInvoicePage() {
           </Card>
         </div>
       </div>
+
+      {/* QUICK EDIT MODAL */}
+      <Dialog open={isQuickEditOpen} onOpenChange={setIsQuickEditOpen}>
+          <DialogContent className="sm:max-w-[450px] rounded-3xl">
+              <DialogHeader>
+                  <DialogTitle className="uppercase font-black tracking-tight text-indigo-700">Quick Fix Customer Data</DialogTitle>
+                  <DialogDescription>Perbarui data langsung dari halaman penagihan untuk akurasi audit.</DialogDescription>
+              </DialogHeader>
+              
+              <div className="py-6 space-y-6">
+                  {editTarget === 'name' ? (
+                      <div className="space-y-2">
+                        <Label className="text-[10px] font-black uppercase text-slate-400 tracking-widest">Nama Legal Perusahaan (PT)</Label>
+                        <Input 
+                            value={tempName} 
+                            onChange={e => setTempName(e.target.value)} 
+                            className="h-12 font-black uppercase bg-indigo-50/30 border-indigo-100 rounded-xl"
+                        />
+                      </div>
+                  ) : (
+                      <div className="space-y-2">
+                        <Label className="text-[10px] font-black uppercase text-slate-400 tracking-widest">Alamat Penagihan</Label>
+                        <textarea 
+                            value={tempAddress} 
+                            onChange={e => setTempAddress(e.target.value)} 
+                            className="w-full min-h-[120px] rounded-xl border border-indigo-100 bg-indigo-50/30 px-4 py-3 text-xs font-medium focus-visible:ring-1 focus-visible:ring-indigo-500 outline-none"
+                        />
+                      </div>
+                  )}
+
+                  <div className="flex items-center space-x-2 bg-slate-50 p-4 rounded-xl border border-dashed">
+                      <Checkbox 
+                        id="update-master" 
+                        checked={updateMaster} 
+                        onCheckedChange={(checked) => setUpdateMaster(!!checked)}
+                      />
+                      <label htmlFor="update-master" className="text-xs font-bold text-slate-600 cursor-pointer select-none">
+                          Simpan perubahan ini secara permanen ke Database Master Customer
+                      </label>
+                  </div>
+              </div>
+
+              <DialogFooter className="bg-slate-50 -mx-6 -mb-6 p-6 rounded-b-3xl">
+                  <Button variant="ghost" onClick={() => setIsQuickEditOpen(false)}>Batal</Button>
+                  <Button 
+                    className="bg-indigo-600 hover:bg-indigo-700 font-black uppercase tracking-widest px-8 shadow-lg shadow-indigo-100 rounded-xl"
+                    onClick={handleSaveQuickUpdate}
+                  >
+                      Update Sekarang
+                  </Button>
+              </DialogFooter>
+          </DialogContent>
+      </Dialog>
     </main>
   );
 }
