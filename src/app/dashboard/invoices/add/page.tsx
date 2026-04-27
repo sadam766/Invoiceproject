@@ -88,6 +88,7 @@ import {
 } from '@/components/ui/popover';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { TOOLTIP_CONTENT } from '@/app/lib/tooltip-content';
 
 export default function AddInvoicePage() {
   const router = useRouter();
@@ -307,6 +308,28 @@ export default function AddInvoicePage() {
       toast({ title: "Baris Item Dihapus" });
   };
 
+  const handleQuickEditSave = async () => {
+    if (!firestore || !user || !currentCustomer) return;
+    
+    // Update Local UI
+    if (editTarget === 'name') {
+        // Warning: Changing name might affect other docs if updated to master
+        if (updateMaster) {
+            await setDoc(doc(firestore, 'customers', currentCustomer.id!), { name: tempName }, { merge: true });
+            toast({ title: "Master Data Updated" });
+        }
+    } else {
+        if (updateMaster) {
+            const currentAddresses = currentCustomer.addresses || [];
+            const updatedAddresses = currentAddresses.map(a => a.address === billingAddress ? { ...a, address: tempAddress } : a);
+            await setDoc(doc(firestore, 'customers', currentCustomer.id!), { addresses: updatedAddresses }, { merge: true });
+            toast({ title: "Master Address Updated" });
+        }
+        setBillingAddress(tempAddress);
+    }
+    setIsQuickEditOpen(false);
+  };
+
   const handleSaveInvoice = async (invoiceStatus: any = 'sent', redirectToPreview = false) => {
     if (!firestore || !user || !activeIdentity) return;
 
@@ -430,8 +453,11 @@ export default function AddInvoicePage() {
                       </div>
                   </div>
 
-                  <div className="space-y-2">
-                      <Label className="text-[10px] font-black uppercase text-slate-400 tracking-widest">Customer Name</Label>
+                  <div className="space-y-2 group">
+                      <Label className="text-[10px] font-black uppercase text-slate-400 tracking-widest flex items-center justify-between">
+                        Customer Name
+                        <Button variant="ghost" size="icon" className="h-5 w-5 opacity-0 group-hover:opacity-100 transition-opacity" onClick={() => { setEditTarget('name'); setTempName(activeIdentity?.customer || ''); setIsQuickEditOpen(true); }}><Pencil className="h-3 w-3 text-indigo-600" /></Button>
+                      </Label>
                       <div className="bg-slate-50 px-4 py-2.5 rounded-xl border border-slate-200 text-xs font-black uppercase truncate text-slate-700">
                           {activeIdentity?.customer}
                       </div>
@@ -450,7 +476,19 @@ export default function AddInvoicePage() {
                         <Label className="text-[10px] font-black uppercase text-slate-400 tracking-widest flex items-center gap-1">
                             <MapPin className="h-3 w-3" /> Billing/Ship-to Address
                         </Label>
-                        <Badge variant="secondary" className="text-[8px] font-black uppercase bg-indigo-50 text-indigo-600">Locked from SO/Master</Badge>
+                        <div className="flex gap-2">
+                             {currentCustomer?.addresses?.map(addr => (
+                                 <Badge 
+                                    key={addr.id} 
+                                    variant="outline" 
+                                    className={cn("text-[8px] uppercase cursor-pointer hover:bg-indigo-50 transition-all font-black", billingAddress === addr.address ? "bg-indigo-600 text-white border-indigo-600" : "bg-white text-slate-400")}
+                                    onClick={() => setBillingAddress(addr.address)}
+                                 >
+                                    {addr.label}
+                                 </Badge>
+                             ))}
+                             <Button variant="ghost" size="icon" className="h-6 w-6 rounded-full" onClick={() => { setEditTarget('address'); setTempAddress(billingAddress); setIsQuickEditOpen(true); }}><Pencil className="h-3 w-3" /></Button>
+                        </div>
                       </div>
 
                       <div className="bg-slate-50/50 p-5 rounded-2xl border-2 border-slate-100 shadow-inner">
@@ -479,7 +517,7 @@ export default function AddInvoicePage() {
                                 </Badge>
                             </TooltipTrigger>
                             <TooltipContent className="max-w-xs bg-slate-900 text-white p-3 text-[10px]">
-                                Klik untuk berganti mode penagihan (DP vs Final).
+                                {isDpInvoice ? TOOLTIP_CONTENT.dp_mode : TOOLTIP_CONTENT.regular_billing}
                             </TooltipContent>
                         </Tooltip>
                     </TooltipProvider>
@@ -704,7 +742,16 @@ export default function AddInvoicePage() {
               <div className="bg-slate-50 p-6 rounded-2xl space-y-4 border border-slate-100">
                 <div className="flex justify-between items-center">
                     <Label className="text-[10px] font-black uppercase text-indigo-600 tracking-widest">Tax Sync (PPN 12%)</Label>
-                    <Switch checked={isTaxManual} onCheckedChange={setIsTaxManual} disabled={isLocked} />
+                    <TooltipProvider>
+                        <Tooltip>
+                            <TooltipTrigger asChild>
+                                <div><Switch checked={isTaxManual} onCheckedChange={setIsTaxManual} disabled={isLocked} /></div>
+                            </TooltipTrigger>
+                            <TooltipContent className="bg-slate-900 text-white text-[11px] font-medium border-none shadow-xl">
+                                {TOOLTIP_CONTENT.tax_sync}
+                            </TooltipContent>
+                        </Tooltip>
+                    </TooltipProvider>
                 </div>
                 <div className="grid gap-4">
                     <div className="flex justify-between items-center"><span className="text-[9px] font-black uppercase text-slate-400">DPP Value</span> <Input value={dppVat} onChange={handleNumericChange(setDppVat)} disabled={!isTaxManual || isLocked} className="h-7 w-36 text-right font-mono text-xs font-black bg-transparent border-none p-0 focus-visible:ring-0" /></div>
@@ -719,19 +766,37 @@ export default function AddInvoicePage() {
                           <Badge className="text-[8px] bg-rose-600 animate-pulse h-4 border-none shadow-none uppercase font-black">EXCEEDS PO</Badge>
                       )}
                   </div>
-                  <div className="text-3xl font-black text-slate-900 leading-none tracking-tighter">Rp {totalAmount}</div>
+                  <TooltipProvider>
+                      <Tooltip>
+                          <TooltipTrigger asChild>
+                              <div className="text-3xl font-black text-slate-900 leading-none tracking-tighter cursor-help">Rp {totalAmount}</div>
+                          </TooltipTrigger>
+                          <TooltipContent className="bg-slate-900 text-white text-[11px] font-medium border-none shadow-xl">
+                              {TOOLTIP_CONTENT.outstanding_balance}
+                          </TooltipContent>
+                      </Tooltip>
+                  </TooltipProvider>
               </div>
 
               <div className="space-y-4 pt-4">
                   {!isLocked && (
                     <div className="grid gap-3">
-                      <Button 
-                          className="w-full h-14 bg-indigo-600 hover:bg-indigo-700 font-black uppercase text-white shadow-xl shadow-indigo-100 rounded-2xl transition-all hover:-translate-y-1 active:translate-y-0" 
-                          onClick={() => handleSaveInvoice('sent', true)}
-                          disabled={isProcessing}
-                      >
-                        {isProcessing ? <Loader2 className="h-5 w-5 animate-spin" /> : <><Eye className="mr-2 h-5 w-5" /> SIMPAN & PREVIEW PDF</>}
-                      </Button>
+                      <TooltipProvider>
+                        <Tooltip>
+                            <TooltipTrigger asChild>
+                                <Button 
+                                    className="w-full h-14 bg-indigo-600 hover:bg-indigo-700 font-black uppercase text-white shadow-xl shadow-indigo-100 rounded-2xl transition-all hover:-translate-y-1 active:translate-y-0" 
+                                    onClick={() => handleSaveInvoice('sent', true)}
+                                    disabled={isProcessing}
+                                >
+                                    {isProcessing ? <Loader2 className="h-5 w-5 animate-spin" /> : <><Eye className="mr-2 h-5 w-5" /> SIMPAN & PREVIEW PDF</>}
+                                </Button>
+                            </TooltipTrigger>
+                            <TooltipContent className="bg-slate-900 text-white text-[11px] font-medium border-none shadow-xl">
+                                {TOOLTIP_CONTENT.add_invoice}
+                            </TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
 
                       <Button 
                           variant="ghost" 
@@ -748,6 +813,44 @@ export default function AddInvoicePage() {
           </Card>
         </div>
       </div>
+
+      <Dialog open={isQuickEditOpen} onOpenChange={setIsQuickEditOpen}>
+          <DialogContent className="sm:max-w-[425px]">
+              <DialogHeader>
+                  <DialogTitle className="uppercase font-black tracking-tight">Quick Fix: Data Master</DialogTitle>
+                  <DialogDescription className="text-xs font-bold uppercase text-slate-400">Ubah data untuk perbaikan dokumen atau master database.</DialogDescription>
+              </DialogHeader>
+              <div className="py-6 space-y-6">
+                  {editTarget === 'name' ? (
+                      <div className="space-y-2">
+                          <Label className="text-[10px] font-black uppercase">Official PT Name</Label>
+                          <Input value={tempName} onChange={e => setTempName(e.target.value)} className="font-black uppercase h-12 bg-slate-50 border-slate-200" />
+                      </div>
+                  ) : (
+                      <div className="space-y-2">
+                          <Label className="text-[10px] font-black uppercase">Specific Billing Address</Label>
+                          <textarea 
+                             className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-xs min-h-[100px] font-medium italic focus:ring-1 focus:ring-indigo-600 outline-none"
+                             value={tempAddress}
+                             onChange={e => setTempAddress(e.target.value)}
+                          />
+                      </div>
+                  )}
+
+                  <div className="flex items-center space-x-2 bg-indigo-50 p-4 rounded-xl border border-indigo-100">
+                      <Checkbox id="update-master" checked={updateMaster} onCheckedChange={(c) => setUpdateMaster(!!c)} />
+                      <div className="grid gap-1.5 leading-none">
+                        <Label htmlFor="update-master" className="text-[10px] font-black uppercase text-indigo-700 cursor-pointer">Update ke Data Master</Label>
+                        <p className="text-[9px] text-indigo-400 font-medium">Perubahan ini akan disimpan permanen di database Customer.</p>
+                      </div>
+                  </div>
+              </div>
+              <DialogFooter className="bg-slate-50 -mx-6 -mb-6 p-6 rounded-b-3xl">
+                  <Button variant="ghost" onClick={() => setIsQuickEditOpen(false)}>Batal</Button>
+                  <Button className="bg-indigo-600 hover:bg-indigo-700 font-black uppercase px-8" onClick={handleQuickEditSave}>Simpan Perubahan</Button>
+              </DialogFooter>
+          </DialogContent>
+      </Dialog>
     </main>
   );
 }

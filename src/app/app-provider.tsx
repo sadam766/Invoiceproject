@@ -1,6 +1,7 @@
 'use client';
 
 import { ThemeProvider } from '@/app/components/theme-provider';
+import { TooltipProvider } from '@/components/ui/tooltip';
 
 export function AppProvider({ children }: { children: React.ReactNode }) {
     return (
@@ -10,7 +11,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
             enableSystem
             disableTransitionOnChange
         >
-            {children}
+            <TooltipProvider delayDuration={500}>
+                {children}
+            </TooltipProvider>
         </ThemeProvider>
     );
 }

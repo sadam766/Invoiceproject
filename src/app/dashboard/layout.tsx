@@ -56,6 +56,8 @@ import { signOut } from 'firebase/auth';
 import { doc, query, collection } from 'firebase/firestore';
 import type { UserProfile, Invoice } from '@/app/lib/data';
 import { startOfToday, isBefore, parseISO } from 'date-fns';
+import { TOOLTIP_CONTENT } from '../lib/tooltip-content';
+import { Tooltip, TooltipContent, TooltipProvider as TooltipRoot, TooltipTrigger } from '@/components/ui/tooltip';
 
 export default function DashboardLayout({
   children,
@@ -147,7 +149,7 @@ export default function DashboardLayout({
             <SidebarGroupLabel className="text-[9px] font-black uppercase tracking-[0.2em] text-slate-500 mb-3 px-2">Core Access</SidebarGroupLabel>
             <SidebarMenu>
               <SidebarMenuItem>
-                <SidebarMenuButton asChild isActive={pathname === '/dashboard'} className="hover:bg-slate-800/50 rounded-xl py-5 transition-smooth">
+                <SidebarMenuButton asChild isActive={pathname === '/dashboard'} className="hover:bg-slate-800/50 rounded-xl py-5 transition-smooth" tooltip={TOOLTIP_CONTENT.nav_dashboard}>
                   <Link href="/dashboard" className="flex items-center gap-3">
                     <LayoutDashboard className={cn("h-4.5 w-4.5", pathname === '/dashboard' ? "text-white" : "text-slate-400")} />
                     <span className="font-bold text-sm">Dashboard</span>
@@ -155,7 +157,7 @@ export default function DashboardLayout({
                 </SidebarMenuButton>
               </SidebarMenuItem>
               <SidebarMenuItem>
-                <SidebarMenuButton asChild isActive={pathname === '/dashboard/monitoring'} className="hover:bg-slate-800/50 rounded-xl py-5 transition-smooth">
+                <SidebarMenuButton asChild isActive={pathname === '/dashboard/monitoring'} className="hover:bg-slate-800/50 rounded-xl py-5 transition-smooth" tooltip={TOOLTIP_CONTENT.nav_monitoring}>
                   <Link href="/dashboard/monitoring" className="flex items-center gap-3">
                     <Eye className={cn("h-4.5 w-4.5", pathname === '/dashboard/monitoring' ? "text-white" : "text-slate-400")} />
                     <span className="font-bold text-sm">Monitor Billing</span>
@@ -169,7 +171,7 @@ export default function DashboardLayout({
             <SidebarGroupLabel className="text-[9px] font-black uppercase tracking-[0.2em] text-slate-500 mb-3 px-2">Commercial Pipeline</SidebarGroupLabel>
             <SidebarMenu>
               <SidebarMenuItem>
-                <SidebarMenuButton asChild isActive={pathname.startsWith('/dashboard/sales-orders')} className="hover:bg-slate-800/50 rounded-xl py-5 transition-smooth">
+                <SidebarMenuButton asChild isActive={pathname.startsWith('/dashboard/sales-orders')} className="hover:bg-slate-800/50 rounded-xl py-5 transition-smooth" tooltip={TOOLTIP_CONTENT.nav_so}>
                   <Link href="/dashboard/sales-orders" className="flex items-center gap-3">
                     <ShoppingCart className={cn("h-4.5 w-4.5", pathname.startsWith('/dashboard/sales-orders') ? "text-white" : "text-slate-400")} />
                     <span className="font-bold text-sm">Sales Orders (SO)</span>
@@ -178,7 +180,7 @@ export default function DashboardLayout({
               </SidebarMenuItem>
 
               <SidebarMenuItem>
-                <SidebarMenuButton asChild isActive={pathname.startsWith('/dashboard/invoices')} className="hover:bg-slate-800/50 rounded-xl py-5 transition-smooth">
+                <SidebarMenuButton asChild isActive={pathname.startsWith('/dashboard/invoices')} className="hover:bg-slate-800/50 rounded-xl py-5 transition-smooth" tooltip={TOOLTIP_CONTENT.nav_billing}>
                     <Link href="/dashboard/invoices" className="flex items-center gap-3">
                         <FileText className={cn("h-4.5 w-4.5", pathname.startsWith('/dashboard/invoices') ? "text-white" : "text-slate-400")} />
                         <span className="font-bold text-sm">Billing Docs</span>
@@ -187,7 +189,7 @@ export default function DashboardLayout({
               </SidebarMenuItem>
 
               <SidebarMenuItem>
-                <SidebarMenuButton asChild isActive={pathname === '/dashboard/sales-management'} className="hover:bg-slate-800/50 rounded-xl py-5 transition-smooth">
+                <SidebarMenuButton asChild isActive={pathname === '/dashboard/sales-management'} className="hover:bg-slate-800/50 rounded-xl py-5 transition-smooth" tooltip={TOOLTIP_CONTENT.nav_ar}>
                     <Link href="/dashboard/sales-management" className="flex items-center gap-3">
                         <History className={cn("h-4.5 w-4.5", pathname === '/dashboard/sales-management' ? "text-white" : "text-slate-400")} />
                         <span className="font-bold text-sm">Buku Piutang (AR)</span>
@@ -201,7 +203,7 @@ export default function DashboardLayout({
             <SidebarGroupLabel className="text-[9px] font-black uppercase tracking-[0.2em] text-slate-500 mb-3 px-2">Data Master</SidebarGroupLabel>
             <SidebarMenu>
               <SidebarMenuItem>
-                <SidebarMenuButton asChild isActive={pathname.startsWith('/dashboard/customers')} className="hover:bg-slate-800/50 rounded-xl py-5 transition-smooth">
+                <SidebarMenuButton asChild isActive={pathname.startsWith('/dashboard/customers')} className="hover:bg-slate-800/50 rounded-xl py-5 transition-smooth" tooltip={TOOLTIP_CONTENT.nav_customers}>
                   <Link href="/dashboard/customers" className="flex items-center gap-3">
                     <Users className={cn("h-4.5 w-4.5", pathname.startsWith('/dashboard/customers') ? "text-white" : "text-slate-400")} />
                     <span className="font-bold text-sm">Customers</span>
@@ -209,7 +211,7 @@ export default function DashboardLayout({
                 </SidebarMenuButton>
               </SidebarMenuItem>
               <SidebarMenuItem>
-                <SidebarMenuButton asChild isActive={pathname.startsWith('/dashboard/products')} className="hover:bg-slate-800/50 rounded-xl py-5 transition-smooth">
+                <SidebarMenuButton asChild isActive={pathname.startsWith('/dashboard/products')} className="hover:bg-slate-800/50 rounded-xl py-5 transition-smooth" tooltip={TOOLTIP_CONTENT.nav_catalog}>
                   <Link href="/dashboard/products" className="flex items-center gap-3">
                     <Package className={cn("h-4.5 w-4.5", pathname.startsWith('/dashboard/products') ? "text-white" : "text-slate-400")} />
                     <span className="font-bold text-sm">Material Catalog</span>
@@ -252,19 +254,28 @@ export default function DashboardLayout({
             <div className="flex items-center gap-4 ml-auto">
                 <ThemeToggle />
                 
-                <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                        <Button className="bg-primary hover:bg-primary/90 shadow-lg shadow-primary/20 h-10 px-6 rounded-2xl gap-2 font-black uppercase text-[10px] tracking-widest text-white transition-smooth active:scale-95">
-                            <Plus className="h-4 w-4" /> Quick Add
-                        </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end" className="w-56 p-2 rounded-2xl shadow-premium border-none ring-1 ring-slate-100">
-                        <DropdownMenuLabel className="text-[10px] uppercase tracking-widest font-black text-slate-400 p-2">Transaction Shortcut</DropdownMenuLabel>
-                        <DropdownMenuItem onClick={() => router.push('/dashboard/sales-orders')} className="rounded-xl py-3 cursor-pointer"><ShoppingCart className="mr-3 h-4 w-4 text-blue-500" /> New SO</DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => router.push('/dashboard/sales')} className="rounded-xl py-3 cursor-pointer"><Layers className="mr-3 h-4 w-4 text-indigo-500" /> Register PO</DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => router.push('/dashboard/customers')} className="rounded-xl py-3 cursor-pointer"><Users className="mr-3 h-4 w-4 text-emerald-500" /> New Customer</DropdownMenuItem>
-                    </DropdownMenuContent>
-                </DropdownMenu>
+                <TooltipProvider>
+                    <Tooltip>
+                        <TooltipTrigger asChild>
+                            <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                    <Button className="bg-primary hover:bg-primary/90 shadow-lg shadow-primary/20 h-10 px-6 rounded-2xl gap-2 font-black uppercase text-[10px] tracking-widest text-white transition-smooth active:scale-95">
+                                        <Plus className="h-4 w-4" /> Quick Add
+                                    </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end" className="w-56 p-2 rounded-2xl shadow-premium border-none ring-1 ring-slate-100">
+                                    <DropdownMenuLabel className="text-[10px] uppercase tracking-widest font-black text-slate-400 p-2">Transaction Shortcut</DropdownMenuLabel>
+                                    <DropdownMenuItem onClick={() => router.push('/dashboard/sales-orders')} className="rounded-xl py-3 cursor-pointer"><ShoppingCart className="mr-3 h-4 w-4 text-blue-500" /> New SO</DropdownMenuItem>
+                                    <DropdownMenuItem onClick={() => router.push('/dashboard/sales')} className="rounded-xl py-3 cursor-pointer"><Layers className="mr-3 h-4 w-4 text-indigo-500" /> Register PO</DropdownMenuItem>
+                                    <DropdownMenuItem onClick={() => router.push('/dashboard/customers')} className="rounded-xl py-3 cursor-pointer"><Users className="mr-3 h-4 w-4 text-emerald-500" /> New Customer</DropdownMenuItem>
+                                </DropdownMenuContent>
+                            </DropdownMenu>
+                        </TooltipTrigger>
+                        <TooltipContent className="bg-slate-900 text-white text-[11px] font-medium px-3 py-1.5 rounded-lg border-none shadow-xl">
+                            {TOOLTIP_CONTENT.quick_add}
+                        </TooltipContent>
+                    </Tooltip>
+                </TooltipProvider>
 
                 <Button variant="ghost" size="icon" className="relative h-10 w-10 rounded-2xl bg-slate-50 text-slate-400 hover:bg-slate-100 transition-smooth">
                     <Bell className="h-5 w-5" />

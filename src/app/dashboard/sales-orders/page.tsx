@@ -44,6 +44,8 @@ import {
     DropdownMenuTrigger,
   } from '@/components/ui/dropdown-menu';
   import { format, addDays } from 'date-fns';
+  import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+  import { TOOLTIP_CONTENT } from '@/app/lib/tooltip-content';
 
   export default function SalesOrderListPage() {
     const router = useRouter();
@@ -284,13 +286,22 @@ import {
 
                         <CardContent className="pt-6 space-y-6 flex-1">
                             {isOrphan ? (
-                                <div className="bg-rose-100/50 p-4 rounded-2xl border border-rose-200 space-y-2">
-                                    <div className="flex items-center gap-2 text-rose-700">
-                                        <AlertTriangle className="h-4 w-4" />
-                                        <span className="text-[10px] font-black uppercase">PO Belum Terhubung</span>
-                                    </div>
-                                    <p className="text-[9px] text-rose-600 leading-tight">Gunakan Constructor untuk menghubungkan SO ini ke Nomor PO agar penagihan tidak Rp 0.</p>
-                                </div>
+                                <TooltipProvider>
+                                    <Tooltip>
+                                        <TooltipTrigger asChild>
+                                            <div className="bg-rose-100/50 p-4 rounded-2xl border border-rose-200 space-y-2 cursor-help">
+                                                <div className="flex items-center gap-2 text-rose-700">
+                                                    <AlertTriangle className="h-4 w-4" />
+                                                    <span className="text-[10px] font-black uppercase">PO Belum Terhubung</span>
+                                                </div>
+                                                <p className="text-[9px] text-rose-600 leading-tight">Gunakan Constructor untuk menghubungkan SO ini ke Nomor PO agar penagihan tidak Rp 0.</p>
+                                            </div>
+                                        </TooltipTrigger>
+                                        <TooltipContent className="bg-slate-900 text-white text-[11px] font-medium border-none shadow-xl max-w-xs">
+                                            {TOOLTIP_CONTENT.missing_po}
+                                        </TooltipContent>
+                                    </Tooltip>
+                                </TooltipProvider>
                             ) : (
                                 <>
                                     <div className="flex items-center justify-between">
@@ -320,15 +331,25 @@ import {
                             <Button variant="ghost" className="flex-1 h-10 text-[10px] font-black uppercase tracking-widest hover:bg-white hover:shadow-md transition-all rounded-xl text-slate-500" onClick={() => { setSelectedOrder(order); setIsDetailOpen(true); }}>
                                 View Details
                             </Button>
-                            <Button 
-                                className={cn(
-                                    "flex-1 h-10 font-black uppercase text-[10px] tracking-widest shadow-lg rounded-xl",
-                                    isOrphan ? "bg-rose-600 hover:bg-rose-700 shadow-rose-100" : "bg-indigo-600 hover:bg-indigo-700 shadow-indigo-100"
-                                )}
-                                onClick={() => isOrphan ? (setEditingOrder(order), setIsConstructorOpen(true)) : router.push(`/dashboard/invoices/number?poNumber=${encodeURIComponent(order.poNumber)}&soNumber=${encodeURIComponent(order.soNumber)}`)}
-                            >
-                                {isOrphan ? <><AlertTriangle className="mr-1.5 h-3.5 w-3.5" /> Fix Mapping</> : <><FilePlus className="mr-1.5 h-3.5 w-3.5" /> Billing</>}
-                            </Button>
+                            
+                            <TooltipProvider>
+                                <Tooltip>
+                                    <TooltipTrigger asChild>
+                                        <Button 
+                                            className={cn(
+                                                "flex-1 h-10 font-black uppercase text-[10px] tracking-widest shadow-lg rounded-xl",
+                                                isOrphan ? "bg-rose-600 hover:bg-rose-700 shadow-rose-100" : "bg-indigo-600 hover:bg-indigo-700 shadow-indigo-100"
+                                            )}
+                                            onClick={() => isOrphan ? (setEditingOrder(order), setIsConstructorOpen(true)) : router.push(`/dashboard/invoices/number?poNumber=${encodeURIComponent(order.poNumber)}&soNumber=${encodeURIComponent(order.soNumber)}`)}
+                                        >
+                                            {isOrphan ? <><AlertTriangle className="mr-1.5 h-3.5 w-3.5" /> Fix Mapping</> : <><FilePlus className="mr-1.5 h-3.5 w-3.5" /> Billing</>}
+                                        </Button>
+                                    </TooltipTrigger>
+                                    <TooltipContent className="bg-slate-900 text-white text-[11px] font-medium border-none shadow-xl">
+                                        {isOrphan ? TOOLTIP_CONTENT.fix_mapping : TOOLTIP_CONTENT.add_invoice}
+                                    </TooltipContent>
+                                </Tooltip>
+                            </TooltipProvider>
                         </CardFooter>
                     </Card>
                 );
