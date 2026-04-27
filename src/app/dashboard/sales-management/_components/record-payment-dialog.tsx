@@ -1,7 +1,6 @@
-
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -22,6 +21,7 @@ import {
 } from '@/components/ui/select';
 import { format } from 'date-fns';
 import { Wallet, CheckCircle2, AlertTriangle, FileUp } from 'lucide-react';
+import { formatNumberWithCommas, parseFormattedNumber } from '@/lib/utils';
 
 type RecordPaymentDialogProps = {
   isOpen: boolean;
@@ -35,7 +35,26 @@ export function RecordPaymentDialog({ isOpen, onOpenChange, onSave, selectedCoun
   const [date, setDate] = useState(format(new Date(), 'yyyy-MM-dd'));
   const [reference, setReference] = useState('');
   const [method, setMethod] = useState('Transfer Bank');
-  const [amountInput, setAmountInput] = useState(totalAmount.toString());
+  const [amountInput, setAmountInput] = useState('');
+
+  useEffect(() => {
+    if (isOpen) {
+        setAmountInput(formatNumberWithCommas(totalAmount));
+    }
+  }, [isOpen, totalAmount]);
+
+  const handleNumericChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    if (value === '') { setAmountInput(''); return; }
+    const num = parseFormattedNumber(value);
+    if (!isNaN(num)) {
+        let formatted = formatNumberWithCommas(num);
+        if (value.endsWith(',') || value.endsWith('.')) {
+            if (!formatted.includes(',')) formatted += ',';
+        }
+        setAmountInput(formatted);
+    }
+  };
 
   const handleSave = () => {
     if (!reference || !date) return;
@@ -43,7 +62,7 @@ export function RecordPaymentDialog({ isOpen, onOpenChange, onSave, selectedCoun
       date,
       reference,
       method,
-      amount: parseFloat(amountInput)
+      amount: parseFormattedNumber(amountInput)
     });
   };
 
@@ -63,7 +82,14 @@ export function RecordPaymentDialog({ isOpen, onOpenChange, onSave, selectedCoun
           <div className="bg-emerald-50 p-4 rounded-xl border border-emerald-100 flex justify-between items-center">
              <div className="space-y-0.5">
                 <p className="text-[10px] font-black uppercase text-emerald-600 tracking-widest">Total Dana Verifikasi</p>
-                <p className="text-xl font-black text-emerald-800">Rp {totalAmount.toLocaleString('id-ID')}</p>
+                <div className="flex items-center gap-1">
+                   <span className="text-sm font-bold text-emerald-600">Rp</span>
+                   <Input 
+                      value={amountInput} 
+                      onChange={handleNumericChange}
+                      className="text-xl font-black text-emerald-800 bg-transparent border-none p-0 h-auto focus-visible:ring-0 shadow-none w-full"
+                   />
+                </div>
              </div>
              <CheckCircle2 className="h-8 w-8 text-emerald-200" />
           </div>

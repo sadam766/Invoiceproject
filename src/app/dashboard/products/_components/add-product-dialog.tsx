@@ -1,4 +1,3 @@
-
 'use client';
 import { Button } from '@/components/ui/button';
 import {
@@ -35,9 +34,9 @@ type AddProductDialogProps = {
 export function AddProductDialog({ isOpen, onOpenChange, onSave, productData, onAddClick }: AddProductDialogProps) {
   const [name, setName] = useState('');
   const [category, setCategory] = useState('');
-  const [quantity, setQuantity] = useState<number | string>(0);
+  const [quantity, setQuantity] = useState<string>('0');
   const [unit, setUnit] = useState('');
-  const [price, setPrice] = useState<number | string>(0);
+  const [price, setPrice] = useState<string>('0');
 
   useEffect(() => {
     if (productData && isOpen) {
@@ -49,17 +48,22 @@ export function AddProductDialog({ isOpen, onOpenChange, onSave, productData, on
     } else if (!isOpen) {
       setName('');
       setCategory('');
-      setQuantity(0);
+      setQuantity('0');
       setUnit('');
-      setPrice(0);
+      setPrice('0');
     }
   }, [productData, isOpen]);
   
-  const handleNumericChange = (setter: React.Dispatch<React.SetStateAction<string | number>>) => (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleNumericChange = (setter: (v: string) => void) => (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
-    const parsedValue = parseFormattedNumber(value);
-    if (!isNaN(parsedValue) || value === '') {
-        setter(value === '' ? '' : formatNumberWithCommas(parsedValue));
+    if (value === '') { setter(''); return; }
+    const num = parseFormattedNumber(value);
+    if (!isNaN(num)) {
+        let formatted = formatNumberWithCommas(num);
+        if (value.endsWith(',') || value.endsWith('.')) {
+            if (!formatted.includes(',')) formatted += ',';
+        }
+        setter(formatted);
     }
   };
 
@@ -68,9 +72,9 @@ export function AddProductDialog({ isOpen, onOpenChange, onSave, productData, on
         id: productData?.id,
         name, 
         category, 
-        quantity: typeof quantity === 'string' ? parseFormattedNumber(quantity) : quantity, 
+        quantity: parseFormattedNumber(quantity), 
         unit, 
-        price: typeof price === 'string' ? parseFormattedNumber(price) : price
+        price: parseFormattedNumber(price)
     });
     onOpenChange(false);
   };

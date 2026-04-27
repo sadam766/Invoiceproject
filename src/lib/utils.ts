@@ -39,42 +39,17 @@ export function parseFormattedNumber(value: string | number): number {
   if (!value || value === '') return 0;
 
   // Hapus karakter yang bukan angka, koma, titik, atau minus
-  let clean = value.replace(/[^\d.,-]/g, '');
+  // Untuk format Indonesia, kita hapus titik (ribuan) dan ubah koma menjadi titik (desimal)
+  let clean = value.toString().replace(/[^\d.,-]/g, '');
 
-  // Jika mengandung keduanya (titik dan koma), tentukan mana yang desimal
-  if (clean.includes(',') && clean.includes('.')) {
-    const lastComma = clean.lastIndexOf(',');
-    const lastDot = clean.lastIndexOf('.');
-    if (lastComma > lastDot) {
-      // Format Indo: 1.234,56 -> hapus titik, ubah koma jadi titik
-      return parseFloat(clean.replace(/\./g, '').replace(',', '.')) || 0;
-    } else {
-      // Format US: 1,234.56 -> hapus koma
-      return parseFloat(clean.replace(/,/g, '')) || 0;
-    }
+  // Cek apakah ada titik sebagai pemisah ribuan (lebih dari satu titik atau titik di posisi ribuan)
+  if ((clean.match(/\./g) || []).length > 0) {
+    // Jika ada titik, kita asumsikan itu pemisah ribuan dan kita hapus
+    clean = clean.replace(/\./g, '');
   }
 
-  // Jika hanya ada koma, asumsikan itu desimal (Standar Indo)
-  if (clean.includes(',')) {
-    return parseFloat(clean.replace(',', '.')) || 0;
-  }
-
-  // Jika hanya ada titik, cek apakah itu ribuan atau desimal
-  if (clean.includes('.')) {
-    // Jika ada lebih dari satu titik, itu pasti ribuan
-    if ((clean.match(/\./g) || []).length > 1) {
-      return parseFloat(clean.replace(/\./g, '')) || 0;
-    }
-    // Jika satu titik diikuti tepat 3 angka, kemungkinan besar ribuan dalam konteks Indo
-    // Contoh: 1.000 vs 1.23. Tapi demi fleksibilitas input user:
-    const parts = clean.split('.');
-    if (parts[1].length === 3) {
-      // Ambil risiko ini ribuan jika tidak ada indikasi lain
-      // Namun jika user ingin desimal 1.000 (presisi 3), ini akan jadi 1000.
-      return parseFloat(clean.replace(/\./g, '')) || 0;
-    }
-    return parseFloat(clean) || 0;
-  }
+  // Ubah koma menjadi titik untuk parseFloat
+  clean = clean.replace(',', '.');
 
   return parseFloat(clean) || 0;
 }

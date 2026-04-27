@@ -1,4 +1,3 @@
-
 'use client';
 import { Button } from '@/components/ui/button';
 import {
@@ -46,8 +45,8 @@ export function AddSaleDialog({ isOpen, onOpenChange, onSave, saleData, onAddCli
     const [customer, setCustomer] = useState('');
     const [sales, setSales] = useState('');
     const [soNumber, setSoNumber] = useState('');
-    const [amount, setAmount] = useState<number | string>('');
-    const [paidOffline, setPaidOffline] = useState<number | string>('');
+    const [amount, setAmount] = useState<string>('');
+    const [paidOffline, setPaidOffline] = useState<string>('');
     
     const [customerPopoverOpen, setCustomerPopoverOpen] = useState(false);
     const [salesPopoverOpen, setSalesPopoverOpen] = useState(false);
@@ -83,33 +82,28 @@ export function AddSaleDialog({ isOpen, onOpenChange, onSave, saleData, onAddCli
         }
     }, [saleData, isOpen]);
     
-    const handleAmountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const handleNumericChange = (setter: (v: string) => void) => (e: React.ChangeEvent<HTMLInputElement>) => {
         const value = e.target.value;
-        const parsedValue = parseFormattedNumber(value);
-        if (!isNaN(parsedValue) || value === '') {
-            setAmount(value === '' ? '' : formatNumberWithCommas(parsedValue));
-        }
-    };
-
-    const handlePaidOfflineChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        const value = e.target.value;
-        const parsedValue = parseFormattedNumber(value);
-        if (!isNaN(parsedValue) || value === '') {
-            setPaidOffline(value === '' ? '' : formatNumberWithCommas(parsedValue));
+        if (value === '') { setter(''); return; }
+        const num = parseFormattedNumber(value);
+        if (!isNaN(num)) {
+            let formatted = formatNumberWithCommas(num);
+            // Tetap izinkan koma di akhir untuk input desimal
+            if (value.endsWith(',') || value.endsWith('.')) {
+                if (!formatted.includes(',')) formatted += ',';
+            }
+            setter(formatted);
         }
     };
 
     const handleSave = () => {
-        const numericAmount = typeof amount === 'string' ? parseFormattedNumber(amount) : amount;
-        const numericPaidOffline = typeof paidOffline === 'string' ? parseFormattedNumber(paidOffline) : paidOffline;
-        
         onSave({
             poNumber,
             customer,
             sales,
             soNumber,
-            amount: numericAmount,
-            paidOffline: numericPaidOffline,
+            amount: parseFormattedNumber(amount),
+            paidOffline: parseFormattedNumber(paidOffline),
             status: saleData?.status || 'Unpaid',
         });
         onOpenChange(false);
@@ -194,7 +188,7 @@ export function AddSaleDialog({ isOpen, onOpenChange, onSave, saleData, onAddCli
           <div className="grid grid-cols-2 gap-4">
               <div className="grid gap-2">
                 <Label htmlFor="amount" className="font-bold">Total Nilai PO</Label>
-                <Input id="amount" value={amount} onChange={handleAmountChange} placeholder="Rp 0" />
+                <Input id="amount" value={amount} onChange={handleNumericChange(setAmount)} placeholder="Rp 0" />
               </div>
               <div className="grid gap-2">
                 <Label htmlFor="so-number">No. SO Produksi</Label>
@@ -211,7 +205,7 @@ export function AddSaleDialog({ isOpen, onOpenChange, onSave, saleData, onAddCli
                 <Input 
                     id="paid-offline" 
                     value={paidOffline} 
-                    onChange={handlePaidOfflineChange} 
+                    onChange={handleNumericChange(setPaidOffline)} 
                     placeholder="Rp 0" 
                     className="border-blue-200 focus-visible:ring-blue-500 bg-white"
                 />

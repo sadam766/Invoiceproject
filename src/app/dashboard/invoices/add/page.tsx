@@ -186,18 +186,18 @@ export default function AddInvoicePage() {
 
   // --- CALCULATION STATES ---
   const [subtotal, setSubtotal] = useState(0);
-  const [negotiationValue, setNegotiationValue] = useState<string | number>('');
+  const [negotiationValue, setNegotiationValue] = useState<string>('');
   const [negotiationMode, setNegotiationMode] = useState<'percent' | 'nominal'>('nominal');
-  const [dpValue, setDpValue] = useState<string | number>('');
+  const [dpValue, setDpValue] = useState<string>('');
   const [dpMode, setDpMode] = useState<'percent' | 'nominal'>('percent');
-  const [retentionValue, setRetentionValue] = useState<string | number>('');
+  const [retentionValue, setRetentionValue] = useState<string>('');
   const [retentionMode, setRetentionMode] = useState<'percent' | 'nominal'>('nominal');
-  const [dpDeductionValue, setDpDeductionValue] = useState<string | number>('');
+  const [dpDeductionValue, setDpDeductionValue] = useState<string>('');
   const [dpDeductionMode, setDpDeductionMode] = useState<'percent' | 'nominal'>('nominal');
   const [isTaxManual, setIsTaxManual] = useState(false);
-  const [dppVat, setDppVat] = useState<string | number>(0);
-  const [vat12, setVat12] = useState<string | number>(0);
-  const [totalAmount, setTotalAmount] = useState<string | number>(0);
+  const [dppVat, setDppVat] = useState<string>('0');
+  const [vat12, setVat12] = useState<string>('0');
+  const [totalAmount, setTotalAmount] = useState<string>('0');
 
   // Initial Sync from Identity or Existing Data
   useEffect(() => {
@@ -233,10 +233,10 @@ export default function AddInvoicePage() {
           setBillingAddress(activeIdentity.billingAddress || '');
           setBillingNpwp(activeIdentity.billingNpwp || '');
           setIsDpInvoice(!!(activeIdentity as Invoice).isDpInvoice);
-          setNegotiationValue((activeIdentity as Invoice).negotiation || 0);
-          setDpValue((activeIdentity as Invoice).dpValue || 0);
-          setDpDeductionValue((activeIdentity as Invoice).dpDeduction || 0);
-          setRetentionValue((activeIdentity as Invoice).retention || 0);
+          setNegotiationValue(formatNumberWithCommas((activeIdentity as Invoice).negotiation || 0));
+          setDpValue(formatNumberWithCommas((activeIdentity as Invoice).dpValue || 0));
+          setDpDeductionValue(formatNumberWithCommas((activeIdentity as Invoice).dpDeduction || 0));
+          setRetentionValue(formatNumberWithCommas((activeIdentity as Invoice).retention || 0));
           if ((activeIdentity as Invoice).paymentMethod) setSelectedVaId((activeIdentity as Invoice).paymentMethod!);
           if (activeIdentity.erpInvoiceId) setInternalNote(activeIdentity.erpInvoiceId);
 
@@ -251,17 +251,17 @@ export default function AddInvoicePage() {
     const currentSubtotal = items.reduce((acc, item) => acc + (item.quantity * item.price), 0);
     setSubtotal(currentSubtotal);
     
-    const negInputVal = parseFormattedNumber(String(negotiationValue));
+    const negInputVal = parseFormattedNumber(negotiationValue);
     const negNominal = negotiationMode === 'percent' ? (currentSubtotal * (negInputVal / 100)) : negInputVal;
     const baseAfterNeg = Math.max(0, currentSubtotal - negNominal);
     
-    const dpInputVal = parseFormattedNumber(String(dpValue));
+    const dpInputVal = parseFormattedNumber(dpValue);
     const dpNominal = dpMode === 'percent' ? (baseAfterNeg * (dpInputVal / 100)) : dpInputVal;
     
-    const retInputVal = parseFormattedNumber(String(retentionValue));
+    const retInputVal = parseFormattedNumber(retentionValue);
     const retNominal = retentionMode === 'percent' ? (baseAfterNeg * (retInputVal / 100)) : retInputVal;
     
-    const dpDedInputVal = parseFormattedNumber(String(dpDeductionValue));
+    const dpDedInputVal = parseFormattedNumber(dpDeductionValue);
     const dpDedNominal = dpDeductionMode === 'percent' ? (baseAfterNeg * (dpDedInputVal / 100)) : dpDedInputVal;
 
     if (!isTaxManual) {
@@ -271,13 +271,26 @@ export default function AddInvoicePage() {
         setVat12(formatNumberWithCommas(calculatedVat));
     }
     
-    const currentDpp = parseFormattedNumber(String(dppVat));
-    const currentVat = parseFormattedNumber(String(vat12));
+    const currentDpp = parseFormattedNumber(dppVat);
+    const currentVat = parseFormattedNumber(vat12);
     
     let grand = isDpInvoice ? dpNominal : (currentDpp + currentVat - dpDedNominal - retNominal);
     grand = Math.max(0, grand);
     setTotalAmount(formatNumberWithCommas(grand));
   }, [items, negotiationValue, negotiationMode, dpValue, dpMode, retentionValue, retentionMode, dpDeductionValue, dpDeductionMode, isTaxManual, dppVat, vat12, isDpInvoice]);
+
+  const handleNumericChange = (setter: (v: string) => void) => (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    if (value === '') { setter(''); return; }
+    const num = parseFormattedNumber(value);
+    if (!isNaN(num)) {
+        let formatted = formatNumberWithCommas(num);
+        if (value.endsWith(',') || value.endsWith('.')) {
+            if (!formatted.includes(',')) formatted += ',';
+        }
+        setter(formatted);
+    }
+  };
 
   const handleProductSelect = (product: ProductListItem) => {
       const newItem: InvoiceItem = {
@@ -324,7 +337,7 @@ export default function AddInvoicePage() {
   const handleSaveInvoice = async (invoiceStatus: any = 'sent', redirectToPreview = false) => {
     if (!firestore || !user || !activeIdentity) return;
 
-    const grandTotalNumeric = parseFormattedNumber(String(totalAmount));
+    const grandTotalNumeric = parseFormattedNumber(totalAmount);
     const totalWithNewInvoice = grandTotalNumeric + totalInvoicedSoFar;
     if (totalWithNewInvoice > (totalPoValue + 0.01)) {
         toast({ 
@@ -354,10 +367,10 @@ export default function AddInvoicePage() {
         amount: grandTotalNumeric,
         status: invoiceStatus,
         isDpInvoice: isDpInvoice,
-        negotiation: parseFormattedNumber(String(negotiationValue)),
-        dpValue: parseFormattedNumber(String(dpValue)),
-        dpDeduction: parseFormattedNumber(String(dpDeductionValue)),
-        retention: parseFormattedNumber(String(retentionValue)),
+        negotiation: parseFormattedNumber(negotiationValue),
+        dpValue: parseFormattedNumber(dpValue),
+        dpDeduction: parseFormattedNumber(dpDeductionValue),
+        retention: parseFormattedNumber(retentionValue),
         paymentMethod: selectedVaId,
         items: items,
         lastUpdatedAt: timestamp,
@@ -397,7 +410,7 @@ export default function AddInvoicePage() {
   }
 
   const isLocked = (existingInvoiceData?.status === 'finalized' || existingInvoiceData?.status === 'paid' || existingInvoiceData?.status === 'received') && !isAdmin;
-  const grandTotalNumeric = parseFormattedNumber(String(totalAmount));
+  const grandTotalNumeric = parseFormattedNumber(totalAmount);
   const isExceedingPo = (grandTotalNumeric + totalInvoicedSoFar) > (totalPoValue + 0.01);
 
   return (
@@ -539,7 +552,7 @@ export default function AddInvoicePage() {
                                     </TableCell>
                                     <TableCell>
                                         <Input 
-                                            value={item.quantity} 
+                                            value={formatNumberWithCommas(item.quantity)} 
                                             onChange={e => {
                                                 const val = parseFormattedNumber(e.target.value);
                                                 setItems(items.map(it => it.id === item.id ? { ...it, quantity: val, total: val * it.price } : it));
@@ -550,7 +563,7 @@ export default function AddInvoicePage() {
                                     </TableCell>
                                     <TableCell>
                                         <Input 
-                                            value={item.price} 
+                                            value={formatNumberWithCommas(item.price)} 
                                             onChange={e => {
                                                 const val = parseFormattedNumber(e.target.value);
                                                 setItems(items.map(it => it.id === item.id ? { ...it, price: val, total: it.quantity * val } : it));
@@ -678,7 +691,7 @@ export default function AddInvoicePage() {
                             <SelectContent><SelectItem value="nominal">IDR</SelectItem><SelectItem value="percent">%</SelectItem></SelectContent>
                         </Select>
                     </div>
-                    <Input value={negotiationValue} onChange={e => setNegotiationValue(e.target.value)} className="h-10 text-right font-black text-amber-600 border-amber-100 rounded-xl bg-amber-50/10" placeholder="0" disabled={isLocked} />
+                    <Input value={negotiationValue} onChange={handleNumericChange(setNegotiationValue)} className="h-10 text-right font-black text-amber-600 border-amber-100 rounded-xl bg-amber-50/10" placeholder="0" disabled={isLocked} />
                 </div>
 
                 {isDpInvoice ? (
@@ -690,7 +703,7 @@ export default function AddInvoicePage() {
                                 <SelectContent><SelectItem value="nominal">IDR</SelectItem><SelectItem value="percent">%</SelectItem></SelectContent>
                             </Select>
                         </div>
-                        <Input value={dpValue} onChange={e => setDpValue(e.target.value)} className="h-10 text-right font-black border-indigo-200 rounded-xl bg-white" placeholder="0" disabled={isLocked} />
+                        <Input value={dpValue} onChange={handleNumericChange(setDpValue)} className="h-10 text-right font-black border-indigo-200 rounded-xl bg-white" placeholder="0" disabled={isLocked} />
                     </div>
                 ) : (
                     <>
@@ -704,7 +717,7 @@ export default function AddInvoicePage() {
                                     <SelectContent><SelectItem value="nominal">IDR</SelectItem><SelectItem value="percent">%</SelectItem></SelectContent>
                                 </Select>
                             </div>
-                            <Input value={dpDeductionValue} onChange={e => setDpDeductionValue(e.target.value)} className="h-10 text-right font-black border-emerald-200 text-emerald-700 rounded-xl bg-white" placeholder="0" disabled={isLocked} />
+                            <Input value={dpDeductionValue} onChange={handleNumericChange(setDpDeductionValue)} className="h-10 text-right font-black border-emerald-200 text-emerald-700 rounded-xl bg-white" placeholder="0" disabled={isLocked} />
                             <div className="flex items-center justify-between text-[9px] font-bold text-emerald-600/70 mt-1 uppercase tracking-tighter">
                                 <span>Kuota DP Tersedia:</span>
                                 <span>Rp {formatNumberWithCommas(dpInvoicedBalance)}</span>
@@ -719,7 +732,7 @@ export default function AddInvoicePage() {
                                     <SelectContent><SelectItem value="nominal">IDR</SelectItem><SelectItem value="percent">%</SelectItem></SelectContent>
                                 </Select>
                             </div>
-                            <Input value={retentionValue} onChange={e => setRetentionValue(e.target.value)} className="h-10 text-right font-black border-slate-200 rounded-xl bg-slate-50/20" placeholder="0" disabled={isLocked} />
+                            <Input value={retentionValue} onChange={handleNumericChange(setRetentionValue)} className="h-10 text-right font-black border-slate-200 rounded-xl bg-slate-50/20" placeholder="0" disabled={isLocked} />
                         </div>
                     </>
                 )}
@@ -731,8 +744,8 @@ export default function AddInvoicePage() {
                     <Switch checked={isTaxManual} onCheckedChange={setIsTaxManual} disabled={isLocked} />
                 </div>
                 <div className="grid gap-4">
-                    <div className="flex justify-between items-center"><span className="text-[9px] font-black uppercase text-slate-400">DPP Value</span> <Input value={dppVat} onChange={e => setDppVat(e.target.value)} disabled={!isTaxManual || isLocked} className="h-7 w-36 text-right font-mono text-xs font-black bg-transparent border-none p-0 focus-visible:ring-0" /></div>
-                    <div className="flex justify-between items-center"><span className="text-[9px] font-black uppercase text-slate-400">PPN 12%</span> <Input value={vat12} onChange={e => setVat12(e.target.value)} disabled={!isTaxManual || isLocked} className="h-7 w-36 text-right font-mono text-xs font-black bg-transparent border-none p-0 focus-visible:ring-0" /></div>
+                    <div className="flex justify-between items-center"><span className="text-[9px] font-black uppercase text-slate-400">DPP Value</span> <Input value={dppVat} onChange={handleNumericChange(setDppVat)} disabled={!isTaxManual || isLocked} className="h-7 w-36 text-right font-mono text-xs font-black bg-transparent border-none p-0 focus-visible:ring-0" /></div>
+                    <div className="flex justify-between items-center"><span className="text-[9px] font-black uppercase text-slate-400">PPN 12%</span> <Input value={vat12} onChange={handleNumericChange(setVat12)} disabled={!isTaxManual || isLocked} className="h-7 w-36 text-right font-mono text-xs font-black bg-transparent border-none p-0 focus-visible:ring-0" /></div>
                 </div>
               </div>
 
@@ -775,4 +788,3 @@ export default function AddInvoicePage() {
     </main>
   );
 }
-
