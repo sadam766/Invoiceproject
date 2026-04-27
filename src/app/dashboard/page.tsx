@@ -79,7 +79,7 @@ export default function DashboardPage() {
     if (!firestore) return null;
     return query(collection(firestore, 'invoices'));
   }, [firestore]);
-  const { data: invoiceList } = useCollection<Invoice>(invoiceListCollection);
+  const { data: invoiceList } = useCollection<Invoice>(invoicesCollection);
 
   const taxInvoicesCollection = useMemoFirebase(() => {
     if (!firestore) return null;
