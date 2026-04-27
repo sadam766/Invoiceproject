@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, Printer, Edit3 } from 'lucide-react';
+import { ArrowLeft, Printer, Edit3, Truck } from 'lucide-react';
 import { useFirestore, useDoc, useMemoFirebase } from '@/firebase';
 import { doc, updateDoc } from 'firebase/firestore';
 import type { SpdData, Customer } from '@/app/lib/data';
@@ -21,43 +21,10 @@ export default function SpdEnvelopePreview() {
     const [manualAddress, setManualAddress] = useState('');
     const [isEditing, setIsEditing] = useState(false);
 
-    // Eager loading: Fetch only specific SPD and Customer
+    // Eager loading: Fetch only specific SPD
     const safeSpdId = decodeURIComponent(id as string).replace(/\//g, '_');
     const spdRef = useMemoFirebase(() => firestore ? doc(firestore, 'spds', safeSpdId) : null, [firestore, safeSpdId]);
     const { data: spd, isLoading: isLoadingSpd } = useDoc<SpdData>(spdRef);
-
-    // Fetch customer profile based on the first invoice in the SPD
-    const customerName = spd?.invoices[0]?.customer;
-    const customerRef = useMemoFirebase(() => {
-        if (!firestore || !customerName) return null;
-        // In a real scenario, we might need a mapping of Name to ID if ID isn't known.
-        // For Dakota, we assume customers use their name normalized or we find them.
-        // To keep it high performance, we use the customer name as a key if possible, 
-        // but since IDs are random, we usually search. 
-        // Optimization: Use a local cache or a better ID lookup.
-        return null; 
-    }, [firestore, customerName]);
-
-    // Workaround for customer name lookup optimization
-    // Since we don't have the Customer ID here, we'll use a direct doc fetch if we can link it, 
-    // or keep using the state passed from the selector if available.
-    // For now, let's pull all addresses for the specific customer to avoid "Membangun Layout" lag.
-    
-    const [customer, setCustomer] = useState<Customer | null>(null);
-    const [isDataReady, setIsDataReady] = useState(false);
-
-    useEffect(() => {
-        if (spd && firestore) {
-            // Find the customer data locally if it's already in the cache or fetch it
-            // Using a simple fetch for the specific customer profile
-            const fetchCustomer = async () => {
-                // This is a simplified fetch - ideally we pass the Customer ID in the URL
-                // For this implementation, we'll try to find the customer.
-                setIsDataReady(true);
-            };
-            fetchCustomer();
-        }
-    }, [spd, firestore]);
 
     // Fallback: If we don't have the full customer object yet, use the data from SPD
     useEffect(() => {
