@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -29,7 +28,8 @@ import {
     Edit3,
     Copy,
     ExternalLink,
-    Map as MapIcon
+    Map as MapIcon,
+    Phone
 } from 'lucide-react';
 import type { Customer, CustomerAddress } from '@/app/lib/data';
 import { cn } from '@/lib/utils';
@@ -48,6 +48,8 @@ export function CustomerDrawer({ isOpen, onOpenChange, customerData, onSave }: C
   const { toast } = useToast();
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
+  const [contactPerson, setContactPerson] = useState('');
+  const [phone, setPhone] = useState('');
   const [addresses, setAddresses] = useState<CustomerAddress[]>([]);
   
   // New address state
@@ -60,11 +62,15 @@ export function CustomerDrawer({ isOpen, onOpenChange, customerData, onSave }: C
     if (customerData && isOpen) {
       setName(customerData.name);
       setEmail(customerData.email || '');
+      setContactPerson(customerData.contactPerson || '');
+      setPhone(customerData.phone || '');
       setAddresses(customerData.addresses || []);
       setIsEditingMain(false);
     } else if (!isOpen) {
       setName('');
       setEmail('');
+      setContactPerson('');
+      setPhone('');
       setAddresses([]);
       resetNewAddressForm();
     }
@@ -100,7 +106,7 @@ export function CustomerDrawer({ isOpen, onOpenChange, customerData, onSave }: C
 
   const handleSave = () => {
     if (!name) return;
-    onSave({ id: customerData?.id, name, email, addresses });
+    onSave({ id: customerData?.id, name, email, contactPerson, phone, addresses });
   };
 
   const copyToClipboard = (text: string) => {
@@ -148,16 +154,34 @@ export function CustomerDrawer({ isOpen, onOpenChange, customerData, onSave }: C
                             <Label className="text-[10px] font-black uppercase">Official PT Name</Label>
                             <Input value={name} onChange={e => setName(e.target.value)} className="font-black uppercase h-11" />
                         </div>
+                        <div className="grid grid-cols-2 gap-4">
+                            <div className="space-y-2">
+                                <Label className="text-[10px] font-black uppercase">Contact Person</Label>
+                                <Input value={contactPerson} onChange={e => setContactPerson(e.target.value)} placeholder="Bpk. John Doe" className="h-11" />
+                            </div>
+                            <div className="space-y-2">
+                                <Label className="text-[10px] font-black uppercase">Phone / WA</Label>
+                                <Input value={phone} onChange={e => setPhone(e.target.value)} placeholder="0812..." className="h-11" />
+                            </div>
+                        </div>
                         <div className="space-y-2">
                             <Label className="text-[10px] font-black uppercase">Billing Contact Email</Label>
                             <Input value={email} onChange={e => setEmail(e.target.value)} placeholder="finance@customer.com" className="h-11" />
                         </div>
                     </div>
                 ) : (
-                    <div className="grid grid-cols-2 gap-8">
+                    <div className="grid grid-cols-2 gap-y-6 gap-x-8">
                         <div className="space-y-1">
                             <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Main Email</p>
                             <p className="text-sm font-bold flex items-center gap-2 text-slate-700"><Mail className="h-3.5 w-3.5 text-indigo-400" /> {email || '-'}</p>
+                        </div>
+                        <div className="space-y-1">
+                            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Contact Point</p>
+                            <p className="text-sm font-bold flex items-center gap-2 text-slate-700"><User className="h-3.5 w-3.5 text-indigo-400" /> {contactPerson || '-'}</p>
+                        </div>
+                        <div className="space-y-1">
+                            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Phone Number</p>
+                            <p className="text-sm font-bold flex items-center gap-2 text-slate-700"><Phone className="h-3.5 w-3.5 text-indigo-400" /> {phone || '-'}</p>
                         </div>
                         <div className="space-y-1">
                             <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Customer ID</p>
@@ -188,7 +212,7 @@ export function CustomerDrawer({ isOpen, onOpenChange, customerData, onSave }: C
                             <CardContent className="p-5 pl-7">
                                 <div className="flex justify-between items-start mb-3">
                                     <div className="flex items-center gap-2">
-                                        {addr.isDefault ? <Home className="h-4 w-4 text-indigo-600" /> : <Building2 className="h-4 w-4 text-slate-400" />}
+                                        {addr.label.toLowerCase().includes('office') ? <Home className="h-4 w-4 text-indigo-600" /> : <Building2 className="h-4 w-4 text-slate-400" />}
                                         <span className={cn("text-[10px] font-black uppercase tracking-wider", addr.isDefault ? "text-indigo-700" : "text-slate-500")}>
                                             {addr.label}
                                         </span>

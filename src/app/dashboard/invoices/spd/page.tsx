@@ -241,7 +241,7 @@ import {
       <main className="flex flex-1 flex-col gap-4 p-4 md:gap-8 md:p-8 max-w-[1400px] mx-auto">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div>
-            <h1 className="text-3xl font-black tracking-tighter uppercase">SPD Digital Dispatch</h1>
+            <h1 className="text-3xl font-black tracking-tighter uppercase text-slate-900">SPD Digital Dispatch</h1>
             <p className="text-muted-foreground font-medium text-sm">Konsolidasi dokumen pengiriman dalam satu sistem terpadu secara real-time.</p>
           </div>
           <TooltipProvider>
@@ -432,7 +432,7 @@ import {
                                                     <Printer className="h-3 w-3" />
                                                 </Button>
                                             </TooltipTrigger>
-                                            <TooltipContent className="bg-slate-900 text-white border-none text-[10px]">Cetak Amplop Coklat</TooltipContent>
+                                            <TooltipContent className="bg-slate-900 text-white border-none text-[10px]">{TOOLTIP_CONTENT.spd_quick_print_envelope}</TooltipContent>
                                         </Tooltip>
                                     </TooltipProvider>
                                     <TooltipProvider>

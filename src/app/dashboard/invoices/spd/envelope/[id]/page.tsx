@@ -42,7 +42,7 @@ export default function SpdEnvelopePreview() {
                     const foundCust = allCustomers.find(c => c.name === foundSpd.invoices[0]?.customer);
                     if (foundCust) {
                         setCustomer(foundCust);
-                        const addr = foundCust.addresses.find(a => a.id === addressId) || foundCust.addresses[0];
+                        const addr = foundCust.addresses.find(a => a.id === addressId) || foundCust.addresses.find(a => a.isDefault) || foundCust.addresses[0];
                         if (addr) setManualAddress(addr.address);
                     }
                 }
@@ -137,8 +137,11 @@ export default function SpdEnvelopePreview() {
 
                                 <div className="pt-4 border-t-2 border-slate-100 flex justify-between items-end">
                                     <div className="space-y-0.5">
-                                        <p className="text-[9px] font-black uppercase text-slate-400 tracking-widest">Contact Person:</p>
-                                        <p className="text-sm font-black text-slate-800 uppercase">{customer.email || 'Dept. Finance'}</p>
+                                        <p className="text-[9px] font-black uppercase text-slate-400 tracking-widest">Attention To / Kontak:</p>
+                                        <p className="text-sm font-black text-slate-800 uppercase">
+                                            {customer.contactPerson ? `Up. ${customer.contactPerson}` : 'Up. Bagian Finance'}
+                                            {customer.phone && <span className="block text-[11px] font-mono mt-1 opacity-70">Telp: {customer.phone}</span>}
+                                        </p>
                                     </div>
                                     <div className="bg-slate-900 text-white px-4 py-1.5 rounded-full font-mono text-[10px] font-black tracking-tighter">
                                         ENVELOPE-ID: {spd.id.split('/').pop()}

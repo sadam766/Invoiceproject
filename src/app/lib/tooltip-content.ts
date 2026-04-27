@@ -44,7 +44,8 @@ export const TOOLTIP_CONTENT = {
     spd_quick_share: "Salin link pelacakan digital untuk dibagikan via WhatsApp kepada customer.",
     spd_auto_pull: "Sistem otomatis menarik nomor Surat Jalan (SJ) dari data invoice terakhir.",
     spd_aging_alert: "Peringatan: Pengiriman ini sudah melebihi 5 hari di jalan. Segera cek status ke kurir.",
-    envelope_print_landscape: "Pastikan posisi amplop coklat di printer sudah sesuai dengan arah landscape (horizontal)."
+    envelope_print_landscape: "Pastikan posisi amplop coklat di printer sudah sesuai dengan arah landscape (horizontal).",
+    spd_quick_print_envelope: "Lihat pratinjau dan cetak amplop coklat penagihan untuk kurir."
 } as const;
 
 export type TooltipKey = keyof typeof TOOLTIP_CONTENT;

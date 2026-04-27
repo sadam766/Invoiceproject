@@ -148,6 +148,8 @@ export type Customer = {
   id?: string;
   name: string;
   email?: string;
+  contactPerson?: string;
+  phone?: string;
   addresses: CustomerAddress[];
   defaultShippingAddressId?: string;
   ownerId?: string;
