@@ -246,7 +246,7 @@ export default function DashboardLayout({
             
             <div className="flex items-center gap-2 text-xs font-bold text-slate-400 group-data-[collapsible=icon]:hidden">
                 <Layers className="h-3.5 w-3.5" />
-                <span>Dakota Hub</span>
+                <Link href="/dashboard/invoices" className="hover:text-primary transition-colors">Dakota Hub</Link>
                 <span className="mx-1 opacity-20">/</span>
                 <span className="text-slate-900 capitalize">{pathname.split('/').pop()?.replace('-', ' ')}</span>
             </div>

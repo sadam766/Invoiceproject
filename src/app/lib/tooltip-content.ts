@@ -27,6 +27,7 @@ export const TOOLTIP_CONTENT = {
     dp_mode: "Mode Down Payment: Tagihan awal sebelum barang dikirim (Uang Muka).",
     regular_billing: "Mode Penagihan Reguler: Tagihan berdasarkan pengiriman barang fisik.",
     tax_sync: "Sinkronisasi otomatis PPN 12% sesuai regulasi perpajakan terbaru.",
+    back_to_list: "Klik untuk kembali ke daftar utama invoice.",
     
     // Sales Management (AR)
     outstanding_balance: "Total dana yang masih tertahan di customer dan belum masuk ke rekening perusahaan.",

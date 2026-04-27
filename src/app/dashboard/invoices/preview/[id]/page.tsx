@@ -1,7 +1,7 @@
 'use client';
 import React, { useRef, useEffect, useState } from 'react';
 import { useRouter, useParams } from 'next/navigation';
-import { Download, Upload, ArrowLeft, Loader2, Globe } from 'lucide-react';
+import { Download, Upload, ArrowLeft, Loader2, Globe, Printer } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { exportToExcel } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
@@ -9,6 +9,8 @@ import { useFirestore, useDoc, useMemoFirebase, useCollection } from '@/firebase
 import { doc, collection, query } from 'firebase/firestore';
 import html2pdf from 'html2pdf.js';
 import type { Invoice, Customer } from '@/app/lib/data';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { TOOLTIP_CONTENT } from '@/app/lib/tooltip-content';
 
 // --- DEFINISI TIPE DATA ---
 interface Item {
@@ -180,10 +182,35 @@ const InvoicePreviewPage = () => {
                 }
             `}</style>
             
-            <div className="flex justify-center space-x-4 mb-4 print-hidden">
-                <Button onClick={() => router.back()} variant="outline"><ArrowLeft size={16} /> Kembali</Button>
-                <Button onClick={handleDownloadPdf} className="bg-indigo-600"><Download size={16} /> PDF</Button>
-                <Button onClick={handleExportExcel} variant="outline"><Upload size={16} /> Excel</Button>
+            <div className="flex justify-center items-center gap-4 mb-8 print-hidden">
+                <TooltipProvider>
+                    <Tooltip>
+                        <TooltipTrigger asChild>
+                            <Button 
+                                onClick={() => router.push('/dashboard/invoices')} 
+                                variant="outline" 
+                                className="font-bold hover:bg-slate-50 rounded-xl px-6 h-10 shadow-sm border-slate-200"
+                            >
+                                <ArrowLeft size={16} className="mr-2" /> Kembali
+                            </Button>
+                        </TooltipTrigger>
+                        <TooltipContent className="bg-slate-900 text-white text-[10px] p-2">
+                            {TOOLTIP_CONTENT.back_to_list}
+                        </TooltipContent>
+                    </Tooltip>
+                </TooltipProvider>
+
+                <div className="flex gap-2 bg-white p-1 rounded-2xl shadow-sm ring-1 ring-slate-200">
+                    <Button onClick={handleDownloadPdf} className="bg-indigo-600 hover:bg-indigo-700 rounded-xl h-10 px-6 font-black uppercase text-[10px] tracking-widest">
+                        <Download size={16} className="mr-2" /> Save PDF
+                    </Button>
+                    <Button onClick={() => window.print()} variant="ghost" className="rounded-xl h-10 px-4">
+                        <Printer size={16} className="text-slate-400" />
+                    </Button>
+                    <Button onClick={handleExportExcel} variant="ghost" className="rounded-xl h-10 px-4">
+                        <Upload size={16} className="text-slate-400" />
+                    </Button>
+                </div>
             </div>
             
             <div ref={invoiceContainerRef}>
