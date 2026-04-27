@@ -7,7 +7,6 @@ import {
   CardContent,
   CardHeader,
   CardTitle,
-  CardDescription,
 } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -35,39 +34,26 @@ import {
 } from '@/components/ui/sheet';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
-import { Separator } from '@/components/ui/separator';
 import { cn, formatNumberWithCommas, parseFormattedNumber } from '@/lib/utils';
 import { format, addDays } from 'date-fns';
 import {
   ChevronLeft,
   Plus,
-  ShieldCheck,
   ReceiptText,
   Lock,
   Hash,
   Wallet,
   Scale,
-  RefreshCw,
-  Tag,
-  MessageSquare,
-  CreditCard,
+  History,
   Eye,
   Loader2,
-  Info,
-  History,
-  AlertTriangle,
-  ChevronRight,
-  TrendingUp,
-  FileCheck,
   Trash2,
   ListChecks,
-  ArrowRight,
   CopyPlus,
   Search,
-  PackageCheck,
   Layers,
 } from 'lucide-react';
-import { type Invoice, type SalesOrder, type UserProfile, type Customer, type InvoiceItem, type InvoiceNumber, type VirtualAccount, type ProductListItem } from '@/app/lib/data';
+import { type Invoice, type SalesOrder, type UserProfile, type InvoiceItem, type InvoiceNumber, type ProductListItem, type SalesListItem } from '@/app/lib/data';
 import { useToast } from '@/hooks/use-toast';
 import { useFirestore, useCollection, useMemoFirebase, useUser, useDoc, errorEmitter, FirestorePermissionError } from '@/firebase';
 import { collection, query, doc, setDoc, arrayUnion } from 'firebase/firestore';
@@ -112,6 +98,13 @@ export default function AddInvoicePage() {
   const { data: existingInvoiceData, isLoading: isExistingLoading } = useDoc<Invoice>(existingInvoiceRef);
 
   const activeIdentity = existingInvoiceData || identityData;
+
+  // Single Source of Truth for PO Amount
+  const saleRef = useMemoFirebase(() => {
+    if (!firestore || !activeIdentity?.poNumber) return null;
+    return doc(firestore, 'sales', activeIdentity.poNumber.replace(/\//g, '_'));
+  }, [firestore, activeIdentity?.poNumber]);
+  const { data: saleData } = useDoc<SalesListItem>(saleRef);
 
   const isLoading = (invoiceNumberIdParam && isIdentityLoading) || (editInvoiceId && isExistingLoading);
 
@@ -158,12 +151,7 @@ export default function AddInvoicePage() {
     return Math.max(0, totalDpInvoiced - totalDpUsed);
   }, [poBillingHistory]);
 
-  const totalPoValue = useMemo(() => {
-    if (!allSoItems || !activeIdentity) return 0;
-    return allSoItems
-        .filter(so => so.poNumber === activeIdentity.poNumber)
-        .reduce((sum, so) => sum + (so.quantity * so.price), 0);
-  }, [allSoItems, activeIdentity]);
+  const totalPoValue = saleData?.amount || 0;
 
   const totalInvoicedSoFar = useMemo(() => {
     return poBillingHistory.reduce((sum, inv) => sum + inv.amount, 0);
@@ -199,7 +187,7 @@ export default function AddInvoicePage() {
   const [vat12, setVat12] = useState<string>('0');
   const [totalAmount, setTotalAmount] = useState<string>('0');
 
-  // Initial Sync from Identity or Existing Data
+  // Initial Sync
   useEffect(() => {
       if (activeIdentity && items.length === 0) {
           if (activeIdentity.items && activeIdentity.items.length > 0) {
@@ -282,7 +270,11 @@ export default function AddInvoicePage() {
   const handleNumericChange = (setter: (v: string) => void) => (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
     if (value === '') { setter(''); return; }
-    const num = parseFormattedNumber(value);
+    
+    // Only parse if it's a valid digit/decimal separator
+    const cleanValue = value.replace(/[^\d.,]/g, '');
+    const num = parseFormattedNumber(cleanValue);
+    
     if (!isNaN(num)) {
         let formatted = formatNumberWithCommas(num);
         if (value.endsWith(',') || value.endsWith('.')) {
@@ -323,10 +315,7 @@ export default function AddInvoicePage() {
           varianceReason: `Copied from prev. Invoice ${histItem.parentInvoice}`
       };
       setItems([...items, newItem]);
-      toast({ 
-        title: "Item Disalin", 
-        description: `${histItem.name} berhasil ditambahkan.` 
-      });
+      toast({ title: "Item Disalin" });
   };
 
   const removeItem = (id: string | number) => {
@@ -339,7 +328,7 @@ export default function AddInvoicePage() {
 
     const grandTotalNumeric = parseFormattedNumber(totalAmount);
     const totalWithNewInvoice = grandTotalNumeric + totalInvoicedSoFar;
-    if (totalWithNewInvoice > (totalPoValue + 0.01)) {
+    if (totalWithNewInvoice > (totalPoValue + 100)) { // Add slight buffer for floating point
         toast({ 
             variant: "destructive", 
             title: "Pencegahan Kelebihan Tagih", 
@@ -411,11 +400,10 @@ export default function AddInvoicePage() {
 
   const isLocked = (existingInvoiceData?.status === 'finalized' || existingInvoiceData?.status === 'paid' || existingInvoiceData?.status === 'received') && !isAdmin;
   const grandTotalNumeric = parseFormattedNumber(totalAmount);
-  const isExceedingPo = (grandTotalNumeric + totalInvoicedSoFar) > (totalPoValue + 0.01);
+  const isExceedingPo = (grandTotalNumeric + totalInvoicedSoFar) > (totalPoValue + 100);
 
   return (
     <main className="flex flex-1 flex-col gap-6 p-4 md:p-8 max-w-[1600px] mx-auto bg-background animate-in fade-in duration-500">
-      {/* HEADER SECTION WITH PROGRESS WIDGET */}
       <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
         <div className="flex items-center gap-4">
             <Button variant="outline" size="icon" onClick={() => router.back()} className="rounded-full h-10 w-10 border-slate-200">
@@ -426,13 +414,12 @@ export default function AddInvoicePage() {
                 <div className="flex items-center gap-2 mt-1">
                     <span className="text-slate-400 text-[10px] font-bold uppercase tracking-widest">Ref PO: {activeIdentity?.poNumber}</span>
                     <Badge variant="outline" className="text-[9px] font-black uppercase bg-slate-50 border-slate-200 text-slate-500 h-4">
-                        <Lock className="h-2.5 w-2.5 mr-1" /> Multi-User Protected
+                        <Lock className="h-2.5 w-2.5 mr-1" /> Audit Safe
                     </Badge>
                 </div>
             </div>
         </div>
         
-        {/* PO PROGRESS TRACKER WIDGET */}
         <div className="flex bg-white rounded-2xl border-2 border-slate-100 shadow-sm p-4 items-center gap-6 divide-x divide-slate-100 min-w-[500px]">
             <div className="space-y-0.5">
                 <p className="text-[9px] font-black uppercase text-slate-400 tracking-wider">Total Kontrak PO</p>
@@ -446,7 +433,7 @@ export default function AddInvoicePage() {
                 <p className="text-[9px] font-black uppercase text-slate-400 tracking-wider flex items-center justify-between">
                     Sisa Plafon PO 
                     <span className={cn("text-[10px]", remainingPoBalance > 0 ? "text-emerald-600" : "text-rose-600")}>
-                        {((totalInvoicedSoFar/totalPoValue)*100).toFixed(0)}%
+                        {totalPoValue > 0 ? ((totalInvoicedSoFar/totalPoValue)*100).toFixed(0) : 0}%
                     </span>
                 </p>
                 <div className="flex items-center gap-3">
@@ -460,12 +447,11 @@ export default function AddInvoicePage() {
       </div>
 
       <div className="grid gap-8 lg:grid-cols-12 items-start">
-        {/* Main Form Section */}
         <div className="lg:col-span-8 space-y-8">
           <Card className={cn("shadow-sm border-none ring-1 ring-slate-200 overflow-hidden", isLocked && "opacity-60")}>
             <CardHeader className="bg-slate-50/50 border-b py-3 px-6">
                 <CardTitle className="text-[10px] font-black uppercase flex items-center gap-2 text-slate-500 tracking-widest">
-                    <ReceiptText className="h-4 w-4 text-indigo-600" /> Identitas Dokumen & Lokasi
+                    <ReceiptText className="h-4 w-4 text-indigo-600" /> Identitas Dokumen
                 </CardTitle>
             </CardHeader>
             <CardContent className="p-8">
@@ -497,7 +483,7 @@ export default function AddInvoicePage() {
             </CardContent>
           </Card>
 
-          <Card className={cn("shadow-sm border-none ring-1 ring-slate-200 overflow-hidden", isLocked && "opacity-60", isDpInvoice && "opacity-40 grayscale pointer-events-none")}>
+          <Card className={cn("shadow-sm border-none ring-1 ring-slate-200 overflow-hidden", isLocked && "opacity-60")}>
             <CardHeader className="bg-slate-50/50 border-b py-4 px-6 flex flex-row items-center justify-between">
                 <CardTitle className="text-sm font-black uppercase text-slate-800 tracking-tighter">Line Items Constructor</CardTitle>
                 <div className="flex items-center gap-3">
@@ -509,11 +495,11 @@ export default function AddInvoicePage() {
                                     className={cn("text-[9px] uppercase cursor-pointer py-1.5 px-4 font-black tracking-widest transition-all", isDpInvoice ? "bg-indigo-600" : "text-indigo-600 border-indigo-200")} 
                                     onClick={() => !isLocked && setIsDpInvoice(!isDpInvoice)}
                                 >
-                                    {isDpInvoice ? "Down Payment Mode" : "Progress Billing Mode"}
+                                    {isDpInvoice ? "Down Payment Mode" : "Regular Billing"}
                                 </Badge>
                             </TooltipTrigger>
                             <TooltipContent className="max-w-xs bg-slate-900 text-white p-3 text-[10px]">
-                                Klik untuk berganti mode penagihan.
+                                Klik untuk berganti mode penagihan (DP vs Final).
                             </TooltipContent>
                         </Tooltip>
                     </TooltipProvider>
@@ -616,7 +602,6 @@ export default function AddInvoicePage() {
                         </PopoverContent>
                     </Popover>
 
-                    {/* QUICK-TRANSFER HISTORY DRAWER */}
                     <Sheet>
                         <SheetTrigger asChild>
                             <Button variant="outline" size="sm" className="h-10 text-[10px] font-black uppercase text-emerald-600 rounded-xl px-6 border-slate-200 shadow-sm" disabled={isLocked || billedItemsHistory.length === 0}>
@@ -670,7 +655,6 @@ export default function AddInvoicePage() {
           </Card>
         </div>
 
-        {/* Sidebar: Audit & Calculations */}
         <div className="lg:col-span-4 space-y-8 sticky top-24">
           <Card className="shadow-lg border-none ring-1 ring-indigo-100 bg-white overflow-hidden rounded-3xl">
             <CardHeader className="bg-indigo-50/20 py-5 px-8 border-b border-indigo-50">

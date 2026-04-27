@@ -10,7 +10,7 @@ import {
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Plus, Calendar as CalendarIcon, Check, ChevronsUpDown, Database, Hash, FilePlus, Info, Search, AlertTriangle, Layers } from 'lucide-react';
+import { Plus, Calendar as CalendarIcon, Hash, FilePlus, Database, Layers, ChevronsUpDown } from 'lucide-react';
 import { Checkbox } from '@/components/ui/checkbox';
 import {
   Popover,
@@ -95,7 +95,7 @@ export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceDa
   }, [firestore]);
   const { data: existingInvoices } = useCollection<Invoice>(invoicesCollection);
 
-  // TRIGGER: "The Golden Key" Fetcher (Logic 1)
+  // TRIGGER: "The Golden Key" Fetcher (Auto-fill Customer & SO from PO)
   useEffect(() => {
     if (!poNumber || !masterSalesList || invoiceData) return;
 
@@ -106,7 +106,6 @@ export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceDa
     if (matchedPo) {
       setCustomer(matchedPo.customer);
       if (matchedPo.soNumber) setSalesOrder(matchedPo.soNumber);
-      console.log(`PO Match Found: ${matchedPo.customer}`);
     }
   }, [poNumber, masterSalesList, invoiceData]);
 
@@ -330,7 +329,7 @@ export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceDa
                                 className="flex-1 h-8 text-[10px] font-bold uppercase"
                                 disabled={!!invoiceData}
                             >
-                                SAR (Tagihan Progress)
+                                SAR (Tagihan)
                             </Button>
                             <Button
                                 variant={invoiceType === 'kw' ? 'default' : 'ghost'}
@@ -379,7 +378,7 @@ export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceDa
 
            <div className="space-y-2">
             <div className="flex justify-between items-center">
-                <Label className="text-[10px] font-black uppercase text-muted-foreground">Opsi A: Tarik Data dari Sales Order (ERP)</Label>
+                <Label className="text-[10px] font-black uppercase text-muted-foreground">Opsi A: Tarik Data dari Sales Order</Label>
                 <Badge variant="outline" className="text-[8px] bg-blue-50 text-blue-600 font-black border-blue-100">Recommended</Badge>
             </div>
             <Popover open={soPopoverOpen} onOpenChange={setSoPopoverOpen}>
@@ -417,7 +416,7 @@ export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceDa
 
           <div className="grid grid-cols-2 gap-4 pt-2 border-t">
               <div className="space-y-2">
-                <Label className="text-[10px] font-black uppercase text-muted-foreground">Golden Key: PO Number (Hybrid)</Label>
+                <Label className="text-[10px] font-black uppercase text-muted-foreground">Kunci Utama: Nomor PO</Label>
                 <Input 
                     value={poNumber} 
                     onChange={e => setPoNumber(e.target.value)} 
@@ -427,7 +426,7 @@ export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceDa
                 {previousInvoicesCount > 0 && (
                     <div className="flex items-center gap-2 bg-blue-50 p-2 rounded border border-blue-200 mt-1">
                         <Layers className="h-3 w-3 text-blue-600" />
-                        <span className="text-[9px] font-bold text-blue-700 uppercase">PO ini memiliki {previousInvoicesCount} invoice aktif. Saldo DP akan otomatis tersinkron.</span>
+                        <span className="text-[9px] font-bold text-blue-700 uppercase">PO ini memiliki {previousInvoicesCount} invoice aktif.</span>
                     </div>
                 )}
               </div>
@@ -508,7 +507,7 @@ export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceDa
                 </Button>
               </TooltipTrigger>
               <TooltipContent className="bg-slate-900 text-white border-none text-[10px]">
-                Masuk ke halaman input detail barang dan riwayat saldo PO.
+                Masuk ke halaman input detail barang dan kalkulasi sisa plafon.
               </TooltipContent>
             </Tooltip>
           </TooltipProvider>
