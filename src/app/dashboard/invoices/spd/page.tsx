@@ -151,6 +151,25 @@ import {
         setDeleteDialogState({ isOpen: false, spdId: undefined });
     };
 
+    /**
+     * Utility to remove undefined keys from objects to prevent Firestore WriteBatch errors.
+     */
+    const cleanUndefined = (obj: any) => {
+        const newObj = { ...obj };
+        Object.keys(newObj).forEach(key => {
+            if (newObj[key] === undefined) {
+                delete newObj[key];
+            } else if (Array.isArray(newObj[key])) {
+                newObj[key] = newObj[key].map((item: any) => 
+                    (typeof item === 'object' && item !== null) ? cleanUndefined(item) : item
+                );
+            } else if (typeof newObj[key] === 'object' && newObj[key] !== null) {
+                newObj[key] = cleanUndefined(newObj[key]);
+            }
+        });
+        return newObj;
+    };
+
     const handleSave = async (newItem: SpdData) => {
         if (!firestore || !user) return;
 
@@ -168,11 +187,11 @@ import {
         const batch = writeBatch(firestore);
         const spdRef = doc(firestore, 'spds', safeId);
         
-        const finalSpdData = { 
+        const finalSpdData = cleanUndefined({ 
             ...newItem, 
             ownerId: user.uid,
             createdBy: userProfile?.displayName || user.email || 'System'
-        };
+        });
 
         newItem.invoices.forEach(inv => {
             const safeInvId = inv.invoiceId.replace(/\//g, '_');
@@ -190,7 +209,7 @@ import {
         
         setIsDialogOpen(false);
         
-        // Triger Envelope Flow for NEW SPD
+        // Trigger Envelope Flow for NEW SPD
         if (!editingSpd) {
             setNewSpdRef(newItem);
             setTimeout(() => setConfirmPrintOpen(true), 500);
