@@ -79,7 +79,7 @@ export default function DashboardPage() {
     if (!firestore) return null;
     return query(collection(firestore, 'invoices'));
   }, [firestore]);
-  const { data: invoiceList } = useCollection<Invoice>(invoicesCollection);
+  const { data: invoiceList } = useCollection<Invoice>(invoiceListCollection);
 
   const taxInvoicesCollection = useMemoFirebase(() => {
     if (!firestore) return null;
@@ -217,22 +217,38 @@ export default function DashboardPage() {
       </div>
 
       <div className="grid gap-4 lg:grid-cols-7">
-        <Card className="lg:col-span-4 shadow-md border-none ring-1 ring-slate-200">
+        <Card className="lg:col-span-4 shadow-md border-none ring-1 ring-slate-200 overflow-hidden">
           <CardHeader className="border-b bg-slate-50/50">
             <CardTitle className="text-sm font-black uppercase flex items-center gap-2 text-slate-900">
                 <BarChart3 className="h-4 w-4 text-indigo-600" /> Daily Activity Chart
             </CardTitle>
           </CardHeader>
           <CardContent className="pt-6">
-            <div className="h-[250px] w-full">
+            <div className="h-[300px] w-full">
               <ChartContainer config={activityChartConfig}>
                 <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={chartData}>
+                  <BarChart data={chartData} margin={{ top: 20, right: 20, left: -20, bottom: 0 }}>
                     <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--border))" />
-                    <XAxis dataKey="day" axisLine={false} tickLine={false} style={{ fontSize: '10px', fontWeight: 'bold' }} />
-                    <YAxis axisLine={false} tickLine={false} style={{ fontSize: '10px' }} />
-                    <ChartTooltip content={<ChartTooltipContent />} />
-                    <Bar dataKey="count" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} barSize={30} />
+                    <XAxis 
+                      dataKey="day" 
+                      axisLine={false} 
+                      tickLine={false} 
+                      style={{ fontSize: '10px', fontWeight: 'bold' }} 
+                    />
+                    <YAxis 
+                      axisLine={false} 
+                      tickLine={false} 
+                      style={{ fontSize: '10px' }} 
+                      allowDecimals={false}
+                      domain={[0, 'dataMax + 1']}
+                    />
+                    <ChartTooltip cursor={{ fill: 'rgba(0,0,0,0.03)' }} content={<ChartTooltipContent />} />
+                    <Bar 
+                      dataKey="count" 
+                      fill="hsl(var(--primary))" 
+                      radius={[4, 4, 0, 0]} 
+                      maxBarSize={45}
+                    />
                   </BarChart>
                 </ResponsiveContainer>
               </ChartContainer>

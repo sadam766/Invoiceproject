@@ -315,14 +315,14 @@ export default function AddInvoicePage() {
   const handleSaveInvoice = async (invoiceStatus: any = 'sent', redirectToPreview = false) => {
     if (!firestore || !user || !activeIdentity) return;
 
-    // PROTECTION: Exceeds PO validation
+    // PROTECTION: Strict PO validation (Replaces Over-Billing logic)
     const grandTotalNumeric = parseFormattedNumber(String(totalAmount));
     const totalWithNewInvoice = grandTotalNumeric + totalInvoicedSoFar;
     if (totalWithNewInvoice > (totalPoValue + 0.01)) {
         toast({ 
             variant: "destructive", 
-            title: "Pencegahan Over-Billing", 
-            description: "Nilai tagihan saat ini melebihi sisa plafon PO. Mohon periksa kembali kuantitas atau nominal." 
+            title: "Pencegahan Kelebihan Tagih", 
+            description: "Nilai tagihan saat ini melebihi sisa plafon PO. Mohon periksa kembali kuantitas atau nominal di Constructor." 
         });
         return;
     }
@@ -417,7 +417,7 @@ export default function AddInvoicePage() {
                     <p className="text-xs">
                         {isDpInvoice 
                             ? "Down Payment: Tagihan uang muka di awal proyek." 
-                            : "Progress Billing: Penagihan bertahap berdasarkan persentase penyelesaian pekerjaan atau termin yang telah disepakati di Sales Order."}
+                            : "Progress Billing: Penagihan bertahap berdasarkan termin atau persentase penyelesaian."}
                     </p>
                 </TooltipContent>
               </Tooltip>
@@ -489,9 +489,7 @@ export default function AddInvoicePage() {
                     <TableBody>
                         {items.length === 0 ? (
                             <TableRow><TableCell colSpan={6} className="text-center py-10 text-slate-400 italic text-xs uppercase font-black">Belum ada item ditarik.</TableCell></TableRow>
-                        ) : items.map(item => {
-                            const totalBillQty = item.quantity + (item.prevInvoicedQty || 0);
-                            return (
+                        ) : items.map(item => (
                                 <TableRow key={item.id} className="transition-colors">
                                     <TableCell>
                                         <div className="flex flex-col gap-1 py-2">
@@ -534,8 +532,8 @@ export default function AddInvoicePage() {
                                         </Button>
                                     </TableCell>
                                 </TableRow>
-                            );
-                        })}
+                            )
+                        )}
                     </TableBody>
                 </Table>
                 <div className="p-4 bg-slate-50/30 border-t">
