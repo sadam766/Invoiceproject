@@ -66,6 +66,7 @@ import {
   Pencil,
   Building2,
   Home,
+  CheckCircle2
 } from 'lucide-react';
 import { type Invoice, type SalesOrder, type UserProfile, type InvoiceItem, type InvoiceNumber, type ProductListItem, type SalesListItem, type Customer } from '@/app/lib/data';
 import { useToast } from '@/hooks/use-toast';
@@ -113,6 +114,15 @@ export default function AddInvoicePage() {
 
   const activeIdentity = existingInvoiceData || identityData;
 
+  // SO Lookup for Master Data Pull
+  const soHeadersCollection = useMemoFirebase(() => firestore ? query(collection(firestore, 'salesOrders')) : null, [firestore]);
+  const { data: allSalesOrders } = useCollection<SalesOrder>(soHeadersCollection);
+
+  const activeSoData = useMemo(() => {
+    if (!allSalesOrders || !activeIdentity?.salesOrder) return null;
+    return allSalesOrders.find(so => so.soNumber === activeIdentity.salesOrder);
+  }, [allSalesOrders, activeIdentity?.salesOrder]);
+
   const saleRef = useMemoFirebase(() => {
     if (!firestore || !activeIdentity?.poNumber) return null;
     return doc(firestore, 'sales', activeIdentity.poNumber.replace(/\//g, '_'));
@@ -123,9 +133,6 @@ export default function AddInvoicePage() {
 
   const invoicesCollection = useMemoFirebase(() => firestore ? query(collection(firestore, 'invoices')) : null, [firestore]);
   const { data: allInvoices } = useCollection<Invoice>(invoicesCollection);
-
-  const soHeadersCollection = useMemoFirebase(() => firestore ? query(collection(firestore, 'salesOrders')) : null, [firestore]);
-  const { data: allSalesOrders } = useCollection<SalesOrder>(soHeadersCollection);
 
   const productsCollection = useMemoFirebase(() => firestore ? query(collection(firestore, 'products')) : null, [firestore]);
   const { data: masterProducts } = useCollection<ProductListItem>(productsCollection);
@@ -177,68 +184,36 @@ export default function AddInvoicePage() {
 
   const dpInvoicedBalance = useMemo(() => {
     if (!poBillingHistory) return 0;
-    
-    const totalDpInvoiced = poBillingHistory
-        .filter(inv => inv.isDpInvoice)
-        .reduce((sum, inv) => sum + inv.amount, 0);
-    
-    const totalDpUsed = poBillingHistory
-        .filter(inv => !inv.isDpInvoice)
-        .reduce((sum, inv) => sum + (inv.dpDeduction || 0), 0);
-
+    const totalDpInvoiced = poBillingHistory.filter(inv => inv.isDpInvoice).reduce((sum, inv) => sum + inv.amount, 0);
+    const totalDpUsed = poBillingHistory.filter(inv => !inv.isDpInvoice).reduce((sum, inv) => sum + (inv.dpDeduction || 0), 0);
     return Math.max(0, totalDpInvoiced - totalDpUsed);
   }, [poBillingHistory]);
 
   const totalPoValue = saleData?.amount || 0;
-
-  const totalInvoicedSoFar = useMemo(() => {
-    return poBillingHistory.reduce((sum, inv) => sum + inv.amount, 0);
-  }, [poBillingHistory]);
-
+  const totalInvoicedSoFar = useMemo(() => poBillingHistory.reduce((sum, inv) => sum + inv.amount, 0), [poBillingHistory]);
   const remainingPoBalance = Math.max(0, totalPoValue - totalInvoicedSoFar);
 
-  useEffect(() => {
-    if (currentCustomer && !billingAddress && !editInvoiceId) {
-      const defaultAddr = currentCustomer.addresses?.find(a => a.isDefault) || currentCustomer.addresses?.[0];
-      if (defaultAddr) {
-        setBillingAddress(defaultAddr.address);
-      }
-    }
-  }, [currentCustomer, billingAddress, editInvoiceId]);
-
+  // CRITICAL: Pull Data from SO to items (Anti-NOL)
   useEffect(() => {
       if (activeIdentity && items.length === 0) {
           if (activeIdentity.items && activeIdentity.items.length > 0) {
              setItems(activeIdentity.items);
-          } else if (allSalesOrders && !editInvoiceId) {
-              const matchingSo = allSalesOrders.find(so => so.soNumber === activeIdentity.salesOrder);
-              if (matchingSo) {
-                setItems(matchingSo.items.map((item, idx) => {
-                    const prevQty = allInvoices?.filter(inv => inv.soNumber === matchingSo.soNumber && inv.status !== 'cancelled')
-                                    .reduce((sum, inv) => {
-                                        const matchingItem = inv.items?.find(i => i.id === item.id || i.name === item.productName);
-                                        return sum + (matchingItem?.quantity || 0);
-                                    }, 0) || 0;
-
-                    return {
-                        id: item.id || idx.toString(),
-                        name: item.productName,
-                        originalName: item.productName,
-                        quantity: Math.max(0, item.quantity - prevQty),
-                        originalQty: item.quantity,
-                        unit: item.unit,
-                        price: item.price,
-                        originalPrice: item.price,
-                        total: Math.max(0, (item.quantity - prevQty) * item.price),
-                        prevInvoicedQty: prevQty,
-                        varianceQty: 0,
-                        varianceReason: ''
-                    };
-                }));
-              }
+          } else if (activeSoData && !editInvoiceId) {
+             // MASTER DATA PULL FROM SO
+             setItems(activeSoData.items.map((item, idx) => ({
+                 id: item.id || `so-${idx}`,
+                 name: item.productName,
+                 quantity: item.quantity,
+                 unit: item.unit,
+                 price: item.price,
+                 total: item.total,
+                 originalPrice: item.price,
+                 originalQty: item.quantity
+             })));
+             if (activeSoData.customerAddress) setBillingAddress(activeSoData.customerAddress);
           }
 
-          if (activeIdentity.billingAddress) setBillingAddress(activeIdentity.billingAddress);
+          if (activeIdentity.billingAddress && !billingAddress) setBillingAddress(activeIdentity.billingAddress);
           
           setIsDpInvoice(!!(activeIdentity as Invoice).isDpInvoice);
           setNegotiationValue(formatNumberWithCommas((activeIdentity as Invoice).negotiation || 0));
@@ -251,7 +226,7 @@ export default function AddInvoicePage() {
               setDpDeductionValue(formatNumberWithCommas(dpInvoicedBalance));
           }
       }
-  }, [activeIdentity, allSalesOrders, allInvoices, editInvoiceId, items.length, dpInvoicedBalance]);
+  }, [activeIdentity, activeSoData, editInvoiceId, items.length, dpInvoicedBalance]);
 
   // --- CALCULATION STATES ---
   const [subtotal, setSubtotal] = useState(0);
@@ -314,38 +289,17 @@ export default function AddInvoicePage() {
     }
   };
 
-  const handleProductSelect = (product: ProductListItem) => {
-      const newItem: InvoiceItem = {
-          id: `manual-${Date.now()}`,
-          name: product.name,
-          originalName: 'Manual Addition',
-          quantity: 1,
-          originalQty: 0,
-          unit: product.unit,
-          price: product.price,
-          originalPrice: 0,
-          total: product.price,
-          varianceReason: 'Additional charge from master catalog'
-      };
-      setItems([...items, newItem]);
-      setProductPopoverOpen(false);
-  };
-
   const handleCopyFromHistory = (histItem: any) => {
       const newItem: InvoiceItem = {
           id: `history-copy-${Date.now()}`,
           name: histItem.name,
-          originalName: histItem.name,
           quantity: 1,
-          originalQty: 0,
           unit: histItem.unit,
           price: histItem.price,
-          originalPrice: histItem.price,
-          total: histItem.price,
-          varianceReason: `Copied from prev. Invoice ${histItem.parentInvoice}`
+          total: histItem.price
       };
       setItems([...items, newItem]);
-      toast({ title: "Item Disalin" });
+      toast({ title: "Item Disalin dari Riwayat" });
   };
 
   const removeItem = (id: string | number) => {
@@ -353,66 +307,10 @@ export default function AddInvoicePage() {
       toast({ title: "Baris Item Dihapus" });
   };
 
-  const openQuickEdit = (type: 'name' | 'address') => {
-      if (!activeIdentity) return;
-      setEditTarget(type);
-      setTempName(activeIdentity.customer);
-      setTempAddress(billingAddress);
-      setIsQuickEditOpen(true);
-  };
-
-  const handleSaveQuickUpdate = async () => {
-    if (!firestore || !activeIdentity) return;
-    
-    try {
-        const safeId = activeIdentity.id.replace(/\//g, '_');
-        const identityDocRef = doc(firestore, 'invoiceNumbers', safeId);
-        const invoiceDocRef = doc(firestore, 'invoices', safeId);
-
-        const updatePayload: any = {};
-        if (editTarget === 'name') updatePayload.customer = tempName;
-        else updatePayload.billingAddress = tempAddress;
-
-        await updateDoc(identityDocRef, updatePayload);
-        if (existingInvoiceData) {
-            await updateDoc(invoiceDocRef, updatePayload);
-        }
-
-        if (updateMaster && currentCustomer?.id) {
-            const masterRef = doc(firestore, 'customers', currentCustomer.id);
-            if (editTarget === 'name') {
-                updateDoc(masterRef, { name: tempName });
-            } else {
-                const updatedAddresses = (currentCustomer.addresses || []).map(a => 
-                    a.address === billingAddress || a.isDefault ? { ...a, address: tempAddress } : a
-                );
-                updateDoc(masterRef, { addresses: updatedAddresses });
-            }
-        }
-
-        if (editTarget === 'address') setBillingAddress(tempAddress);
-        
-        toast({ title: "Data Berhasil Diperbarui" });
-        setIsQuickEditOpen(false);
-    } catch (e) {
-        toast({ variant: "destructive", title: "Gagal Update" });
-    }
-  };
-
   const handleSaveInvoice = async (invoiceStatus: any = 'sent', redirectToPreview = false) => {
     if (!firestore || !user || !activeIdentity) return;
 
     const grandTotalNumeric = parseFormattedNumber(totalAmount);
-    const totalWithNewInvoice = grandTotalNumeric + totalInvoicedSoFar;
-    if (totalWithNewInvoice > (totalPoValue + 100)) {
-        toast({ 
-            variant: "destructive", 
-            title: "Pencegahan Kelebihan Tagih", 
-            description: "Nilai tagihan saat ini melebihi sisa plafon PO." 
-        });
-        return;
-    }
-
     setIsSaving(true);
     const safeInvoiceId = activeIdentity.id.replace(/\//g, '_');
     const invoiceDocRef = doc(firestore, 'invoices', safeInvoiceId);
@@ -461,12 +359,6 @@ export default function AddInvoicePage() {
         })
         .finally(() => setIsSaving(false));
   };
-
-  const filteredHistory = useMemo(() => {
-      if (!billedItemsHistory) return [];
-      if (!historySearch) return billedItemsHistory;
-      return billedItemsHistory.filter(h => h.name.toLowerCase().includes(historySearch.toLowerCase()));
-  }, [billedItemsHistory, historySearch]);
 
   if (isLoading) {
       return <div className="flex h-[80vh] items-center justify-center font-bold text-slate-400 animate-pulse uppercase tracking-widest text-xs">Architectural Handshake...</div>;
@@ -539,27 +431,16 @@ export default function AddInvoicePage() {
                   </div>
 
                   <div className="space-y-2">
-                      <Label className="text-[10px] font-black uppercase text-slate-400 tracking-widest">Customer</Label>
-                      <div className="group relative">
-                        <div className="bg-slate-50 px-4 py-2.5 rounded-xl border border-slate-200 text-xs font-black uppercase truncate text-slate-700">
-                            {activeIdentity?.customer}
-                        </div>
-                        <Button 
-                            variant="ghost" 
-                            size="icon" 
-                            className="absolute -right-2 -top-2 h-6 w-6 rounded-full bg-indigo-600 text-white hover:bg-indigo-700 shadow-md opacity-0 group-hover:opacity-100 transition-opacity"
-                            onClick={() => openQuickEdit('name')}
-                            disabled={isLocked}
-                        >
-                            <Pencil className="h-3 w-3" />
-                        </Button>
+                      <Label className="text-[10px] font-black uppercase text-slate-400 tracking-widest">Customer Name</Label>
+                      <div className="bg-slate-50 px-4 py-2.5 rounded-xl border border-slate-200 text-xs font-black uppercase truncate text-slate-700">
+                          {activeIdentity?.customer}
                       </div>
                   </div>
 
                   <div className="space-y-2">
-                      <Label className="text-[10px] font-black uppercase text-slate-400 tracking-widest">Reference SO</Label>
-                      <div className="flex items-center gap-2 bg-slate-50 px-4 py-2.5 rounded-xl border border-slate-200 text-xs font-bold text-slate-600">
-                          <FileText className="h-4 w-4 text-slate-400" />
+                      <Label className="text-[10px] font-black uppercase text-slate-400 tracking-widest">Active SO Reference</Label>
+                      <div className="flex items-center gap-2 bg-indigo-50 px-4 py-2.5 rounded-xl border border-indigo-200 text-xs font-black text-indigo-700">
+                          <FileText className="h-4 w-4" />
                           <span>{activeIdentity?.salesOrder || 'Waiting SO'}</span>
                       </div>
                   </div>
@@ -567,51 +448,15 @@ export default function AddInvoicePage() {
                   <div className="md:col-span-3 space-y-4">
                       <div className="flex justify-between items-center">
                         <Label className="text-[10px] font-black uppercase text-slate-400 tracking-widest flex items-center gap-1">
-                            <MapPin className="h-3 w-3" /> Smart Address Selector (HO/Cabang)
+                            <MapPin className="h-3 w-3" /> Billing/Ship-to Address
                         </Label>
-                        <Button 
-                            variant="link" 
-                            size="sm" 
-                            className="h-auto p-0 text-[9px] font-black uppercase text-indigo-600"
-                            onClick={() => openQuickEdit('address')}
-                            disabled={isLocked}
-                        >
-                            <Pencil className="h-2.5 w-2.5 mr-1" /> Quick Fix Alamat
-                        </Button>
+                        <Badge variant="secondary" className="text-[8px] font-black uppercase bg-indigo-50 text-indigo-600">Locked from SO/Master</Badge>
                       </div>
 
-                      <div className="grid gap-4 md:grid-cols-2">
-                        <div className="space-y-2">
-                            <Select value={billingAddress} onValueChange={setBillingAddress} disabled={isLocked}>
-                                <SelectTrigger className="h-11 bg-slate-50 border-slate-200 rounded-xl text-xs font-bold">
-                                    <SelectValue placeholder="Pilih Alamat dari Master..." />
-                                </SelectTrigger>
-                                <SelectContent className="max-h-[300px]">
-                                    {currentCustomer?.addresses?.map((addr) => (
-                                        <SelectItem key={addr.id} value={addr.address} className="py-3 px-4 border-b last:border-0">
-                                            <div className="flex flex-col gap-0.5">
-                                                <div className="flex items-center gap-1.5">
-                                                    {addr.label.toLowerCase().includes('office') ? <Home className="h-3 w-3 text-indigo-600" /> : <Building2 className="h-3 w-3 text-amber-600" />}
-                                                    <span className="font-black uppercase text-[10px] tracking-tight">{addr.label}</span>
-                                                    {addr.isDefault && <Badge variant="outline" className="text-[8px] h-3 px-1 font-black bg-blue-50">DEFAULT</Badge>}
-                                                </div>
-                                                <p className="text-[10px] text-muted-foreground truncate max-w-[300px] italic">{addr.address}</p>
-                                            </div>
-                                        </SelectItem>
-                                    ))}
-                                    {!currentCustomer?.addresses?.length && (
-                                        <div className="p-4 text-center text-[10px] italic text-slate-400">Belum ada alamat terdaftar di master.</div>
-                                    )}
-                                </SelectContent>
-                            </Select>
-                        </div>
-
-                        <div className="bg-slate-50/50 p-4 rounded-xl border border-dashed border-slate-200">
-                             <p className="text-[9px] font-black uppercase text-slate-400 mb-1 tracking-widest">Preview Alamat Penagihan:</p>
+                      <div className="bg-slate-50/50 p-5 rounded-2xl border-2 border-slate-100 shadow-inner">
                              <p className="text-[11px] leading-snug font-medium text-slate-700 italic">
-                                 {billingAddress || 'Belum ada alamat dipilih.'}
+                                 {billingAddress || 'Alamat ditarik otomatis dari Master Sales Order.'}
                              </p>
-                        </div>
                       </div>
                   </div>
               </div>
@@ -653,7 +498,7 @@ export default function AddInvoicePage() {
                     </TableHeader>
                     <TableBody>
                         {items.length === 0 ? (
-                            <TableRow><TableCell colSpan={5} className="text-center py-20 text-slate-400 italic text-[11px] uppercase font-black opacity-30 tracking-widest">Belum ada item yang ditarik.</TableCell></TableRow>
+                            <TableRow><TableCell colSpan={5} className="text-center py-20 text-slate-400 italic text-[11px] uppercase font-black opacity-30 tracking-widest">Belum ada item yang ditarik dari Sales Order.</TableCell></TableRow>
                         ) : items.map(item => (
                                 <TableRow key={item.id} className="hover:bg-slate-50/50 transition-colors">
                                     <TableCell className="px-6">
@@ -662,13 +507,8 @@ export default function AddInvoicePage() {
                                                 value={item.name} 
                                                 onChange={e => setItems(items.map(it => it.id === item.id ? { ...it, name: e.target.value } : it))}
                                                 className="h-8 text-[11px] font-bold border-dashed shadow-none"
-                                                disabled={isLocked || !isAdmin}
+                                                disabled={isLocked}
                                             />
-                                            <div className="flex items-center gap-2">
-                                                <span className="text-[9px] font-black uppercase text-slate-400">Kontrak: {item.originalQty} {item.unit}</span>
-                                                <span className="text-[8px] font-bold text-slate-300">|</span>
-                                                <span className="text-[9px] font-black uppercase text-indigo-400">Prev. Bill: {item.prevInvoicedQty || 0}</span>
-                                            </div>
                                         </div>
                                     </TableCell>
                                     <TableCell>
@@ -690,7 +530,7 @@ export default function AddInvoicePage() {
                                                 setItems(items.map(it => it.id === item.id ? { ...it, price: val, total: it.quantity * val } : it));
                                             }}
                                             className="h-9 text-right text-xs font-black border-dashed rounded-lg"
-                                            disabled={isLocked || !isAdmin}
+                                            disabled={isLocked}
                                         />
                                     </TableCell>
                                     <TableCell className="text-right font-black text-xs px-2">Rp {formatNumberWithCommas(item.total)}</TableCell>
@@ -722,7 +562,11 @@ export default function AddInvoicePage() {
                                             <CommandItem
                                                 key={p.id}
                                                 value={`${p.name}|${p.id}`}
-                                                onSelect={() => handleProductSelect(p)}
+                                                onSelect={() => {
+                                                    const newItem: InvoiceItem = { id: `manual-${Date.now()}`, name: p.name, quantity: 1, unit: p.unit, price: p.price, total: p.price };
+                                                    setItems([...items, newItem]);
+                                                    setProductPopoverOpen(false);
+                                                }}
                                                 className="p-4 border-b last:border-0"
                                             >
                                                 <div className="flex justify-between w-full">
@@ -740,7 +584,7 @@ export default function AddInvoicePage() {
                     <Sheet>
                         <SheetTrigger asChild>
                             <Button variant="outline" size="sm" className="h-10 text-[10px] font-black uppercase text-emerald-600 rounded-xl px-6 border-slate-200 shadow-sm" disabled={isLocked || billedItemsHistory.length === 0}>
-                                <History className="mr-2 h-3.5 w-3.5" /> Pilih dari Riwayat ({billedItemsHistory.length})
+                                <History className="mr-2 h-3.5 w-3.5" /> Tarik dari Riwayat ({billedItemsHistory.length})
                             </Button>
                         </SheetTrigger>
                         <SheetContent className="sm:max-w-md w-full p-0 flex flex-col">
@@ -751,7 +595,7 @@ export default function AddInvoicePage() {
                                 <div className="relative mt-4">
                                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
                                     <Input 
-                                        placeholder="Cari item di riwayat..." 
+                                        placeholder="Klik pada baris riwayat untuk menyalin..." 
                                         className="pl-10 h-11 bg-white border-slate-200 rounded-xl text-xs" 
                                         value={historySearch}
                                         onChange={e => setHistorySearch(e.target.value)}
@@ -759,11 +603,11 @@ export default function AddInvoicePage() {
                                 </div>
                             </SheetHeader>
                             <ScrollArea className="flex-1 px-2 py-4">
-                                {filteredHistory.length === 0 ? (
+                                {billedItemsHistory.filter(h => h.name.toLowerCase().includes(historySearch.toLowerCase())).length === 0 ? (
                                     <div className="py-20 text-center text-slate-400 opacity-40 italic text-xs uppercase font-black">Tidak ada item ditemukan.</div>
                                 ) : (
                                     <div className="space-y-3 px-4">
-                                        {filteredHistory.map((h, i) => (
+                                        {billedItemsHistory.filter(h => h.name.toLowerCase().includes(historySearch.toLowerCase())).map((h, i) => (
                                             <div 
                                                 key={i} 
                                                 onClick={() => !isLocked && handleCopyFromHistory(h)}
@@ -771,7 +615,7 @@ export default function AddInvoicePage() {
                                             >
                                                 <div className="flex justify-between items-start mb-2">
                                                     <span className="text-[9px] font-black text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-full">{h.parentInvoice}</span>
-                                                    <CopyPlus className="h-4 w-4 text-indigo-400 opacity-0 group-hover:opacity-100 transition-opacity" />
+                                                    <CheckCircle2 className="h-4 w-4 text-indigo-400 opacity-0 group-hover:opacity-100 transition-opacity" />
                                                 </div>
                                                 <p className="text-xs font-black uppercase text-slate-800 line-clamp-2 leading-tight">{h.name}</p>
                                                 <div className="flex justify-between items-center mt-3 pt-3 border-t border-slate-50">
@@ -904,58 +748,6 @@ export default function AddInvoicePage() {
           </Card>
         </div>
       </div>
-
-      <Dialog open={isQuickEditOpen} onOpenChange={setIsQuickEditOpen}>
-          <DialogContent className="sm:max-w-[450px] rounded-3xl">
-              <DialogHeader>
-                  <DialogTitle className="uppercase font-black tracking-tight text-indigo-700">Quick Fix Customer Data</DialogTitle>
-                  <DialogDescription>Perbarui data langsung dari halaman penagihan untuk akurasi audit.</DialogDescription>
-              </DialogHeader>
-              
-              <div className="py-6 space-y-6">
-                  {editTarget === 'name' ? (
-                      <div className="space-y-2">
-                        <Label className="text-[10px] font-black uppercase text-slate-400 tracking-widest">Nama Legal Perusahaan (PT)</Label>
-                        <Input 
-                            value={tempName} 
-                            onChange={e => setTempName(e.target.value)} 
-                            className="h-12 font-black uppercase bg-indigo-50/30 border-indigo-100 rounded-xl"
-                        />
-                      </div>
-                  ) : (
-                      <div className="space-y-2">
-                        <Label className="text-[10px] font-black uppercase text-slate-400 tracking-widest">Alamat Penagihan</Label>
-                        <textarea 
-                            value={tempAddress} 
-                            onChange={e => setTempAddress(e.target.value)} 
-                            className="w-full min-h-[120px] rounded-xl border border-indigo-100 bg-indigo-50/30 px-4 py-3 text-xs font-medium focus-visible:ring-1 focus-visible:ring-indigo-500 outline-none"
-                        />
-                      </div>
-                  )}
-
-                  <div className="flex items-center space-x-2 bg-slate-50 p-4 rounded-xl border border-dashed">
-                      <Checkbox 
-                        id="update-master" 
-                        checked={updateMaster} 
-                        onCheckedChange={(checked) => setUpdateMaster(!!checked)}
-                      />
-                      <label htmlFor="update-master" className="text-xs font-bold text-slate-600 cursor-pointer select-none">
-                          Simpan perubahan ini secara permanen ke Database Master Customer
-                      </label>
-                  </div>
-              </div>
-
-              <DialogFooter className="bg-slate-50 -mx-6 -mb-6 p-6 rounded-b-3xl">
-                  <Button variant="ghost" onClick={() => setIsQuickEditOpen(false)}>Batal</Button>
-                  <Button 
-                    className="bg-indigo-600 hover:bg-indigo-700 font-black uppercase tracking-widest px-8 shadow-lg shadow-indigo-100 rounded-xl"
-                    onClick={handleSaveQuickUpdate}
-                  >
-                      Update Sekarang
-                  </Button>
-              </DialogFooter>
-          </DialogContent>
-      </Dialog>
     </main>
   );
 }
