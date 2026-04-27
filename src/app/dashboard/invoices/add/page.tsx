@@ -26,6 +26,13 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
+import {
+    Sheet,
+    SheetContent,
+    SheetHeader,
+    SheetTitle,
+    SheetTrigger,
+} from '@/components/ui/sheet';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
@@ -56,6 +63,9 @@ import {
   ListChecks,
   ArrowRight,
   CopyPlus,
+  Search,
+  PackageCheck,
+  Layers,
 } from 'lucide-react';
 import { type Invoice, type SalesOrder, type UserProfile, type Customer, type InvoiceItem, type InvoiceNumber, type VirtualAccount, type ProductListItem } from '@/app/lib/data';
 import { useToast } from '@/hooks/use-toast';
@@ -76,6 +86,7 @@ import {
     PopoverTrigger,
 } from '@/components/ui/popover';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { ScrollArea } from '@/components/ui/scroll-area';
 
 export default function AddInvoicePage() {
   const router = useRouter();
@@ -113,9 +124,6 @@ export default function AddInvoicePage() {
 
   const productsCollection = useMemoFirebase(() => firestore ? query(collection(firestore, 'products')) : null, [firestore]);
   const { data: masterProducts } = useCollection<ProductListItem>(productsCollection);
-
-  const vaCollection = useMemoFirebase(() => firestore ? query(collection(firestore, 'virtualAccounts')) : null, [firestore]);
-  const { data: allVas } = useCollection<VirtualAccount>(vaCollection);
 
   const userProfileRef = useMemoFirebase(() => (!firestore || !user) ? null : doc(firestore, 'users', user.uid), [firestore, user]);
   const { data: userProfile } = useDoc<UserProfile>(userProfileRef);
@@ -174,6 +182,7 @@ export default function AddInvoicePage() {
   const [selectedVaId, setSelectedVaId] = useState<string>('manual');
   const [productPopoverOpen, setProductPopoverOpen] = useState(false);
   const [isProcessing, setIsSaving] = useState(false);
+  const [historySearch, setHistorySearch] = useState('');
 
   // --- CALCULATION STATES ---
   const [subtotal, setSubtotal] = useState(0);
@@ -303,26 +312,25 @@ export default function AddInvoicePage() {
       setItems([...items, newItem]);
       toast({ 
         title: "Item Disalin", 
-        description: `${histItem.name} berhasil ditambahkan ke tabel input.` 
+        description: `${histItem.name} berhasil ditambahkan.` 
       });
   };
 
   const removeItem = (id: string | number) => {
       setItems(items.filter(it => it.id !== id));
-      toast({ title: "Baris Item Dihapus", description: "Kalkulasi total telah disesuaikan." });
+      toast({ title: "Baris Item Dihapus" });
   };
 
   const handleSaveInvoice = async (invoiceStatus: any = 'sent', redirectToPreview = false) => {
     if (!firestore || !user || !activeIdentity) return;
 
-    // PROTECTION: Strict PO validation (Replaces Over-Billing logic)
     const grandTotalNumeric = parseFormattedNumber(String(totalAmount));
     const totalWithNewInvoice = grandTotalNumeric + totalInvoicedSoFar;
     if (totalWithNewInvoice > (totalPoValue + 0.01)) {
         toast({ 
             variant: "destructive", 
             title: "Pencegahan Kelebihan Tagih", 
-            description: "Nilai tagihan saat ini melebihi sisa plafon PO. Mohon periksa kembali kuantitas atau nominal di Constructor." 
+            description: "Nilai tagihan saat ini melebihi sisa plafon PO." 
         });
         return;
     }
@@ -378,128 +386,155 @@ export default function AddInvoicePage() {
         .finally(() => setIsSaving(false));
   };
 
+  const filteredHistory = useMemo(() => {
+      if (!billedItemsHistory) return [];
+      if (!historySearch) return billedItemsHistory;
+      return billedItemsHistory.filter(h => h.name.toLowerCase().includes(historySearch.toLowerCase()));
+  }, [billedItemsHistory, historySearch]);
+
   if (isLoading) {
-      return <div className="flex h-[80vh] items-center justify-center font-bold text-slate-400 animate-pulse uppercase tracking-widest">Architectural Handshake...</div>;
+      return <div className="flex h-[80vh] items-center justify-center font-bold text-slate-400 animate-pulse uppercase tracking-widest text-xs">Architectural Handshake...</div>;
   }
 
   const isLocked = (existingInvoiceData?.status === 'finalized' || existingInvoiceData?.status === 'paid' || existingInvoiceData?.status === 'received') && !isAdmin;
   const grandTotalNumeric = parseFormattedNumber(String(totalAmount));
-  const isExceedingPo = (grandTotalNumeric + totalInvoicedSoFar) > (totalPoValue + 0.01); // 0.01 tolerance for floats
+  const isExceedingPo = (grandTotalNumeric + totalInvoicedSoFar) > (totalPoValue + 0.01);
 
   return (
-    <main className="flex flex-1 flex-col gap-4 p-4 md:gap-8 md:p-8 max-w-[1600px] mx-auto bg-background">
-      <div className="flex items-center justify-between">
+    <main className="flex flex-1 flex-col gap-6 p-4 md:p-8 max-w-[1600px] mx-auto bg-background animate-in fade-in duration-500">
+      {/* HEADER SECTION WITH PROGRESS WIDGET */}
+      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
         <div className="flex items-center gap-4">
-            <Button variant="outline" size="icon" onClick={() => router.back()} className="rounded-full">
-                <ChevronLeft className="h-4 w-4" />
+            <Button variant="outline" size="icon" onClick={() => router.back()} className="rounded-full h-10 w-10 border-slate-200">
+                <ChevronLeft className="h-5 w-5" />
             </Button>
             <div>
-                <h1 className="text-2xl font-black tracking-tight uppercase">Invoice Constructor</h1>
-                <div className="text-slate-400 text-[10px] font-bold uppercase tracking-widest flex items-center gap-1.5 mt-0.5">
-                    Parent PO: {activeIdentity?.poNumber} <Badge variant="secondary" className="text-[8px] bg-indigo-50 text-indigo-600 h-3.5"><Lock className="h-2 w-2 mr-1" /> Data Locked</Badge>
+                <h1 className="text-xl font-black tracking-tight uppercase text-slate-900">Invoice Constructor</h1>
+                <div className="flex items-center gap-2 mt-1">
+                    <span className="text-slate-400 text-[10px] font-bold uppercase tracking-widest">Ref PO: {activeIdentity?.poNumber}</span>
+                    <Badge variant="outline" className="text-[9px] font-black uppercase bg-slate-50 border-slate-200 text-slate-500 h-4">
+                        <Lock className="h-2.5 w-2.5 mr-1" /> Multi-User Protected
+                    </Badge>
                 </div>
             </div>
         </div>
         
-        <div className="flex items-center gap-4">
-            <TooltipProvider>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Badge 
-                      variant={isDpInvoice ? "default" : "outline"} 
-                      className={cn("text-[9px] uppercase cursor-pointer py-1.5 px-4", isDpInvoice ? "bg-indigo-600" : "text-indigo-600 border-indigo-200")} 
-                      onClick={() => !isLocked && setIsDpInvoice(!isDpInvoice)}
-                  >
-                      {isDpInvoice ? "Down Payment" : "Progress Billing"}
-                  </Badge>
-                </TooltipTrigger>
-                <TooltipContent className="max-w-xs bg-slate-900 text-white p-3">
-                    <p className="text-xs">
-                        {isDpInvoice 
-                            ? "Down Payment: Tagihan uang muka di awal proyek." 
-                            : "Progress Billing: Penagihan bertahap berdasarkan termin atau persentase penyelesaian."}
+        {/* PO PROGRESS TRACKER WIDGET */}
+        <div className="flex bg-white rounded-2xl border-2 border-slate-100 shadow-sm p-4 items-center gap-6 divide-x divide-slate-100 min-w-[500px]">
+            <div className="space-y-0.5">
+                <p className="text-[9px] font-black uppercase text-slate-400 tracking-wider">Total Kontrak PO</p>
+                <p className="text-sm font-black text-slate-900">Rp {formatNumberWithCommas(totalPoValue)}</p>
+            </div>
+            <div className="pl-6 space-y-0.5">
+                <p className="text-[9px] font-black uppercase text-indigo-600 tracking-wider">Total Ditagih</p>
+                <p className="text-sm font-black text-indigo-600">Rp {formatNumberWithCommas(totalInvoicedSoFar)}</p>
+            </div>
+            <div className="pl-6 space-y-0.5 flex-1">
+                <p className="text-[9px] font-black uppercase text-slate-400 tracking-wider flex items-center justify-between">
+                    Sisa Plafon PO 
+                    <span className={cn("text-[10px]", remainingPoBalance > 0 ? "text-emerald-600" : "text-rose-600")}>
+                        {((totalInvoicedSoFar/totalPoValue)*100).toFixed(0)}%
+                    </span>
+                </p>
+                <div className="flex items-center gap-3">
+                    <p className={cn("text-sm font-black truncate", remainingPoBalance > 0 ? "text-slate-900" : "text-rose-600")}>
+                        Rp {formatNumberWithCommas(remainingPoBalance)}
                     </p>
-                </TooltipContent>
-              </Tooltip>
-            </TooltipProvider>
+                    <ListChecks className={cn("h-4 w-4", remainingPoBalance > 0 ? "text-emerald-500" : "text-rose-500")} />
+                </div>
+            </div>
         </div>
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-12 items-start">
+      <div className="grid gap-8 lg:grid-cols-12 items-start">
         {/* Main Form Section */}
-        <div className="lg:col-span-8 space-y-6">
-          <Card className={cn("shadow-sm ring-1 ring-slate-200", isLocked && "opacity-60")}>
-            <CardHeader className="bg-slate-50/50 border-b py-3">
-                <CardTitle className="text-[10px] font-black uppercase flex items-center gap-2 text-slate-400">
-                    <ReceiptText className="h-4 w-4" /> Identitas Penagihan
+        <div className="lg:col-span-8 space-y-8">
+          <Card className={cn("shadow-sm border-none ring-1 ring-slate-200 overflow-hidden", isLocked && "opacity-60")}>
+            <CardHeader className="bg-slate-50/50 border-b py-3 px-6">
+                <CardTitle className="text-[10px] font-black uppercase flex items-center gap-2 text-slate-500 tracking-widest">
+                    <ReceiptText className="h-4 w-4 text-indigo-600" /> Identitas Dokumen & Lokasi
                 </CardTitle>
             </CardHeader>
-            <CardContent className="p-6">
-              <div className="grid gap-6 md:grid-cols-3">
-                  <div className="space-y-1.5">
-                      <Label className="text-[9px] font-black uppercase text-slate-400">Invoice Number</Label>
-                      <div className="flex items-center gap-2 bg-indigo-50/30 px-3 py-2 rounded-md border-2 border-indigo-100/50">
-                          <Hash className="h-3.5 w-3.5 text-indigo-600" />
-                          <span className="font-black text-indigo-600">{activeIdentity?.id || 'N/A'}</span>
+            <CardContent className="p-8">
+              <div className="grid gap-8 md:grid-cols-3">
+                  <div className="space-y-2">
+                      <Label className="text-[10px] font-black uppercase text-slate-400 tracking-widest">Invoice Number</Label>
+                      <div className="flex items-center gap-2 bg-indigo-50/30 px-4 py-2.5 rounded-xl border-2 border-indigo-100/50">
+                          <Hash className="h-4 w-4 text-indigo-600" />
+                          <span className="font-black text-indigo-700 text-sm tracking-tight">{activeIdentity?.id || 'N/A'}</span>
                       </div>
                   </div>
 
-                  <div className="space-y-1.5">
-                      <Label className="text-[9px] font-black uppercase text-slate-400">Customer</Label>
-                      <div className="bg-slate-50 px-3 py-2 rounded-md border border-slate-200 text-xs font-black uppercase truncate">{activeIdentity?.customer}</div>
+                  <div className="space-y-2">
+                      <Label className="text-[10px] font-black uppercase text-slate-400 tracking-widest">Nama Legal Customer</Label>
+                      <div className="bg-slate-50 px-4 py-2.5 rounded-xl border border-slate-200 text-xs font-black uppercase truncate text-slate-700">{activeIdentity?.customer}</div>
                   </div>
 
-                  <div className="space-y-1.5">
-                      <Label className="text-[9px] font-black uppercase text-slate-400 tracking-widest">Ref PO / ERP Hub</Label>
-                      <div className="bg-slate-50 px-3 py-2 rounded-md border border-slate-200 text-xs font-mono font-bold truncate">
-                          {activeIdentity?.poNumber}
-                      </div>
+                  <div className="space-y-2">
+                      <Label className="text-[10px] font-black uppercase text-slate-400 tracking-widest">ERP Reference (Manual)</Label>
+                      <Input value={internalNote} onChange={e => setInternalNote(e.target.value)} className="font-mono text-[10px] h-10 rounded-xl bg-slate-50/50 border-slate-200" placeholder="Input nomor ERP jika ada..." disabled={isLocked} />
                   </div>
 
-                  <div className="md:col-span-2 space-y-1.5">
-                      <Label className="text-[9px] font-black uppercase text-slate-400">Billing Address & NPWP</Label>
-                      <Input value={billingAddress} onChange={e => setBillingAddress(e.target.value)} className="font-medium h-9 text-xs" placeholder="Alamat..." disabled={isLocked} />
-                      <Input value={billingNpwp} onChange={e => setBillingNpwp(e.target.value)} className="font-mono text-[10px] mt-2 h-8 bg-slate-50" placeholder="NPWP..." disabled={isLocked} />
-                  </div>
-
-                  <div className="space-y-1.5">
-                      <Label className="text-[9px] font-black uppercase text-slate-400">ERP Sync Reference (Manual)</Label>
-                      <Input value={internalNote} onChange={e => setInternalNote(e.target.value)} className="font-mono text-[10px] h-9" placeholder="Internal Ref..." disabled={isLocked} />
+                  <div className="md:col-span-3 space-y-2">
+                      <Label className="text-[10px] font-black uppercase text-slate-400 tracking-widest">Billing Address & NPWP</Label>
+                      <Input value={billingAddress} onChange={e => setBillingAddress(e.target.value)} className="font-medium h-10 text-xs rounded-xl" placeholder="Alamat lengkap penagihan..." disabled={isLocked} />
+                      <Input value={billingNpwp} onChange={e => setBillingNpwp(e.target.value)} className="font-mono text-[10px] h-9 bg-slate-50 rounded-lg mt-1" placeholder="Nomor NPWP..." disabled={isLocked} />
                   </div>
               </div>
             </CardContent>
           </Card>
 
-          <Card className={cn("shadow-sm ring-1 ring-slate-200", isLocked && "opacity-60", isDpInvoice && "opacity-40 grayscale pointer-events-none")}>
-            <CardHeader className="bg-slate-50/50 border-b py-4">
-                <CardTitle className="text-sm font-black uppercase text-slate-800">Item Tracking (Input Aktif)</CardTitle>
+          <Card className={cn("shadow-sm border-none ring-1 ring-slate-200 overflow-hidden", isLocked && "opacity-60", isDpInvoice && "opacity-40 grayscale pointer-events-none")}>
+            <CardHeader className="bg-slate-50/50 border-b py-4 px-6 flex flex-row items-center justify-between">
+                <CardTitle className="text-sm font-black uppercase text-slate-800 tracking-tighter">Line Items Constructor</CardTitle>
+                <div className="flex items-center gap-3">
+                    <TooltipProvider>
+                        <Tooltip>
+                            <TooltipTrigger asChild>
+                                <Badge 
+                                    variant={isDpInvoice ? "default" : "outline"} 
+                                    className={cn("text-[9px] uppercase cursor-pointer py-1.5 px-4 font-black tracking-widest transition-all", isDpInvoice ? "bg-indigo-600" : "text-indigo-600 border-indigo-200")} 
+                                    onClick={() => !isLocked && setIsDpInvoice(!isDpInvoice)}
+                                >
+                                    {isDpInvoice ? "Down Payment Mode" : "Progress Billing Mode"}
+                                </Badge>
+                            </TooltipTrigger>
+                            <TooltipContent className="max-w-xs bg-slate-900 text-white p-3 text-[10px]">
+                                Klik untuk berganti mode penagihan.
+                            </TooltipContent>
+                        </Tooltip>
+                    </TooltipProvider>
+                </div>
             </CardHeader>
             <CardContent className="p-0">
                 <Table>
                     <TableHeader className="bg-slate-50">
                         <TableRow>
-                            <TableHead className="text-[10px] font-black uppercase py-2">Item Detail</TableHead>
-                            <TableHead className="w-[100px] text-center text-[10px] font-black uppercase py-2">Now Bill</TableHead>
-                            <TableHead className="w-[100px] text-center text-[10px] font-black uppercase py-2">Prev. Bill</TableHead>
-                            <TableHead className="w-[120px] text-right text-[10px] font-black uppercase py-2">Unit Price</TableHead>
-                            <TableHead className="w-[140px] text-right text-[10px] font-black uppercase py-2">Total (IDR)</TableHead>
-                            <TableHead className="w-[50px]"></TableHead>
+                            <TableHead className="text-[10px] font-black uppercase py-4 px-6">Description</TableHead>
+                            <TableHead className="w-[100px] text-center text-[10px] font-black uppercase">Quantity</TableHead>
+                            <TableHead className="w-[120px] text-right text-[10px] font-black uppercase">Unit Price</TableHead>
+                            <TableHead className="w-[140px] text-right text-[10px] font-black uppercase">Total</TableHead>
+                            <TableHead className="w-[60px]"></TableHead>
                         </TableRow>
                     </TableHeader>
                     <TableBody>
                         {items.length === 0 ? (
-                            <TableRow><TableCell colSpan={6} className="text-center py-10 text-slate-400 italic text-xs uppercase font-black">Belum ada item ditarik.</TableCell></TableRow>
+                            <TableRow><TableCell colSpan={5} className="text-center py-20 text-slate-400 italic text-[11px] uppercase font-black opacity-30 tracking-widest">Belum ada item yang ditarik.</TableCell></TableRow>
                         ) : items.map(item => (
-                                <TableRow key={item.id} className="transition-colors">
-                                    <TableCell>
-                                        <div className="flex flex-col gap-1 py-2">
+                                <TableRow key={item.id} className="hover:bg-slate-50/50 transition-colors">
+                                    <TableCell className="px-6">
+                                        <div className="flex flex-col gap-1 py-3">
                                             <Input 
                                                 value={item.name} 
                                                 onChange={e => setItems(items.map(it => it.id === item.id ? { ...it, name: e.target.value } : it))}
-                                                className="h-7 text-[11px] font-bold border-dashed"
+                                                className="h-8 text-[11px] font-bold border-dashed shadow-none"
                                                 disabled={isLocked || !isAdmin}
                                             />
-                                            <span className="text-[8px] font-black uppercase text-slate-400">Kontrak PO: {item.originalQty} {item.unit}</span>
+                                            <div className="flex items-center gap-2">
+                                                <span className="text-[9px] font-black uppercase text-slate-400">Kontrak: {item.originalQty} {item.unit}</span>
+                                                <span className="text-[8px] font-bold text-slate-300">|</span>
+                                                <span className="text-[9px] font-black uppercase text-indigo-400">Prev. Bill: {item.prevInvoicedQty || 0}</span>
+                                            </div>
                                         </div>
                                     </TableCell>
                                     <TableCell>
@@ -509,11 +544,10 @@ export default function AddInvoicePage() {
                                                 const val = parseFormattedNumber(e.target.value);
                                                 setItems(items.map(it => it.id === item.id ? { ...it, quantity: val, total: val * it.price } : it));
                                             }} 
-                                            className="text-center text-xs h-8 font-black" 
+                                            className="text-center text-xs h-9 font-black rounded-lg border-slate-200" 
                                             disabled={isLocked}
                                         />
                                     </TableCell>
-                                    <TableCell className="text-center font-black text-[10px] text-slate-400">{item.prevInvoicedQty || 0}</TableCell>
                                     <TableCell>
                                         <Input 
                                             value={item.price} 
@@ -521,13 +555,13 @@ export default function AddInvoicePage() {
                                                 const val = parseFormattedNumber(e.target.value);
                                                 setItems(items.map(it => it.id === item.id ? { ...it, price: val, total: it.quantity * val } : it));
                                             }}
-                                            className="h-8 text-right text-xs font-black border-dashed"
+                                            className="h-9 text-right text-xs font-black border-dashed rounded-lg"
                                             disabled={isLocked || !isAdmin}
                                         />
                                     </TableCell>
-                                    <TableCell className="text-right font-black text-xs">Rp {formatNumberWithCommas(item.total)}</TableCell>
-                                    <TableCell>
-                                        <Button variant="ghost" size="icon" className="h-7 w-7 text-rose-500 hover:text-rose-700 hover:bg-rose-50" onClick={() => removeItem(item.id)} disabled={isLocked}>
+                                    <TableCell className="text-right font-black text-xs px-2">Rp {formatNumberWithCommas(item.total)}</TableCell>
+                                    <TableCell className="px-4">
+                                        <Button variant="ghost" size="icon" className="h-8 w-8 text-rose-500 hover:text-rose-700 hover:bg-rose-50 rounded-full" onClick={() => removeItem(item.id)} disabled={isLocked}>
                                             <Trash2 className="h-4 w-4" />
                                         </Button>
                                     </TableCell>
@@ -536,16 +570,17 @@ export default function AddInvoicePage() {
                         )}
                     </TableBody>
                 </Table>
-                <div className="p-4 bg-slate-50/30 border-t">
+                
+                <div className="p-6 bg-slate-50/50 border-t flex flex-wrap gap-3">
                     <Popover open={productPopoverOpen} onOpenChange={setProductPopoverOpen}>
                         <PopoverTrigger asChild>
-                            <Button variant="outline" size="sm" className="border-dashed h-8 text-[9px] font-black uppercase text-indigo-600" disabled={isLocked}>
-                                <Plus className="mr-2 h-3 w-3" /> Tambah Baris Manual (Master Catalog)
+                            <Button variant="outline" size="sm" className="h-10 text-[10px] font-black uppercase text-indigo-600 rounded-xl px-6 border-slate-200 shadow-sm" disabled={isLocked}>
+                                <Plus className="mr-2 h-3.5 w-3.5" /> Tambah dari Katalog
                             </Button>
                         </PopoverTrigger>
-                        <PopoverContent className="w-[400px] p-0 shadow-2xl" align="start">
+                        <PopoverContent className="w-[400px] p-0 shadow-2xl border-none ring-1 ring-slate-200" align="start">
                             <Command>
-                                <CommandInput placeholder="Cari Produk di Master Database..." className="h-10" />
+                                <CommandInput placeholder="Cari Produk di Master Database..." className="h-12" />
                                 <CommandList>
                                     <CommandEmpty>Produk tidak ditemukan.</CommandEmpty>
                                     <CommandGroup>
@@ -554,11 +589,11 @@ export default function AddInvoicePage() {
                                                 key={p.id}
                                                 value={`${p.name}|${p.id}`}
                                                 onSelect={() => handleProductSelect(p)}
-                                                className="p-3 border-b"
+                                                className="p-4 border-b last:border-0"
                                             >
                                                 <div className="flex justify-between w-full">
                                                     <span className="font-bold text-slate-800 uppercase text-xs">{p.name}</span>
-                                                    <span className="text-[10px] font-black text-indigo-600">Rp {p.price.toLocaleString()}</span>
+                                                    <span className="text-[10px] font-black text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded">Rp {p.price.toLocaleString()}</span>
                                                 </div>
                                             </CommandItem>
                                         ))}
@@ -567,233 +602,170 @@ export default function AddInvoicePage() {
                             </Command>
                         </PopoverContent>
                     </Popover>
+
+                    {/* QUICK-TRANSFER HISTORY DRAWER */}
+                    <Sheet>
+                        <SheetTrigger asChild>
+                            <Button variant="outline" size="sm" className="h-10 text-[10px] font-black uppercase text-emerald-600 rounded-xl px-6 border-slate-200 shadow-sm" disabled={isLocked || billedItemsHistory.length === 0}>
+                                <History className="mr-2 h-3.5 w-3.5" /> Pilih dari Riwayat ({billedItemsHistory.length})
+                            </Button>
+                        </SheetTrigger>
+                        <SheetContent className="sm:max-w-md w-full p-0 flex flex-col">
+                            <SheetHeader className="p-6 border-b bg-slate-50/50">
+                                <SheetTitle className="text-sm font-black uppercase tracking-tight flex items-center gap-2">
+                                    <Layers className="h-5 w-5 text-indigo-600" /> Riwayat Item Terbit
+                                </SheetTitle>
+                                <div className="relative mt-4">
+                                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                                    <Input 
+                                        placeholder="Cari item di riwayat..." 
+                                        className="pl-10 h-11 bg-white border-slate-200 rounded-xl text-xs" 
+                                        value={historySearch}
+                                        onChange={e => setHistorySearch(e.target.value)}
+                                    />
+                                </div>
+                            </SheetHeader>
+                            <ScrollArea className="flex-1 px-2 py-4">
+                                {filteredHistory.length === 0 ? (
+                                    <div className="py-20 text-center text-slate-400 opacity-40 italic text-xs uppercase font-black">Tidak ada item ditemukan.</div>
+                                ) : (
+                                    <div className="space-y-3 px-4">
+                                        {filteredHistory.map((h, i) => (
+                                            <div 
+                                                key={i} 
+                                                onClick={() => !isLocked && handleCopyFromHistory(h)}
+                                                className="group p-4 bg-white border rounded-2xl hover:border-indigo-300 hover:ring-1 hover:ring-indigo-300 transition-all cursor-pointer shadow-sm relative overflow-hidden"
+                                            >
+                                                <div className="flex justify-between items-start mb-2">
+                                                    <span className="text-[9px] font-black text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-full">{h.parentInvoice}</span>
+                                                    <CopyPlus className="h-4 w-4 text-indigo-400 opacity-0 group-hover:opacity-100 transition-opacity" />
+                                                </div>
+                                                <p className="text-xs font-black uppercase text-slate-800 line-clamp-2 leading-tight">{h.name}</p>
+                                                <div className="flex justify-between items-center mt-3 pt-3 border-t border-slate-50">
+                                                    <span className="text-[10px] font-bold text-slate-400">{h.quantity} {h.unit}</span>
+                                                    <span className="text-[10px] font-black text-slate-900">Rp {h.price.toLocaleString()}</span>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                            </ScrollArea>
+                        </SheetContent>
+                    </Sheet>
                 </div>
             </CardContent>
           </Card>
-
-          {/* ITEM HISTORY AUDIT TRAIL - QUICK TRANSFER ENABLED */}
-          {billedItemsHistory.length > 0 && (
-              <Card className="shadow-sm ring-1 ring-slate-200 border-none overflow-hidden">
-                <CardHeader className="bg-slate-50 border-b py-3 flex flex-row items-center justify-between">
-                    <CardTitle className="text-[10px] font-black uppercase flex items-center gap-2 text-indigo-600">
-                        <History className="h-4 w-4" /> Riwayat Item Terbit (Quick-Transfer)
-                    </CardTitle>
-                    <Badge className="text-[8px] bg-indigo-50 text-indigo-700 font-bold uppercase">Klik Baris untuk Menyalin ke Input Aktif</Badge>
-                </CardHeader>
-                <CardContent className="p-0">
-                    <Table>
-                        <TableHeader className="bg-slate-100/50">
-                            <TableRow>
-                                <TableHead className="text-[9px] font-bold uppercase py-2">Invoice #</TableHead>
-                                <TableHead className="text-[9px] font-bold uppercase py-2">Nama Barang (Lama)</TableHead>
-                                <TableHead className="text-center text-[9px] font-bold uppercase py-2">Qty Terbit</TableHead>
-                                <TableHead className="text-right text-[9px] font-bold uppercase py-2">Unit Price</TableHead>
-                                <TableHead className="w-[40px]"></TableHead>
-                            </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                            {billedItemsHistory.map((h, i) => (
-                                <TableRow 
-                                    key={i} 
-                                    className="hover:bg-indigo-50/50 cursor-pointer group transition-colors"
-                                    onClick={() => !isLocked && handleCopyFromHistory(h)}
-                                >
-                                    <TableCell className="text-[9px] font-black text-slate-400">{h.parentInvoice}</TableCell>
-                                    <TableCell className="text-[10px] font-bold text-slate-600 uppercase">{h.name}</TableCell>
-                                    <TableCell className="text-center text-[10px] font-black">{h.quantity} {h.unit}</TableCell>
-                                    <TableCell className="text-right text-[10px] font-mono">Rp {h.price.toLocaleString()}</TableCell>
-                                    <TableCell className="text-center">
-                                        <CopyPlus className="h-3 w-3 text-indigo-400 opacity-0 group-hover:opacity-100 transition-opacity" />
-                                    </TableCell>
-                                </TableRow>
-                            ))}
-                        </TableBody>
-                    </Table>
-                </CardContent>
-              </Card>
-          )}
         </div>
 
         {/* Sidebar: Audit & Calculations */}
-        <div className="lg:col-span-4 space-y-6">
-          {/* PO BILLING LEDGER (RECORD TRACKING) */}
-          <Card className="shadow-md ring-1 ring-slate-200 border-none overflow-hidden">
-             <CardHeader className="bg-slate-900 text-white py-3">
-                 <CardTitle className="text-[10px] font-black uppercase tracking-widest flex items-center gap-2">
-                     <History className="h-3.5 w-3.5 text-indigo-400" /> PO Billing Ledger (Audit)
-                 </CardTitle>
-             </CardHeader>
-             <CardContent className="p-4 space-y-4 bg-slate-50/50">
-                 <div className="grid grid-cols-2 gap-3">
-                     <div className="p-3 bg-white rounded-lg border shadow-sm">
-                         <p className="text-[8px] font-black text-slate-400 uppercase">Total Nilai PO</p>
-                         <p className="text-sm font-black text-slate-900">Rp {formatNumberWithCommas(totalPoValue)}</p>
-                     </div>
-                     <div className="p-3 bg-white rounded-lg border shadow-sm">
-                         <p className="text-[8px] font-black text-slate-400 uppercase">Sudah Ditagih</p>
-                         <p className="text-sm font-black text-indigo-600">Rp {formatNumberWithCommas(totalInvoicedSoFar)}</p>
-                     </div>
-                 </div>
-
-                 <div className={cn(
-                     "p-3 rounded-lg border-2 flex justify-between items-center",
-                     remainingPoBalance > 0 ? "bg-indigo-50/50 border-indigo-100" : "bg-red-50 border-red-100"
-                 )}>
-                    <div className="space-y-0.5">
-                        <p className="text-[8px] font-black text-slate-400 uppercase">Sisa Plafon PO</p>
-                        <p className={cn("text-xs font-black", remainingPoBalance > 0 ? "text-indigo-700" : "text-red-600")}>
-                            Rp {formatNumberWithCommas(remainingPoBalance)}
-                        </p>
-                    </div>
-                    <ListChecks className={cn("h-5 w-5", remainingPoBalance > 0 ? "text-indigo-400" : "text-red-400")} />
-                 </div>
-
-                 <div className="space-y-2">
-                     <p className="text-[9px] font-black uppercase text-slate-500 flex items-center gap-1.5">
-                         <ChevronRight className="h-3 w-3" /> Riwayat Transaksi PO
-                     </p>
-                     <div className="space-y-1.5 max-h-[150px] overflow-y-auto pr-1">
-                         {poBillingHistory.length === 0 ? (
-                             <p className="text-[10px] italic text-slate-400 py-4 text-center">First time billing for this PO.</p>
-                         ) : poBillingHistory.map(inv => (
-                             <div key={inv.id} className="flex justify-between items-center bg-white p-2 rounded border border-slate-100 text-[10px] shadow-sm">
-                                 <div className="flex flex-col">
-                                     <span className="font-black text-indigo-700">{inv.id}</span>
-                                     <span className="text-[8px] text-slate-400">{inv.date} • {inv.isDpInvoice ? 'DP' : 'Progress'}</span>
-                                 </div>
-                                 <span className="font-black">Rp {formatNumberWithCommas(inv.amount)}</span>
-                             </div>
-                         ))}
-                     </div>
-                 </div>
-
-                 <Separator />
-
-                 <div className={cn("p-3 rounded-lg border-2 border-dashed flex justify-between items-center", dpInvoicedBalance > 0 ? "bg-emerald-50 border-emerald-200" : "bg-slate-100 border-slate-200 opacity-50")}>
-                     <div className="space-y-0.5">
-                         <p className="text-[8px] font-black text-slate-400 uppercase">Saldo DP Tersedia (Pengurang)</p>
-                         <p className="text-xs font-black text-emerald-700">Rp {formatNumberWithCommas(dpInvoicedBalance)}</p>
-                     </div>
-                     <Wallet className="h-5 w-5 text-emerald-500" />
-                 </div>
-             </CardContent>
-          </Card>
-
-          {/* CALCULATION CARD */}
-          <Card className="shadow-lg ring-1 ring-indigo-100 bg-white">
-            <CardHeader className="bg-indigo-50/20 py-4 border-b">
-                <CardTitle className="text-[10px] font-black uppercase tracking-widest text-slate-400">Final Calculation Audit</CardTitle>
+        <div className="lg:col-span-4 space-y-8 sticky top-24">
+          <Card className="shadow-lg border-none ring-1 ring-indigo-100 bg-white overflow-hidden rounded-3xl">
+            <CardHeader className="bg-indigo-50/20 py-5 px-8 border-b border-indigo-50">
+                <CardTitle className="text-[10px] font-black uppercase tracking-[0.2em] text-indigo-400">Calculation Audit Trail</CardTitle>
             </CardHeader>
-            <CardContent className="p-6 space-y-5">
-              <div className="space-y-4">
-                <div className="flex justify-between items-center text-[10px]">
-                    <span className="text-slate-400 font-black uppercase">Gross Subtotal</span>
+            <CardContent className="p-8 space-y-8">
+              <div className="space-y-6">
+                <div className="flex justify-between items-center">
+                    <span className="text-[10px] font-black uppercase text-slate-400 tracking-wider">Gross Subtotal</span>
                     <span className="font-black text-slate-900">Rp {formatNumberWithCommas(subtotal)}</span>
                 </div>
                 
-                <div className="space-y-1.5">
+                <div className="space-y-2">
                     <div className="flex justify-between items-center">
-                        <Label className="text-[9px] font-black uppercase text-amber-600">Negotiation</Label>
+                        <Label className="text-[10px] font-black uppercase text-amber-600">Negotiation Adjustment</Label>
                         <Select value={negotiationMode} onValueChange={(v: any) => setNegotiationMode(v)} disabled={isLocked}>
-                            <SelectTrigger className="h-5 w-14 text-[8px] font-black shadow-none border-none bg-amber-50 text-amber-700"><SelectValue /></SelectTrigger>
+                            <SelectTrigger className="h-6 w-16 text-[9px] font-black shadow-none border-none bg-amber-50 text-amber-700 rounded-lg"><SelectValue /></SelectTrigger>
                             <SelectContent><SelectItem value="nominal">IDR</SelectItem><SelectItem value="percent">%</SelectItem></SelectContent>
                         </Select>
                     </div>
-                    <Input value={negotiationValue} onChange={e => setNegotiationValue(e.target.value)} className="h-8 text-right font-black text-amber-600 border-amber-100" placeholder="0" disabled={isLocked} />
+                    <Input value={negotiationValue} onChange={e => setNegotiationValue(e.target.value)} className="h-10 text-right font-black text-amber-600 border-amber-100 rounded-xl bg-amber-50/10" placeholder="0" disabled={isLocked} />
                 </div>
 
                 {isDpInvoice ? (
-                    <div className="space-y-1.5 bg-indigo-50/30 p-3 rounded-xl border border-indigo-100">
+                    <div className="space-y-2 bg-indigo-50/30 p-5 rounded-2xl border border-indigo-100 ring-4 ring-indigo-50/10">
                         <div className="flex justify-between items-center mb-1">
-                            <Label className="text-[9px] font-black uppercase text-indigo-700">Tagihan Down Payment (DP)</Label>
+                            <Label className="text-[10px] font-black uppercase text-indigo-700">Down Payment (DP)</Label>
                             <Select value={dpMode} onValueChange={(v: any) => setDpMode(v)} disabled={isLocked}>
-                                <SelectTrigger className="h-5 w-14 text-[8px] font-black shadow-none border-none bg-indigo-100 text-indigo-700"><SelectValue /></SelectTrigger>
+                                <SelectTrigger className="h-6 w-16 text-[9px] font-black shadow-none border-none bg-indigo-100 text-indigo-700 rounded-lg"><SelectValue /></SelectTrigger>
                                 <SelectContent><SelectItem value="nominal">IDR</SelectItem><SelectItem value="percent">%</SelectItem></SelectContent>
                             </Select>
                         </div>
-                        <Input value={dpValue} onChange={e => setDpValue(e.target.value)} className="h-8 text-right font-black border-indigo-200" placeholder="0" disabled={isLocked} />
+                        <Input value={dpValue} onChange={e => setDpValue(e.target.value)} className="h-10 text-right font-black border-indigo-200 rounded-xl bg-white" placeholder="0" disabled={isLocked} />
                     </div>
                 ) : (
                     <>
-                        <div className="space-y-2 bg-emerald-50/20 p-3 rounded-xl border border-emerald-100">
+                        <div className="space-y-3 bg-emerald-50/20 p-5 rounded-2xl border border-emerald-100 border-dashed">
                             <div className="flex justify-between items-center mb-1">
-                                <Label className="text-[9px] font-black uppercase text-emerald-700 flex items-center gap-1">
-                                    <Wallet className="h-3 w-3" /> Potongan Saldo DP (Child Sync)
+                                <Label className="text-[10px] font-black uppercase text-emerald-700 flex items-center gap-1">
+                                    <Wallet className="h-3.5 w-3.5" /> Potongan Saldo DP
                                 </Label>
                                 <Select value={dpDeductionMode} onValueChange={(v: any) => setDpDeductionMode(v)} disabled={isLocked}>
-                                    <SelectTrigger className="h-5 w-14 text-[8px] font-black shadow-none border-none bg-emerald-100 text-emerald-700"><SelectValue /></SelectTrigger>
+                                    <SelectTrigger className="h-6 w-16 text-[9px] font-black shadow-none border-none bg-emerald-100 text-emerald-700 rounded-lg"><SelectValue /></SelectTrigger>
                                     <SelectContent><SelectItem value="nominal">IDR</SelectItem><SelectItem value="percent">%</SelectItem></SelectContent>
                                 </Select>
                             </div>
-                            <Input value={dpDeductionValue} onChange={e => setDpDeductionValue(e.target.value)} className="h-8 text-right font-black border-emerald-200 text-emerald-700" placeholder="0" disabled={isLocked} />
-                            <div className="flex items-center justify-between text-[8px] font-bold text-emerald-600 mt-1 uppercase">
-                                <span>Sisa Kuota DP:</span>
+                            <Input value={dpDeductionValue} onChange={e => setDpDeductionValue(e.target.value)} className="h-10 text-right font-black border-emerald-200 text-emerald-700 rounded-xl bg-white" placeholder="0" disabled={isLocked} />
+                            <div className="flex items-center justify-between text-[9px] font-bold text-emerald-600/70 mt-1 uppercase tracking-tighter">
+                                <span>Kuota DP Tersedia:</span>
                                 <span>Rp {formatNumberWithCommas(dpInvoicedBalance)}</span>
                             </div>
                         </div>
 
-                        <div className="space-y-1.5">
+                        <div className="space-y-2">
                             <div className="flex justify-between items-center">
-                                <Label className="text-[9px] font-black uppercase text-slate-400">Retention / Guarantee (Pengurang)</Label>
+                                <Label className="text-[10px] font-black uppercase text-slate-400">Retention / Guarantee</Label>
                                 <Select value={retentionMode} onValueChange={(v: any) => setRetentionMode(v)} disabled={isLocked}>
-                                    <SelectTrigger className="h-5 w-14 text-[8px] font-black shadow-none border-none bg-slate-100 text-slate-700"><SelectValue /></SelectTrigger>
+                                    <SelectTrigger className="h-6 w-16 text-[9px] font-black shadow-none border-none bg-slate-100 text-slate-700 rounded-lg"><SelectValue /></SelectTrigger>
                                     <SelectContent><SelectItem value="nominal">IDR</SelectItem><SelectItem value="percent">%</SelectItem></SelectContent>
                                 </Select>
                             </div>
-                            <Input value={retentionValue} onChange={e => setRetentionValue(e.target.value)} className="h-8 text-right font-black border-slate-200" placeholder="0" disabled={isLocked} />
+                            <Input value={retentionValue} onChange={e => setRetentionValue(e.target.value)} className="h-10 text-right font-black border-slate-200 rounded-xl bg-slate-50/20" placeholder="0" disabled={isLocked} />
                         </div>
                     </>
                 )}
               </div>
 
-              <div className="bg-slate-50 p-4 rounded-xl space-y-3 border border-slate-100">
+              <div className="bg-slate-50 p-6 rounded-2xl space-y-4 border border-slate-100">
                 <div className="flex justify-between items-center">
-                    <Label className="text-[9px] font-black uppercase text-indigo-600">Tax Override (VAT 12%)</Label>
+                    <Label className="text-[10px] font-black uppercase text-indigo-600 tracking-widest">Tax Sync (PPN 12%)</Label>
                     <Switch checked={isTaxManual} onCheckedChange={setIsTaxManual} disabled={isLocked} />
                 </div>
-                <div className="grid gap-2">
-                    <div className="flex justify-between items-center px-1"><span className="text-[8px] font-black uppercase text-slate-400">DPP</span> <Input value={dppVat} onChange={e => setDppVat(e.target.value)} disabled={!isTaxManual || isLocked} className="h-6 w-32 text-right font-mono text-[10px] font-black bg-transparent border-none p-0" /></div>
-                    <div className="flex justify-between items-center px-1"><span className="text-[8px] font-black uppercase text-slate-400">PPN</span> <Input value={vat12} onChange={e => setVat12(e.target.value)} disabled={!isTaxManual || isLocked} className="h-6 w-32 text-right font-mono text-[10px] font-black bg-transparent border-none p-0" /></div>
+                <div className="grid gap-4">
+                    <div className="flex justify-between items-center"><span className="text-[9px] font-black uppercase text-slate-400">DPP Value</span> <Input value={dppVat} onChange={e => setDppVat(e.target.value)} disabled={!isTaxManual || isLocked} className="h-7 w-36 text-right font-mono text-xs font-black bg-transparent border-none p-0 focus-visible:ring-0" /></div>
+                    <div className="flex justify-between items-center"><span className="text-[9px] font-black uppercase text-slate-400">PPN 12%</span> <Input value={vat12} onChange={e => setVat12(e.target.value)} disabled={!isTaxManual || isLocked} className="h-7 w-36 text-right font-mono text-xs font-black bg-transparent border-none p-0 focus-visible:ring-0" /></div>
                 </div>
               </div>
 
-              <div className="pt-2 border-t-2 border-indigo-600/10">
-                  <div className="flex justify-between items-end">
-                      <span className="text-[9px] font-black uppercase text-slate-400">Grand Total Net</span>
+              <div className="pt-4 border-t-4 border-indigo-600/10">
+                  <div className="flex justify-between items-center mb-1">
+                      <span className="text-[10px] font-black uppercase text-slate-400 tracking-[0.2em]">Grand Total Net</span>
                       {isExceedingPo && (
-                          <Badge className="text-[7px] bg-rose-600 animate-pulse h-3.5"><AlertTriangle className="h-2 w-2 mr-1" /> EXCEEDS PO</Badge>
+                          <Badge className="text-[8px] bg-rose-600 animate-pulse h-4 border-none shadow-none uppercase font-black">EXCEEDS PO</Badge>
                       )}
                   </div>
-                  <div className="text-2xl font-black text-slate-900 leading-none mt-1 tracking-tight">Rp {totalAmount}</div>
+                  <div className="text-3xl font-black text-slate-900 leading-none tracking-tighter">Rp {totalAmount}</div>
               </div>
 
-              <div className="space-y-3 pt-4">
+              <div className="space-y-4 pt-4">
                   {!isLocked && (
-                    <TooltipProvider>
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <Button 
-                              className="w-full h-11 bg-indigo-600 hover:bg-indigo-700 font-black uppercase text-white shadow-lg" 
-                              onClick={() => handleSaveInvoice('sent', true)}
-                              disabled={isProcessing}
-                          >
-                            {isProcessing ? <Loader2 className="h-4 w-4 animate-spin" /> : <><Eye className="mr-2 h-4 w-4" /> SIMPAN & PREVIEW</>}
-                          </Button>
-                        </TooltipTrigger>
-                        <TooltipContent className="bg-slate-900 text-white border-none text-[10px]">
-                          Preview tampilan PDF sebelum dikirim.
-                        </TooltipContent>
-                      </Tooltip>
+                    <div className="grid gap-3">
+                      <Button 
+                          className="w-full h-14 bg-indigo-600 hover:bg-indigo-700 font-black uppercase text-white shadow-xl shadow-indigo-100 rounded-2xl transition-all hover:-translate-y-1 active:translate-y-0" 
+                          onClick={() => handleSaveInvoice('sent', true)}
+                          disabled={isProcessing}
+                      >
+                        {isProcessing ? <Loader2 className="h-5 w-5 animate-spin" /> : <><Eye className="mr-2 h-5 w-5" /> SIMPAN & PREVIEW PDF</>}
+                      </Button>
 
                       <Button 
                           variant="ghost" 
-                          className="w-full text-[10px] font-black uppercase text-slate-400" 
+                          className="w-full h-12 text-[10px] font-black uppercase text-slate-400 hover:bg-slate-50 rounded-2xl tracking-widest" 
                           onClick={() => handleSaveInvoice('sent')}
                           disabled={isProcessing}
                       >
-                        {isProcessing ? "Processing..." : "Hanya Simpan (Draft)"}
+                        {isProcessing ? "Processing..." : "Hanya Simpan Ke Database"}
                       </Button>
-                    </TooltipProvider>
+                    </div>
                   )}
               </div>
             </CardContent>
@@ -803,3 +775,4 @@ export default function AddInvoicePage() {
     </main>
   );
 }
+
