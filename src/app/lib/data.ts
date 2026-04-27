@@ -41,15 +41,15 @@ export type InvoiceItem = {
 };
 
 export type Invoice = {
-  id: string; // Manual Invoice Number (Primary Display)
-  erpInvoiceId?: string; // ERP Reference ID (Secondary ID)
+  id: string; 
+  erpInvoiceId?: string; 
   soNumber: string;
   poNumber: string;
   customer: string;
   billingAddress: string;
   billingNpwp?: string;
-  date: string; // Issue Date
-  dueDate?: string; // Due Date
+  date: string; 
+  dueDate?: string; 
   amount: number;
   status: 'paid' | 'unpaid' | 'sent' | 'draft' | 'received' | 'cancelled' | 'finalized' | 'partial';
   voidReason?: string;
@@ -63,10 +63,10 @@ export type Invoice = {
   sjNumbers?: string[]; 
   negotiation?: number;
   negotiationMode?: 'percent' | 'nominal';
-  dpValue?: number; // Nilai DP yang ditagih
-  dpDeduction?: number; // Nilai DP yang dipotong
-  unusedDpCredit?: number; // Kredit dari retur/pembatalan sebelumnya
-  isOverBillingAllowed?: boolean; // Persetujuan kelebihan kirim
+  dpValue?: number; 
+  dpDeduction?: number; 
+  unusedDpCredit?: number; 
+  isOverBillingAllowed?: boolean; 
   retention?: number;
   payments?: PaymentRecord[];
   items?: InvoiceItem[];
@@ -106,18 +106,34 @@ export type ProductListItem = {
     createdBy?: string;
 };
 
-export type SalesOrder = {
-    id?: string;
-    soNumber: string;
-    poNumber?: string;
+export type SalesOrderItem = {
+    id: string | number;
     productName: string;
     category: string;
     quantity: number;
     unit: string;
     price: number;
-    ownerId?: string;
+    total: number;
+};
+
+export type SalesOrder = {
+    id?: string;
+    soNumber: string;
+    poNumber: string;
     customer: string;
+    customerAddress?: string;
+    orderDate: string;
+    deliveryDate: string;
+    status: 'draft' | 'confirmed' | 'invoiced' | 'cancelled';
+    items: SalesOrderItem[];
+    totalAmount: number;
+    taxAmount: number;
+    grandTotal: number;
+    ownerId?: string;
     createdBy?: string;
+    lastUpdatedAt?: string;
+    revisionLogs?: RevisionLog[];
+    attachments?: string[];
 };
 
 export type CustomerAddress = {

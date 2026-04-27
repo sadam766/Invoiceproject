@@ -113,7 +113,6 @@ export default function AddInvoicePage() {
 
   const activeIdentity = existingInvoiceData || identityData;
 
-  // Single Source of Truth for PO Amount
   const saleRef = useMemoFirebase(() => {
     if (!firestore || !activeIdentity?.poNumber) return null;
     return doc(firestore, 'sales', activeIdentity.poNumber.replace(/\//g, '_'));
@@ -122,12 +121,11 @@ export default function AddInvoicePage() {
 
   const isLoading = (invoiceNumberIdParam && isIdentityLoading) || (editInvoiceId && isExistingLoading);
 
-  // --- COLLECTIONS FOR HISTORY & SYNC ---
   const invoicesCollection = useMemoFirebase(() => firestore ? query(collection(firestore, 'invoices')) : null, [firestore]);
   const { data: allInvoices } = useCollection<Invoice>(invoicesCollection);
 
-  const soItemsCollection = useMemoFirebase(() => firestore ? query(collection(firestore, 'salesOrders')) : null, [firestore]);
-  const { data: allSoItems } = useCollection<SalesOrder>(soItemsCollection);
+  const soHeadersCollection = useMemoFirebase(() => firestore ? query(collection(firestore, 'salesOrders')) : null, [firestore]);
+  const { data: allSalesOrders } = useCollection<SalesOrder>(soHeadersCollection);
 
   const productsCollection = useMemoFirebase(() => firestore ? query(collection(firestore, 'products')) : null, [firestore]);
   const { data: masterProducts } = useCollection<ProductListItem>(productsCollection);
@@ -163,7 +161,6 @@ export default function AddInvoicePage() {
     return allCustomers.find(c => c.name.toLowerCase() === activeIdentity.customer.toLowerCase());
   }, [activeIdentity?.customer, allCustomers]);
 
-  // --- LOGIKA "THE GOLDEN KEY" (PO HISTORY) ---
   const poBillingHistory = useMemo(() => {
     if (!allInvoices || !activeIdentity) return [];
     return allInvoices.filter(inv => 
@@ -200,7 +197,6 @@ export default function AddInvoicePage() {
 
   const remainingPoBalance = Math.max(0, totalPoValue - totalInvoicedSoFar);
 
-  // --- AUTO-PULL ADDRESS LOGIC ---
   useEffect(() => {
     if (currentCustomer && !billingAddress && !editInvoiceId) {
       const defaultAddr = currentCustomer.addresses?.find(a => a.isDefault) || currentCustomer.addresses?.[0];
@@ -210,35 +206,36 @@ export default function AddInvoicePage() {
     }
   }, [currentCustomer, billingAddress, editInvoiceId]);
 
-  // Initial Sync from Record
   useEffect(() => {
       if (activeIdentity && items.length === 0) {
           if (activeIdentity.items && activeIdentity.items.length > 0) {
              setItems(activeIdentity.items);
-          } else if (allSoItems && !editInvoiceId) {
-              const relatedItems = allSoItems.filter(item => item.soNumber === activeIdentity.salesOrder);
-              setItems(relatedItems.map((item, idx) => {
-                  const prevQty = allInvoices?.filter(inv => inv.soNumber === item.soNumber && inv.status !== 'cancelled')
-                                  .reduce((sum, inv) => {
-                                      const matchingItem = inv.items?.find(i => i.id === item.id || i.name === item.productName);
-                                      return sum + (matchingItem?.quantity || 0);
-                                  }, 0) || 0;
+          } else if (allSalesOrders && !editInvoiceId) {
+              const matchingSo = allSalesOrders.find(so => so.soNumber === activeIdentity.salesOrder);
+              if (matchingSo) {
+                setItems(matchingSo.items.map((item, idx) => {
+                    const prevQty = allInvoices?.filter(inv => inv.soNumber === matchingSo.soNumber && inv.status !== 'cancelled')
+                                    .reduce((sum, inv) => {
+                                        const matchingItem = inv.items?.find(i => i.id === item.id || i.name === item.productName);
+                                        return sum + (matchingItem?.quantity || 0);
+                                    }, 0) || 0;
 
-                  return {
-                      id: item.id || idx.toString(),
-                      name: item.productName,
-                      originalName: item.productName,
-                      quantity: Math.max(0, item.quantity - prevQty),
-                      originalQty: item.quantity,
-                      unit: item.unit,
-                      price: item.price,
-                      originalPrice: item.price,
-                      total: Math.max(0, (item.quantity - prevQty) * item.price),
-                      prevInvoicedQty: prevQty,
-                      varianceQty: 0,
-                      varianceReason: ''
-                  };
-              }));
+                    return {
+                        id: item.id || idx.toString(),
+                        name: item.productName,
+                        originalName: item.productName,
+                        quantity: Math.max(0, item.quantity - prevQty),
+                        originalQty: item.quantity,
+                        unit: item.unit,
+                        price: item.price,
+                        originalPrice: item.price,
+                        total: Math.max(0, (item.quantity - prevQty) * item.price),
+                        prevInvoicedQty: prevQty,
+                        varianceQty: 0,
+                        varianceReason: ''
+                    };
+                }));
+              }
           }
 
           if (activeIdentity.billingAddress) setBillingAddress(activeIdentity.billingAddress);
@@ -254,7 +251,7 @@ export default function AddInvoicePage() {
               setDpDeductionValue(formatNumberWithCommas(dpInvoicedBalance));
           }
       }
-  }, [activeIdentity, allSoItems, allInvoices, editInvoiceId, items.length, dpInvoicedBalance]);
+  }, [activeIdentity, allSalesOrders, allInvoices, editInvoiceId, items.length, dpInvoicedBalance]);
 
   // --- CALCULATION STATES ---
   const [subtotal, setSubtotal] = useState(0);
@@ -271,7 +268,6 @@ export default function AddInvoicePage() {
   const [vat12, setVat12] = useState<string>('0');
   const [totalAmount, setTotalAmount] = useState<string>('0');
 
-  // Dynamic Calculations
   useEffect(() => {
     const currentSubtotal = items.reduce((acc, item) => acc + (item.quantity * item.price), 0);
     setSubtotal(currentSubtotal);
@@ -357,7 +353,6 @@ export default function AddInvoicePage() {
       toast({ title: "Baris Item Dihapus" });
   };
 
-  // QUICK UPDATE LOGIC
   const openQuickEdit = (type: 'name' | 'address') => {
       if (!activeIdentity) return;
       setEditTarget(type);
@@ -378,13 +373,11 @@ export default function AddInvoicePage() {
         if (editTarget === 'name') updatePayload.customer = tempName;
         else updatePayload.billingAddress = tempAddress;
 
-        // 1. Update Current Document(s)
         await updateDoc(identityDocRef, updatePayload);
         if (existingInvoiceData) {
             await updateDoc(invoiceDocRef, updatePayload);
         }
 
-        // 2. Optional Update Master Customer
         if (updateMaster && currentCustomer?.id) {
             const masterRef = doc(firestore, 'customers', currentCustomer.id);
             if (editTarget === 'name') {
@@ -912,7 +905,6 @@ export default function AddInvoicePage() {
         </div>
       </div>
 
-      {/* QUICK EDIT MODAL */}
       <Dialog open={isQuickEditOpen} onOpenChange={setIsQuickEditOpen}>
           <DialogContent className="sm:max-w-[450px] rounded-3xl">
               <DialogHeader>
