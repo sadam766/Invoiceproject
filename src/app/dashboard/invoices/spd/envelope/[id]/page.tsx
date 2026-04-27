@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { ArrowLeft, Printer, Edit3, Truck } from 'lucide-react';
 import { useFirestore, useDoc, useMemoFirebase } from '@/firebase';
 import { doc, updateDoc } from 'firebase/firestore';
-import type { SpdData, Customer } from '@/app/lib/data';
+import type { SpdData } from '@/app/lib/data';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { TOOLTIP_CONTENT } from '@/app/lib/tooltip-content';
 
@@ -15,7 +15,6 @@ export default function SpdEnvelopePreview() {
     const params = useParams();
     const searchParams = useSearchParams();
     const { id } = params;
-    const addressId = searchParams.get('addressId');
     const firestore = useFirestore();
 
     const [manualAddress, setManualAddress] = useState('');
@@ -82,7 +81,7 @@ export default function SpdEnvelopePreview() {
                         <ArrowLeft className="mr-2 h-4 w-4" /> Kembali
                     </Button>
                     <div className="flex gap-3">
-                        <Button variant="outline" className="font-black uppercase text-[10px] border-slate-200 rounded-xl px-6" onClick={() => setIsEditing(!isEditing)}>
+                        <Button variant="outline" className="font-black uppercase text-[10px] border-slate-200 rounded-xl px-6 text-black" onClick={() => setIsEditing(!isEditing)}>
                             <Edit3 className="mr-2 h-4 w-4" /> {isEditing ? "Selesai Edit" : "Edit Manual Alamat"}
                         </Button>
                         <TooltipProvider>
@@ -119,35 +118,33 @@ export default function SpdEnvelopePreview() {
 
                 {/* RECIPIENT: BOTTOM RIGHT (CUSTOMER) */}
                 <div className="mt-auto ml-auto mb-16 mr-10 w-[550px]">
-                    <div className="space-y-4">
-                        <p className="text-sm font-black text-black tracking-widest pl-10 italic">Kepada Yth :</p>
-                        <div className="border-[3px] border-black p-10 bg-white space-y-5">
-                            <h2 className="text-2xl font-black uppercase leading-tight text-black border-b border-black pb-2">{firstInv?.customer || 'Nama Pelanggan'}</h2>
-                            
-                            {isEditing ? (
-                                <textarea 
-                                    className="w-full text-lg font-bold text-black italic bg-slate-50 p-4 border border-black outline-none"
-                                    value={manualAddress}
-                                    onChange={(e) => setManualAddress(e.target.value)}
-                                    rows={4}
-                                />
-                            ) : (
-                                <p className="text-lg font-bold text-black leading-tight italic whitespace-pre-line min-h-[80px]">
-                                    {manualAddress || 'Alamat tujuan belum ditentukan.'}
-                                </p>
-                            )}
+                    <div className="border-[3px] border-black p-10 bg-white space-y-5">
+                        <p className="text-sm font-black text-black tracking-widest italic mb-2">Kepada Yth :</p>
+                        
+                        <h2 className="text-2xl font-black uppercase leading-tight text-black border-b border-black pb-2">
+                            {firstInv?.customer || 'Nama Pelanggan'}
+                        </h2>
+                        
+                        {isEditing ? (
+                            <textarea 
+                                className="w-full text-lg font-bold text-black italic bg-slate-50 p-4 border border-black outline-none"
+                                value={manualAddress}
+                                onChange={(e) => setManualAddress(e.target.value)}
+                                rows={4}
+                            />
+                        ) : (
+                            <p className="text-lg font-bold text-black leading-tight italic whitespace-pre-line min-h-[80px]">
+                                {manualAddress || 'Alamat tujuan belum ditentukan.'}
+                            </p>
+                        )}
 
-                            <div className="pt-2 flex justify-between items-end">
-                                <div className="space-y-0.5">
-                                    <p className="text-[9px] font-black uppercase text-black tracking-widest opacity-60">Attention To / Kontak:</p>
-                                    <p className="text-[13px] font-black text-black uppercase">
-                                        Up. Bagian Finance / Purchasing
-                                        <span className="block text-[11px] font-mono mt-0.5 opacity-80">Ref: {spd.id.split('/').pop()}</span>
-                                    </p>
-                                </div>
-                                <div className="text-[9px] font-black border border-black px-3 py-1 uppercase">
-                                    DAKOTA HUB
-                                </div>
+                        <div className="pt-2">
+                            <div className="space-y-0.5">
+                                <p className="text-[9px] font-black uppercase text-black tracking-widest opacity-60">Attention To / Kontak:</p>
+                                <p className="text-[13px] font-black text-black uppercase">
+                                    Up. Bagian Finance / Purchasing
+                                    <span className="block text-[11px] font-mono mt-0.5 opacity-80">Ref: {spd.id.split('/').pop()}</span>
+                                </p>
                             </div>
                         </div>
                     </div>
@@ -155,7 +152,7 @@ export default function SpdEnvelopePreview() {
 
                 {/* LOGISTICS WATERMARK */}
                 <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 opacity-[0.03] pointer-events-none rotate-[-12deg]">
-                    <Truck size={500} strokeWidth={1} />
+                    <Truck size={500} strokeWidth={1} color="#000000" />
                 </div>
             </div>
 
