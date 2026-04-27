@@ -57,7 +57,7 @@ import { doc, query, collection } from 'firebase/firestore';
 import type { UserProfile, Invoice } from '@/app/lib/data';
 import { startOfToday, isBefore, parseISO } from 'date-fns';
 import { TOOLTIP_CONTENT } from '../lib/tooltip-content';
-import { Tooltip, TooltipContent, TooltipProvider as TooltipRoot, TooltipTrigger } from '@/components/ui/tooltip';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
 export default function DashboardLayout({
   children,
