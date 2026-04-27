@@ -222,10 +222,10 @@ import {
         <div className="flex justify-between items-end">
             <div>
                 <h1 className="text-3xl font-black tracking-tighter uppercase text-slate-900">Payment & Receivables</h1>
-                <p className="text-slate-500 font-medium flex items-center gap-2">
+                <div className="text-slate-500 font-medium flex items-center gap-2">
                     Monitoring Arus Kas Penagihan (Buku Piutang Digital).
                     <Badge variant="outline" className="text-[10px] font-black uppercase tracking-widest bg-indigo-50 text-indigo-600 border-indigo-100">Smart Checklist Active</Badge>
-                </p>
+                </div>
             </div>
             <div className="flex gap-3">
                 {selectedInvoiceIds.size > 0 && (
@@ -478,4 +478,3 @@ import {
       </main>
     );
   }
-
