@@ -28,7 +28,7 @@ import {
   } from '@/components/ui/dialog';
   import { Textarea } from '@/components/ui/textarea';
   import { type SalesListItem, type UserProfile, type Invoice } from '@/app/lib/data';
-  import { Search, MoreHorizontal, Download, Eye, Edit, FileSpreadsheet, RefreshCw, XCircle, FilePlus, Trash2 } from 'lucide-react';
+  import { Search, MoreHorizontal, Download, Eye, Edit, FileSpreadsheet, RefreshCw, XCircle, FilePlus, Trash2, Wallet } from 'lucide-react';
   import { AddSaleDialog } from './_components/add-sale-dialog';
   import { useToast } from '@/hooks/use-toast';
   import { cn, exportToExcel } from '@/lib/utils';
@@ -95,12 +95,13 @@ import {
             
             const relatedInvoices = invoices.filter(inv => inv.poNumber === sale.poNumber && inv.status !== 'cancelled');
             const totalPaid = relatedInvoices.filter(inv => inv.status === 'paid').reduce((sum, inv) => sum + inv.amount, 0);
+            const totalInvoiced = relatedInvoices.reduce((sum, inv) => sum + inv.amount, 0);
             
             let status: any = 'Waiting';
             if (totalPaid >= sale.amount && sale.amount > 0) status = 'Paid';
-            else if (totalPaid > 0) status = 'Partial';
+            else if (totalPaid > 0 || totalInvoiced > 0) status = 'Partial';
 
-            return { ...sale, status };
+            return { ...sale, status, totalPaid, totalInvoiced };
         });
     }, [sales, invoices, searchQuery]);
 
@@ -138,17 +139,13 @@ import {
         const docRef = doc(firestore, 'sales', hardDeleteState.docId);
         
         try {
-            // KRITIKAL: Menunggu konfirmasi nyata dari server
             await deleteDoc(docRef);
-            
             toast({ 
                 title: "PO Dihapus Permanen", 
                 description: `Data PO ${hardDeleteState.poNumber} telah dihapus sepenuhnya dari database.` 
             });
-            
             setHardDeleteState({ isOpen: false });
         } catch (error: any) {
-            // Mengirimkan error ke arsitektur contextual error handling
             errorEmitter.emit('permission-error', new FirestorePermissionError({
                 path: docRef.path,
                 operation: 'delete',
@@ -211,134 +208,136 @@ import {
     };
 
     return (
-      <main className="flex flex-1 flex-col gap-4 p-4 md:gap-8 md:p-8">
+      <main className="flex flex-1 flex-col gap-4 p-4 md:gap-8 md:p-8 animate-in fade-in duration-500">
         <div className="flex justify-between items-center">
             <div>
-                <h1 className="text-2xl font-black tracking-tight uppercase">Sales List (Registrasi PO)</h1>
-                <p className="text-muted-foreground font-medium text-sm">Pilih PO untuk menerbitkan invoice secara otomatis.</p>
+                <h1 className="text-3xl font-black tracking-tight uppercase text-slate-900">Sales Order Hub</h1>
+                <p className="text-muted-foreground font-medium text-sm">Registrasi kontrak PO dan monitoring integrasi penagihan.</p>
             </div>
-            <div className="flex items-center gap-2">
-                <Button variant="outline" onClick={() => exportToExcel(filteredSales, 'daftar_po')} className="font-bold"><Download className="mr-2 h-4 w-4"/> Export</Button>
-                <TooltipProvider>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <div>
-                        <AddSaleDialog 
-                            isOpen={isDialogOpen}
-                            onOpenChange={setIsDialogOpen}
-                            onSave={handleSaveSale}
-                            saleData={editingSale}
-                            onAddClick={() => { setEditingSale(undefined); setIsDialogOpen(true); }}
-                        />
-                      </div>
-                    </TooltipTrigger>
-                    <TooltipContent className="bg-slate-900 text-white border-none text-[10px] p-3 max-w-[200px]">
-                      Langkah awal untuk membuat Sales Order (SO) baru. Masukkan data pelanggan dan detail barang di sini.
-                    </TooltipContent>
-                  </Tooltip>
-                </TooltipProvider>
+            <div className="flex items-center gap-3">
+                <Button variant="outline" onClick={() => exportToExcel(filteredSales, 'daftar_po')} className="font-black uppercase text-[10px] tracking-widest h-10"><Download className="mr-2 h-4 w-4"/> Export</Button>
+                <AddSaleDialog 
+                    isOpen={isDialogOpen}
+                    onOpenChange={setIsDialogOpen}
+                    onSave={handleSaveSale}
+                    saleData={editingSale}
+                    onAddClick={() => { setEditingSale(undefined); setIsDialogOpen(true); }}
+                />
             </div>
         </div>
 
-        <Card className="shadow-md border-none ring-1 ring-border">
-            <CardContent className="pt-6">
-                <div className="flex justify-between items-center mb-6">
+        <Card className="shadow-xl border-none ring-1 ring-slate-200 bg-white rounded-3xl overflow-hidden">
+            <CardContent className="pt-8">
+                <div className="flex justify-between items-center mb-8">
                     <div className="relative w-full md:w-1/3">
-                        <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-                        <Input placeholder="Cari PO, Customer..." className="pl-8 bg-muted/20 border-none font-medium" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} />
+                        <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                        <Input placeholder="Cari PO atau Customer..." className="pl-11 bg-slate-50 border-none font-medium h-12 rounded-2xl focus-visible:ring-indigo-500" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} />
                     </div>
                 </div>
                 
-                <div className="rounded-xl border overflow-hidden">
+                <div className="rounded-2xl border border-slate-100 overflow-hidden">
                     <Table>
-                        <TableHeader className="bg-muted/50">
-                            <TableRow>
-                                <TableHead className="w-[40px]"><Checkbox onCheckedChange={(checked) => setSelectedIds(checked ? new Set(filteredSales.map(s => s.poNumber)) : new Set())} /></TableHead>
-                                <TableHead className="text-[10px] font-black uppercase tracking-widest">PO Number</TableHead>
-                                <TableHead className="text-[10px] font-black uppercase tracking-widest">Customer</TableHead>
-                                <TableHead className="text-[10px] font-black uppercase tracking-widest">SO Produksi</TableHead>
-                                <TableHead className="text-[10px] font-black uppercase tracking-widest">Nilai PO</TableHead>
-                                <TableHead className="text-[10px] font-black uppercase tracking-widest text-center">Status</TableHead>
-                                <TableHead className="text-right py-4"></TableHead>
+                        <TableHeader className="bg-slate-50/50">
+                            <TableRow className="border-b-slate-100">
+                                <TableHead className="w-[40px] px-4"><Checkbox onCheckedChange={(checked) => setSelectedIds(checked ? new Set(filteredSales.map(s => s.poNumber)) : new Set())} /></TableHead>
+                                <TableHead className="text-[10px] font-black uppercase tracking-widest py-5">Identity / PO Number</TableHead>
+                                <TableHead className="text-[10px] font-black uppercase tracking-widest">Legal Customer</TableHead>
+                                <TableHead className="text-[10px] font-black uppercase tracking-widest">SO Reference</TableHead>
+                                <TableHead className="text-[10px] font-black uppercase tracking-widest text-right">Nilai Kontrak</TableHead>
+                                <TableHead className="text-[10px] font-black uppercase tracking-widest text-center">AR Status</TableHead>
+                                <TableHead className="text-right py-4 px-6"></TableHead>
                             </TableRow>
                         </TableHeader>
                         <TableBody>
                             {isLoading ? (
-                                <TableRow><TableCell colSpan={7} className="text-center py-20 font-bold text-muted-foreground">Memuat Database Sales...</TableCell></TableRow>
+                                <TableRow><TableCell colSpan={7} className="text-center py-20 font-black uppercase text-[10px] tracking-widest animate-pulse text-slate-400">Syncing Master Sales Database...</TableCell></TableRow>
                             ) : filteredSales.length === 0 ? (
-                                <TableRow><TableCell colSpan={7} className="text-center py-20 text-muted-foreground font-medium italic">Belum ada data PO terdaftar.</TableCell></TableRow>
+                                <TableRow><TableCell colSpan={7} className="text-center py-20 text-slate-400 font-bold italic">Belum ada PO terdaftar.</TableCell></TableRow>
                             ) : filteredSales.map((sale: any) => (
-                                <TableRow key={sale.id || sale.poNumber} className={cn("hover:bg-muted/5 border-b last:border-0", selectedIds.has(sale.poNumber) ? "bg-muted/30" : "", sale.status === 'Cancelled' && "opacity-40 grayscale")}>
-                                    <TableCell><Checkbox checked={selectedIds.has(sale.poNumber)} onCheckedChange={() => setSelectedIds(prev => { const n = new Set(prev); n.has(sale.poNumber) ? n.delete(sale.poNumber) : n.add(sale.poNumber); return n; })} /></TableCell>
-                                    <TableCell className="font-black text-slate-800">{sale.poNumber}</TableCell>
-                                    <TableCell className="text-xs font-bold uppercase text-slate-600">{sale.customer}</TableCell>
+                                <TableRow key={sale.id || sale.poNumber} className={cn("hover:bg-indigo-50/10 border-b-slate-100 last:border-0 transition-colors", selectedIds.has(sale.poNumber) ? "bg-indigo-50/30" : "", sale.status === 'Cancelled' && "opacity-40 grayscale")}>
+                                    <TableCell className="px-4"><Checkbox checked={selectedIds.has(sale.poNumber)} onCheckedChange={() => setSelectedIds(prev => { const n = new Set(prev); n.has(sale.poNumber) ? n.delete(sale.poNumber) : n.add(sale.poNumber); return n; })} /></TableCell>
+                                    <TableCell className="font-black text-indigo-700">{sale.poNumber}</TableCell>
+                                    <TableCell className="text-xs font-black uppercase text-slate-700">{sale.customer}</TableCell>
                                     <TableCell>
                                         <div className="flex items-center gap-2">
                                             {sale.soNumber ? (
-                                                <Badge variant="outline" className="font-mono bg-blue-50 text-blue-700 font-bold border-blue-100">{sale.soNumber}</Badge>
+                                                <Badge variant="outline" className="font-mono bg-blue-50 text-blue-700 font-black text-[9px] border-blue-100 h-5">{sale.soNumber}</Badge>
                                             ) : (
-                                                <span className="text-[10px] font-bold italic text-muted-foreground uppercase opacity-50">Waiting SO</span>
+                                                <span className="text-[9px] font-black italic text-slate-300 uppercase">Awaiting SO</span>
                                             )}
                                             {sale.status !== 'Cancelled' && (
-                                                <Button variant="ghost" size="icon" className="h-6 w-6 rounded-full hover:bg-blue-100" onClick={() => { setTempSo(sale.soNumber || ''); setSoUpdateState({ isOpen: true, poNumber: sale.poNumber }); }}>
+                                                <Button variant="ghost" size="icon" className="h-7 w-7 rounded-full hover:bg-blue-100" onClick={() => { setTempSo(sale.soNumber || ''); setSoUpdateState({ isOpen: true, poNumber: sale.poNumber }); }}>
                                                     <RefreshCw className="h-3 w-3 text-blue-600" />
                                                 </Button>
                                             )}
                                         </div>
                                     </TableCell>
-                                    <TableCell className="font-black text-slate-800">Rp {sale.amount.toLocaleString('id-ID')}</TableCell>
+                                    <TableCell className="font-black text-slate-900 text-right">Rp {sale.amount.toLocaleString('id-ID')}</TableCell>
                                     <TableCell className="text-center">
                                         <Badge className={cn(
-                                            "text-[9px] font-black uppercase px-2 py-0.5",
-                                            sale.status === 'Paid' ? 'bg-emerald-600' : 
-                                            sale.status === 'Cancelled' ? 'bg-red-600' : 
-                                            sale.status === 'Partial' ? 'bg-amber-500' : 'bg-slate-400'
+                                            "text-[9px] font-black uppercase px-2.5 py-0.5 border-none h-5",
+                                            sale.status === 'Paid' ? 'bg-emerald-100 text-emerald-700' : 
+                                            sale.status === 'Cancelled' ? 'bg-rose-100 text-rose-700' : 
+                                            sale.status === 'Partial' ? 'bg-amber-100 text-amber-700' : 'bg-slate-100 text-slate-500'
                                         )}>
                                             {sale.status}
                                         </Badge>
                                     </TableCell>
-                                    <TableCell className="text-right">
-                                        <div className="flex justify-end gap-1">
+                                    <TableCell className="text-right px-6">
+                                        <div className="flex justify-end gap-2">
                                             {sale.status !== 'Cancelled' && (
-                                                <TooltipProvider>
-                                                  <Tooltip>
-                                                    <TooltipTrigger asChild>
-                                                      <Button 
-                                                          size="sm" 
-                                                          className="h-8 bg-indigo-600 hover:bg-indigo-700 font-black uppercase text-[10px] tracking-widest shadow-md"
-                                                          onClick={() => router.push(`/dashboard/invoices/number?poNumber=${encodeURIComponent(sale.poNumber)}`)}
-                                                      >
-                                                          <FilePlus className="mr-1.5 h-3.5 w-3.5" /> Terbitkan Invoice
-                                                      </Button>
-                                                    </TooltipTrigger>
-                                                    <TooltipContent className="bg-slate-900 text-white border-none text-[10px] p-2">
-                                                      Mengirim data SO ke bagian penagihan agar nomor PO muncul saat admin membuat Invoice.
-                                                    </TooltipContent>
-                                                  </Tooltip>
-                                                </TooltipProvider>
+                                                <>
+                                                    <TooltipProvider>
+                                                        <Tooltip>
+                                                            <TooltipTrigger asChild>
+                                                                <Button 
+                                                                    size="sm" 
+                                                                    className="h-8 bg-indigo-600 hover:bg-indigo-700 font-black uppercase text-[9px] tracking-widest shadow-md px-4 rounded-xl"
+                                                                    onClick={() => router.push(`/dashboard/invoices/number?poNumber=${encodeURIComponent(sale.poNumber)}`)}
+                                                                >
+                                                                    <FilePlus className="mr-1.5 h-3.5 w-3.5" /> Billing
+                                                                </Button>
+                                                            </TooltipTrigger>
+                                                            <TooltipContent className="bg-slate-900 text-white border-none text-[10px]">Tarik data PO ke bagian Penagihan.</TooltipContent>
+                                                        </Tooltip>
+                                                    </TooltipProvider>
+
+                                                    <TooltipProvider>
+                                                        <Tooltip>
+                                                            <TooltipTrigger asChild>
+                                                                <Button 
+                                                                    size="sm" 
+                                                                    variant="outline"
+                                                                    className="h-8 border-emerald-200 text-emerald-700 hover:bg-emerald-50 font-black uppercase text-[9px] tracking-widest px-4 rounded-xl"
+                                                                    onClick={() => router.push(`/dashboard/sales-management?search=${encodeURIComponent(sale.poNumber)}`)}
+                                                                >
+                                                                    <Wallet className="mr-1.5 h-3.5 w-3.5" /> AR Book
+                                                                </Button>
+                                                            </TooltipTrigger>
+                                                            <TooltipContent className="bg-slate-900 text-white border-none text-[10px]">Monitoring Piutang & Ceklist Bayar.</TooltipContent>
+                                                        </Tooltip>
+                                                    </TooltipProvider>
+                                                </>
                                             )}
                                             <DropdownMenu>
-                                                <DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8 rounded-full"><MoreHorizontal className="h-4 w-4" /></Button></DropdownMenuTrigger>
+                                                <DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8 rounded-full"><MoreHorizontal className="h-4 w-4 text-slate-400" /></Button></DropdownMenuTrigger>
                                                 <DropdownMenuContent align="end" className="w-48">
-                                                    <DropdownMenuItem onClick={() => { sessionStorage.setItem('activePoPreview', sale.poNumber); router.push('/dashboard/sales-management'); }}>
-                                                        <Eye className="mr-2 h-4 w-4" /> Monitoring Piutang
-                                                    </DropdownMenuItem>
                                                     {isAdmin && sale.status !== 'Cancelled' && (
                                                         <>
-                                                            <DropdownMenuItem onClick={() => { setEditingSale(sale); setIsDialogOpen(true); }}>
-                                                              <Edit className="mr-2 h-4 w-4" /> Edit Data PO
+                                                            <DropdownMenuItem onClick={() => { setEditingSale(sale); setIsDialogOpen(true); }} className="text-[10px] font-black uppercase tracking-widest">
+                                                              <Edit className="mr-2 h-4 w-4" /> Edit Kontrak PO
                                                             </DropdownMenuItem>
-                                                            <DropdownMenuItem className="text-destructive font-bold" onClick={() => { setTargetPoId(sale.poNumber); setVoidDialogOpen(true); }}>
-                                                              <XCircle className="mr-2 h-4 w-4" /> Void / Batalkan
+                                                            <DropdownMenuItem className="text-rose-600 font-black uppercase text-[10px] tracking-widest focus:text-rose-600" onClick={() => { setTargetPoId(sale.poNumber); setVoidDialogOpen(true); }}>
+                                                              <XCircle className="mr-2 h-4 w-4" /> Batal / Void PO
                                                             </DropdownMenuItem>
                                                         </>
                                                     )}
                                                     {isSuperAdmin && (
                                                         <DropdownMenuItem 
-                                                            className="text-red-600 font-bold" 
+                                                            className="text-red-700 font-black uppercase text-[10px] tracking-widest focus:bg-red-50 focus:text-red-700" 
                                                             onSelect={(e) => { e.preventDefault(); setHardDeleteState({ isOpen: true, docId: sale.id, poNumber: sale.poNumber }); }}
                                                         >
-                                                            <Trash2 className="mr-2 h-4 w-4" /> Hapus Permanen
+                                                            <Trash2 className="mr-2 h-4 w-4" /> Hapus Database
                                                         </DropdownMenuItem>
                                                     )}
                                                 </DropdownMenuContent>
@@ -357,16 +356,16 @@ import {
         <Dialog open={voidDialogOpen} onOpenChange={setVoidDialogOpen}>
             <DialogContent className="sm:max-w-[400px]">
                 <DialogHeader>
-                    <DialogTitle>Konfirmasi Pembatalan PO</DialogTitle>
-                    <DialogDescription>Nomor PO ini akan ditandai Batal dan tidak akan muncul di penagihan baru.</DialogDescription>
+                    <DialogTitle className="uppercase font-black tracking-tight">Pembatalan PO</DialogTitle>
+                    <DialogDescription>Nomor PO ini akan ditandai Batal secara permanen dan piutangnya akan dinolkan.</DialogDescription>
                 </DialogHeader>
                 <div className="py-4 space-y-2">
-                    <Label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Alasan Pembatalan</Label>
-                    <Textarea value={voidReason} onChange={(e) => setVoidReason(e.target.value)} placeholder="Contoh: Kesalahan input rute, Customer ganti vendor..." className="text-sm font-medium" />
+                    <Label className="text-[10px] font-black uppercase text-slate-400">Alasan Void</Label>
+                    <Textarea value={voidReason} onChange={(e) => setVoidReason(e.target.value)} placeholder="Contoh: Kesalahan rute, Customer ganti vendor..." className="text-sm font-medium rounded-xl border-slate-200" />
                 </div>
-                <DialogFooter>
-                    <Button variant="outline" onClick={() => setVoidDialogOpen(false)} className="font-bold">Batal</Button>
-                    <Button variant="destructive" onClick={handleVoidPo} disabled={!voidReason} className="font-black uppercase tracking-widest">SIMPAN VOID</Button>
+                <DialogFooter className="bg-slate-50 -mx-6 -mb-6 p-6 rounded-b-3xl mt-4">
+                    <Button variant="ghost" onClick={() => setVoidDialogOpen(false)} className="font-bold">Batal</Button>
+                    <Button variant="destructive" onClick={handleVoidPo} disabled={!voidReason} className="font-black uppercase tracking-widest px-8">Kunci Void</Button>
                 </DialogFooter>
             </DialogContent>
         </Dialog>
@@ -383,12 +382,14 @@ import {
         {/* SO Update Modal */}
         <Dialog open={soUpdateState.isOpen} onOpenChange={(o) => setSoUpdateState(prev => ({...prev, isOpen: o}))}>
             <DialogContent className="sm:max-w-[400px]">
-                <DialogHeader><DialogTitle className="uppercase font-black tracking-tight">Sinkronisasi No. SO</DialogTitle></DialogHeader>
-                <div className="py-4 space-y-2">
-                    <Label className="text-[10px] font-black uppercase text-muted-foreground">Nomor SO Produksi Baru</Label>
-                    <Input value={tempSo} onChange={e => setTempSo(e.target.value)} placeholder="Contoh: SO-12345" className="font-mono font-bold text-blue-700" />
+                <DialogHeader><DialogTitle className="uppercase font-black tracking-tight">Sinkronisasi SO Produksi</DialogTitle></DialogHeader>
+                <div className="py-6 space-y-2">
+                    <Label className="text-[10px] font-black uppercase text-slate-400">Nomor SO Resmi</Label>
+                    <Input value={tempSo} onChange={e => setTempSo(e.target.value)} placeholder="SO-2024-XXXX" className="font-mono font-black text-lg text-indigo-700 h-12 bg-indigo-50 border-indigo-100 rounded-xl text-center" />
                 </div>
-                <DialogFooter><Button onClick={handleUpdateSo} className="w-full bg-blue-600 hover:bg-blue-700 font-bold uppercase tracking-widest">Update & Sinkronkan</Button></DialogFooter>
+                <DialogFooter className="bg-slate-50 -mx-6 -mb-6 p-6 rounded-b-3xl">
+                    <Button onClick={handleUpdateSo} className="w-full bg-indigo-600 hover:bg-indigo-700 h-12 font-black uppercase tracking-widest rounded-xl shadow-lg shadow-indigo-100">Simpan & Sinkronkan</Button>
+                </DialogFooter>
             </DialogContent>
         </Dialog>
       </main>
