@@ -45,7 +45,7 @@ import { Bar, BarChart, XAxis, YAxis, CartesianGrid, ResponsiveContainer } from 
 import { useFirestore, useUser, useCollection, useMemoFirebase, useDoc } from '@/firebase';
 import { collection, query, doc } from 'firebase/firestore';
 import { type SalesListItem, type Invoice, type TaxInvoice, type UserProfile, type SpdData } from '@/app/lib/data';
-import { format, isSameDay, parseISO, isWithinInterval, startOfToday, subDays, eachDayOfInterval, differenceInDays } from 'date-fns';
+import { format, isSameDay, parseISO, isWithinInterval, startOfToday, subDays, eachDayOfInterval, differenceInDays, isBefore } from 'date-fns';
 import { DateRangePicker } from '../components/date-range-picker';
 import { cn } from '@/lib/utils';
 
@@ -345,4 +345,3 @@ export default function DashboardPage() {
     </main>
   );
 }
-
