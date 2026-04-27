@@ -149,6 +149,7 @@ export type Customer = {
   name: string;
   email?: string;
   addresses: CustomerAddress[];
+  defaultShippingAddressId?: string;
   ownerId?: string;
   createdBy?: string;
 };
@@ -182,6 +183,7 @@ export type SpdData = {
     courier: string;
     invoices: SpdInvoiceEntry[];
     status: 'in_delivery' | 'received' | 'rejected' | 'cancelled';
+    envelopePrinted?: boolean;
     voidReason?: string;
     ownerId?: string;
     createdBy?: string;

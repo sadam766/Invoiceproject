@@ -6,6 +6,7 @@ import {
     CardContent,
     CardHeader,
     CardTitle,
+    CardFooter,
   } from '@/components/ui/card';
   import { Input } from '@/components/ui/input';
   import { Button } from '@/components/ui/button';
@@ -24,11 +25,24 @@ import {
     Layers,
     FileCheck,
     AlertTriangle,
-    Share2
+    Share2,
+    Mail,
+    Printer
   } from 'lucide-react';
   import { AddSpdDialog } from './_components/add-spd-dialog';
+  import { AddressSelectorDialog } from './_components/address-selector-dialog';
   import { useToast } from '@/hooks/use-toast';
   import { DeleteConfirmationDialog } from '@/app/components/delete-confirmation-dialog';
+  import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+  } from '@/components/ui/alert-dialog';
   import { useFirestore, useUser, useCollection, useMemoFirebase, useDoc } from '@/firebase';
   import { collection, doc, deleteDoc, writeBatch, query, updateDoc, setDoc } from 'firebase/firestore';
   import { cn } from '@/lib/utils';
@@ -39,7 +53,7 @@ import {
     DropdownMenuTrigger 
   } from '@/components/ui/dropdown-menu';
   import { parseISO, differenceInDays } from 'date-fns';
-  import type { SpdData, Invoice, SpdInvoiceEntry, UserProfile } from '@/app/lib/data';
+  import type { SpdData, Invoice, SpdInvoiceEntry, UserProfile, Customer } from '@/app/lib/data';
   import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
   import { TOOLTIP_CONTENT } from '@/app/lib/tooltip-content';
   
@@ -54,6 +68,11 @@ import {
     const [searchQuery, setSearchQuery] = useState('');
     const [deleteDialogState, setDeleteDialogState] = useState<{ isOpen: boolean; spdId?: string }>({ isOpen: false });
 
+    // Envelope Flow States
+    const [confirmPrintOpen, setConfirmPrintOpen] = useState(false);
+    const [addressSelectorOpen, setAddressSelectorOpen] = useState(false);
+    const [newSpdRef, setNewSpdRef] = useState<SpdData | null>(null);
+
     // State for pre-selected invoices from shortcut
     const [initialPreselected, setInitialPreselected] = useState<SpdInvoiceEntry[] | undefined>(undefined);
 
@@ -66,6 +85,9 @@ import {
         return query(collection(firestore, 'spds'));
     }, [firestore]);
     const { data: spds, isLoading } = useCollection<SpdData>(spdsCollection);
+
+    const customersQuery = useMemoFirebase(() => firestore ? query(collection(firestore, 'customers')) : null, [firestore]);
+    const { data: allCustomers } = useCollection<Customer>(customersQuery);
 
     // Effect to check for pre-selected invoices from Invoice List shortcut
     useEffect(() => {
@@ -116,7 +138,6 @@ import {
         const spdToDelete = spds?.find(s => s.id === deleteDialogState.spdId);
         const batch = writeBatch(firestore);
 
-        // RESET: Melepaskan invoice dari SPD yang dihapus (Status Sync)
         spdToDelete?.invoices.forEach(inv => {
             const safeInvId = inv.invoiceId.replace(/\//g, '_');
             const invRef = doc(firestore, 'invoices', safeInvId);
@@ -133,7 +154,6 @@ import {
     const handleSave = async (newItem: SpdData) => {
         if (!firestore || !user) return;
 
-        // ANTI-DUPLICATE CHECK
         const existing = spds?.find(s => s.id.toLowerCase() === newItem.id.toLowerCase());
         if (existing && !editingSpd) {
             toast({ 
@@ -154,14 +174,12 @@ import {
             createdBy: userProfile?.displayName || user.email || 'System'
         };
 
-        // 1. UPDATE INVOICES: Tandai invoice dengan No. SPD (Pencegahan Duplikasi)
         newItem.invoices.forEach(inv => {
             const safeInvId = inv.invoiceId.replace(/\//g, '_');
             const invRef = doc(firestore, 'invoices', safeInvId);
             batch.update(invRef, { spdNumber: newItem.id });
         });
 
-        // 2. SAVE SPD
         batch.set(spdRef, finalSpdData, { merge: true });
 
         await batch.commit();
@@ -169,7 +187,15 @@ import {
             title: editingSpd ? "SPD Berhasil Diperbarui" : "SPD Berhasil Diterbitkan",
             description: `${newItem.invoices.length} Invoice telah berhasil ditambahkan ke SPD Nomor ${newItem.id}`
         });
+        
         setIsDialogOpen(false);
+        
+        // Triger Envelope Flow for NEW SPD
+        if (!editingSpd) {
+            setNewSpdRef(newItem);
+            setTimeout(() => setConfirmPrintOpen(true), 500);
+        }
+
         setEditingSpd(undefined);
         setInitialPreselected(undefined);
     };
@@ -179,17 +205,14 @@ import {
         const safeId = spd.id.replace(/\//g, '_');
         const batch = writeBatch(firestore);
         
-        // Update SPD status
         batch.update(doc(firestore, 'spds', safeId), { status: newStatus });
         
-        // Automated Status Link: If Received, update all linked invoices status
         if (newStatus === 'received') {
             spd.invoices.forEach(invEntry => {
                 const safeInvId = invEntry.invoiceId.replace(/\//g, '_');
                 batch.update(doc(firestore, 'invoices', safeInvId), { status: 'received' });
             });
         } else if (newStatus === 'in_delivery') {
-            // Revert back to sent if reset to delivery
             spd.invoices.forEach(invEntry => {
                 const safeInvId = invEntry.invoiceId.replace(/\//g, '_');
                 batch.update(doc(firestore, 'invoices', safeInvId), { status: 'sent' });
@@ -208,6 +231,11 @@ import {
         received: { label: 'Received', color: 'bg-emerald-100 text-emerald-800 border-emerald-200', icon: CheckCircle2, tooltip: TOOLTIP_CONTENT.spd_status_received },
         rejected: { label: 'Rejected', color: 'bg-rose-100 text-rose-800 border-rose-200', icon: XCircle, tooltip: TOOLTIP_CONTENT.spd_status_rejected }
     };
+
+    const currentCustomerForEnvelope = useMemo(() => {
+        if (!newSpdRef || !allCustomers) return null;
+        return allCustomers.find(c => c.name === newSpdRef.invoices[0]?.customer) || null;
+    }, [newSpdRef, allCustomers]);
 
     return (
       <main className="flex flex-1 flex-col gap-4 p-4 md:gap-8 md:p-8 max-w-[1400px] mx-auto">
@@ -247,7 +275,7 @@ import {
                     onChange={(e) => setSearchQuery(e.target.value)}
                 />
             </div>
-            <div className="hidden lg:flex gap-4 text-[10px] font-black uppercase tracking-widest text-muted-foreground/60 ml-auto">
+            <div className="hidden lg:flex gap-6 text-[10px] font-black uppercase tracking-widest text-muted-foreground/60 ml-auto">
                 <div className="flex items-center gap-1.5"><div className="w-2.5 h-2.5 rounded-full bg-yellow-400" /> In Delivery</div>
                 <div className="flex items-center gap-1.5"><div className="w-2.5 h-2.5 rounded-full bg-emerald-500" /> Received</div>
                 <div className="flex items-center gap-1.5"><div className="w-2.5 h-2.5 rounded-full bg-rose-500" /> Rejected</div>
@@ -284,6 +312,9 @@ import {
                                     <DropdownMenuItem onClick={() => router.push(`/dashboard/invoices/spd/preview/${encodeURIComponent(spd.id)}`)} className="rounded-lg py-2 cursor-pointer font-bold text-[10px] uppercase">
                                         <FileCheck className="mr-2 h-4 w-4 text-indigo-600" /> Cetak Summary (PDF)
                                     </DropdownMenuItem>
+                                    <DropdownMenuItem onClick={() => { setNewSpdRef(spd); setAddressSelectorOpen(true); }} className="rounded-lg py-2 cursor-pointer font-bold text-[10px] uppercase text-indigo-600">
+                                        <Mail className="mr-2 h-4 w-4" /> Cetak Amplop Coklat
+                                    </DropdownMenuItem>
                                     <DropdownMenuItem onClick={() => handleEdit(spd)} className="rounded-lg py-2 cursor-pointer font-bold text-[10px] uppercase">
                                         <Edit className="mr-2 h-4 w-4 text-blue-600" /> Edit Batch Dispatch
                                     </DropdownMenuItem>
@@ -310,6 +341,7 @@ import {
                                                 </Tooltip>
                                             </TooltipProvider>
                                         )}
+                                        {spd.envelopePrinted && <Badge variant="secondary" className="ml-2 h-3.5 bg-blue-50 text-blue-600 text-[7px] font-black uppercase border-none px-1.5">ENVELOPE READY</Badge>}
                                     </div>
                                 </div>
                                 <TooltipProvider>
@@ -389,25 +421,67 @@ import {
                             </div>
                             <div className="flex items-center justify-between px-2">
                                 <span className="text-[8px] text-slate-400 font-bold uppercase tracking-widest">By: {spd.createdBy || 'Unknown'}</span>
-                                <TooltipProvider>
-                                    <Tooltip>
-                                        <TooltipTrigger asChild>
-                                            <Button variant="ghost" size="icon" className="h-6 w-6 rounded-full text-indigo-400" onClick={() => {
-                                                navigator.clipboard.writeText(`Pelacakan SPD ${spd.id}: [Link Placeholder]`);
-                                                toast({ title: "Tracking Link Copied" });
-                                            }}>
-                                                <Share2 className="h-3 w-3" />
-                                            </Button>
-                                        </TooltipTrigger>
-                                        <TooltipContent className="bg-slate-900 text-white border-none text-[10px]">{TOOLTIP_CONTENT.spd_quick_share}</TooltipContent>
-                                    </Tooltip>
-                                </TooltipProvider>
+                                <div className="flex gap-1">
+                                    <TooltipProvider>
+                                        <Tooltip>
+                                            <TooltipTrigger asChild>
+                                                <Button variant="ghost" size="icon" className="h-6 w-6 rounded-full text-indigo-400" onClick={() => {
+                                                    setNewSpdRef(spd);
+                                                    setAddressSelectorOpen(true);
+                                                }}>
+                                                    <Printer className="h-3 w-3" />
+                                                </Button>
+                                            </TooltipTrigger>
+                                            <TooltipContent className="bg-slate-900 text-white border-none text-[10px]">Cetak Amplop Coklat</TooltipContent>
+                                        </Tooltip>
+                                    </TooltipProvider>
+                                    <TooltipProvider>
+                                        <Tooltip>
+                                            <TooltipTrigger asChild>
+                                                <Button variant="ghost" size="icon" className="h-6 w-6 rounded-full text-indigo-400" onClick={() => {
+                                                    navigator.clipboard.writeText(`Pelacakan SPD ${spd.id}: [Link Placeholder]`);
+                                                    toast({ title: "Tracking Link Copied" });
+                                                }}>
+                                                    <Share2 className="h-3 w-3" />
+                                                </Button>
+                                            </TooltipTrigger>
+                                            <TooltipContent className="bg-slate-900 text-white border-none text-[10px]">{TOOLTIP_CONTENT.spd_quick_share}</TooltipContent>
+                                        </Tooltip>
+                                    </TooltipProvider>
+                                </div>
                             </div>
                         </CardFooter>
                     </Card>
                 );
             })}
         </div>
+
+        {/* Envelope Printing Confirmation */}
+        <AlertDialog open={confirmPrintOpen} onOpenChange={setConfirmPrintOpen}>
+            <AlertDialogContent className="rounded-3xl border-none shadow-2xl">
+                <AlertDialogHeader>
+                    <div className="bg-indigo-50 w-12 h-12 rounded-2xl flex items-center justify-center mb-4"><Mail className="text-indigo-600 h-6 w-6" /></div>
+                    <AlertDialogTitle className="text-xl font-black uppercase tracking-tight">SPD BERHASIL DIBUAT</AlertDialogTitle>
+                    <AlertDialogDescription className="text-sm font-medium text-slate-600">
+                        Apakah Anda ingin mencetak amplop tagihan coklat sekarang? Sistem akan menyiapkan alamat pengiriman secara otomatis.
+                    </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter className="gap-2 sm:gap-0">
+                    <AlertDialogCancel onClick={() => setConfirmPrintOpen(false)} className="h-11 rounded-xl font-bold border-slate-200">Tidak, Nanti Saja</AlertDialogCancel>
+                    <AlertDialogAction onClick={() => { setConfirmPrintOpen(false); setAddressSelectorOpen(true); }} className="h-11 rounded-xl bg-indigo-600 hover:bg-indigo-700 font-black uppercase text-[10px] tracking-widest px-6 shadow-lg shadow-indigo-100">
+                        YA, CETAK AMPLOP SEKARANG
+                    </AlertDialogAction>
+                </AlertDialogFooter>
+            </AlertDialogContent>
+        </AlertDialog>
+
+        {/* Smart Address Selector Modal */}
+        <AddressSelectorDialog 
+            isOpen={addressSelectorOpen} 
+            onOpenChange={setAddressSelectorOpen} 
+            customer={currentCustomerForEnvelope} 
+            spdId={newSpdRef?.id || ''}
+        />
 
         <DeleteConfirmationDialog 
             open={deleteDialogState.isOpen} 

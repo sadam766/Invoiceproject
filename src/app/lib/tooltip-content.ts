@@ -43,7 +43,8 @@ export const TOOLTIP_CONTENT = {
     spd_quick_print: "Cetak ringkasan pengiriman (A4) sebagai bukti fisik tanda tangan basah.",
     spd_quick_share: "Salin link pelacakan digital untuk dibagikan via WhatsApp kepada customer.",
     spd_auto_pull: "Sistem otomatis menarik nomor Surat Jalan (SJ) dari data invoice terakhir.",
-    spd_aging_alert: "Peringatan: Pengiriman ini sudah melebihi 5 hari di jalan. Segera cek status ke kurir."
+    spd_aging_alert: "Peringatan: Pengiriman ini sudah melebihi 5 hari di jalan. Segera cek status ke kurir.",
+    envelope_print_landscape: "Pastikan posisi amplop coklat di printer sudah sesuai dengan arah landscape (horizontal)."
 } as const;
 
 export type TooltipKey = keyof typeof TOOLTIP_CONTENT;
