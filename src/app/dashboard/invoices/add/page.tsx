@@ -64,6 +64,8 @@ import {
   MapPin,
   FileText,
   Pencil,
+  Building2,
+  Home,
 } from 'lucide-react';
 import { type Invoice, type SalesOrder, type UserProfile, type InvoiceItem, type InvoiceNumber, type ProductListItem, type SalesListItem, type Customer } from '@/app/lib/data';
 import { useToast } from '@/hooks/use-toast';
@@ -155,6 +157,12 @@ export default function AddInvoicePage() {
   const [tempAddress, setTempAddress] = useState('');
   const [updateMaster, setUpdateMaster] = useState(true);
 
+  // --- CUSTOMER ADDR LOGIC ---
+  const currentCustomer = useMemo(() => {
+    if (!activeIdentity?.customer || !allCustomers) return null;
+    return allCustomers.find(c => c.name.toLowerCase() === activeIdentity.customer.toLowerCase());
+  }, [activeIdentity?.customer, allCustomers]);
+
   // --- LOGIKA "THE GOLDEN KEY" (PO HISTORY) ---
   const poBillingHistory = useMemo(() => {
     if (!allInvoices || !activeIdentity) return [];
@@ -194,16 +202,13 @@ export default function AddInvoicePage() {
 
   // --- AUTO-PULL ADDRESS LOGIC ---
   useEffect(() => {
-    if (activeIdentity?.customer && allCustomers && !billingAddress && !editInvoiceId) {
-      const foundCustomer = allCustomers.find(c => c.name.toLowerCase() === activeIdentity.customer.toLowerCase());
-      if (foundCustomer) {
-        const defaultAddr = foundCustomer.addresses?.find(a => a.isDefault) || foundCustomer.addresses?.[0];
-        if (defaultAddr) {
-          setBillingAddress(defaultAddr.address);
-        }
+    if (currentCustomer && !billingAddress && !editInvoiceId) {
+      const defaultAddr = currentCustomer.addresses?.find(a => a.isDefault) || currentCustomer.addresses?.[0];
+      if (defaultAddr) {
+        setBillingAddress(defaultAddr.address);
       }
     }
-  }, [activeIdentity, allCustomers, billingAddress, editInvoiceId]);
+  }, [currentCustomer, billingAddress, editInvoiceId]);
 
   // Initial Sync from Record
   useEffect(() => {
@@ -380,19 +385,15 @@ export default function AddInvoicePage() {
         }
 
         // 2. Optional Update Master Customer
-        if (updateMaster && allCustomers) {
-            const masterCustomer = allCustomers.find(c => c.name.toLowerCase() === activeIdentity.customer.toLowerCase());
-            if (masterCustomer?.id) {
-                const masterRef = doc(firestore, 'customers', masterCustomer.id);
-                if (editTarget === 'name') {
-                    updateDoc(masterRef, { name: tempName });
-                } else {
-                    // Update matching or first address
-                    const updatedAddresses = (masterCustomer.addresses || []).map(a => 
-                        a.address === billingAddress || a.isDefault ? { ...a, address: tempAddress } : a
-                    );
-                    updateDoc(masterRef, { addresses: updatedAddresses });
-                }
+        if (updateMaster && currentCustomer?.id) {
+            const masterRef = doc(firestore, 'customers', currentCustomer.id);
+            if (editTarget === 'name') {
+                updateDoc(masterRef, { name: tempName });
+            } else {
+                const updatedAddresses = (currentCustomer.addresses || []).map(a => 
+                    a.address === billingAddress || a.isDefault ? { ...a, address: tempAddress } : a
+                );
+                updateDoc(masterRef, { addresses: updatedAddresses });
             }
         }
 
@@ -570,10 +571,10 @@ export default function AddInvoicePage() {
                       </div>
                   </div>
 
-                  <div className="md:col-span-3 space-y-2">
+                  <div className="md:col-span-3 space-y-4">
                       <div className="flex justify-between items-center">
                         <Label className="text-[10px] font-black uppercase text-slate-400 tracking-widest flex items-center gap-1">
-                            <MapPin className="h-3 w-3" /> Billing Address (HO/Site Selection)
+                            <MapPin className="h-3 w-3" /> Smart Address Selector (HO/Cabang)
                         </Label>
                         <Button 
                             variant="link" 
@@ -585,14 +586,39 @@ export default function AddInvoicePage() {
                             <Pencil className="h-2.5 w-2.5 mr-1" /> Quick Fix Alamat
                         </Button>
                       </div>
-                      <div className="relative group">
-                        <textarea 
-                            value={billingAddress} 
-                            onChange={e => setBillingAddress(e.target.value)} 
-                            className="w-full min-h-[80px] rounded-xl border border-slate-200 bg-white px-4 py-3 text-xs font-medium focus-visible:ring-1 focus-visible:ring-indigo-500 outline-none pr-10"
-                            placeholder="Alamat lengkap penagihan..." 
-                            disabled={isLocked} 
-                        />
+
+                      <div className="grid gap-4 md:grid-cols-2">
+                        <div className="space-y-2">
+                            <Select value={billingAddress} onValueChange={setBillingAddress} disabled={isLocked}>
+                                <SelectTrigger className="h-11 bg-slate-50 border-slate-200 rounded-xl text-xs font-bold">
+                                    <SelectValue placeholder="Pilih Alamat dari Master..." />
+                                </SelectTrigger>
+                                <SelectContent className="max-h-[300px]">
+                                    {currentCustomer?.addresses?.map((addr) => (
+                                        <SelectItem key={addr.id} value={addr.address} className="py-3 px-4 border-b last:border-0">
+                                            <div className="flex flex-col gap-0.5">
+                                                <div className="flex items-center gap-1.5">
+                                                    {addr.label.toLowerCase().includes('office') ? <Home className="h-3 w-3 text-indigo-600" /> : <Building2 className="h-3 w-3 text-amber-600" />}
+                                                    <span className="font-black uppercase text-[10px] tracking-tight">{addr.label}</span>
+                                                    {addr.isDefault && <Badge variant="outline" className="text-[8px] h-3 px-1 font-black bg-blue-50">DEFAULT</Badge>}
+                                                </div>
+                                                <p className="text-[10px] text-muted-foreground truncate max-w-[300px] italic">{addr.address}</p>
+                                            </div>
+                                        </SelectItem>
+                                    ))}
+                                    {!currentCustomer?.addresses?.length && (
+                                        <div className="p-4 text-center text-[10px] italic text-slate-400">Belum ada alamat terdaftar di master.</div>
+                                    )}
+                                </SelectContent>
+                            </Select>
+                        </div>
+
+                        <div className="bg-slate-50/50 p-4 rounded-xl border border-dashed border-slate-200">
+                             <p className="text-[9px] font-black uppercase text-slate-400 mb-1 tracking-widest">Preview Alamat Penagihan:</p>
+                             <p className="text-[11px] leading-snug font-medium text-slate-700 italic">
+                                 {billingAddress || 'Belum ada alamat dipilih.'}
+                             </p>
+                        </div>
                       </div>
                   </div>
               </div>
