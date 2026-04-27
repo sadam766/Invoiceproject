@@ -1,4 +1,3 @@
-
 'use client';
 import { Button } from '@/components/ui/button';
 import {
@@ -23,7 +22,8 @@ import {
   Calendar as CalendarIcon,
   Layers,
   FileText,
-  AlertTriangle
+  AlertTriangle,
+  FileDown
 } from 'lucide-react';
 import { useEffect, useState, useMemo } from 'react';
 import type { SpdData, Invoice, SpdInvoiceEntry } from '@/app/lib/data';
@@ -31,6 +31,8 @@ import { useFirestore, useCollection, useMemoFirebase } from '@/firebase';
 import { collection, query, where, writeBatch, doc } from 'firebase/firestore';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { TOOLTIP_CONTENT } from '@/app/lib/tooltip-content';
 
 type AddSpdDialogProps = {
   isOpen: boolean;
@@ -56,7 +58,7 @@ export function AddSpdDialog({ isOpen, onOpenChange, onSave, spdData, onAddClick
     if (!firestore) return null;
     return query(
         collection(firestore, 'invoices'), 
-        where('status', 'in', ['sent', 'partial', 'unpaid'])
+        where('status', 'in', ['sent', 'partial', 'unpaid', 'draft'])
     );
   }, [firestore]);
   
@@ -136,7 +138,6 @@ export function AddSpdDialog({ isOpen, onOpenChange, onSave, spdData, onAddClick
         return { ...inv, sjNumbers: sjList };
     });
 
-    // --- REFINEMENT: AUTO-STATUS "IN TRANSIT" ---
     const batch = writeBatch(firestore);
     processedInvoices.forEach(inv => {
         const invRef = doc(firestore, 'invoices', inv.invoiceId.replace(/\//g, '_'));
@@ -161,73 +162,87 @@ export function AddSpdDialog({ isOpen, onOpenChange, onSave, spdData, onAddClick
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
       <DialogTrigger asChild>
-        <Button onClick={onAddClick} className="bg-indigo-600 hover:bg-indigo-700 shadow-md">
-          <Plus className="mr-2 h-4 w-4" /> BUAT SPD BARU
+        <Button onClick={onAddClick} className="bg-indigo-600 hover:bg-indigo-700 shadow-xl shadow-indigo-100 h-10 font-black uppercase text-[10px] tracking-widest px-6 rounded-2xl group active:scale-95 transition-all">
+          <Plus className="mr-2 h-4 w-4 group-hover:rotate-90 transition-transform" /> BUAT SPD BARU
         </Button>
       </DialogTrigger>
-      <DialogContent className="sm:max-w-5xl max-h-[95vh] flex flex-col p-0 overflow-hidden">
-        <DialogHeader className="p-6 pb-0">
-          <DialogTitle className="flex items-center gap-2 text-xl font-bold">
-              <Layers className="h-6 w-6 text-indigo-600" /> 
-              SPD Multi-Surat Jalan Dispatch
-          </DialogTitle>
-          <DialogDescription>
-            Pilih invoice dan lengkapi nomor Surat Jalan (SJ). Status invoice akan berubah menjadi 'In Transit'.
-          </DialogDescription>
+      <DialogContent className="sm:max-w-5xl max-h-[95vh] flex flex-col p-0 overflow-hidden border-none shadow-2xl rounded-3xl">
+        <DialogHeader className="p-8 pb-4 bg-white">
+          <div className="flex items-center gap-3">
+            <div className="bg-indigo-50 p-2.5 rounded-2xl"><Layers className="h-6 w-6 text-indigo-600" /></div>
+            <div>
+                <DialogTitle className="text-xl font-black uppercase tracking-tight text-slate-900">
+                    SPD Multi-Document Dispatch
+                </DialogTitle>
+                <DialogDescription className="text-xs font-bold uppercase text-slate-400 tracking-tighter mt-1">
+                    Konsolidasi surat jalan & invoice ke dalam satu batch pengiriman digital.
+                </DialogDescription>
+            </div>
+          </div>
         </DialogHeader>
         
         <div className="grid grid-cols-1 md:grid-cols-5 gap-0 flex-1 overflow-hidden border-t mt-4">
-          <div className="bg-muted/30 p-6 space-y-6 border-r md:col-span-2">
-             <div className="space-y-4">
+          <div className="bg-slate-50 p-8 space-y-8 border-r md:col-span-2">
+             <div className="space-y-6">
                 <div className="space-y-2">
-                    <Label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Nomor SPD Digital</Label>
-                    <Input value={spdId} readOnly className="bg-background font-mono text-xs font-bold border-indigo-100" />
+                    <Label className="text-[9px] font-black uppercase text-slate-400 tracking-widest">Nomor SPD Digital</Label>
+                    <div className="bg-white p-3 rounded-xl border border-indigo-100 font-mono text-xs font-black text-indigo-700 shadow-sm">{spdId}</div>
                 </div>
                 <div className="space-y-2">
-                    <Label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Tanggal Pengiriman</Label>
+                    <Label className="text-[9px] font-black uppercase text-slate-400 tracking-widest">Tanggal Pengiriman</Label>
                     <div className="relative">
-                        <CalendarIcon className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-                        <Input type="date" value={date} onChange={e => setDate(e.target.value)} className="pl-8 bg-background" />
+                        <CalendarIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-300" />
+                        <Input type="date" value={date} onChange={e => setDate(e.target.value)} className="pl-10 h-11 bg-white border-slate-200 rounded-xl font-bold shadow-sm" />
                     </div>
                 </div>
                 <div className="space-y-2">
-                    <Label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Kurir / Pembawa Dokumen</Label>
+                    <Label className="text-[9px] font-black uppercase text-slate-400 tracking-widest">Kurir / Carrier Identity</Label>
                     <Input 
-                        placeholder="Nama Kurir atau Ekspedisi..." 
+                        placeholder="Nama Kurir atau Nama Ekspedisi..." 
                         value={courier} 
                         onChange={e => setCourier(e.target.value)} 
-                        className="bg-background"
+                        className="h-11 bg-white border-slate-200 rounded-xl font-bold shadow-sm placeholder:italic"
                     />
                 </div>
              </div>
 
-             <div className="pt-6 border-t">
-                <p className="text-[10px] font-black uppercase text-indigo-600 mb-3 tracking-widest">Selected List & SJ Management</p>
+             <div className="pt-8 border-t border-slate-200">
+                <div className="flex items-center justify-between mb-4">
+                    <p className="text-[9px] font-black uppercase text-indigo-600 tracking-widest flex items-center gap-1.5">
+                        <FileDown className="h-3.5 w-3.5" /> Selected Batch ({selectedInvoices.length})
+                    </p>
+                    <TooltipProvider>
+                        <Tooltip>
+                            <TooltipTrigger asChild>
+                                <AlertTriangle className="h-4 w-4 text-amber-500 cursor-help" />
+                            </TooltipTrigger>
+                            <TooltipContent className="bg-slate-900 text-white text-[10px]">{TOOLTIP_CONTENT.spd_auto_pull}</TooltipContent>
+                        </Tooltip>
+                    </TooltipProvider>
+                </div>
                 <ScrollArea className="h-[250px] pr-4">
                     <div className="space-y-3">
                         {selectedInvoices.length === 0 ? (
-                            <p className="text-[10px] text-muted-foreground italic text-center py-10">Belum ada invoice dipilih.</p>
+                            <div className="py-20 text-center flex flex-col items-center opacity-30">
+                                <Search className="h-8 w-8 mb-2" />
+                                <p className="text-[10px] font-black uppercase tracking-widest">Antrian Kosong</p>
+                            </div>
                         ) : selectedInvoices.map((inv) => (
-                            <div key={inv.invoiceId} className="p-3 bg-white rounded-lg border border-indigo-100 shadow-sm space-y-2">
+                            <div key={inv.invoiceId} className="p-4 bg-white rounded-2xl border border-indigo-100 shadow-sm space-y-3 animate-in fade-in slide-in-from-left-2">
                                 <div className="flex justify-between items-center">
-                                    <span className="text-[10px] font-black text-indigo-700">{inv.invoiceId}</span>
-                                    <Button variant="ghost" size="icon" className="h-5 w-5 text-rose-500" onClick={() => setSelectedInvoices(selectedInvoices.filter(si => si.invoiceId !== inv.invoiceId))}>
-                                        <Plus className="h-3 w-3 rotate-45" />
+                                    <span className="text-[11px] font-black text-indigo-700 font-mono">{inv.invoiceId}</span>
+                                    <Button variant="ghost" size="icon" className="h-6 w-6 text-rose-400 hover:text-rose-600 hover:bg-rose-50 rounded-full" onClick={() => setSelectedInvoices(selectedInvoices.filter(si => si.invoiceId !== inv.invoiceId))}>
+                                        <Plus className="h-4 w-4 rotate-45" />
                                     </Button>
                                 </div>
-                                <div className="space-y-1">
-                                    <Label className="text-[9px] font-bold text-muted-foreground uppercase">Daftar No. Surat Jalan (SJ):</Label>
+                                <div className="space-y-2">
+                                    <Label className="text-[8px] font-black text-slate-400 uppercase tracking-tighter">Verified Surat Jalan (SJ) Nos:</Label>
                                     <Input 
-                                        className="h-7 text-[10px] font-mono bg-blue-50/30" 
-                                        placeholder="SJ-001, SJ-002..." 
+                                        className="h-9 text-[11px] font-bold bg-slate-50 border-dashed rounded-lg" 
+                                        placeholder="E.g. SJ-001, SJ-992..." 
                                         value={localSjAdditions[inv.invoiceId] || ''}
                                         onChange={(e) => handleSjChange(inv.invoiceId, e.target.value)}
                                     />
-                                    {(localSjAdditions[inv.invoiceId] || '').length === 0 && (
-                                        <div className="flex items-center gap-1 text-[8px] text-amber-600 font-bold">
-                                            <AlertTriangle className="h-2 w-2" /> WAJIB ADA SURAT JALAN
-                                        </div>
-                                    )}
                                 </div>
                             </div>
                         ))}
@@ -236,78 +251,96 @@ export function AddSpdDialog({ isOpen, onOpenChange, onSave, spdData, onAddClick
              </div>
           </div>
 
-          <div className="md:col-span-3 flex flex-col bg-background overflow-hidden">
-             <div className="p-4 border-b bg-muted/10">
+          <div className="md:col-span-3 flex flex-col bg-white overflow-hidden">
+             <div className="p-6 border-b bg-slate-50/50">
                 <div className="relative">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                    <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
                     <Input 
-                        placeholder="Cari Customer atau No. Invoice..." 
-                        className="pl-10 h-11 shadow-none border-none focus-visible:ring-0 text-sm"
+                        placeholder="Scan atau Cari Customer / No. Invoice..." 
+                        className="pl-12 h-14 bg-white border-none shadow-premium text-sm font-bold rounded-2xl focus-visible:ring-indigo-500"
                         value={searchInvoice}
                         onChange={e => setSearchInvoice(e.target.value)}
                     />
                 </div>
              </div>
 
-             <ScrollArea className="flex-1 p-4">
-                <div className="space-y-3">
+             <ScrollArea className="flex-1 p-8">
+                <div className="space-y-4">
                     <div className="flex items-center justify-between px-2">
-                        <Label className="text-[10px] font-black uppercase text-muted-foreground tracking-tighter">Ready to Deliver Invoices</Label>
-                        <Badge variant="secondary" className="text-[9px] h-4">{filteredAvailableInvoices.length} Tersedia</Badge>
+                        <Label className="text-[10px] font-black uppercase text-slate-400 tracking-widest flex items-center gap-2">
+                            <Clock className="h-3 w-3" /> Invoices Ready to Dispatch
+                        </Label>
+                        <Badge variant="secondary" className="text-[9px] h-5 px-3 font-black bg-indigo-50 text-indigo-600">{filteredAvailableInvoices.length} Tersedia</Badge>
                     </div>
 
                     {isLoadingInvoices ? (
-                        <div className="text-center py-20 animate-pulse text-xs text-muted-foreground">Analisa antrian gudang...</div>
+                        <div className="text-center py-20 animate-pulse text-xs font-black uppercase text-slate-300 tracking-widest">Analisa Antrian Gudang...</div>
                     ) : filteredAvailableInvoices.length === 0 ? (
-                        <div className="flex flex-col items-center justify-center py-20 opacity-40 text-center space-y-2">
-                            <Layers className="h-10 w-10 mb-2" />
-                            <p className="text-xs font-medium">Data kosong. Pastikan invoice sudah diterbitkan.</p>
+                        <div className="flex flex-col items-center justify-center py-32 opacity-20 text-center space-y-4 grayscale">
+                            <Layers className="h-16 w-16" />
+                            <p className="text-xs font-black uppercase tracking-[0.2em]">Semua dokumen telah terproses.</p>
                         </div>
-                    ) : filteredAvailableInvoices.map((inv) => {
-                        const isSelected = selectedInvoices.some(si => si.invoiceId === inv.id);
-                        return (
-                            <div 
-                                key={inv.id} 
-                                onClick={() => toggleInvoice(inv)}
-                                className={cn(
-                                    "group relative flex items-start gap-4 p-4 rounded-xl border transition-all cursor-pointer",
-                                    isSelected 
-                                        ? "bg-indigo-50/50 border-indigo-300 ring-1 ring-indigo-300" 
-                                        : "bg-background hover:border-indigo-200 hover:bg-muted/10"
-                                )}
-                            >
-                                <div className="mt-1">
-                                    <Checkbox checked={isSelected} className="rounded-full h-5 w-5 data-[state=checked]:bg-indigo-600 data-[state=checked]:border-indigo-600" />
-                                </div>
-                                <div className="flex-1 space-y-1.5 min-w-0">
-                                    <div className="flex justify-between items-center">
-                                        <span className="text-xs font-black font-mono tracking-tight text-indigo-700">{inv.id}</span>
-                                        <Badge variant="outline" className="text-[8px] h-4 uppercase">{inv.status}</Badge>
+                    ) : (
+                        <div className="grid gap-3">
+                            {filteredAvailableInvoices.map((inv) => {
+                                const isSelected = selectedInvoices.some(si => si.invoiceId === inv.id);
+                                return (
+                                    <div 
+                                        key={inv.id} 
+                                        onClick={() => toggleInvoice(inv)}
+                                        className={cn(
+                                            "group relative flex items-start gap-4 p-5 rounded-2xl border-2 transition-all duration-300 cursor-pointer",
+                                            isSelected 
+                                                ? "bg-indigo-50/30 border-indigo-600 shadow-lg shadow-indigo-100 -translate-y-1" 
+                                                : "bg-white border-slate-100 hover:border-indigo-200 hover:bg-slate-50/50"
+                                        )}
+                                    >
+                                        <div className="mt-1">
+                                            <div className={cn(
+                                                "h-6 w-6 rounded-full border-2 flex items-center justify-center transition-all",
+                                                isSelected ? "bg-indigo-600 border-indigo-600 text-white" : "border-slate-200 bg-white"
+                                            )}>
+                                                {isSelected && <CheckCircle2 className="h-4 w-4" />}
+                                            </div>
+                                        </div>
+                                        <div className="flex-1 space-y-2 min-w-0">
+                                            <div className="flex justify-between items-center">
+                                                <span className="text-xs font-black font-mono tracking-tight text-indigo-700">{inv.id}</span>
+                                                <Badge variant="outline" className="text-[8px] h-4 uppercase font-black bg-white">{inv.status}</Badge>
+                                            </div>
+                                            <p className="text-sm font-black uppercase text-slate-800 truncate leading-none">{inv.customer}</p>
+                                            <div className="flex items-start gap-1.5 text-[10px] text-slate-400">
+                                                <MapPin className="h-3 w-3 shrink-0 mt-0.5 text-rose-400" />
+                                                <span className="line-clamp-1 italic font-medium">{inv.billingAddress}</span>
+                                            </div>
+                                        </div>
                                     </div>
-                                    <p className="text-sm font-black uppercase leading-none truncate pr-4">{inv.customer}</p>
-                                    <div className="flex items-start gap-1.5 text-[10px] text-muted-foreground">
-                                        <MapPin className="h-3 w-3 shrink-0 mt-0.5 text-rose-500" />
-                                        <span className="line-clamp-1 italic">{inv.billingAddress}</span>
-                                    </div>
-                                </div>
-                            </div>
-                        );
-                    })}
+                                );
+                            })}
+                        </div>
+                    )}
                 </div>
              </ScrollArea>
           </div>
         </div>
 
-        <DialogFooter className="p-4 border-t bg-muted/20">
-          <Button variant="ghost" onClick={() => onOpenChange(false)} className="h-10">Batal</Button>
-          <Button 
-            type="button" 
-            onClick={handleSave} 
-            disabled={!courier || selectedInvoices.length === 0}
-            className="h-10 bg-indigo-600 hover:bg-indigo-700 px-8 font-bold"
-          >
-             <CheckCircle2 className="mr-2 h-4 w-4" /> TERBITKAN SPD (SIAP JALAN)
-          </Button>
+        <DialogFooter className="p-8 bg-slate-50 border-t flex flex-col sm:flex-row gap-4">
+          <Button variant="ghost" onClick={() => onOpenChange(false)} className="h-12 font-bold px-8">Batal</Button>
+          <TooltipProvider>
+            <Tooltip>
+                <TooltipTrigger asChild>
+                    <Button 
+                        type="button" 
+                        onClick={handleSave} 
+                        disabled={!courier || selectedInvoices.length === 0}
+                        className="h-14 flex-1 bg-indigo-600 hover:bg-indigo-700 shadow-2xl shadow-indigo-200 rounded-2xl font-black uppercase text-xs tracking-[0.2em] transition-all hover:-translate-y-1 active:translate-y-0"
+                    >
+                        <CheckCircle2 className="mr-2 h-5 w-5" /> TERBITKAN SPD (SIAP JALAN)
+                    </Button>
+                </TooltipTrigger>
+                <TooltipContent className="bg-slate-900 text-white text-[10px] p-2">{TOOLTIP_CONTENT.create_spd}</TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
         </DialogFooter>
       </DialogContent>
     </Dialog>

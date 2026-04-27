@@ -33,6 +33,16 @@ export const TOOLTIP_CONTENT = {
     smart_checklist: "Gunakan ceklist untuk memilih banyak invoice sekaligus guna rekonsiliasi pembayaran massal.",
     payment_verify: "Konfirmasi bahwa dana telah benar-benar diterima di rekening bank/kas.",
     migration_adjustment: "Saldo pindahan dari sistem lama yang diakui secara manual sebagai saldo pembuka piutang.",
+
+    // SPD Module
+    create_spd: "Menerbitkan Surat Pengantar Dokumen (SPD) untuk konsolidasi pengiriman ke kurir.",
+    spd_status_delivery: "Dokumen sedang dalam perjalanan menuju customer lewat kurir/ekspedisi.",
+    spd_status_received: "Barang/Dokumen telah diterima dan ditandatangani oleh customer (Status Invoice akan otomatis berubah).",
+    spd_status_rejected: "Pengiriman ditolak atau dokumen dikembalikan karena alasan operasional.",
+    spd_quick_print: "Cetak ringkasan pengiriman (A4) sebagai bukti fisik tanda tangan basah.",
+    spd_quick_share: "Salin link pelacakan digital untuk dibagikan via WhatsApp kepada customer.",
+    spd_auto_pull: "Sistem otomatis menarik nomor Surat Jalan (SJ) dari data invoice terakhir.",
+    spd_aging_alert: "Peringatan: Pengiriman ini sudah melebihi 5 hari di jalan. Segera cek status ke kurir."
 } as const;
 
 export type TooltipKey = keyof typeof TOOLTIP_CONTENT;
