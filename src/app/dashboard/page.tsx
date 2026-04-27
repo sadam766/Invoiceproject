@@ -31,7 +31,8 @@ import {
   CreditCard,
   BadgeCheck,
   Zap,
-  Target
+  Target,
+  ShieldAlert
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -45,8 +46,8 @@ import {
 import { Bar, BarChart, XAxis, YAxis, CartesianGrid, ResponsiveContainer } from 'recharts';
 import { useFirestore, useUser, useCollection, useMemoFirebase, useDoc } from '@/firebase';
 import { collection, query, doc } from 'firebase/firestore';
-import { type SalesListItem, type Invoice, type TaxInvoice, type UserProfile, type SpdData } from '@/app/lib/data';
-import { format, isSameDay, parseISO, isWithinInterval, startOfToday, subDays, eachDayOfInterval, differenceInDays, isBefore } from 'date-fns';
+import { type SalesListItem, type Invoice, type UserProfile } from '@/app/lib/data';
+import { format, isSameDay, parseISO, startOfToday, subDays, eachDayOfInterval, differenceInDays, isBefore } from 'date-fns';
 import { DateRangePicker } from '../components/date-range-picker';
 import { cn } from '@/lib/utils';
 
