@@ -1,14 +1,14 @@
 'use client';
 import React, { useRef, useEffect, useState } from 'react';
 import { useRouter, useParams } from 'next/navigation';
-import { Download, Upload, ArrowLeft, Loader2 } from 'lucide-react';
+import { Download, Upload, ArrowLeft, Loader2, Globe } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { exportToExcel } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
-import { useFirestore, useDoc, useMemoFirebase } from '@/firebase';
-import { doc } from 'firebase/firestore';
+import { useFirestore, useDoc, useMemoFirebase, useCollection } from '@/firebase';
+import { doc, collection, query } from 'firebase/firestore';
 import html2pdf from 'html2pdf.js';
-import type { Invoice } from '@/app/lib/data';
+import type { Invoice, Customer } from '@/app/lib/data';
 
 // --- DEFINISI TIPE DATA ---
 interface Item {
@@ -23,7 +23,6 @@ interface Item {
 
 interface InvoiceData {
     id: string;
-    erpInvoiceId?: string;
     items: Item[];
     customer: {
         name: string;
@@ -75,15 +74,28 @@ const InvoicePreviewPage = () => {
     const firestore = useFirestore();
     const invoiceIdParam = decodeURIComponent(params.id as string).replace(/\//g, '_');
 
-    // AUDIT FIX: Mandatory Database Re-fetch for Persistence
+    // Fetch Invoice
     const invoiceRef = useMemoFirebase(() => (!firestore || !invoiceIdParam) ? null : doc(firestore, 'invoices', invoiceIdParam), [firestore, invoiceIdParam]);
     const { data: dbInvoice, isLoading: isDbLoading } = useDoc<Invoice>(invoiceRef);
 
+    // Fetch Customers for NPWP Lookup
+    const customersCollection = useMemoFirebase(() => firestore ? query(collection(firestore, 'customers')) : null, [firestore]);
+    const { data: allCustomers } = useCollection<Customer>(customersCollection);
+
     useEffect(() => {
         if (dbInvoice && !isDbLoading) {
+            // Find NPWP from master data if available
+            let finalNpwp = dbInvoice.billingNpwp || '';
+            if (!finalNpwp && allCustomers) {
+                const found = allCustomers.find(c => c.name.toLowerCase() === dbInvoice.customer.toLowerCase());
+                if (found) {
+                    const defaultAddr = found.addresses?.find(a => a.isDefault) || found.addresses?.[0];
+                    if (defaultAddr?.npwp) finalNpwp = defaultAddr.npwp;
+                }
+            }
+
             const mappedData: InvoiceData = {
                 id: dbInvoice.id,
-                erpInvoiceId: dbInvoice.erpInvoiceId,
                 items: (dbInvoice.items || []).map((it, idx) => ({
                     id: String(it.id),
                     no: idx + 1,
@@ -96,7 +108,7 @@ const InvoicePreviewPage = () => {
                 customer: {
                     name: dbInvoice.customer,
                     address: dbInvoice.billingAddress,
-                    npwp: dbInvoice.billingNpwp
+                    npwp: finalNpwp
                 },
                 date: dbInvoice.date,
                 soNumber: dbInvoice.soNumber,
@@ -112,7 +124,7 @@ const InvoicePreviewPage = () => {
             };
             setInvoiceData(mappedData);
         }
-    }, [dbInvoice, isDbLoading]);
+    }, [dbInvoice, isDbLoading, allCustomers]);
 
     const handleDownloadPdf = () => {
         const element = invoiceContainerRef.current;
@@ -131,7 +143,6 @@ const InvoicePreviewPage = () => {
         if (!invoiceData) return;
         const dataToExport = invoiceData.items.map(item => ({
             'Invoice ID': invoiceData.id,
-            'ERP Reference': invoiceData.erpInvoiceId || '-',
             'Customer': invoiceData.customer.name,
             'SO Number': invoiceData.soNumber,
             'Date': formatDate(invoiceData.date),
@@ -182,7 +193,6 @@ const InvoicePreviewPage = () => {
                             <div className="w-full text-center">
                                 <p className="font-black uppercase text-sm tracking-widest">{invoiceTitle}</p>
                                 <p className="font-black text-lg">{invoiceData.id}</p>
-                                {invoiceData.erpInvoiceId && <p className="text-[8px] font-mono text-gray-500">ERP REF: {invoiceData.erpInvoiceId}</p>}
                             </div>
                             <div className='flex justify-between items-start mt-6'>
                                 <div className='w-[45%]'>

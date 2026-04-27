@@ -52,8 +52,10 @@ import {
   CopyPlus,
   Search,
   Layers,
+  MapPin,
+  FileText,
 } from 'lucide-react';
-import { type Invoice, type SalesOrder, type UserProfile, type InvoiceItem, type InvoiceNumber, type ProductListItem, type SalesListItem } from '@/app/lib/data';
+import { type Invoice, type SalesOrder, type UserProfile, type InvoiceItem, type InvoiceNumber, type ProductListItem, type SalesListItem, type Customer } from '@/app/lib/data';
 import { useToast } from '@/hooks/use-toast';
 import { useFirestore, useCollection, useMemoFirebase, useUser, useDoc, errorEmitter, FirestorePermissionError } from '@/firebase';
 import { collection, query, doc, setDoc, arrayUnion } from 'firebase/firestore';
@@ -118,9 +120,24 @@ export default function AddInvoicePage() {
   const productsCollection = useMemoFirebase(() => firestore ? query(collection(firestore, 'products')) : null, [firestore]);
   const { data: masterProducts } = useCollection<ProductListItem>(productsCollection);
 
+  const customersCollection = useMemoFirebase(() => firestore ? query(collection(firestore, 'customers')) : null, [firestore]);
+  const { data: allCustomers } = useCollection<Customer>(customersCollection);
+
   const userProfileRef = useMemoFirebase(() => (!firestore || !user) ? null : doc(firestore, 'users', user.uid), [firestore, user]);
   const { data: userProfile } = useDoc<UserProfile>(userProfileRef);
   const isAdmin = user?.email?.toLowerCase() === 'fa@gmail.com' || userProfile?.role === 'admin';
+
+  // --- FORM STATES ---
+  const [items, setItems] = useState<InvoiceItem[]>([]);
+  const [billingAddress, setBillingAddress] = useState('');
+  const [billingNpwp, setBillingNpwp] = useState('');
+  const [issueDate, setIssueDate] = useState<Date>(new Date());
+  const [dueDate, setDueDate] = useState<Date>(addDays(new Date(), 30));
+  const [isDpInvoice, setIsDpInvoice] = useState(false);
+  const [selectedVaId, setSelectedVaId] = useState<string>('manual');
+  const [productPopoverOpen, setProductPopoverOpen] = useState(false);
+  const [isProcessing, setIsSaving] = useState(false);
+  const [historySearch, setHistorySearch] = useState('');
 
   // --- LOGIKA "THE GOLDEN KEY" (PO HISTORY) ---
   const poBillingHistory = useMemo(() => {
@@ -159,35 +176,21 @@ export default function AddInvoicePage() {
 
   const remainingPoBalance = Math.max(0, totalPoValue - totalInvoicedSoFar);
 
-  // --- FORM STATES ---
-  const [items, setItems] = useState<InvoiceItem[]>([]);
-  const [billingAddress, setBillingAddress] = useState('');
-  const [billingNpwp, setBillingNpwp] = useState('');
-  const [internalNote, setInternalNote] = useState('');
-  const [issueDate, setIssueDate] = useState<Date>(new Date());
-  const [dueDate, setDueDate] = useState<Date>(addDays(new Date(), 30));
-  const [isDpInvoice, setIsDpInvoice] = useState(false);
-  const [selectedVaId, setSelectedVaId] = useState<string>('manual');
-  const [productPopoverOpen, setProductPopoverOpen] = useState(false);
-  const [isProcessing, setIsSaving] = useState(false);
-  const [historySearch, setHistorySearch] = useState('');
+  // --- AUTO-PULL ADDRESS & NPWP LOGIC ---
+  useEffect(() => {
+    if (activeIdentity?.customer && allCustomers && !billingAddress && !editInvoiceId) {
+      const foundCustomer = allCustomers.find(c => c.name.toLowerCase() === activeIdentity.customer.toLowerCase());
+      if (foundCustomer) {
+        const defaultAddr = foundCustomer.addresses?.find(a => a.isDefault) || foundCustomer.addresses?.[0];
+        if (defaultAddr) {
+          setBillingAddress(defaultAddr.address);
+          if (defaultAddr.npwp) setBillingNpwp(defaultAddr.npwp);
+        }
+      }
+    }
+  }, [activeIdentity, allCustomers, billingAddress, editInvoiceId]);
 
-  // --- CALCULATION STATES ---
-  const [subtotal, setSubtotal] = useState(0);
-  const [negotiationValue, setNegotiationValue] = useState<string>('');
-  const [negotiationMode, setNegotiationMode] = useState<'percent' | 'nominal'>('nominal');
-  const [dpValue, setDpValue] = useState<string>('');
-  const [dpMode, setDpMode] = useState<'percent' | 'nominal'>('percent');
-  const [retentionValue, setRetentionValue] = useState<string>('');
-  const [retentionMode, setRetentionMode] = useState<'percent' | 'nominal'>('nominal');
-  const [dpDeductionValue, setDpDeductionValue] = useState<string>('');
-  const [dpDeductionMode, setDpDeductionMode] = useState<'percent' | 'nominal'>('nominal');
-  const [isTaxManual, setIsTaxManual] = useState(false);
-  const [dppVat, setDppVat] = useState<string>('0');
-  const [vat12, setVat12] = useState<string>('0');
-  const [totalAmount, setTotalAmount] = useState<string>('0');
-
-  // Initial Sync
+  // Initial Sync from Record
   useEffect(() => {
       if (activeIdentity && items.length === 0) {
           if (activeIdentity.items && activeIdentity.items.length > 0) {
@@ -218,21 +221,36 @@ export default function AddInvoicePage() {
               }));
           }
 
-          setBillingAddress(activeIdentity.billingAddress || '');
-          setBillingNpwp(activeIdentity.billingNpwp || '');
+          if (activeIdentity.billingAddress) setBillingAddress(activeIdentity.billingAddress);
+          if ((activeIdentity as Invoice).billingNpwp) setBillingNpwp((activeIdentity as Invoice).billingNpwp!);
+          
           setIsDpInvoice(!!(activeIdentity as Invoice).isDpInvoice);
           setNegotiationValue(formatNumberWithCommas((activeIdentity as Invoice).negotiation || 0));
           setDpValue(formatNumberWithCommas((activeIdentity as Invoice).dpValue || 0));
           setDpDeductionValue(formatNumberWithCommas((activeIdentity as Invoice).dpDeduction || 0));
           setRetentionValue(formatNumberWithCommas((activeIdentity as Invoice).retention || 0));
           if ((activeIdentity as Invoice).paymentMethod) setSelectedVaId((activeIdentity as Invoice).paymentMethod!);
-          if (activeIdentity.erpInvoiceId) setInternalNote(activeIdentity.erpInvoiceId);
 
           if (!editInvoiceId && !(activeIdentity as Invoice).isDpInvoice && dpInvoicedBalance > 0) {
               setDpDeductionValue(formatNumberWithCommas(dpInvoicedBalance));
           }
       }
   }, [activeIdentity, allSoItems, allInvoices, editInvoiceId, items.length, dpInvoicedBalance]);
+
+  // --- CALCULATION STATES ---
+  const [subtotal, setSubtotal] = useState(0);
+  const [negotiationValue, setNegotiationValue] = useState<string>('');
+  const [negotiationMode, setNegotiationMode] = useState<'percent' | 'nominal'>('nominal');
+  const [dpValue, setDpValue] = useState<string>('');
+  const [dpMode, setDpMode] = useState<'percent' | 'nominal'>('percent');
+  const [retentionValue, setRetentionValue] = useState<string>('');
+  const [retentionMode, setRetentionMode] = useState<'percent' | 'nominal'>('nominal');
+  const [dpDeductionValue, setDpDeductionValue] = useState<string>('');
+  const [dpDeductionMode, setDpDeductionMode] = useState<'percent' | 'nominal'>('nominal');
+  const [isTaxManual, setIsTaxManual] = useState(false);
+  const [dppVat, setDppVat] = useState<string>('0');
+  const [vat12, setVat12] = useState<string>('0');
+  const [totalAmount, setTotalAmount] = useState<string>('0');
 
   // Dynamic Calculations
   useEffect(() => {
@@ -270,11 +288,8 @@ export default function AddInvoicePage() {
   const handleNumericChange = (setter: (v: string) => void) => (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
     if (value === '') { setter(''); return; }
-    
-    // Only parse if it's a valid digit/decimal separator
     const cleanValue = value.replace(/[^\d.,]/g, '');
     const num = parseFormattedNumber(cleanValue);
-    
     if (!isNaN(num)) {
         let formatted = formatNumberWithCommas(num);
         if (value.endsWith(',') || value.endsWith('.')) {
@@ -328,7 +343,7 @@ export default function AddInvoicePage() {
 
     const grandTotalNumeric = parseFormattedNumber(totalAmount);
     const totalWithNewInvoice = grandTotalNumeric + totalInvoicedSoFar;
-    if (totalWithNewInvoice > (totalPoValue + 100)) { // Add slight buffer for floating point
+    if (totalWithNewInvoice > (totalPoValue + 100)) {
         toast({ 
             variant: "destructive", 
             title: "Pencegahan Kelebihan Tagih", 
@@ -345,7 +360,6 @@ export default function AddInvoicePage() {
 
     const dataToSave: any = {
         id: activeIdentity.id,
-        erpInvoiceId: internalNote,
         soNumber: activeIdentity.salesOrder || '',
         poNumber: activeIdentity.poNumber || '',
         customer: activeIdentity.customer,
@@ -413,7 +427,7 @@ export default function AddInvoicePage() {
                 <h1 className="text-xl font-black tracking-tight uppercase text-slate-900">Invoice Constructor</h1>
                 <div className="flex items-center gap-2 mt-1">
                     <span className="text-slate-400 text-[10px] font-bold uppercase tracking-widest">Ref PO: {activeIdentity?.poNumber}</span>
-                    <Badge variant="outline" className="text-[9px] font-black uppercase bg-slate-50 border-slate-200 text-slate-500 h-4">
+                    <Badge variant="outline" className="text-[9px] font-black uppercase bg-indigo-50 border-slate-200 text-slate-500 h-4">
                         <Lock className="h-2.5 w-2.5 mr-1" /> Audit Safe
                     </Badge>
                 </div>
@@ -465,19 +479,29 @@ export default function AddInvoicePage() {
                   </div>
 
                   <div className="space-y-2">
-                      <Label className="text-[10px] font-black uppercase text-slate-400 tracking-widest">Nama Legal Customer</Label>
+                      <Label className="text-[10px] font-black uppercase text-slate-400 tracking-widest">Customer</Label>
                       <div className="bg-slate-50 px-4 py-2.5 rounded-xl border border-slate-200 text-xs font-black uppercase truncate text-slate-700">{activeIdentity?.customer}</div>
                   </div>
 
                   <div className="space-y-2">
-                      <Label className="text-[10px] font-black uppercase text-slate-400 tracking-widest">ERP Reference (Manual)</Label>
-                      <Input value={internalNote} onChange={e => setInternalNote(e.target.value)} className="font-mono text-[10px] h-10 rounded-xl bg-slate-50/50 border-slate-200" placeholder="Input nomor ERP jika ada..." disabled={isLocked} />
+                      <Label className="text-[10px] font-black uppercase text-slate-400 tracking-widest">Reference SO</Label>
+                      <div className="flex items-center gap-2 bg-slate-50 px-4 py-2.5 rounded-xl border border-slate-200 text-xs font-bold text-slate-600">
+                          <FileText className="h-4 w-4 text-slate-400" />
+                          <span>{activeIdentity?.salesOrder || 'Waiting SO'}</span>
+                      </div>
                   </div>
 
                   <div className="md:col-span-3 space-y-2">
-                      <Label className="text-[10px] font-black uppercase text-slate-400 tracking-widest">Billing Address & NPWP</Label>
-                      <Input value={billingAddress} onChange={e => setBillingAddress(e.target.value)} className="font-medium h-10 text-xs rounded-xl" placeholder="Alamat lengkap penagihan..." disabled={isLocked} />
-                      <Input value={billingNpwp} onChange={e => setBillingNpwp(e.target.value)} className="font-mono text-[10px] h-9 bg-slate-50 rounded-lg mt-1" placeholder="Nomor NPWP..." disabled={isLocked} />
+                      <Label className="text-[10px] font-black uppercase text-slate-400 tracking-widest flex items-center gap-1">
+                          <MapPin className="h-3 w-3" /> Billing Address (Auto-Pulled from Customer Data)
+                      </Label>
+                      <textarea 
+                          value={billingAddress} 
+                          onChange={e => setBillingAddress(e.target.value)} 
+                          className="w-full min-h-[80px] rounded-xl border border-slate-200 bg-white px-4 py-3 text-xs font-medium focus-visible:ring-1 focus-visible:ring-indigo-500 outline-none"
+                          placeholder="Alamat lengkap penagihan..." 
+                          disabled={isLocked} 
+                      />
                   </div>
               </div>
             </CardContent>
