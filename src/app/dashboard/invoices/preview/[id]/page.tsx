@@ -2,7 +2,7 @@
 'use client';
 import React, { useRef, useEffect, useState } from 'react';
 import { useRouter, useParams } from 'next/navigation';
-import { Download, Upload, ArrowLeft, Loader2, Globe, Printer } from 'lucide-react';
+import { Download, Upload, ArrowLeft, Loader2, Globe, Printer, CreditCard } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { exportToExcel, cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
@@ -43,10 +43,7 @@ interface InvoiceData {
     printType: 'original' | 'copy';
     negotiation: number;
     dpValue: number;
-    virtualAccount?: {
-        bankName: string;
-        vaNumber: string;
-    };
+    virtualAccount?: string;
 }
 
 const formatCurrency = (amount: number): string => {
@@ -86,11 +83,14 @@ const InvoicePreviewPage = () => {
     useEffect(() => {
         if (dbInvoice && !isDbLoading) {
             let finalNpwp = dbInvoice.billingNpwp || '';
-            if (!finalNpwp && allCustomers) {
+            let vaFromMaster = '';
+            
+            if (allCustomers) {
                 const found = allCustomers.find(c => c.name.toLowerCase() === dbInvoice.customer.toLowerCase());
                 if (found) {
                     const defaultAddr = found.addresses?.find(a => a.isDefault) || found.addresses?.[0];
                     if (defaultAddr?.npwp) finalNpwp = defaultAddr.npwp;
+                    vaFromMaster = found.virtualAccountNumber || '';
                 }
             }
 
@@ -121,6 +121,7 @@ const InvoicePreviewPage = () => {
                 printType: 'original',
                 negotiation: dbInvoice.negotiation || 0,
                 dpValue: dbInvoice.isDpInvoice ? dbInvoice.amount : ((dbInvoice.dpDeduction || 0) + (dbInvoice.retention || 0)),
+                virtualAccount: dbInvoice.vaNumber || vaFromMaster
             };
             setInvoiceData(mappedData);
         }
@@ -244,10 +245,13 @@ const InvoicePreviewPage = () => {
                                 <div className="flex justify-between gap-12">
                                     <div className="flex-1 space-y-6">
                                         <div className="bg-slate-50 p-6 rounded-2xl border-2 border-dashed border-slate-200">
-                                            <p className="font-black uppercase text-[8px] text-indigo-600 mb-2 tracking-[0.2em]">Mandatory Payment Instruction:</p>
+                                            <p className="font-black uppercase text-[8px] text-indigo-600 mb-2 tracking-[0.2em] flex items-center gap-1.5"><CreditCard className="h-3 w-3" /> Mandatory Payment Instruction:</p>
                                             <p className="font-black text-xs">PT JEMBO CABLE COMPANY Tbk</p>
-                                            <p className="text-[10px] font-bold text-slate-500">BANK MANDIRI - Jakarta Sudirman</p>
-                                            <p className="font-mono font-black text-indigo-700 text-lg mt-1 tracking-tighter">A/C: 102-0005000218 (IDR)</p>
+                                            <p className="text-[10px] font-bold text-slate-500 uppercase">Bank Mandiri — Virtual Account Center</p>
+                                            <p className="font-mono font-black text-indigo-700 text-lg mt-1 tracking-tighter">
+                                                A/C: {invoiceData.virtualAccount || '102-0005000218'} (IDR)
+                                            </p>
+                                            {invoiceData.virtualAccount && <p className="text-[8px] font-black text-emerald-600 uppercase mt-1">Verified Unique Customer Account</p>}
                                         </div>
                                         <p className="text-[8px] font-medium text-slate-400 leading-relaxed uppercase">
                                             * Validasi pembayaran sah apabila dana telah efektif di rekening kami. <br />

@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useEffect, useState, useMemo } from 'react';
@@ -69,7 +70,8 @@ import {
   CheckCircle2,
   Tag,
   CreditCard,
-  Banknote
+  Banknote,
+  ShieldCheck
 } from 'lucide-react';
 import { type Invoice, type SalesOrder, type UserProfile, type InvoiceItem, type InvoiceNumber, type ProductListItem, type SalesListItem, type Customer, type VirtualAccount } from '@/app/lib/data';
 import { useToast } from '@/hooks/use-toast';
@@ -92,6 +94,7 @@ import {
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { TOOLTIP_CONTENT } from '@/app/lib/tooltip-content';
+import { useDashboardData } from '../../layout';
 
 export default function AddInvoicePage() {
   const router = useRouter();
@@ -103,6 +106,9 @@ export default function AddInvoicePage() {
   const editInvoiceId = searchParams.get('editInvoiceId');
   const invoiceNumberIdParam = searchParams.get('invoiceNumberId');
   
+  // Consuming Cached Data for speed
+  const { customers: allCustomers, products: masterProducts, vas: allVAs } = useDashboardData();
+
   // --- DATA FETCHING ---
   const identityRef = useMemoFirebase(() => {
       if (!firestore || !invoiceNumberIdParam) return null;
@@ -127,23 +133,6 @@ export default function AddInvoicePage() {
     return allSalesOrders.find(so => so.soNumber === activeIdentity.salesOrder);
   }, [allSalesOrders, activeIdentity?.salesOrder]);
 
-  const saleRef = useMemoFirebase(() => {
-    if (!firestore || !activeIdentity?.poNumber) return null;
-    return doc(firestore, 'sales', activeIdentity.poNumber.replace(/\//g, '_'));
-  }, [firestore, activeIdentity?.poNumber]);
-  const { data: saleData } = useDoc<SalesListItem>(saleRef);
-
-  const isLoading = (invoiceNumberIdParam && isIdentityLoading) || (editInvoiceId && isExistingLoading);
-
-  const productsCollection = useMemoFirebase(() => firestore ? query(collection(firestore, 'products')) : null, [firestore]);
-  const { data: masterProducts } = useCollection<ProductListItem>(productsCollection);
-
-  const customersCollection = useMemoFirebase(() => firestore ? query(collection(firestore, 'customers')) : null, [firestore]);
-  const { data: allCustomers } = useCollection<Customer>(customersCollection);
-
-  const vaCollection = useMemoFirebase(() => firestore ? query(collection(firestore, 'virtualAccounts')) : null, [firestore]);
-  const { data: allVAs } = useCollection<VirtualAccount>(vaCollection);
-
   const userProfileRef = useMemoFirebase(() => (!firestore || !user) ? null : doc(firestore, 'users', user.uid), [firestore, user]);
   const { data: userProfile } = useDoc<UserProfile>(userProfileRef);
   const isAdmin = user?.email?.toLowerCase() === 'fa@gmail.com' || userProfile?.role === 'admin';
@@ -154,7 +143,8 @@ export default function AddInvoicePage() {
   const [issueDate, setIssueDate] = useState<Date>(new Date());
   const [dueDate, setDueDate] = useState<Date>(addDays(new Date(), 30));
   const [isDpInvoice, setIsDpInvoice] = useState(false);
-  const [selectedVaId, setSelectedVaId] = useState<string>('manual');
+  const [selectedVaId, setSelectedVaId] = useState<string>('auto');
+  const [manualVaNumber, setManualVaNumber] = useState('');
   const [productPopoverOpen, setProductPopoverOpen] = useState(false);
   const [isProcessing, setIsSaving] = useState(false);
 
@@ -171,7 +161,14 @@ export default function AddInvoicePage() {
     return allCustomers.find(c => c.name.toLowerCase() === activeIdentity.customer.toLowerCase());
   }, [activeIdentity?.customer, allCustomers]);
 
-  // CRITICAL: Pull Data from SO to items (Anti-NOL)
+  // AUTO-POPULATE VA
+  useEffect(() => {
+    if (currentCustomer && selectedVaId === 'auto') {
+        setManualVaNumber(currentCustomer.virtualAccountNumber || '');
+    }
+  }, [currentCustomer, selectedVaId]);
+
+  // CRITICAL: Pull Data from SO to items
   useEffect(() => {
       if (activeIdentity && items.length === 0) {
           if (activeIdentity.items && activeIdentity.items.length > 0) {
@@ -196,7 +193,10 @@ export default function AddInvoicePage() {
           setDpValue(formatNumberWithCommas((activeIdentity as Invoice).dpValue || 0));
           setDpDeductionValue(formatNumberWithCommas((activeIdentity as Invoice).dpDeduction || 0));
           setRetentionValue(formatNumberWithCommas((activeIdentity as Invoice).retention || 0));
-          if ((activeIdentity as Invoice).paymentMethod) setSelectedVaId((activeIdentity as Invoice).paymentMethod!);
+          if ((activeIdentity as Invoice).vaNumber) {
+              setManualVaNumber((activeIdentity as Invoice).vaNumber!);
+              setSelectedVaId('custom');
+          }
       }
   }, [activeIdentity, activeSoData, editInvoiceId, items.length]);
 
@@ -300,6 +300,7 @@ export default function AddInvoicePage() {
         soNumber: activeIdentity.salesOrder || '',
         poNumber: activeIdentity.poNumber || '',
         customer: activeIdentity.customer,
+        customerCode: currentCustomer?.customerCode || '',
         billingAddress: billingAddress,
         date: format(issueDate, 'yyyy-MM-dd'),
         dueDate: format(dueDate, 'yyyy-MM-dd'),
@@ -310,7 +311,7 @@ export default function AddInvoicePage() {
         dpValue: parseFormattedNumber(dpValue),
         dpDeduction: parseFormattedNumber(dpDeductionValue),
         retention: parseFormattedNumber(retentionValue),
-        paymentMethod: selectedVaId,
+        vaNumber: manualVaNumber,
         items: items,
         lastUpdatedAt: timestamp,
         lastUpdatedBy: updater,
@@ -338,7 +339,7 @@ export default function AddInvoicePage() {
         .finally(() => setIsSaving(false));
   };
 
-  if (isLoading) {
+  if (isIdentityLoading || isExistingLoading) {
       return <div className="flex h-[80vh] items-center justify-center font-bold text-slate-400 animate-pulse uppercase tracking-widest text-xs">Syncing Constructor...</div>;
   }
 
@@ -382,30 +383,32 @@ export default function AddInvoicePage() {
                   </div>
 
                   <div className="space-y-2 group">
-                      <Label className="text-[10px] font-black uppercase text-slate-400 tracking-widest flex items-center justify-between">
-                        Nama Customer
-                        <Button variant="ghost" size="icon" className="h-5 w-5 opacity-0 group-hover:opacity-100 transition-opacity" onClick={() => { setEditTarget('name'); setTempName(activeIdentity?.customer || ''); setIsQuickEditOpen(true); }}><Pencil className="h-3 w-3 text-indigo-600" /></Button>
-                      </Label>
-                      <div className="bg-slate-50 px-4 py-2.5 rounded-xl border border-slate-200 text-xs font-black uppercase truncate text-slate-700">
+                      <div className="flex justify-between items-center">
+                          <Label className="text-[10px] font-black uppercase text-slate-400 tracking-widest">Nama Customer</Label>
+                          <Button variant="ghost" size="icon" className="h-5 w-5 opacity-0 group-hover:opacity-100 transition-opacity" onClick={() => { setEditTarget('name'); setTempName(activeIdentity?.customer || ''); setIsQuickEditOpen(true); }}><Pencil className="h-3 w-3 text-indigo-600" /></Button>
+                      </div>
+                      <div className="bg-slate-50 px-4 py-2.5 rounded-xl border border-slate-200 text-xs font-black uppercase truncate text-slate-700 flex justify-between items-center">
                           {activeIdentity?.customer}
+                          {currentCustomer?.customerCode && <span className="text-[9px] bg-indigo-100 text-indigo-700 px-1.5 rounded">{currentCustomer.customerCode}</span>}
                       </div>
                   </div>
 
                   <div className="space-y-2">
-                      <Label className="text-[10px] font-black uppercase text-slate-400 tracking-widest">Metode Pembayaran (VA)</Label>
-                      <Select value={selectedVaId} onValueChange={setSelectedVaId} disabled={isLocked}>
-                        <SelectTrigger className="h-10 bg-white border-indigo-100 font-bold text-xs rounded-xl shadow-sm">
-                            <SelectValue placeholder="Pilih Bank..." />
-                        </SelectTrigger>
-                        <SelectContent>
-                            <SelectItem value="manual" className="font-bold">Manual Transfer (Default)</SelectItem>
-                            {allVAs?.map(va => (
-                                <SelectItem key={va.id} value={va.id!} className="font-bold">
-                                    {va.bankName} - {va.vaNumber}
-                                </SelectItem>
-                            ))}
-                        </SelectContent>
-                      </Select>
+                      <Label className="text-[10px] font-black uppercase text-slate-400 tracking-widest flex items-center gap-1.5">
+                        <CreditCard className="h-3.5 w-3.5 text-emerald-600" /> Mandiri Virtual Account
+                      </Label>
+                      <div className="relative group">
+                          <Input 
+                            value={manualVaNumber} 
+                            onChange={e => { setManualVaNumber(e.target.value); setSelectedVaId('custom'); }} 
+                            className="h-10 font-mono font-black text-xs border-emerald-100 bg-emerald-50/10 focus-visible:ring-emerald-500 rounded-xl"
+                            placeholder="Generated from Code..."
+                            disabled={isLocked}
+                          />
+                          <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-1">
+                              {manualVaNumber.length === 16 ? <ShieldCheck className="h-3.5 w-3.5 text-emerald-500" /> : <Badge variant="outline" className="text-[7px] h-3 px-1">AUTO</Badge>}
+                          </div>
+                      </div>
                   </div>
 
                   <div className="md:col-span-3 space-y-4">
@@ -599,7 +602,7 @@ export default function AddInvoicePage() {
                     <>
                         <div className="space-y-3 bg-emerald-50/20 p-5 rounded-2xl border border-emerald-100 border-dashed">
                             <div className="flex justify-between items-center mb-1">
-                                <Label className="text-[10px] font-black uppercase text-emerald-700 flex items-center gap-1">
+                                <Label className="text-[10px] font-black uppercase text-emerald-700 flex items-center gap-1.5">
                                     <Wallet className="h-3.5 w-3.5" /> Potongan Saldo DP
                                 </Label>
                                 <Select value={dpDeductionMode} onValueChange={(v: any) => setDpDeductionMode(v)} disabled={isLocked}>

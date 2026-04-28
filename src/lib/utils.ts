@@ -1,9 +1,40 @@
+
 import { clsx, type ClassValue } from "clsx"
 import { twMerge } from "tailwind-merge"
 import * as XLSX from 'xlsx';
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
+}
+
+/**
+ * Generate a Virtual Account number based on Customer Code
+ * Formula: 86625 (Bank) + 26 (Year) + Encoded Code
+ * Target: 16 digits
+ */
+export function generateVirtualAccount(customerCode: string): string {
+  if (!customerCode) return '';
+  
+  const bankPrefix = "86625";
+  const yearPrefix = "26"; // 2026 short
+  const base = bankPrefix + yearPrefix;
+  
+  // Extract letters and numbers
+  const letters = customerCode.replace(/[^A-Z]/gi, '').toUpperCase();
+  const digits = customerCode.replace(/[^0-9]/g, '');
+  
+  // Convert letters to numeric values (A=01, B=02...)
+  let letterNumeric = "";
+  for (let i = 0; i < letters.length; i++) {
+    const code = letters.charCodeAt(i) - 64;
+    letterNumeric += code.toString().padStart(2, '0');
+  }
+  
+  // Construct the body: LetterMapping + Digits
+  // We need 16 - 7 = 9 digits for the body
+  const body = (letterNumeric + digits).slice(0, 9).padStart(9, '0');
+  
+  return base + body;
 }
 
 /**

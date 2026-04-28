@@ -47,6 +47,7 @@ export type Invoice = {
   soNumber: string;
   poNumber: string;
   customer: string;
+  customerCode?: string;
   billingAddress: string;
   billingNpwp?: string;
   date: string; 
@@ -56,6 +57,7 @@ export type Invoice = {
   voidReason?: string;
   spdNumber?: string;
   paymentMethod?: string;
+  vaNumber?: string;
   ownerId?: string;
   createdBy?: string;
   lastUpdatedBy?: string;
@@ -77,6 +79,7 @@ export type Invoice = {
 export type InvoiceNumber = {
   id: string;
   customer: string;
+  customerCode?: string;
   salesOrder: string;
   poNumber?: string;
   date: string;
@@ -122,6 +125,7 @@ export type SalesOrder = {
     soNumber: string;
     poNumber: string;
     customer: string;
+    customerCode?: string;
     customerAddress?: string;
     orderDate: string;
     deliveryDate: string;
@@ -148,12 +152,14 @@ export type CustomerAddress = {
 export type Customer = {
   id?: string;
   name: string;
+  customerCode: string;
   email?: string;
   contactPerson?: string;
   phone?: string;
   addresses: CustomerAddress[];
   billingSchedule?: string;
   defaultShippingAddressId?: string;
+  virtualAccountNumber?: string;
   ownerId?: string;
   createdBy?: string;
 };
@@ -162,6 +168,7 @@ export type SalesListItem = {
   id?: string;
   soNumber: string;
   customer: string;
+  customerCode?: string;
   sales: string;
   poNumber: string;
   amount: number;

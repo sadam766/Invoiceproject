@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import {
     Sheet,
     SheetContent,
@@ -31,10 +31,12 @@ import {
     ExternalLink,
     Map as MapIcon,
     Phone,
-    Clock
+    Clock,
+    CreditCard,
+    ShieldAlert
 } from 'lucide-react';
 import type { Customer, CustomerAddress } from '@/app/lib/data';
-import { cn } from '@/lib/utils';
+import { cn, generateVirtualAccount } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
 import { useRouter } from 'next/navigation';
 
@@ -48,14 +50,15 @@ type CustomerDrawerProps = {
 export function CustomerDrawer({ isOpen, onOpenChange, customerData, onSave }: CustomerDrawerProps) {
   const router = useRouter();
   const { toast } = useToast();
+  
   const [name, setName] = useState('');
+  const [customerCode, setCustomerCode] = useState('');
   const [email, setEmail] = useState('');
   const [contactPerson, setContactPerson] = useState('');
   const [phone, setPhone] = useState('');
   const [billingSchedule, setBillingSchedule] = useState('');
   const [addresses, setAddresses] = useState<CustomerAddress[]>([]);
   
-  // New address state
   const [newLabel, setNewLabel] = useState('');
   const [newAddress, setNewAddress] = useState('');
   const [newNpwp, setNewNpwp] = useState('');
@@ -64,6 +67,7 @@ export function CustomerDrawer({ isOpen, onOpenChange, customerData, onSave }: C
   useEffect(() => {
     if (customerData && isOpen) {
       setName(customerData.name);
+      setCustomerCode(customerData.customerCode || '');
       setEmail(customerData.email || '');
       setContactPerson(customerData.contactPerson || '');
       setPhone(customerData.phone || '');
@@ -72,6 +76,7 @@ export function CustomerDrawer({ isOpen, onOpenChange, customerData, onSave }: C
       setIsEditingMain(false);
     } else if (!isOpen) {
       setName('');
+      setCustomerCode('');
       setEmail('');
       setContactPerson('');
       setPhone('');
@@ -80,6 +85,8 @@ export function CustomerDrawer({ isOpen, onOpenChange, customerData, onSave }: C
       resetNewAddressForm();
     }
   }, [customerData, isOpen]);
+
+  const autoVa = useMemo(() => generateVirtualAccount(customerCode), [customerCode]);
 
   const resetNewAddressForm = () => {
     setNewLabel('');
@@ -110,13 +117,32 @@ export function CustomerDrawer({ isOpen, onOpenChange, customerData, onSave }: C
   };
 
   const handleSave = () => {
-    if (!name) return;
-    onSave({ id: customerData?.id, name, email, contactPerson, phone, billingSchedule, addresses });
+    if (!name || !customerCode) {
+        toast({ variant: "destructive", title: "Data Tidak Lengkap", description: "Nama PT dan Kode Customer wajib diisi." });
+        return;
+    }
+    
+    if (autoVa.length !== 16) {
+        toast({ variant: "destructive", title: "Format VA Tidak Valid", description: "Kode Customer tidak menghasilkan 16 digit VA. Gunakan format seperti ADH004." });
+        return;
+    }
+
+    onSave({ 
+        id: customerData?.id, 
+        name, 
+        customerCode: customerCode.toUpperCase(),
+        email, 
+        contactPerson, 
+        phone, 
+        billingSchedule, 
+        addresses,
+        virtualAccountNumber: autoVa
+    });
   };
 
   const copyToClipboard = (text: string) => {
       navigator.clipboard.writeText(text);
-      toast({ title: "Alamat Disalin", description: "Teks alamat telah siap di clipboard." });
+      toast({ title: "Teks Disalin", description: "Data telah siap di clipboard." });
   };
 
   return (
@@ -130,9 +156,11 @@ export function CustomerDrawer({ isOpen, onOpenChange, customerData, onSave }: C
                     {customerData ? customerData.name : 'Register New PT'}
                 </SheetTitle>
              </div>
-             <Badge variant="outline" className="bg-indigo-50 border-indigo-200 text-indigo-700 text-[10px] font-black uppercase px-3 py-1">
-                {addresses.length} Active Address
-             </Badge>
+             {customerData && (
+                <Badge variant="outline" className="bg-indigo-50 border-indigo-200 text-indigo-700 text-[10px] font-black uppercase px-3 py-1">
+                    ID: {customerData.customerCode}
+                </Badge>
+             )}
           </div>
 
           <div className="flex gap-3">
@@ -155,10 +183,28 @@ export function CustomerDrawer({ isOpen, onOpenChange, customerData, onSave }: C
                 </div>
                 {isEditingMain ? (
                     <div className="grid gap-4">
-                        <div className="space-y-2">
-                            <Label className="text-[10px] font-black uppercase">Official PT Name</Label>
-                            <Input value={name} onChange={e => setName(e.target.value)} className="font-black uppercase h-11" />
+                        <div className="grid grid-cols-3 gap-4">
+                            <div className="col-span-2 space-y-2">
+                                <Label className="text-[10px] font-black uppercase">Official PT Name</Label>
+                                <Input value={name} onChange={e => setName(e.target.value)} className="font-black uppercase h-11" placeholder="PT JEMBO CABLE" />
+                            </div>
+                            <div className="space-y-2">
+                                <Label className="text-[10px] font-black uppercase">Unique Code</Label>
+                                <Input value={customerCode} onChange={e => setCustomerCode(e.target.value.toUpperCase())} className="font-black h-11 border-indigo-200" placeholder="ADH004" />
+                            </div>
                         </div>
+
+                        <div className="bg-emerald-50/50 p-4 rounded-xl border border-emerald-100 space-y-2">
+                            <Label className="text-[9px] font-black uppercase text-emerald-700 flex items-center gap-1.5"><CreditCard className="h-3 w-3" /> Auto-Generated Virtual Account (Mandiri)</Label>
+                            <div className="flex items-center justify-between">
+                                <span className={cn("font-mono font-black text-sm", autoVa.length === 16 ? "text-emerald-700" : "text-rose-600")}>
+                                    {autoVa || 'WAITING FOR CODE...'}
+                                </span>
+                                {autoVa.length > 0 && autoVa.length !== 16 && <ShieldAlert className="h-4 w-4 text-rose-500" />}
+                            </div>
+                            <p className="text-[8px] text-emerald-600 font-medium italic">Rumus: 86625 + 26 + Logic({customerCode || '?'})</p>
+                        </div>
+
                         <div className="grid grid-cols-2 gap-4">
                             <div className="space-y-2">
                                 <Label className="text-[10px] font-black uppercase">Contact Person</Label>
@@ -179,22 +225,31 @@ export function CustomerDrawer({ isOpen, onOpenChange, customerData, onSave }: C
                         </div>
                     </div>
                 ) : (
-                    <div className="grid grid-cols-2 gap-y-6 gap-x-8">
-                        <div className="space-y-1">
-                            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Main Email</p>
-                            <p className="text-sm font-bold flex items-center gap-2 text-slate-700"><Mail className="h-3.5 w-3.5 text-indigo-400" /> {email || '-'}</p>
-                        </div>
-                        <div className="space-y-1">
-                            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Contact Point</p>
-                            <p className="text-sm font-bold flex items-center gap-2 text-slate-700"><User className="h-3.5 w-3.5 text-indigo-400" /> {contactPerson || '-'}</p>
-                        </div>
-                        <div className="space-y-1">
-                            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Phone Number</p>
-                            <p className="text-sm font-bold flex items-center gap-2 text-slate-700"><Phone className="h-3.5 w-3.5 text-indigo-400" /> {phone || '-'}</p>
-                        </div>
-                        <div className="space-y-1 col-span-2 bg-amber-50 p-3 rounded-xl border border-amber-100">
-                            <p className="text-[9px] font-black text-amber-600 uppercase tracking-widest flex items-center gap-1.5"><Clock className="h-3 w-3" /> Jadwal Terima Tagihan</p>
-                            <p className="text-sm font-black text-amber-800 uppercase mt-1">{billingSchedule || 'BELUM DIATUR'}</p>
+                    <div className="space-y-6">
+                        <div className="grid grid-cols-2 gap-y-6 gap-x-8">
+                            <div className="space-y-1">
+                                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Customer Unique Code</p>
+                                <p className="text-sm font-black text-indigo-700">{customerCode || '-'}</p>
+                            </div>
+                            <div className="space-y-1">
+                                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Active Virtual Account</p>
+                                <p className="text-sm font-mono font-black text-emerald-700 flex items-center gap-2">
+                                    {autoVa || 'NOT GENERATED'}
+                                    {autoVa && <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => copyToClipboard(autoVa)}><Copy className="h-3 w-3" /></Button>}
+                                </p>
+                            </div>
+                            <div className="space-y-1">
+                                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Main Email</p>
+                                <p className="text-sm font-bold flex items-center gap-2 text-slate-700"><Mail className="h-3.5 w-3.5 text-indigo-400" /> {email || '-'}</p>
+                            </div>
+                            <div className="space-y-1">
+                                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Contact Point</p>
+                                <p className="text-sm font-bold flex items-center gap-2 text-slate-700"><User className="h-3.5 w-3.5 text-indigo-400" /> {contactPerson || '-'}</p>
+                            </div>
+                            <div className="space-y-1 col-span-2 bg-amber-50 p-3 rounded-xl border border-amber-100">
+                                <p className="text-[9px] font-black text-amber-600 uppercase tracking-widest flex items-center gap-1.5"><Clock className="h-3 w-3" /> Jadwal Terima Tagihan</p>
+                                <p className="text-sm font-black text-amber-800 uppercase mt-1">{billingSchedule || 'BELUM DIATUR'}</p>
+                            </div>
                         </div>
                     </div>
                 )}
