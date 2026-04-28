@@ -1,3 +1,4 @@
+
 'use client';
 import { useState, useMemo, useRef } from 'react';
 import { useRouter } from 'next/navigation';
@@ -6,16 +7,16 @@ import {
     CardContent,
     CardHeader,
     CardTitle,
+    CardFooter,
   } from '@/components/ui/card';
   import { Input } from '@/components/ui/input';
   import { Button } from '@/components/ui/button';
   import { Badge } from '@/components/ui/badge';
-  import { type SalesOrder, type UserProfile, type Invoice, type SalesListItem, type ProductListItem, type SalesOrderItem } from '@/app/lib/data';
+  import { type SalesOrder, type UserProfile, type SalesListItem, type ProductListItem, type SalesOrderItem } from '@/app/lib/data';
   import { 
     Search, 
     Plus, 
     MoreHorizontal, 
-    Copy, 
     FilePlus, 
     Eye, 
     Clock, 
@@ -24,12 +25,11 @@ import {
     FileText,
     TrendingUp,
     Calendar,
-    ArrowRight,
     Trash2,
     Upload,
     AlertTriangle,
-    Check,
-    Layers
+    Layers,
+    Loader2
   } from 'lucide-react';
   import { useFirestore, useUser, useCollection, useMemoFirebase, useDoc, errorEmitter, FirestorePermissionError } from '@/firebase';
   import { collection, query, doc, deleteDoc, setDoc, writeBatch } from 'firebase/firestore';
@@ -58,6 +58,7 @@ import {
     const [searchQuery, setSearchQuery] = useState('');
     const [isConstructorOpen, setIsConstructorOpen] = useState(false);
     const [editingOrder, setEditingOrder] = useState<SalesOrder | undefined>(undefined);
+    const [isImporting, setIsImporting] = useState(false);
     
     const [isDetailOpen, setIsDetailOpen] = useState(false);
     const [selectedOrder, setSelectedOrder] = useState<SalesOrder | null>(null);
@@ -131,11 +132,12 @@ import {
     const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
         const file = event.target.files?.[0];
         if (file && firestore && user && masterSales) {
+            setIsImporting(true);
             try {
                 const data = await importFromExcel(file);
                 const batch = writeBatch(firestore);
                 
-                // --- STEP 1: CONSOLIDATE DATA BY SO NUMBER ---
+                // --- STEP 1: CONSOLIDATE DATA BY SO NUMBER (SMART AGGREGATION) ---
                 const soGroups: Record<string, { header: any, items: any[] }> = {};
                 
                 data.forEach((row: any) => {
@@ -143,7 +145,6 @@ import {
                     if (!soNum) return;
 
                     if (!soGroups[soNum]) {
-                        // Find matching PO for Header info
                         const matchedSale = masterSales.find(s => s.soNumber?.toLowerCase() === soNum.toLowerCase());
                         soGroups[soNum] = {
                             header: {
@@ -155,7 +156,6 @@ import {
                         };
                     }
 
-                    // Collect item data
                     const itemName = String(row.productName || row['Product'] || row['Item Name'] || '').trim();
                     const itemPrice = parseFormattedNumber(row.price || row['Price'] || 0);
                     const itemQty = parseFormattedNumber(row.quantity || row['Quantity'] || row['QTY'] || 0);
@@ -171,10 +171,7 @@ import {
                     }
                 });
 
-                // --- STEP 2: AGGREGATE ITEMS (AUTO-SUM) & SYNC UNITS ---
-                let totalItemsCreated = 0;
-                let mergedCount = 0;
-
+                // --- STEP 2: AUTO-SUM DUPLICATE ITEMS & SYNC UNITS ---
                 Object.values(soGroups).forEach((group) => {
                     const aggregatedItems: Record<string, SalesOrderItem> = {};
                     
@@ -184,9 +181,7 @@ import {
                         if (aggregatedItems[key]) {
                             aggregatedItems[key].quantity += it.qty;
                             aggregatedItems[key].total = aggregatedItems[key].quantity * aggregatedItems[key].price;
-                            mergedCount++;
                         } else {
-                            // Try to pull master unit if missing
                             let finalUnit = it.unit;
                             if (!finalUnit && masterProducts) {
                                 const master = masterProducts.find(p => p.name.toLowerCase() === it.name.toLowerCase());
@@ -196,13 +191,12 @@ import {
                             aggregatedItems[key] = {
                                 id: `item-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
                                 productName: it.name,
-                                category: 'kabel', // Default
+                                category: 'kabel',
                                 quantity: it.qty,
                                 unit: finalUnit || 'Meter',
                                 price: it.price,
                                 total: it.qty * it.price
                             };
-                            totalItemsCreated++;
                         }
                     });
 
@@ -228,27 +222,13 @@ import {
                 });
 
                 await batch.commit();
-                toast({ 
-                    title: "Smart Import Selesai", 
-                    description: `Diproses ${Object.keys(soGroups).length} Sales Orders. Sistem berhasil menggabungkan ${mergedCount} baris item duplikat.` 
-                });
+                toast({ title: "Smart SO Import Selesai", description: `Data telah diagregasi dan disinkronkan dengan Katalog Master.` });
                 event.target.value = '';
             } catch (error) {
-                console.error(error);
-                toast({ variant: "destructive", title: "Gagal Impor", description: "Terjadi kesalahan saat pemrosesan data agregat." });
+                toast({ variant: "destructive", title: "Gagal Impor" });
+            } finally {
+                setIsImporting(false);
             }
-        }
-    };
-
-    const handleDeleteConfirm = async () => {
-        if (!firestore || !deleteDialogState.orderId) return;
-        const docRef = doc(firestore, 'salesOrders', deleteDialogState.orderId);
-        try {
-            await deleteDoc(docRef);
-            toast({ title: "Sales Order Cleansed from Database" });
-            setDeleteDialogState({ isOpen: false });
-        } catch (e) {
-            errorEmitter.emit('permission-error', new FirestorePermissionError({ path: docRef.path, operation: 'delete' }));
         }
     };
 
@@ -264,18 +244,19 @@ import {
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div>
             <h1 className="text-3xl font-black tracking-tighter uppercase text-slate-900">Commercial Pipeline</h1>
-            <p className="text-muted-foreground font-medium text-sm">Manajemen Sales Order & Sinkronisasi Master Data Produksi.</p>
+            <p className="text-muted-foreground font-medium text-sm">Input SO & Smart Aggregation — Tahap Awal Administrasi Dakota.</p>
           </div>
           <div className="flex items-center gap-3">
              <input type="file" ref={fileInputRef} onChange={handleFileChange} className="hidden" accept=".xlsx, .xls" />
              <TooltipProvider>
                 <Tooltip>
                     <TooltipTrigger asChild>
-                        <Button variant="outline" className="h-10 font-bold text-[10px] uppercase tracking-widest border-slate-200" onClick={() => fileInputRef.current?.click()}>
-                            <Upload className="mr-2 h-4 w-4" /> Smart Import (Auto-Sum)
+                        <Button variant="outline" className="h-10 font-bold text-[10px] uppercase tracking-widest border-slate-200" onClick={() => fileInputRef.current?.click()} disabled={isImporting}>
+                            {isImporting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Upload className="mr-2 h-4 w-4" />}
+                            Smart Import
                         </Button>
                     </TooltipTrigger>
-                    <TooltipContent className="bg-slate-900 text-white text-[10px] p-2">Sistem akan otomatis menggabungkan item dengan nama & harga yang sama.</TooltipContent>
+                    <TooltipContent className="bg-slate-900 text-white text-[10px] p-2">Sistem otomatis menggabungkan item (Auto-Sum) & mencocokkan Satuan (UOM).</TooltipContent>
                 </Tooltip>
              </TooltipProvider>
 
@@ -299,13 +280,9 @@ import {
                 />
             </div>
             <div className="hidden lg:flex gap-6 items-center px-4 border-l">
-                <div className="flex flex-col">
+                <div className="flex flex-col text-center">
                     <span className="text-[9px] font-black uppercase text-slate-400 leading-none">Total Pipeline</span>
-                    <span className="text-sm font-black text-slate-900">{filteredOrders.length} Documents</span>
-                </div>
-                <div className="flex flex-col">
-                    <span className="text-[9px] font-black uppercase text-indigo-600 leading-none">Aggregated Records</span>
-                    <Layers className="h-4 w-4 text-indigo-400 mt-1" />
+                    <span className="text-sm font-black text-slate-900">{filteredOrders.length} Docs</span>
                 </div>
             </div>
         </div>
@@ -316,7 +293,7 @@ import {
             ) : filteredOrders.length === 0 ? (
                 <div className="col-span-full py-32 text-center flex flex-col items-center opacity-30">
                     <TrendingUp className="h-16 w-16 mb-4 text-slate-400" />
-                    <p className="font-black uppercase text-sm tracking-widest">No Sales Orders in Pipeline.</p>
+                    <p className="font-black uppercase text-sm tracking-widest">No Active Orders.</p>
                 </div>
             ) : filteredOrders.map((order) => {
                 const conf = statusConfig[order.status || 'draft'];
@@ -329,8 +306,7 @@ import {
                     )}>
                         <div className={cn("absolute top-0 left-0 w-full h-1.5", 
                             isOrphan ? "bg-rose-500" :
-                            order.status === 'confirmed' ? "bg-blue-500" : 
-                            order.status === 'invoiced' ? "bg-emerald-500" : "bg-amber-400"
+                            order.status === 'confirmed' ? "bg-blue-500" : "bg-emerald-500"
                         )} />
                         
                         <CardHeader className="pb-4 pt-6 bg-slate-50/30 border-b border-slate-100">
@@ -362,46 +338,23 @@ import {
                         </CardHeader>
 
                         <CardContent className="pt-6 space-y-6 flex-1">
-                            {isOrphan ? (
-                                <TooltipProvider>
-                                    <Tooltip>
-                                        <TooltipTrigger asChild>
-                                            <div className="bg-rose-100/50 p-4 rounded-2xl border border-rose-200 space-y-2 cursor-help">
-                                                <div className="flex items-center gap-2 text-rose-700">
-                                                    <AlertTriangle className="h-4 w-4" />
-                                                    <span className="text-[10px] font-black uppercase">PO Belum Terhubung</span>
-                                                </div>
-                                                <p className="text-[9px] text-rose-600 leading-tight">Gunakan Constructor untuk menghubungkan SO ini ke Nomor PO agar penagihan tidak Rp 0.</p>
-                                            </div>
-                                        </TooltipTrigger>
-                                        <TooltipContent className="bg-slate-900 text-white text-[11px] font-medium border-none shadow-xl max-w-xs">
-                                            {TOOLTIP_CONTENT.missing_po}
-                                        </TooltipContent>
-                                    </Tooltip>
-                                </TooltipProvider>
-                            ) : (
-                                <>
-                                    <div className="flex items-center justify-between">
-                                        <div className="space-y-0.5">
-                                            <p className="text-[9px] font-black uppercase text-slate-400 tracking-widest">Order Date</p>
-                                            <div className="flex items-center gap-1.5 text-xs font-bold text-slate-700">
-                                                <Calendar className="h-3.5 w-3.5 text-slate-400" /> {order.orderDate}
-                                            </div>
-                                        </div>
-                                        <div className="space-y-0.5 text-right">
-                                            <p className="text-[9px] font-black uppercase text-slate-400 tracking-widest">PO Reference</p>
-                                            <p className="text-xs font-mono font-bold text-indigo-600">{order.poNumber}</p>
-                                        </div>
-                                    </div>
+                            <div className="flex items-center justify-between">
+                                <div className="space-y-0.5">
+                                    <p className="text-[9px] font-black uppercase text-slate-400 tracking-widest">PO Reference</p>
+                                    <p className="text-xs font-mono font-bold text-indigo-600">{order.poNumber || 'UNLINKED'}</p>
+                                </div>
+                                <div className="space-y-0.5 text-right">
+                                    <p className="text-[9px] font-black uppercase text-slate-400 tracking-widest">Items Count</p>
+                                    <Badge variant="secondary" className="text-[9px] h-4">{order.items?.length || 0} Products</Badge>
+                                </div>
+                            </div>
 
-                                    <div className="space-y-2">
-                                        <p className="text-[9px] font-black uppercase text-slate-400 tracking-widest flex items-center gap-2">
-                                            <TrendingUp className="h-3 w-3" /> Net Order Value
-                                        </p>
-                                        <p className="text-xl font-black text-slate-900">Rp {formatNumberWithCommas(order.grandTotal)}</p>
-                                    </div>
-                                </>
-                            )}
+                            <div className="space-y-2">
+                                <p className="text-[9px] font-black uppercase text-slate-400 tracking-widest flex items-center gap-2">
+                                    <TrendingUp className="h-3 w-3" /> Net Order Value
+                                </p>
+                                <p className="text-xl font-black text-slate-900">Rp {formatNumberWithCommas(order.grandTotal)}</p>
+                            </div>
                         </CardContent>
 
                         <CardFooter className="p-4 bg-slate-50/50 border-t border-slate-100 flex gap-2">
@@ -409,24 +362,12 @@ import {
                                 View Details
                             </Button>
                             
-                            <TooltipProvider>
-                                <Tooltip>
-                                    <TooltipTrigger asChild>
-                                        <Button 
-                                            className={cn(
-                                                "flex-1 h-10 font-black uppercase text-[10px] tracking-widest shadow-lg rounded-xl",
-                                                isOrphan ? "bg-rose-600 hover:bg-rose-700 shadow-rose-100" : "bg-indigo-600 hover:bg-indigo-700 shadow-indigo-100"
-                                            )}
-                                            onClick={() => isOrphan ? (setEditingOrder(order), setIsConstructorOpen(true)) : router.push(`/dashboard/invoices/number?poNumber=${encodeURIComponent(order.poNumber)}&soNumber=${encodeURIComponent(order.soNumber)}`)}
-                                        >
-                                            {isOrphan ? <><AlertTriangle className="mr-1.5 h-3.5 w-3.5" /> Fix Mapping</> : <><FilePlus className="mr-1.5 h-3.5 w-3.5" /> Billing</>}
-                                        </Button>
-                                    </TooltipTrigger>
-                                    <TooltipContent className="bg-slate-900 text-white text-[11px] font-medium border-none shadow-xl">
-                                        {isOrphan ? TOOLTIP_CONTENT.fix_mapping : TOOLTIP_CONTENT.add_invoice}
-                                    </TooltipContent>
-                                </Tooltip>
-                            </TooltipProvider>
+                            <Button 
+                                className="flex-1 h-10 font-black uppercase text-[10px] tracking-widest shadow-lg rounded-xl bg-indigo-600 hover:bg-indigo-700 shadow-indigo-100"
+                                onClick={() => router.push(`/dashboard/invoices/number?poNumber=${encodeURIComponent(order.poNumber)}&soNumber=${encodeURIComponent(order.soNumber)}`)}
+                            >
+                                <FilePlus className="mr-1.5 h-3.5 w-3.5" /> Billing
+                            </Button>
                         </CardFooter>
                     </Card>
                 );
@@ -453,7 +394,6 @@ import {
         >
             <div className="hidden" />
         </DeleteConfirmationDialog>
-
       </main>
     );
   }
