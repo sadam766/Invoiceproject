@@ -55,6 +55,9 @@ export function AddSpdDialog({ isOpen, onOpenChange, onSave, spdData, onAddClick
 
   const [localSjAdditions, setLocalSjAdditions] = useState<Record<string, string>>({});
 
+  const spdsQuery = useMemoFirebase(() => (firestore ? query(collection(firestore, 'spds')) : null), [firestore]);
+  const { data: allSpds } = useCollection<SpdData>(spdsQuery);
+
   const availableInvoicesQuery = useMemoFirebase(() => {
     if (!firestore) return null;
     return query(
@@ -76,6 +79,20 @@ export function AddSpdDialog({ isOpen, onOpenChange, onSave, spdData, onAddClick
       });
   }, [allSentInvoices, searchInvoice, spdData]);
 
+  // LOGIC: Generate PS/0588-J/KEU/2026/DK format
+  useEffect(() => {
+    if (!isOpen || spdData) return;
+
+    const now = new Date();
+    const currentYear = format(now, 'yyyy');
+    
+    // Count existing SPDs in this year to get the next number
+    const yearSpds = allSpds?.filter(s => s.date.startsWith(currentYear)) || [];
+    const nextNum = (yearSpds.length + 1).toString().padStart(4, '0');
+    
+    setSpdId(`PS/${nextNum}-J/KEU/${currentYear}/DK`);
+  }, [isOpen, spdData, allSpds]);
+
   useEffect(() => {
     if (spdData && isOpen) {
       setSpdId(spdData.id);
@@ -88,9 +105,6 @@ export function AddSpdDialog({ isOpen, onOpenChange, onSave, spdData, onAddClick
       });
       setLocalSjAdditions(initialSjs);
     } else if (isOpen && initialPreselectedInvoices) {
-        const now = new Date();
-        setSpdId(`SPD/${format(now, 'yyyy/MM')}/${Math.floor(100 + Math.random() * 900)}`);
-        setDate(format(now, 'yyyy-MM-dd'));
         setSelectedInvoices(initialPreselectedInvoices);
         const initialSjs: Record<string, string> = {};
         initialPreselectedInvoices.forEach(inv => {
@@ -98,9 +112,6 @@ export function AddSpdDialog({ isOpen, onOpenChange, onSave, spdData, onAddClick
         });
         setLocalSjAdditions(initialSjs);
     } else if (!isOpen) {
-      const now = new Date();
-      setSpdId(`SPD/${format(now, 'yyyy/MM')}/${Math.floor(100 + Math.random() * 900)}`);
-      setDate(format(now, 'yyyy-MM-dd'));
       setCourier('');
       setSelectedInvoices([]);
       setSearchInvoice('');
@@ -176,7 +187,7 @@ export function AddSpdDialog({ isOpen, onOpenChange, onSave, spdData, onAddClick
                     SPD Multi-Document Dispatch
                 </DialogTitle>
                 <DialogDescription className="text-xs font-bold uppercase text-slate-400 tracking-tighter mt-1">
-                    Konsolidasi surat jalan & invoice ke dalam satu batch pengiriman digital.
+                    Format Resmi PS/[URUT]-J/KEU/[TAHUN]/DK
                 </DialogDescription>
             </div>
           </div>
@@ -186,7 +197,7 @@ export function AddSpdDialog({ isOpen, onOpenChange, onSave, spdData, onAddClick
           <div className="bg-slate-50 p-8 space-y-8 border-r md:col-span-2">
              <div className="space-y-6">
                 <div className="space-y-2">
-                    <Label className="text-[9px] font-black uppercase text-slate-400 tracking-widest">Nomor SPD Digital</Label>
+                    <Label className="text-[9px] font-black uppercase text-slate-400 tracking-widest">Nomor SPD Digital (Auto)</Label>
                     <div className="bg-white p-3 rounded-xl border border-indigo-100 font-mono text-xs font-black text-indigo-700 shadow-sm">{spdId}</div>
                 </div>
                 <div className="space-y-2">
@@ -237,7 +248,7 @@ export function AddSpdDialog({ isOpen, onOpenChange, onSave, spdData, onAddClick
                                     </Button>
                                 </div>
                                 <div className="space-y-2">
-                                    <Label className="text-[8px] font-black text-slate-400 uppercase tracking-tighter">Verified Surat Jalan (SJ) Nos:</Label>
+                                    <Label className="text-[8px] font-black text-slate-400 uppercase tracking-tighter">Surat Jalan (SJ) Nos:</Label>
                                     <Input 
                                         className="h-9 text-[11px] font-bold bg-slate-50 border-dashed rounded-lg" 
                                         placeholder="E.g. SJ-001, SJ-992..." 
