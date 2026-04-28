@@ -1,4 +1,3 @@
-
 'use client';
 import { useState, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
@@ -43,7 +42,7 @@ import {
   import { collection, query, doc, updateDoc, arrayUnion, deleteDoc } from 'firebase/firestore';
   import { exportToExcel, cn } from '@/lib/utils';
   import { DateRangePicker } from '@/app/components/date-range-picker';
-  import { isWithinInterval, parseISO, startOfToday, format } from 'date-fns';
+  import { isWithinInterval, parseISO, startOfToday, format, subDays, startOfMonth, endOfMonth } from 'date-fns';
   import { DeleteConfirmationDialog } from '@/app/components/delete-confirmation-dialog';
   import { useDashboardData } from '../layout';
 
@@ -52,9 +51,11 @@ import {
     const [activeTab, setActiveTab] = useState('all');
     const [searchQuery, setSearchQuery] = useState('');
     const [selectedInvoices, setSelectedInvoices] = useState<Set<string>>(new Set());
+    
+    // Set default range to current month to avoid empty list on fresh load
     const [dateRange, setDateRange] = useState<{ from: Date; to: Date }>({
-        from: startOfToday(),
-        to: startOfToday(),
+        from: startOfMonth(new Date()),
+        to: endOfMonth(new Date()),
     });
     const { toast } = useToast();
     const firestore = useFirestore();
@@ -84,10 +85,13 @@ import {
         if (!invoices) return [];
         let filtered = invoices;
 
-        filtered = filtered.filter(inv => {
-            const invDate = parseISO(inv.date);
-            return isWithinInterval(invDate, { start: dateRange.from, end: dateRange.to });
-        });
+        // Smart Filtering: If there is a search query, search across all dates
+        if (!searchQuery) {
+            filtered = filtered.filter(inv => {
+                const invDate = parseISO(inv.date);
+                return isWithinInterval(invDate, { start: dateRange.from, end: dateRange.to });
+            });
+        }
 
         if (activeTab !== 'all') {
             filtered = filtered.filter(i => {
@@ -124,13 +128,13 @@ import {
             revisionLogs: arrayUnion({
                 updatedBy: userProfile?.displayName || user.email || 'Unknown',
                 updatedAt: timestamp,
-                action: `Invoice VOIDED (Reversal Triggered): ${voidReason}`
+                action: `Invoice VOIDED: ${voidReason}`
             })
         };
         
         updateDoc(docRef, updateData)
             .then(() => {
-                toast({ title: "Invoice Dibatalkan", description: `Invoice ${targetInvoiceId} kini berstatus VOID. Saldo PO & DP telah disinkronkan.` });
+                toast({ title: "Invoice Dibatalkan", description: `Invoice ${targetInvoiceId} kini berstatus VOID.` });
                 setVoidDialogOpen(false);
                 setVoidReason('');
                 setTargetInvoiceId(null);
@@ -151,15 +155,12 @@ import {
         const invoiceRef = doc(firestore, 'invoices', safeId);
         const identityRef = doc(firestore, 'invoiceNumbers', safeId);
 
-        // Chain the delete from the main collection
         deleteDoc(invoiceRef)
             .then(() => {
-                // Background cleanup of identity ref if exists
                 deleteDoc(identityRef).catch(() => {});
-                
                 toast({ 
                     title: "Data Dihapus Permanen", 
-                    description: `Nomor ${deleteTargetId} kini telah dilepaskan dan dapat digunakan kembali.` 
+                    description: `Nomor ${deleteTargetId} telah dihapus total.` 
                 });
                 setDeleteDialogOpen(false);
                 setDeleteTargetId(null);
@@ -200,34 +201,33 @@ import {
       <main className="flex flex-1 flex-col gap-4 p-4 md:gap-8 md:p-8">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
             <div>
-                <h1 className="text-2xl font-black tracking-tighter uppercase">Invoice List</h1>
+                <h1 className="text-2xl font-black tracking-tighter uppercase">Invoice Repository</h1>
                 <div className="text-muted-foreground font-medium flex items-center gap-2">
-                    Ditemukan {filteredInvoices.length} Data 
+                    Database penagihan terpusat.
                     <span className="text-[10px] font-black bg-primary/10 text-primary px-2 py-0.5 rounded">
-                        Periode: {format(dateRange.from, 'dd/MM')} - {format(dateRange.to, 'dd/MM/yy')}
+                        {filteredInvoices.length} Dokumen Tampil
                     </span>
                 </div>
             </div>
             <div className="flex items-center gap-2">
                 <DateRangePicker onRangeChange={setDateRange} />
-                <Button variant="outline" size="sm" onClick={() => exportToExcel(filteredInvoices, `Invoice-Laporan-${format(dateRange.from, 'yyyyMMdd')}`)} className="font-bold h-9">
+                <Button variant="outline" size="sm" onClick={() => exportToExcel(filteredInvoices, `Invoice-Log-${format(new Date(), 'yyyyMMdd')}`)} className="font-bold h-9">
                     <FileSpreadsheet className="mr-2 h-4 w-4 text-green-600" /> Export
                 </Button>
                 <Button size="sm" className="font-black uppercase h-9 shadow-md bg-indigo-600 hover:bg-indigo-700" onClick={() => router.push('/dashboard/sales')}>
-                    <Layers className="mr-2 h-4 w-4" /> Start from Sales List
+                    <Layers className="mr-2 h-4 w-4" /> Mulai Penagihan
                 </Button>
             </div>
         </div>
 
-        <Card className="shadow-md border-none ring-1 ring-border">
+        <Card className="shadow-md border-none ring-1 ring-border bg-white">
             <CardContent className="pt-6">
                 <Tabs defaultValue="all" value={activeTab} onValueChange={setActiveTab}>
                     <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
                         <TabsList className="bg-muted/50 p-1">
                             <TabsTrigger value="all" className="text-xs font-bold uppercase">Semua</TabsTrigger>
                             <TabsTrigger value="paid" className="text-xs font-bold uppercase px-4 text-emerald-600">Lunas</TabsTrigger>
-                            <TabsTrigger value="received" className="text-xs font-bold uppercase px-4 text-blue-600">Diterima / Transit</TabsTrigger>
-                            <TabsTrigger value="unpaid" className="text-xs font-bold uppercase px-4 text-red-600">Unpaid</TabsTrigger>
+                            <TabsTrigger value="unpaid" className="text-xs font-bold uppercase px-4 text-red-600">Terutang</TabsTrigger>
                             <TabsTrigger value="cancelled" className="text-xs font-bold uppercase px-4 opacity-50">Void</TabsTrigger>
                         </TabsList>
                         <div className="relative w-full sm:w-64">
@@ -241,26 +241,21 @@ import {
                             <TableHeader className="bg-muted/30">
                                 <TableRow>
                                     <TableHead className="w-[40px]"><Checkbox onCheckedChange={(c) => c ? setSelectedInvoices(new Set(filteredInvoices.map(i => i.id))) : setSelectedInvoices(new Set())} /></TableHead>
-                                    <TableHead className="text-[10px] font-black uppercase tracking-widest">Invoice Number</TableHead>
-                                    <TableHead className="text-[10px] font-black uppercase tracking-widest">Customer & PO</TableHead>
-                                    <TableHead className="text-[10px] font-black uppercase tracking-widest text-right">Grand Total</TableHead>
+                                    <TableHead className="text-[10px] font-black uppercase tracking-widest">Identitas Penagihan</TableHead>
+                                    <TableHead className="text-[10px] font-black uppercase tracking-widest">Legal Customer & PO</TableHead>
+                                    <TableHead className="text-[10px] font-black uppercase tracking-widest text-right">Total Tagihan</TableHead>
                                     <TableHead className="text-[10px] font-black uppercase tracking-widest text-right">Outstanding</TableHead>
                                     <TableHead className="text-[10px] font-black uppercase tracking-widest">Status</TableHead>
                                     <TableHead className="text-right text-[10px] font-black uppercase tracking-widest">Aksi</TableHead>
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
-                                {(isGlobalLoading && !invoices) ? <TableRow><TableCell colSpan={7} className="text-center py-20 font-bold animate-pulse text-muted-foreground">Menganalisa Data Invoices...</TableCell></TableRow> : 
+                                {(isGlobalLoading && !invoices) ? <TableRow><TableCell colSpan={7} className="text-center py-20 font-bold animate-pulse text-muted-foreground">Menghubungkan ke Database...</TableCell></TableRow> : 
+                                    filteredInvoices.length === 0 ? <TableRow><TableCell colSpan={7} className="text-center py-20 text-slate-400 font-bold italic">Tidak ada invoice ditemukan.</TableCell></TableRow> :
                                     filteredInvoices.map((invoice) => {
-                                    const isERP = !(invoice.id.startsWith('SAR') || invoice.id.startsWith('KW'));
-                                    
                                     const totalPaid = invoice.payments?.reduce((s, p) => s + p.amount, 0) || (invoice.status === 'paid' ? invoice.amount : 0);
                                     const outstandingDoc = Math.max(0, invoice.amount - totalPaid);
-                                    let displayStatus = invoice.status;
-                                    if (invoice.status !== 'cancelled' && invoice.status !== 'paid' && totalPaid > 0) {
-                                        displayStatus = 'partial';
-                                    }
-
+                                    
                                     return (
                                         <TableRow key={invoice.id} className={cn("hover:bg-muted/5 transition-colors", invoice.status === 'cancelled' && "opacity-40 grayscale")}>
                                             <TableCell><Checkbox checked={selectedInvoices.has(invoice.id)} onCheckedChange={() => setSelectedInvoices(prev => { const n = new Set(prev); n.has(invoice.id) ? n.delete(invoice.id) : n.add(invoice.id); return n; })} /></TableCell>
@@ -268,7 +263,7 @@ import {
                                                 <div className="flex flex-col gap-0.5">
                                                     <div className="flex items-center gap-1.5">
                                                         <span className={cn("font-black text-sm", invoice.status === 'cancelled' ? "line-through" : "text-indigo-700")}>{invoice.id}</span>
-                                                        {isERP ? <Database className="h-3 w-3 text-emerald-600" title="Source: ERP Pusat" /> : <Hash className="h-3 w-3 text-indigo-400" title="Source: Manual SAR" />}
+                                                        {invoice.erpInvoiceId && <Database className="h-3 w-3 text-emerald-600" />}
                                                     </div>
                                                     <span className="text-[9px] font-bold text-muted-foreground">{invoice.date}</span>
                                                 </div>
@@ -286,38 +281,32 @@ import {
                                                     variant={invoice.status === 'paid' ? 'outline' : invoice.status === 'cancelled' ? 'destructive' : 'secondary'} 
                                                     className={cn(
                                                         "text-[9px] uppercase font-black px-2 py-0",
-                                                        displayStatus === 'received' ? "bg-blue-50 text-blue-700 border-blue-100" : 
-                                                        displayStatus === 'in_transit' ? "bg-indigo-50 text-indigo-700 border-indigo-100" : 
-                                                        displayStatus === 'paid' ? "bg-emerald-50 text-emerald-700 border-emerald-100" : 
-                                                        displayStatus === 'partial' ? "bg-amber-50 text-amber-700 border-amber-100" :
-                                                        displayStatus === 'finalized' ? "bg-indigo-600 text-white" : ""
+                                                        invoice.status === 'paid' ? "bg-emerald-50 text-emerald-700 border-emerald-100" : 
+                                                        invoice.status === 'sent' || invoice.status === 'unpaid' ? "bg-rose-50 text-rose-600 border-rose-100" : ""
                                                     )}
                                                 >
-                                                    {displayStatus.replace('_', ' ')}
+                                                    {invoice.status.replace('_', ' ')}
                                                 </Badge>
                                             </TableCell>
                                             <TableCell className="text-right">
                                                 <DropdownMenu>
                                                     <DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8 rounded-full"><MoreHorizontal className="h-4 w-4" /></Button></DropdownMenuTrigger>
-                                                    <DropdownMenuContent align="end">
-                                                        <DropdownMenuItem onClick={() => router.push(`/dashboard/invoices/preview/${encodeURIComponent(invoice.id)}`)}><Eye className="mr-2 h-4 w-4" /> Pratinjau</DropdownMenuItem>
+                                                    <DropdownMenuContent align="end" className="w-48">
+                                                        <DropdownMenuItem onClick={() => router.push(`/dashboard/invoices/preview/${encodeURIComponent(invoice.id)}`)}><Eye className="mr-2 h-4 w-4" /> Pratinjau Cetak</DropdownMenuItem>
                                                         {invoice.status !== 'finalized' && invoice.status !== 'cancelled' && invoice.status !== 'paid' && (
-                                                            <DropdownMenuItem onClick={() => router.push(`/dashboard/invoices/add?editInvoiceId=${invoice.id.replace(/\//g, '_')}`)}><Pencil className="mr-2 h-4 w-4" /> Edit</DropdownMenuItem>
-                                                        )}
-                                                        {isSuperAdmin && invoice.status !== 'finalized' && invoice.status !== 'cancelled' && (
-                                                            <DropdownMenuItem onClick={() => handleFinalize(invoice.id)} className="text-indigo-600 font-bold"><ShieldCheck className="mr-2 h-4 w-4" /> Finalisasi (Lock)</DropdownMenuItem>
+                                                            <DropdownMenuItem onClick={() => router.push(`/dashboard/invoices/add?editInvoiceId=${invoice.id.replace(/\//g, '_')}`)}><Pencil className="mr-2 h-4 w-4" /> Ubah Data</DropdownMenuItem>
                                                         )}
                                                         {isSuperAdmin && (
                                                             <DropdownMenuItem 
                                                                 className="text-red-600 font-bold" 
                                                                 onClick={() => { setDeleteTargetId(invoice.id); setDeleteDialogOpen(true); }}
                                                             >
-                                                                <Trash2 className="mr-2 h-4 w-4" /> Hapus Permanen (Cleansing)
+                                                                <Trash2 className="mr-2 h-4 w-4" /> Hapus Permanen
                                                             </DropdownMenuItem>
                                                         )}
                                                         {invoice.status !== 'cancelled' && (
                                                             <DropdownMenuItem className="text-destructive font-bold" onClick={() => { setTargetInvoiceId(invoice.id); setVoidDialogOpen(true); }}>
-                                                                <XCircle className="mr-2 h-4 w-4" /> Batal / VOID
+                                                                <XCircle className="mr-2 h-4 w-4" /> Tandai VOID
                                                             </DropdownMenuItem>
                                                         )}
                                                     </DropdownMenuContent>
@@ -338,21 +327,19 @@ import {
             <DialogContent className="sm:max-w-[400px]">
                 <DialogHeader>
                     <DialogTitle>Konfirmasi VOID Invoice</DialogTitle>
-                    <DialogDescription>Data tidak akan dihapus fisik, namun kuota barang & saldo DP akan dikembalikan ke PO asal secara otomatis.</DialogDescription>
+                    <DialogDescription>Invoice ini akan ditandai sebagai Batal dan tidak akan dihitung dalam total piutang.</DialogDescription>
                 </DialogHeader>
-                <div className="py-4 space-y-4">
-                    <div className="space-y-2">
-                        <Label className="text-xs font-bold uppercase">Alasan Pembatalan</Label>
-                        <Textarea 
-                            placeholder="Contoh: Salah nominal, ganti rincian barang, customer cancel..." 
-                            value={voidReason}
-                            onChange={(e) => setVoidReason(e.target.value)}
-                        />
-                    </div>
+                <div className="py-4 space-y-2">
+                    <Label className="text-xs font-bold uppercase">Alasan Pembatalan</Label>
+                    <Textarea 
+                        placeholder="Masukkan alasan..." 
+                        value={voidReason}
+                        onChange={(e) => setVoidReason(e.target.value)}
+                    />
                 </div>
                 <DialogFooter>
                     <Button variant="outline" onClick={() => setVoidDialogOpen(false)}>Batal</Button>
-                    <Button variant="destructive" onClick={handleVoidInvoice} disabled={!voidReason}>SIMPAN SEBAGAI VOID</Button>
+                    <Button variant="destructive" onClick={handleVoidInvoice} disabled={!voidReason}>YA, BATALKAN</Button>
                 </DialogFooter>
             </DialogContent>
         </Dialog>
@@ -362,15 +349,15 @@ import {
             <DialogContent className="sm:max-w-[400px]">
                 <DialogHeader>
                     <DialogTitle className="text-red-600 flex items-center gap-2">
-                        <AlertTriangle className="h-5 w-5" /> Hapus Permanen (Cleansing)
+                        <AlertTriangle className="h-5 w-5" /> Hapus Total
                     </DialogTitle>
                     <DialogDescription>
-                        Tindakan ini tidak dapat dibatalkan. Seluruh data invoice <b>{deleteTargetId}</b> akan dihapus total dan nomor tersebut akan dilepaskan agar bisa digunakan kembali.
+                        Data invoice <b>{deleteTargetId}</b> akan dihapus permanen.
                     </DialogDescription>
                 </DialogHeader>
                 <DialogFooter className="mt-4">
                     <Button variant="outline" onClick={() => setDeleteDialogOpen(false)}>Batal</Button>
-                    <Button variant="destructive" onClick={handleHardDelete} className="font-black uppercase">YA, HAPUS PERMANEN</Button>
+                    <Button variant="destructive" onClick={handleHardDelete} className="font-black uppercase">KONFIRMASI HAPUS</Button>
                 </DialogFooter>
             </DialogContent>
         </Dialog>
