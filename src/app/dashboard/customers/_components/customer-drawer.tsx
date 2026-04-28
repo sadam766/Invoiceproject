@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -29,7 +30,8 @@ import {
     Copy,
     ExternalLink,
     Map as MapIcon,
-    Phone
+    Phone,
+    Clock
 } from 'lucide-react';
 import type { Customer, CustomerAddress } from '@/app/lib/data';
 import { cn } from '@/lib/utils';
@@ -50,6 +52,7 @@ export function CustomerDrawer({ isOpen, onOpenChange, customerData, onSave }: C
   const [email, setEmail] = useState('');
   const [contactPerson, setContactPerson] = useState('');
   const [phone, setPhone] = useState('');
+  const [billingSchedule, setBillingSchedule] = useState('');
   const [addresses, setAddresses] = useState<CustomerAddress[]>([]);
   
   // New address state
@@ -64,6 +67,7 @@ export function CustomerDrawer({ isOpen, onOpenChange, customerData, onSave }: C
       setEmail(customerData.email || '');
       setContactPerson(customerData.contactPerson || '');
       setPhone(customerData.phone || '');
+      setBillingSchedule(customerData.billingSchedule || '');
       setAddresses(customerData.addresses || []);
       setIsEditingMain(false);
     } else if (!isOpen) {
@@ -71,6 +75,7 @@ export function CustomerDrawer({ isOpen, onOpenChange, customerData, onSave }: C
       setEmail('');
       setContactPerson('');
       setPhone('');
+      setBillingSchedule('');
       setAddresses([]);
       resetNewAddressForm();
     }
@@ -106,7 +111,7 @@ export function CustomerDrawer({ isOpen, onOpenChange, customerData, onSave }: C
 
   const handleSave = () => {
     if (!name) return;
-    onSave({ id: customerData?.id, name, email, contactPerson, phone, addresses });
+    onSave({ id: customerData?.id, name, email, contactPerson, phone, billingSchedule, addresses });
   };
 
   const copyToClipboard = (text: string) => {
@@ -165,6 +170,10 @@ export function CustomerDrawer({ isOpen, onOpenChange, customerData, onSave }: C
                             </div>
                         </div>
                         <div className="space-y-2">
+                            <Label className="text-[10px] font-black uppercase">Jadwal Terima Tagihan</Label>
+                            <Input value={billingSchedule} onChange={e => setBillingSchedule(e.target.value)} placeholder="Contoh: Selasa (10.00 - 16.00)" className="h-11 border-amber-200 focus-visible:ring-amber-500" />
+                        </div>
+                        <div className="space-y-2">
                             <Label className="text-[10px] font-black uppercase">Billing Contact Email</Label>
                             <Input value={email} onChange={e => setEmail(e.target.value)} placeholder="finance@customer.com" className="h-11" />
                         </div>
@@ -183,9 +192,9 @@ export function CustomerDrawer({ isOpen, onOpenChange, customerData, onSave }: C
                             <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Phone Number</p>
                             <p className="text-sm font-bold flex items-center gap-2 text-slate-700"><Phone className="h-3.5 w-3.5 text-indigo-400" /> {phone || '-'}</p>
                         </div>
-                        <div className="space-y-1">
-                            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Customer ID</p>
-                            <p className="text-xs font-mono font-bold text-slate-500 uppercase">{customerData?.id?.substring(0,8) || 'AUTO'}</p>
+                        <div className="space-y-1 col-span-2 bg-amber-50 p-3 rounded-xl border border-amber-100">
+                            <p className="text-[9px] font-black text-amber-600 uppercase tracking-widest flex items-center gap-1.5"><Clock className="h-3 w-3" /> Jadwal Terima Tagihan</p>
+                            <p className="text-sm font-black text-amber-800 uppercase mt-1">{billingSchedule || 'BELUM DIATUR'}</p>
                         </div>
                     </div>
                 )}

@@ -1,3 +1,4 @@
+
 import type { LucideIcon } from 'lucide-react';
 import { PlaceHolderImages, type ImagePlaceholder } from '@/lib/placeholder-images';
 
@@ -151,6 +152,7 @@ export type Customer = {
   contactPerson?: string;
   phone?: string;
   addresses: CustomerAddress[];
+  billingSchedule?: string;
   defaultShippingAddressId?: string;
   ownerId?: string;
   createdBy?: string;

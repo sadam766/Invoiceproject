@@ -1,3 +1,4 @@
+
 {
   "entities": {
     "User": {
@@ -19,6 +20,7 @@
         "name": { "type": "string" },
         "email": { "type": "string" },
         "addresses": { "type": "array" },
+        "billingSchedule": { "type": "string", "description": "Specific days/times for accepting invoices" },
         "createdBy": { "type": "string" }
       }
     },

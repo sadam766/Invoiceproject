@@ -1,3 +1,4 @@
+
 'use client';
 import { useState, useMemo, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
@@ -151,9 +152,6 @@ import {
         setDeleteDialogState({ isOpen: false, spdId: undefined });
     };
 
-    /**
-     * Utility to remove undefined keys from objects to prevent Firestore WriteBatch errors.
-     */
     const cleanUndefined = (obj: any) => {
         const newObj = { ...obj };
         Object.keys(newObj).forEach(key => {
@@ -209,7 +207,6 @@ import {
         
         setIsDialogOpen(false);
         
-        // Trigger Envelope Flow for NEW SPD
         if (!editingSpd) {
             setNewSpdRef(newItem);
             setTimeout(() => setConfirmPrintOpen(true), 500);
@@ -245,7 +242,6 @@ import {
         });
     };
 
-    // Helper to open address selector with validation
     const handlePrepareEnvelope = (spd: SpdData) => {
         setNewSpdRef(spd);
         const customerName = spd.invoices[0]?.customer;
@@ -409,18 +405,26 @@ import {
                                     <Layers className="h-3 w-3" /> Consolidated Documents ({spd.invoices.length})
                                 </p>
                                 <div className="space-y-2">
-                                    {spd.invoices.slice(0, 3).map((inv, idx) => (
-                                        <div key={idx} className="flex flex-col gap-0.5 bg-slate-50/50 p-3 rounded-2xl border border-slate-100 hover:border-indigo-200 transition-colors cursor-pointer group/row" onClick={() => router.push(`/dashboard/invoices`)}>
-                                            <div className="flex justify-between items-center">
-                                                <span className="text-[10px] font-black uppercase truncate max-w-[150px] text-slate-700 group-hover/row:text-indigo-700">{inv.customer}</span>
-                                                <span className="text-[9px] font-mono font-bold text-slate-400">{inv.invoiceId.split('/').pop()}</span>
+                                    {spd.invoices.slice(0, 3).map((inv, idx) => {
+                                        const cust = allCustomers?.find(c => c.name === inv.customer);
+                                        return (
+                                            <div key={idx} className="flex flex-col gap-1 bg-slate-50/50 p-3 rounded-2xl border border-slate-100 hover:border-indigo-200 transition-colors cursor-pointer group/row" onClick={() => router.push(`/dashboard/invoices`)}>
+                                                <div className="flex justify-between items-center">
+                                                    <span className="text-[10px] font-black uppercase truncate max-w-[150px] text-slate-700 group-hover/row:text-indigo-700">{inv.customer}</span>
+                                                    <span className="text-[9px] font-mono font-bold text-slate-400">{inv.invoiceId.split('/').pop()}</span>
+                                                </div>
+                                                {cust?.billingSchedule && (
+                                                    <div className="flex items-center gap-1 text-[8px] font-black text-amber-600 uppercase tracking-tighter">
+                                                        <Clock className="h-2.5 w-2.5" /> Jadwal: {cust.billingSchedule}
+                                                    </div>
+                                                )}
+                                                <div className="flex items-center gap-1.5 mt-0.5 text-slate-400">
+                                                    <Share2 className="h-2.5 w-2.5 text-indigo-400" />
+                                                    <span className="text-[8px] text-muted-foreground line-clamp-1 italic">{inv.address}</span>
+                                                </div>
                                             </div>
-                                            <div className="flex items-center gap-1.5 mt-1">
-                                                <Share2 className="h-2.5 w-2.5 text-indigo-400" />
-                                                <span className="text-[8px] text-muted-foreground line-clamp-1 italic">{inv.address}</span>
-                                            </div>
-                                        </div>
-                                    ))}
+                                        );
+                                    })}
                                     {spd.invoices.length > 3 && (
                                         <div className="text-center pt-1">
                                             <Button variant="ghost" size="sm" className="text-[9px] font-black text-indigo-600 hover:bg-indigo-50 rounded-xl" onClick={() => router.push(`/dashboard/invoices/spd/preview/${encodeURIComponent(spd.id)}`)}>
