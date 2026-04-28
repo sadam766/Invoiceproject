@@ -1,4 +1,3 @@
-
 'use client';
 import { useState, useMemo, useRef } from 'react';
 import { useRouter } from 'next/navigation';
@@ -94,6 +93,23 @@ import {
         }
         return filtered.sort((a, b) => (b.lastUpdatedAt || '').localeCompare(a.lastUpdatedAt || ''));
     }, [orders, searchQuery]);
+
+    const handleDeleteConfirm = async () => {
+        if (!firestore || !deleteDialogState.orderId) return;
+
+        const docRef = doc(firestore, 'salesOrders', deleteDialogState.orderId);
+        try {
+            await deleteDoc(docRef);
+            toast({ title: 'Record Purged', description: 'The Sales Order has been permanently deleted.' });
+        } catch (e) {
+            errorEmitter.emit('permission-error', new FirestorePermissionError({
+                path: docRef.path,
+                operation: 'delete',
+            }));
+        } finally {
+            setDeleteDialogState({ isOpen: false });
+        }
+    };
 
     const handleSave = async (order: SalesOrder) => {
         if (!firestore || !user) return;
