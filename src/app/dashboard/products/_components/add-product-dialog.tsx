@@ -68,10 +68,11 @@ export function AddProductDialog({ isOpen, onOpenChange, onSave, productData, on
   };
 
   const handleSave = () => {
+    if (!name || !unit) return;
     onSave({ 
         id: productData?.id,
         name, 
-        category, 
+        category: category || 'kabel', 
         quantity: parseFormattedNumber(quantity), 
         unit, 
         price: parseFormattedNumber(price)
@@ -79,65 +80,62 @@ export function AddProductDialog({ isOpen, onOpenChange, onSave, productData, on
     onOpenChange(false);
   };
 
-  const dialogTitle = productData ? "Edit Product" : "Add New Product";
-  const dialogDescription = productData ? "Update the product's details below." : "Fill in the details below to add a new product.";
+  const dialogTitle = productData ? "Edit Master Item" : "Add New Master Item";
+  const dialogDescription = productData ? "Update item specifications and standard pricing." : "Register a new commercial item with a standard Unit of Measurement (UOM).";
 
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
       <DialogTrigger asChild>
-        <Button onClick={onAddClick}>
-          <Plus className="mr-2 h-4 w-4" /> Add Product
+        <Button onClick={onAddClick} className="bg-indigo-600 hover:bg-indigo-700 font-black uppercase text-[10px] tracking-widest px-6 h-10 rounded-xl shadow-lg shadow-indigo-100">
+          <Plus className="mr-2 h-4 w-4" /> Add Item
         </Button>
       </DialogTrigger>
-      <DialogContent className="sm:max-w-[425px]">
+      <DialogContent className="sm:max-w-[450px] rounded-3xl">
         <DialogHeader>
-          <DialogTitle>{dialogTitle}</DialogTitle>
-          <DialogDescription>
+          <DialogTitle className="uppercase font-black tracking-tight">{dialogTitle}</DialogTitle>
+          <DialogDescription className="text-xs font-bold text-slate-400">
             {dialogDescription}
           </DialogDescription>
         </DialogHeader>
-        <div className="grid gap-4 py-4">
-          <div className="grid grid-cols-4 items-center gap-4">
-            <Label htmlFor="product-name" className="text-right">
-              Product
-            </Label>
-            <Input id="product-name" value={name} onChange={(e) => setName(e.target.value)} className="col-span-3" />
+        <div className="grid gap-6 py-6">
+          <div className="space-y-2">
+            <Label htmlFor="product-name" className="text-[10px] font-black uppercase text-slate-400">Official Product Name</Label>
+            <Input id="product-name" value={name} onChange={(e) => setName(e.target.value)} className="font-bold h-11 bg-slate-50 border-slate-200" placeholder="E.g. NYYGBY 4x10mm" />
           </div>
-          <div className="grid grid-cols-4 items-center gap-4">
-            <Label htmlFor="category" className="text-right">
-              Category
-            </Label>
-            <Select value={category} onValueChange={setCategory}>
-              <SelectTrigger className="col-span-3">
-                <SelectValue placeholder="Select a category" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="kabel">Kabel</SelectItem>
-                <SelectItem value="aksesoris">Aksesoris</SelectItem>
-              </SelectContent>
-            </Select>
+          
+          <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="category" className="text-[10px] font-black uppercase text-slate-400">Category</Label>
+                <Select value={category} onValueChange={setCategory}>
+                  <SelectTrigger className="h-11 font-bold bg-slate-50 border-slate-200">
+                    <SelectValue placeholder="Select" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="kabel">Kabel</SelectItem>
+                    <SelectItem value="aksesoris">Aksesoris</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="unit" className="text-[10px] font-black uppercase text-slate-400">Unit (UOM)</Label>
+                <Input id="unit" value={unit} onChange={(e) => setUnit(e.target.value)} className="h-11 font-black text-indigo-600 bg-indigo-50/50 border-indigo-100" placeholder="Meter / Pcs / Roll" />
+              </div>
           </div>
-          <div className="grid grid-cols-4 items-center gap-4">
-            <Label htmlFor="quantity" className="text-right">
-              Quantity
-            </Label>
-            <Input id="quantity" value={quantity} onChange={handleNumericChange(setQuantity)} className="col-span-3" placeholder="0" />
-          </div>
-          <div className="grid grid-cols-4 items-center gap-4">
-            <Label htmlFor="unit" className="text-right">
-              Satuan
-            </Label>
-            <Input id="unit" value={unit} onChange={(e) => setUnit(e.target.value)} className="col-span-3" />
-          </div>
-          <div className="grid grid-cols-4 items-center gap-4">
-            <Label htmlFor="price" className="text-right">
-              Price
-            </Label>
-            <Input id="price" value={price} onChange={handleNumericChange(setPrice)} className="col-span-3" placeholder="0"/>
+
+          <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="quantity" className="text-[10px] font-black uppercase text-slate-400">Initial Stock</Label>
+                <Input id="quantity" value={quantity} onChange={handleNumericChange(setQuantity)} className="h-11 font-bold" placeholder="0" />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="price" className="text-[10px] font-black uppercase text-slate-400">Standard Price (IDR)</Label>
+                <Input id="price" value={price} onChange={handleNumericChange(setPrice)} className="h-11 font-black text-slate-900" placeholder="0"/>
+              </div>
           </div>
         </div>
-        <DialogFooter>
-          <Button type="button" onClick={handleSave}>Save Product</Button>
+        <DialogFooter className="bg-slate-50 -mx-6 -mb-6 p-6 rounded-b-3xl">
+          <Button variant="ghost" onClick={() => onOpenChange(false)}>Cancel</Button>
+          <Button type="button" onClick={handleSave} className="bg-indigo-600 hover:bg-indigo-700 font-black uppercase tracking-widest px-8">Save Master Data</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

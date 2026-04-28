@@ -10,7 +10,7 @@ import {
   import { Input } from '@/components/ui/input';
   import { Button } from '@/components/ui/button';
   import { Badge } from '@/components/ui/badge';
-  import { type SalesOrder, type UserProfile, type Invoice, type SalesListItem } from '@/app/lib/data';
+  import { type SalesOrder, type UserProfile, type Invoice, type SalesListItem, type ProductListItem, type SalesOrderItem } from '@/app/lib/data';
   import { 
     Search, 
     Plus, 
@@ -28,11 +28,12 @@ import {
     Trash2,
     Upload,
     AlertTriangle,
-    Check
+    Check,
+    Layers
   } from 'lucide-react';
   import { useFirestore, useUser, useCollection, useMemoFirebase, useDoc, errorEmitter, FirestorePermissionError } from '@/firebase';
   import { collection, query, doc, deleteDoc, setDoc, writeBatch } from 'firebase/firestore';
-  import { cn, formatNumberWithCommas, importFromExcel } from '@/lib/utils';
+  import { cn, formatNumberWithCommas, importFromExcel, parseFormattedNumber } from '@/lib/utils';
   import { SalesOrderConstructor } from './_components/sales-order-constructor';
   import { SoDetailDrawer } from './_components/so-detail-drawer';
   import { DeleteConfirmationDialog } from '@/app/components/delete-confirmation-dialog';
@@ -75,6 +76,10 @@ import {
     // Master Sales for Matching
     const masterSalesQuery = useMemoFirebase(() => firestore ? query(collection(firestore, 'sales')) : null, [firestore]);
     const { data: masterSales } = useCollection<SalesListItem>(masterSalesQuery);
+
+    // Master Products for Unit Lookup
+    const productsQuery = useMemoFirebase(() => firestore ? query(collection(firestore, 'products')) : null, [firestore]);
+    const { data: masterProducts } = useCollection<ProductListItem>(productsQuery);
 
     const filteredOrders = useMemo(() => {
         if (!orders) return [];
@@ -129,44 +134,108 @@ import {
             try {
                 const data = await importFromExcel(file);
                 const batch = writeBatch(firestore);
-                let matchedCount = 0;
-                let orphanCount = 0;
-
+                
+                // --- STEP 1: CONSOLIDATE DATA BY SO NUMBER ---
+                const soGroups: Record<string, { header: any, items: any[] }> = {};
+                
                 data.forEach((row: any) => {
-                    const soNum = String(row.soNumber || row['SO Number'] || '');
+                    const soNum = String(row.soNumber || row['SO Number'] || '').trim();
                     if (!soNum) return;
 
-                    // GOLDEN KEY MATCHING: Look up PO from Master Sales List
-                    const matchedSale = masterSales.find(s => s.soNumber?.toLowerCase() === soNum.toLowerCase());
+                    if (!soGroups[soNum]) {
+                        // Find matching PO for Header info
+                        const matchedSale = masterSales.find(s => s.soNumber?.toLowerCase() === soNum.toLowerCase());
+                        soGroups[soNum] = {
+                            header: {
+                                soNumber: soNum,
+                                poNumber: matchedSale ? matchedSale.poNumber : (row.poNumber || row['PO Number'] || ''),
+                                customer: matchedSale ? matchedSale.customer : (row.customer || row['Customer'] || 'Unknown'),
+                            },
+                            items: []
+                        };
+                    }
+
+                    // Collect item data
+                    const itemName = String(row.productName || row['Product'] || row['Item Name'] || '').trim();
+                    const itemPrice = parseFormattedNumber(row.price || row['Price'] || 0);
+                    const itemQty = parseFormattedNumber(row.quantity || row['Quantity'] || row['QTY'] || 0);
+                    const itemUnitRaw = String(row.unit || row['Unit'] || row['UOM'] || '').trim();
+
+                    if (itemName) {
+                        soGroups[soNum].items.push({
+                            name: itemName,
+                            price: itemPrice,
+                            qty: itemQty,
+                            unit: itemUnitRaw
+                        });
+                    }
+                });
+
+                // --- STEP 2: AGGREGATE ITEMS (AUTO-SUM) & SYNC UNITS ---
+                let totalItemsCreated = 0;
+                let mergedCount = 0;
+
+                Object.values(soGroups).forEach((group) => {
+                    const aggregatedItems: Record<string, SalesOrderItem> = {};
                     
+                    group.items.forEach((it) => {
+                        const key = `${it.name.toLowerCase()}|${it.price}`;
+                        
+                        if (aggregatedItems[key]) {
+                            aggregatedItems[key].quantity += it.qty;
+                            aggregatedItems[key].total = aggregatedItems[key].quantity * aggregatedItems[key].price;
+                            mergedCount++;
+                        } else {
+                            // Try to pull master unit if missing
+                            let finalUnit = it.unit;
+                            if (!finalUnit && masterProducts) {
+                                const master = masterProducts.find(p => p.name.toLowerCase() === it.name.toLowerCase());
+                                if (master) finalUnit = master.unit;
+                            }
+
+                            aggregatedItems[key] = {
+                                id: `item-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
+                                productName: it.name,
+                                category: 'kabel', // Default
+                                quantity: it.qty,
+                                unit: finalUnit || 'Meter',
+                                price: it.price,
+                                total: it.qty * it.price
+                            };
+                            totalItemsCreated++;
+                        }
+                    });
+
+                    const finalItemList = Object.values(aggregatedItems);
+                    const subtotal = finalItemList.reduce((s, i) => s + i.total, 0);
+                    const tax = subtotal * 0.12;
+
                     const newDocRef = doc(collection(firestore, 'salesOrders'));
-                    const soData = {
+                    batch.set(newDocRef, {
                         id: newDocRef.id,
-                        soNumber: soNum,
-                        poNumber: matchedSale ? matchedSale.poNumber : (row.poNumber || ''),
-                        customer: matchedSale ? matchedSale.customer : (row.customer || 'Unknown'),
+                        ...group.header,
                         orderDate: format(new Date(), 'yyyy-MM-dd'),
                         deliveryDate: format(addDays(new Date(), 3), 'yyyy-MM-dd'),
                         status: 'confirmed',
-                        items: [],
-                        totalAmount: 0,
-                        grandTotal: 0,
+                        items: finalItemList,
+                        totalAmount: subtotal,
+                        taxAmount: tax,
+                        grandTotal: subtotal + tax,
                         ownerId: user.uid,
-                        createdBy: userProfile?.displayName || user.email || 'System Importer',
+                        createdBy: userProfile?.displayName || user.email || 'Smart Importer',
                         lastUpdatedAt: new Date().toISOString()
-                    };
-
-                    if (matchedSale) matchedCount++; else orphanCount++;
-                    batch.set(newDocRef, soData);
+                    });
                 });
 
                 await batch.commit();
                 toast({ 
-                    title: "Impor Selesai", 
-                    description: `Berhasil memproses ${data.length} SO. (${matchedCount} Terhubung ke PO, ${orphanCount} Menunggu Mapping).` 
+                    title: "Smart Import Selesai", 
+                    description: `Diproses ${Object.keys(soGroups).length} Sales Orders. Sistem berhasil menggabungkan ${mergedCount} baris item duplikat.` 
                 });
+                event.target.value = '';
             } catch (error) {
-                toast({ variant: "destructive", title: "Gagal Impor", description: "Format file tidak didukung atau sistem sibuk." });
+                console.error(error);
+                toast({ variant: "destructive", title: "Gagal Impor", description: "Terjadi kesalahan saat pemrosesan data agregat." });
             }
         }
     };
@@ -199,9 +268,17 @@ import {
           </div>
           <div className="flex items-center gap-3">
              <input type="file" ref={fileInputRef} onChange={handleFileChange} className="hidden" accept=".xlsx, .xls" />
-             <Button variant="outline" className="h-10 font-bold text-[10px] uppercase tracking-widest border-slate-200" onClick={() => fileInputRef.current?.click()}>
-                <Upload className="mr-2 h-4 w-4" /> Import SO List
-             </Button>
+             <TooltipProvider>
+                <Tooltip>
+                    <TooltipTrigger asChild>
+                        <Button variant="outline" className="h-10 font-bold text-[10px] uppercase tracking-widest border-slate-200" onClick={() => fileInputRef.current?.click()}>
+                            <Upload className="mr-2 h-4 w-4" /> Smart Import (Auto-Sum)
+                        </Button>
+                    </TooltipTrigger>
+                    <TooltipContent className="bg-slate-900 text-white text-[10px] p-2">Sistem akan otomatis menggabungkan item dengan nama & harga yang sama.</TooltipContent>
+                </Tooltip>
+             </TooltipProvider>
+
              <Button 
                 onClick={() => { setEditingOrder(undefined); setIsConstructorOpen(true); }}
                 className="bg-indigo-600 hover:bg-indigo-700 h-10 font-black uppercase text-[10px] tracking-widest px-6 shadow-lg shadow-indigo-100"
@@ -227,8 +304,8 @@ import {
                     <span className="text-sm font-black text-slate-900">{filteredOrders.length} Documents</span>
                 </div>
                 <div className="flex flex-col">
-                    <span className="text-[9px] font-black uppercase text-rose-600 leading-none">Missing PO Link</span>
-                    <span className="text-sm font-black text-rose-600">{filteredOrders.filter(o => !o.poNumber).length} SO</span>
+                    <span className="text-[9px] font-black uppercase text-indigo-600 leading-none">Aggregated Records</span>
+                    <Layers className="h-4 w-4 text-indigo-400 mt-1" />
                 </div>
             </div>
         </div>

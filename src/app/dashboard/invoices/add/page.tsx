@@ -66,7 +66,8 @@ import {
   Pencil,
   Building2,
   Home,
-  CheckCircle2
+  CheckCircle2,
+  Tag
 } from 'lucide-react';
 import { type Invoice, type SalesOrder, type UserProfile, type InvoiceItem, type InvoiceNumber, type ProductListItem, type SalesListItem, type Customer } from '@/app/lib/data';
 import { useToast } from '@/hooks/use-toast';
@@ -205,7 +206,7 @@ export default function AddInvoicePage() {
                  id: item.id || `so-${idx}`,
                  name: item.productName,
                  quantity: item.quantity,
-                 unit: item.unit,
+                 unit: item.unit || 'Meter',
                  price: item.price,
                  total: item.total,
                  originalPrice: item.price,
@@ -232,13 +233,13 @@ export default function AddInvoicePage() {
   // --- CALCULATION STATES ---
   const [subtotal, setSubtotal] = useState(0);
   const [negotiationValue, setNegotiationValue] = useState<string>('');
-  const [negotiationMode, setNegotiationMode] = useState<'percent' | 'nominal'>('nominal');
+  const [negotiationMode, setNegotiationMode] = useState<'percent' | 'nominal'| any>('nominal');
   const [dpValue, setDpValue] = useState<string>('');
-  const [dpMode, setDpMode] = useState<'percent' | 'nominal'>('percent');
+  const [dpMode, setDpMode] = useState<'percent' | 'nominal'| any>('percent');
   const [retentionValue, setRetentionValue] = useState<string>('');
-  const [retentionMode, setRetentionMode] = useState<'percent' | 'nominal'>('nominal');
+  const [retentionMode, setRetentionMode] = useState<'percent' | 'nominal'| any>('nominal');
   const [dpDeductionValue, setDpDeductionValue] = useState<string>('');
-  const [dpDeductionMode, setDpDeductionMode] = useState<'percent' | 'nominal'>('nominal');
+  const [dpDeductionMode, setDpDeductionMode] = useState<'percent' | 'nominal'| any>('nominal');
   const [isTaxManual, setIsTaxManual] = useState(false);
   const [dppVat, setDppVat] = useState<string>('0');
   const [vat12, setVat12] = useState<string>('0');
@@ -295,7 +296,7 @@ export default function AddInvoicePage() {
           id: `history-copy-${Date.now()}`,
           name: histItem.name,
           quantity: 1,
-          unit: histItem.unit,
+          unit: histItem.unit || 'Meter',
           price: histItem.price,
           total: histItem.price
       };
@@ -528,7 +529,8 @@ export default function AddInvoicePage() {
                     <TableHeader className="bg-slate-50">
                         <TableRow>
                             <TableHead className="text-[10px] font-black uppercase py-4 px-6">Description</TableHead>
-                            <TableHead className="w-[100px] text-center text-[10px] font-black uppercase">Quantity</TableHead>
+                            <TableHead className="w-[80px] text-center text-[10px] font-black uppercase">Qty</TableHead>
+                            <TableHead className="w-[100px] text-center text-[10px] font-black uppercase">Unit</TableHead>
                             <TableHead className="w-[120px] text-right text-[10px] font-black uppercase">Unit Price</TableHead>
                             <TableHead className="w-[140px] text-right text-[10px] font-black uppercase">Total</TableHead>
                             <TableHead className="w-[60px]"></TableHead>
@@ -536,7 +538,7 @@ export default function AddInvoicePage() {
                     </TableHeader>
                     <TableBody>
                         {items.length === 0 ? (
-                            <TableRow><TableCell colSpan={5} className="text-center py-20 text-slate-400 italic text-[11px] uppercase font-black opacity-30 tracking-widest">Belum ada item yang ditarik dari Sales Order.</TableCell></TableRow>
+                            <TableRow><TableCell colSpan={6} className="text-center py-20 text-slate-400 italic text-[11px] uppercase font-black opacity-30 tracking-widest">Belum ada item yang ditarik dari Sales Order.</TableCell></TableRow>
                         ) : items.map(item => (
                                 <TableRow key={item.id} className="hover:bg-slate-50/50 transition-colors">
                                     <TableCell className="px-6">
@@ -557,6 +559,14 @@ export default function AddInvoicePage() {
                                                 setItems(items.map(it => it.id === item.id ? { ...it, quantity: val, total: val * it.price } : it));
                                             }} 
                                             className="text-center text-xs h-9 font-black rounded-lg border-slate-200" 
+                                            disabled={isLocked}
+                                        />
+                                    </TableCell>
+                                    <TableCell>
+                                        <Input 
+                                            value={item.unit} 
+                                            onChange={e => setItems(items.map(it => it.id === item.id ? { ...it, unit: e.target.value } : it))}
+                                            className="text-center text-xs h-9 font-bold bg-indigo-50/30 border-indigo-100"
                                             disabled={isLocked}
                                         />
                                     </TableCell>
@@ -601,14 +611,17 @@ export default function AddInvoicePage() {
                                                 key={p.id}
                                                 value={`${p.name}|${p.id}`}
                                                 onSelect={() => {
-                                                    const newItem: InvoiceItem = { id: `manual-${Date.now()}`, name: p.name, quantity: 1, unit: p.unit, price: p.price, total: p.price };
+                                                    const newItem: InvoiceItem = { id: `manual-${Date.now()}`, name: p.name, quantity: 1, unit: p.unit || 'Meter', price: p.price, total: p.price };
                                                     setItems([...items, newItem]);
                                                     setProductPopoverOpen(false);
                                                 }}
                                                 className="p-4 border-b last:border-0"
                                             >
                                                 <div className="flex justify-between w-full">
-                                                    <span className="font-bold text-slate-800 uppercase text-xs">{p.name}</span>
+                                                    <div className="flex flex-col">
+                                                        <span className="font-bold text-slate-800 uppercase text-xs">{p.name}</span>
+                                                        <span className="text-[9px] font-bold text-slate-400">{p.unit || 'No Unit'}</span>
+                                                    </div>
                                                     <span className="text-[10px] font-black text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded">Rp {p.price.toLocaleString()}</span>
                                                 </div>
                                             </CommandItem>
