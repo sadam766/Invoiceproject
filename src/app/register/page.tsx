@@ -7,7 +7,7 @@ import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Eye, EyeOff, Mountain } from 'lucide-react';
+import { Eye, EyeOff, TrendingUp } from 'lucide-react';
 import { useAuth, useUser } from '@/firebase';
 import {
   createUserWithEmailAndPassword,
@@ -58,42 +58,48 @@ export default function RegisterPage() {
     }
   }, [user, isUserLoading, router]);
 
-  const handleRegister = async (e: React.FormEvent) => {
+  const handleRegister = (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
-    try {
-      const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-      await updateProfile(userCredential.user, { displayName: name });
-      
-      const userDocRef = doc(firestore, 'users', userCredential.user.uid);
-      const isLeader = email.toLowerCase() === 'fa@gmail.com';
+    
+    createUserWithEmailAndPassword(auth, email, password)
+      .then(async (userCredential) => {
+        await updateProfile(userCredential.user, { displayName: name });
+        
+        const userDocRef = doc(firestore, 'users', userCredential.user.uid);
+        const isLeader = email.toLowerCase() === 'fa@gmail.com';
 
-      await setDoc(userDocRef, {
-        uid: userCredential.user.uid,
-        email: userCredential.user.email,
-        displayName: name,
-        role: isLeader ? 'admin' : 'staff',
-        status: isLeader ? 'active' : 'pending' // Leader is auto-active, others pending
+        await setDoc(userDocRef, {
+          uid: userCredential.user.uid,
+          email: userCredential.user.email,
+          displayName: name,
+          role: isLeader ? 'admin' : 'staff',
+          status: isLeader ? 'active' : 'pending'
+        });
+        
+        toast({
+            title: isLeader ? "Pendaftaran Leader Berhasil" : "Pendaftaran Berhasil",
+            description: isLeader 
+              ? "Akun Leader Utama telah aktif. Selamat datang di Dakota Hub."
+              : "Akun Anda telah dibuat. Tunggu persetujuan Admin untuk aktivasi dashboard.",
+        });
+        
+        // Navigation will be handled by useEffect
+      })
+      .catch((error: any) => {
+        let message = 'Terjadi kesalahan saat pendaftaran.';
+        if (error.code === 'auth/email-already-in-use') {
+          message = 'Alamat email sudah terdaftar. Silakan login atau gunakan email lain.';
+        } else if (error.code === 'auth/weak-password') {
+          message = 'Kata sandi terlalu lemah. Gunakan minimal 6 karakter.';
+        }
+        toast({
+          variant: 'destructive',
+          title: 'Registrasi Gagal',
+          description: message,
+        });
+        setIsLoading(false);
       });
-      
-      toast({
-          title: isLeader ? "Pendaftaran Leader Berhasil" : "Pendaftaran Berhasil",
-          description: isLeader 
-            ? "Akun Leader Utama telah aktif. Silakan masuk ke Dashboard."
-            : "Akun Anda telah dibuat. Tunggu persetujuan Admin untuk mengakses dashboard.",
-      });
-      
-      router.push('/dashboard');
-    } catch (error: any) {
-      toast({
-        variant: 'destructive',
-        title: 'Registrasi Gagal',
-        description: error.message || 'Terjadi kesalahan. Silakan coba lagi.',
-      });
-      console.error('Registration error:', error);
-    } finally {
-      setIsLoading(false);
-    }
   };
   
   const handleGoogleLogin = async () => {
@@ -119,10 +125,8 @@ export default function RegisterPage() {
       toast({
         variant: 'destructive',
         title: 'Login Google Gagal',
-        description:
-          'Tidak dapat login dengan Google. Silakan coba lagi nanti.',
+        description: 'Tidak dapat login dengan Google. Silakan coba lagi.',
       });
-      console.error('Google login error:', error);
     } finally {
       setIsLoading(false);
     }
@@ -131,7 +135,10 @@ export default function RegisterPage() {
   if (isUserLoading || (!isUserLoading && user)) {
     return (
       <div className="flex h-screen w-full items-center justify-center">
-        Memuat...
+        <div className="flex flex-col items-center gap-4">
+           <div className="h-10 w-10 animate-spin rounded-full border-4 border-indigo-600 border-t-transparent" />
+           <p className="text-xs font-black uppercase tracking-[0.3em] text-slate-400">Processing Request...</p>
+        </div>
       </div>
     );
   }
@@ -152,28 +159,29 @@ export default function RegisterPage() {
         <div className="mx-auto grid w-[350px] gap-6">
           <div className="grid gap-2">
             <div className="flex items-center gap-2 mb-4">
-              <Mountain className="h-6 w-6 text-primary" />
-              <span className="text-xl font-semibold">Dakota</span>
+              <TrendingUp className="h-6 w-6 text-primary" />
+              <span className="text-xl font-black uppercase italic tracking-tighter">Dakota Hub</span>
             </div>
-            <h1 className="text-3xl font-bold">Create an Account</h1>
-            <p className="text-balance text-muted-foreground">
-              Daftarkan akun operasional Anda untuk sistem Dakota.
+            <h1 className="text-3xl font-black uppercase tracking-tight">Create Account</h1>
+            <p className="text-balance text-muted-foreground font-medium">
+              Daftarkan akun operasional Anda untuk akses penuh ke sistem Dakota.
             </p>
           </div>
           <form onSubmit={handleRegister} className="grid gap-4">
             <div className="grid gap-2">
-              <Label htmlFor="name">Nama Lengkap</Label>
+              <Label htmlFor="name" className="text-[10px] font-black uppercase tracking-widest text-slate-400">Nama Lengkap</Label>
               <Input
                 id="name"
                 type="text"
-                placeholder="Masukkan nama lengkap"
+                placeholder="Nama sesuai identitas"
                 required
                 value={name}
                 onChange={(e) => setName(e.target.value)}
+                className="h-11"
               />
             </div>
             <div className="grid gap-2">
-              <Label htmlFor="email">Email</Label>
+              <Label htmlFor="email" className="text-[10px] font-black uppercase tracking-widest text-slate-400">Email Address</Label>
               <Input
                 id="email"
                 type="email"
@@ -181,19 +189,21 @@ export default function RegisterPage() {
                 required
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
+                className="h-11"
               />
             </div>
             <div className="grid gap-2 relative">
               <div className="flex items-center">
-                <Label htmlFor="password">Password</Label>
+                <Label htmlFor="password" className="text-[10px] font-black uppercase tracking-widest text-slate-400">Password</Label>
               </div>
               <Input
                 id="password"
                 type={showPassword ? 'text' : 'password'}
-                placeholder="Masukkan password"
+                placeholder="Min. 6 karakter"
                 required
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
+                className="h-11"
               />
               <button
                 type="button"
@@ -207,33 +217,33 @@ export default function RegisterPage() {
                 )}
               </button>
             </div>
-            <Button type="submit" className="w-full" disabled={isLoading}>
-              {isLoading ? 'Mendaftarkan Akun...' : 'Buat Akun'}
+            <Button type="submit" className="w-full h-12 font-black uppercase tracking-widest shadow-lg shadow-primary/20 mt-2" disabled={isLoading}>
+              {isLoading ? 'Registering...' : 'Complete Registration'}
             </Button>
           </form>
           <div className="relative my-4">
             <div className="absolute inset-0 flex items-center">
               <span className="w-full border-t" />
             </div>
-            <div className="relative flex justify-center text-xs uppercase">
-              <span className="bg-background px-2 text-muted-foreground">
-                Atau daftar dengan
+            <div className="relative flex justify-center text-[10px] font-black uppercase tracking-widest">
+              <span className="bg-background px-4 text-muted-foreground">
+                Or quick sign up
               </span>
             </div>
           </div>
           <Button
             variant="outline"
-            className="w-full"
+            className="w-full h-12 font-bold"
             onClick={handleGoogleLogin}
             disabled={isLoading}
           >
             <GoogleIcon className="mr-2 h-4 w-4" />
-            Daftar dengan Google
+            Register with Google
           </Button>
-          <div className="mt-4 text-center text-sm">
-            Sudah punya akun?{' '}
-            <Link href="/login" className="underline text-primary">
-              Log in di sini
+          <div className="mt-4 text-center text-sm font-medium">
+            Already have an account?{' '}
+            <Link href="/login" className="font-black text-primary hover:underline">
+              Log in here
             </Link>
           </div>
         </div>

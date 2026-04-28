@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Eye, EyeOff, Mountain } from 'lucide-react';
+import { Eye, EyeOff, TrendingUp } from 'lucide-react';
 import { useAuth, useUser } from '@/firebase';
 import {
   GoogleAuthProvider,
@@ -54,22 +54,27 @@ export default function LoginPage() {
     }
   }, [user, isUserLoading, router]);
 
-  const handleLogin = async (e: React.FormEvent) => {
+  const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
-    try {
-      await signInWithEmailAndPassword(auth, email, password);
-      router.push('/dashboard');
-    } catch (error: any) {
-      toast({
-        variant: 'destructive',
-        title: 'Login Gagal',
-        description: 'Email atau password salah. Silakan coba lagi.',
+    
+    // Pattern: Non-blocking auth call
+    signInWithEmailAndPassword(auth, email, password)
+      .then(() => {
+        // Navigation is handled by the useEffect above
+      })
+      .catch((error: any) => {
+        let message = 'Email atau password salah. Silakan coba lagi.';
+        if (error.code === 'auth/invalid-credential') {
+          message = 'Kredensial tidak valid. Periksa kembali email dan password Anda.';
+        }
+        toast({
+          variant: 'destructive',
+          title: 'Login Gagal',
+          description: message,
+        });
+        setIsLoading(false);
       });
-      console.error('Login error:', error);
-    } finally {
-      setIsLoading(false);
-    }
   };
 
   const handleGoogleLogin = async () => {
@@ -85,7 +90,6 @@ export default function LoginPage() {
         description:
           'Tidak dapat login dengan Google. Silakan coba lagi nanti.',
       });
-      console.error('Google login error:', error);
     } finally {
       setIsLoading(false);
     }
@@ -94,7 +98,10 @@ export default function LoginPage() {
   if (isUserLoading || (!isUserLoading && user)) {
     return (
       <div className="flex h-screen w-full items-center justify-center">
-        Loading...
+        <div className="flex flex-col items-center gap-4">
+           <div className="h-10 w-10 animate-spin rounded-full border-4 border-indigo-600 border-t-transparent" />
+           <p className="text-xs font-black uppercase tracking-[0.3em] text-slate-400">Authenticating...</p>
+        </div>
       </div>
     );
   }
@@ -105,29 +112,30 @@ export default function LoginPage() {
         <div className="mx-auto grid w-[350px] gap-6">
           <div className="grid gap-2">
             <div className="flex items-center gap-2 mb-4">
-              <Mountain className="h-6 w-6 text-primary" />
-              <span className="text-xl font-semibold">Acme Inc</span>
+              <TrendingUp className="h-6 w-6 text-primary" />
+              <span className="text-xl font-black uppercase italic tracking-tighter">Dakota Hub</span>
             </div>
-            <h1 className="text-3xl font-bold">Welcome back !</h1>
-            <p className="text-balance text-muted-foreground">
+            <h1 className="text-3xl font-black uppercase tracking-tight">Welcome back !</h1>
+            <p className="text-balance text-muted-foreground font-medium">
               Enter to get unlimited access to data & information.
             </p>
           </div>
           <form onSubmit={handleLogin} className="grid gap-4">
             <div className="grid gap-2">
-              <Label htmlFor="email">Email</Label>
+              <Label htmlFor="email" className="text-[10px] font-black uppercase tracking-widest text-slate-400">Email Address</Label>
               <Input
                 id="email"
                 type="email"
-                placeholder="Enter your mail address"
+                placeholder="email@perusahaan.com"
                 required
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
+                className="h-11"
               />
             </div>
             <div className="grid gap-2 relative">
               <div className="flex items-center">
-                <Label htmlFor="password">Password</Label>
+                <Label htmlFor="password" className="text-[10px] font-black uppercase tracking-widest text-slate-400">Password</Label>
               </div>
               <Input
                 id="password"
@@ -136,6 +144,7 @@ export default function LoginPage() {
                 required
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
+                className="h-11"
               />
               <button
                 type="button"
@@ -154,41 +163,41 @@ export default function LoginPage() {
                 <Checkbox id="remember-me" />
                 <Label
                   htmlFor="remember-me"
-                  className="text-sm font-medium"
+                  className="text-xs font-bold uppercase text-slate-500 cursor-pointer"
                 >
                   Remember me
                 </Label>
               </div>
-              <Link href="#" className="text-sm text-primary hover:underline">
-                Forgot your password?
+              <Link href="#" className="text-xs font-bold text-primary hover:underline uppercase tracking-tighter">
+                Forgot password?
               </Link>
             </div>
-            <Button type="submit" className="w-full" disabled={isLoading}>
-              {isLoading ? 'Logging in...' : 'Log In'}
+            <Button type="submit" className="w-full h-12 font-black uppercase tracking-widest shadow-lg shadow-primary/20" disabled={isLoading}>
+              {isLoading ? 'Logging in...' : 'Secure Log In'}
             </Button>
           </form>
           <div className="relative my-4">
             <div className="absolute inset-0 flex items-center">
               <span className="w-full border-t" />
             </div>
-            <div className="relative flex justify-center text-xs uppercase">
-              <span className="bg-background px-2 text-muted-foreground">
-                Or, Login with
+            <div className="relative flex justify-center text-[10px] font-black uppercase tracking-widest">
+              <span className="bg-background px-4 text-muted-foreground">
+                Or identity provider
               </span>
             </div>
           </div>
           <Button
             variant="outline"
-            className="w-full"
+            className="w-full h-12 font-bold"
             onClick={handleGoogleLogin}
             disabled={isLoading}
           >
             <GoogleIcon className="mr-2 h-4 w-4" />
-            Sign up with google
+            Sign in with Google
           </Button>
-          <div className="mt-4 text-center text-sm">
+          <div className="mt-4 text-center text-sm font-medium">
             Don&apos;t have an account?{' '}
-            <Link href="/register" className="underline text-primary">
+            <Link href="/register" className="font-black text-primary hover:underline">
               Register here
             </Link>
           </div>
