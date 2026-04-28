@@ -1,13 +1,12 @@
 
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect } from 'react';
 import {
     Sheet,
     SheetContent,
     SheetHeader,
     SheetTitle,
-    SheetDescription,
 } from '@/components/ui/sheet';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -28,8 +27,6 @@ import {
     FilePlus, 
     Edit3,
     Copy,
-    ExternalLink,
-    Map as MapIcon,
     Phone,
     Clock,
     CreditCard,
@@ -44,6 +41,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useRouter } from 'next/navigation';
 import { useFirestore } from '@/firebase';
 import { collection, query, where, getDocs } from 'firebase/firestore';
+import { TooltipProvider } from '@/components/ui/tooltip';
 
 type CustomerDrawerProps = {
   isOpen: boolean;
@@ -98,7 +96,7 @@ export function CustomerDrawer({ isOpen, onOpenChange, customerData, onSave }: C
     }
   }, [customerData, isOpen]);
 
-  // INTELLIGENT CODE GENERATOR
+  // INTELLIGENT CODE SUGGESTION (3+3 Pattern)
   useEffect(() => {
       if (!customerData && isOpen && name.length > 3 && !customerCode) {
           const suggestedCode = generateDefaultCode(name);
@@ -106,10 +104,11 @@ export function CustomerDrawer({ isOpen, onOpenChange, customerData, onSave }: C
       }
   }, [name, isOpen, customerData, customerCode]);
 
-  // INTELLIGENT VA LOOKUP & GENERATOR
+  // PRECISION VA LOOKUP & ASCII GENERATOR
   useEffect(() => {
       const fetchOrGenerateVa = async () => {
-          if (!customerCode || !firestore) {
+          const trimmedCode = customerCode.trim().toUpperCase();
+          if (!trimmedCode || trimmedCode.length < 6 || !firestore) {
               setVaNumber('');
               setVaSource('system');
               return;
@@ -118,9 +117,9 @@ export function CustomerDrawer({ isOpen, onOpenChange, customerData, onSave }: C
           setVaSource('searching');
           
           try {
-              // Priority 1: Check in imported virtualAccounts collection
+              // Priority 1: Exact Case-Sensitive matching with Imported virtualAccounts
               const vaRef = collection(firestore, 'virtualAccounts');
-              const q = query(vaRef, where('customerCode', '==', customerCode.toUpperCase()));
+              const q = query(vaRef, where('customerCode', '==', trimmedCode));
               const snapshot = await getDocs(q);
 
               if (!snapshot.empty) {
@@ -128,8 +127,8 @@ export function CustomerDrawer({ isOpen, onOpenChange, customerData, onSave }: C
                   setVaNumber(existingVa.vaNumber);
                   setVaSource('database');
               } else {
-                  // Priority 2: Fallback to System Logic
-                  const generated = generateVirtualAccount(customerCode);
+                  // Priority 2: Replicate User's Excel ASCII logic for new customers
+                  const generated = generateVirtualAccount(trimmedCode);
                   setVaNumber(generated);
                   setVaSource('system');
               }
@@ -139,7 +138,7 @@ export function CustomerDrawer({ isOpen, onOpenChange, customerData, onSave }: C
           }
       };
 
-      const timer = setTimeout(fetchOrGenerateVa, 500); // Debounce lookup
+      const timer = setTimeout(fetchOrGenerateVa, 400); // Fast debounce
       return () => clearTimeout(timer);
   }, [customerCode, firestore]);
 
@@ -160,7 +159,7 @@ export function CustomerDrawer({ isOpen, onOpenChange, customerData, onSave }: C
     };
     setAddresses([...addresses, newEntry]);
     resetNewAddressForm();
-    toast({ title: "Alamat Ditambahkan", description: "Klik simpan di bawah untuk memperbarui data master." });
+    toast({ title: "Alamat Ditambahkan", description: "Simpan profil untuk memperbarui data permanen." });
   };
 
   const handleRemoveAddress = (id: string) => {
@@ -173,19 +172,19 @@ export function CustomerDrawer({ isOpen, onOpenChange, customerData, onSave }: C
 
   const handleSave = () => {
     if (!name || !customerCode) {
-        toast({ variant: "destructive", title: "Data Tidak Lengkap", description: "Nama PT dan Kode Customer wajib diisi." });
+        toast({ variant: "destructive", title: "Data Tidak Lengkap", description: "Nama PT dan Kode Customer (3 Huruf + 3 Angka) wajib diisi." });
         return;
     }
     
     if (vaNumber.length !== 16) {
-        toast({ variant: "destructive", title: "Format VA Tidak Valid", description: "Nomor VA harus tepat 16 digit. Periksa kembali Kode Customer." });
+        toast({ variant: "destructive", title: "Format VA Tidak Valid", description: "Nomor VA harus tepat 16 digit. Periksa format Kode Customer Anda." });
         return;
     }
 
     onSave({ 
         id: customerData?.id, 
         name, 
-        customerCode: customerCode.toUpperCase(),
+        customerCode: customerCode.trim().toUpperCase(),
         email, 
         contactPerson, 
         phone, 
@@ -197,7 +196,7 @@ export function CustomerDrawer({ isOpen, onOpenChange, customerData, onSave }: C
 
   const copyToClipboard = (text: string) => {
       navigator.clipboard.writeText(text);
-      toast({ title: "Teks Disalin", description: "Data telah siap di clipboard." });
+      toast({ title: "Teks Disalin" });
   };
 
   return (
@@ -230,7 +229,6 @@ export function CustomerDrawer({ isOpen, onOpenChange, customerData, onSave }: C
 
         <ScrollArea className="flex-1 p-8 pt-6">
           <div className="space-y-10">
-            {/* LEGAL INFO SECTION */}
             <div className={cn("space-y-6 transition-all", isEditingMain ? "bg-white p-6 rounded-2xl border-2 border-indigo-100 shadow-sm" : "")}>
                 <div className="flex items-center gap-2 mb-2">
                     <User className="h-4 w-4 text-slate-400" />
@@ -244,7 +242,7 @@ export function CustomerDrawer({ isOpen, onOpenChange, customerData, onSave }: C
                                 <Input value={name} onChange={e => setName(e.target.value)} className="font-black uppercase h-11" placeholder="PT JEMBO CABLE" />
                             </div>
                             <div className="space-y-2">
-                                <Label className="text-[10px] font-black uppercase">Unique Code</Label>
+                                <Label className="text-[10px] font-black uppercase">Unique Code (3+3)</Label>
                                 <Input value={customerCode} onChange={e => setCustomerCode(e.target.value.toUpperCase())} className="font-black h-11 border-indigo-200" placeholder="ADH004" />
                             </div>
                         </div>
@@ -252,7 +250,7 @@ export function CustomerDrawer({ isOpen, onOpenChange, customerData, onSave }: C
                         <div className="bg-slate-900 p-5 rounded-2xl border border-slate-800 space-y-3 shadow-xl">
                             <div className="flex justify-between items-center">
                                 <Label className="text-[9px] font-black uppercase text-indigo-400 flex items-center gap-1.5">
-                                    <CreditCard className="h-3 w-3" /> Mandatory Virtual Account (Mandiri)
+                                    <CreditCard className="h-3 w-3" /> Mandiri Virtual Account (16 Digit)
                                 </Label>
                                 {vaSource === 'searching' ? (
                                     <Loader2 className="h-3 w-3 animate-spin text-slate-500" />
@@ -267,12 +265,10 @@ export function CustomerDrawer({ isOpen, onOpenChange, customerData, onSave }: C
                                     {vaNumber || 'AWAITING CODE...'}
                                 </span>
                                 {vaNumber.length > 0 && vaNumber.length !== 16 && (
-                                    <TooltipProvider>
-                                        <ShieldAlert className="h-5 w-5 text-rose-500 animate-pulse" />
-                                    </TooltipProvider>
+                                    <ShieldAlert className="h-5 w-5 text-rose-500 animate-pulse" />
                                 )}
                             </div>
-                            <p className="text-[8px] text-slate-500 font-medium italic">Sistem otomatis mencocokkan kode dengan database impor sebelum meng-generate baru.</p>
+                            <p className="text-[8px] text-slate-500 font-medium italic">Sistem otomatis mencocokkan kode ASCII dengan rumus Excel Anda.</p>
                         </div>
 
                         <div className="grid grid-cols-2 gap-4">
@@ -287,11 +283,7 @@ export function CustomerDrawer({ isOpen, onOpenChange, customerData, onSave }: C
                         </div>
                         <div className="space-y-2">
                             <Label className="text-[10px] font-black uppercase">Jadwal Terima Tagihan</Label>
-                            <Input value={billingSchedule} onChange={e => setBillingSchedule(e.target.value)} placeholder="Contoh: Selasa (10.00 - 16.00)" className="h-11 border-amber-200 focus-visible:ring-amber-500" />
-                        </div>
-                        <div className="space-y-2">
-                            <Label className="text-[10px] font-black uppercase">Billing Contact Email</Label>
-                            <Input value={email} onChange={e => setEmail(e.target.value)} placeholder="finance@customer.com" className="h-11" />
+                            <Input value={billingSchedule} onChange={e => setBillingSchedule(e.target.value)} placeholder="Contoh: Selasa (10.00 - 16.00)" className="h-11 border-amber-200" />
                         </div>
                     </div>
                 ) : (
@@ -307,7 +299,6 @@ export function CustomerDrawer({ isOpen, onOpenChange, customerData, onSave }: C
                                     <p className="text-sm font-mono font-black text-emerald-700">{vaNumber || 'NOT SET'}</p>
                                     {vaNumber && <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => copyToClipboard(vaNumber)}><Copy className="h-3 w-3" /></Button>}
                                 </div>
-                                {vaSource === 'database' && <p className="text-[7px] font-black text-emerald-600 uppercase">Legacy Verified</p>}
                             </div>
                             <div className="space-y-1">
                                 <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Main Email</p>
@@ -328,7 +319,6 @@ export function CustomerDrawer({ isOpen, onOpenChange, customerData, onSave }: C
 
             <Separator className="bg-slate-200" />
 
-            {/* ADDRESS BOOK SECTION */}
             <div className="space-y-6">
                 <div className="flex justify-between items-center">
                     <div className="flex items-center gap-2">
@@ -354,24 +344,14 @@ export function CustomerDrawer({ isOpen, onOpenChange, customerData, onSave }: C
                                         {addr.isDefault && <BadgeCheck className="h-3.5 w-3.5 text-indigo-600" />}
                                     </div>
                                     <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                        <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full text-slate-400 hover:text-indigo-600" onClick={() => copyToClipboard(addr.address)}>
-                                            <Copy className="h-3.5 w-3.5" />
-                                        </Button>
                                         <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full text-rose-400 hover:text-rose-600" onClick={() => handleRemoveAddress(addr.id)}>
                                             <Trash2 className="h-3.5 w-3.5" />
                                         </Button>
                                     </div>
                                 </div>
-                                
-                                <p className="text-[11px] leading-relaxed font-medium text-slate-600 italic mb-4">
-                                    {addr.address}
-                                </p>
-
+                                <p className="text-[11px] leading-relaxed font-medium text-slate-600 italic mb-4">{addr.address}</p>
                                 <div className="flex justify-between items-center pt-3 border-t border-slate-100">
-                                    <div className="flex flex-col gap-0.5">
-                                        <span className="text-[8px] font-black text-slate-400 uppercase">NPWP Cabang:</span>
-                                        <span className="text-[10px] font-mono font-black text-slate-700">{addr.npwp || 'NOT SET'}</span>
-                                    </div>
+                                    <span className="text-[10px] font-mono font-black text-slate-700">{addr.npwp || 'NPWP CABANG: NOT SET'}</span>
                                     {!addr.isDefault && (
                                         <Button variant="link" size="sm" className="h-auto p-0 text-[9px] font-black uppercase text-indigo-600" onClick={() => handleSetDefault(addr.id)}>
                                             Set as HQ
@@ -382,30 +362,29 @@ export function CustomerDrawer({ isOpen, onOpenChange, customerData, onSave }: C
                         </Card>
                     ))}
 
-                    {/* ADD NEW ADDRESS CARD */}
                     <Card className="border-2 border-dashed border-indigo-200 bg-indigo-50/20 rounded-2xl">
                         <CardContent className="p-6 space-y-4">
                             <p className="text-[9px] font-black uppercase text-indigo-400 tracking-widest text-center">Registrasi Alamat Cabang Baru</p>
                             <div className="grid grid-cols-2 gap-3">
                                 <div className="space-y-1.5">
                                     <Label className="text-[9px] font-black uppercase text-slate-500">Label Cabang</Label>
-                                    <Input placeholder="E.g. Cabang Bandung" value={newLabel} onChange={e => setNewLabel(e.target.value)} className="h-9 text-xs bg-white" />
+                                    <Input placeholder="E.g. Cabang Bandung" value={newLabel} onChange={e => setNewLabel(e.target.value)} className="h-9 text-xs" />
                                 </div>
                                 <div className="space-y-1.5">
                                     <Label className="text-[9px] font-black uppercase text-slate-500">NPWP Unit</Label>
-                                    <Input placeholder="00.000.000.0-000.000" value={newNpwp} onChange={e => setNewNpwp(e.target.value)} className="h-9 text-xs bg-white font-mono" />
+                                    <Input placeholder="00.000.000.0-000.000" value={newNpwp} onChange={e => setNewNpwp(e.target.value)} className="h-9 text-xs font-mono" />
                                 </div>
                             </div>
                             <div className="space-y-1.5">
                                 <Label className="text-[9px] font-black uppercase text-slate-500">Alamat Lengkap</Label>
                                 <textarea 
-                                    className="w-full rounded-xl border border-indigo-100 bg-white px-4 py-3 text-xs min-h-[80px] focus:ring-1 focus:ring-indigo-600 outline-none"
-                                    placeholder="Jalan, No, Blok, Kelurahan, Kota..."
+                                    className="w-full rounded-xl border border-indigo-100 bg-white px-4 py-3 text-xs min-h-[80px] outline-none"
+                                    placeholder="Jalan, No, Blok..."
                                     value={newAddress}
                                     onChange={e => setNewAddress(e.target.value)}
                                 />
                             </div>
-                            <Button type="button" size="sm" className="w-full h-10 bg-white border-2 border-indigo-600 text-indigo-700 hover:bg-indigo-600 hover:text-white font-black uppercase text-[10px] tracking-widest rounded-xl transition-all" onClick={handleAddAddress} disabled={!newLabel || !newAddress}>
+                            <Button type="button" size="sm" className="w-full h-10 bg-white border-2 border-indigo-600 text-indigo-700 hover:bg-indigo-600 hover:text-white font-black uppercase text-[10px] rounded-xl" onClick={handleAddAddress} disabled={!newLabel || !newAddress}>
                                 <Plus className="h-3.5 w-3.5 mr-2" /> Simpan ke Address Book
                             </Button>
                         </CardContent>
@@ -415,11 +394,10 @@ export function CustomerDrawer({ isOpen, onOpenChange, customerData, onSave }: C
           </div>
         </ScrollArea>
 
-        <div className="p-8 bg-white border-t-2 border-slate-100 shadow-[0_-10px_20px_-5px_rgba(0,0,0,0.05)]">
-          <Button type="button" onClick={handleSave} className="w-full h-14 bg-indigo-600 hover:bg-indigo-700 font-black uppercase text-xs tracking-[0.2em] shadow-xl shadow-indigo-100 rounded-2xl">
+        <div className="p-8 bg-white border-t-2 border-slate-100">
+          <Button type="button" onClick={handleSave} className="w-full h-14 bg-indigo-600 hover:bg-indigo-700 font-black uppercase text-xs tracking-[0.2em] rounded-2xl">
               Kunci Perubahan Profil
           </Button>
-          <p className="text-center text-[8px] font-bold text-slate-400 uppercase mt-4 tracking-widest">Data akan diperbarui secara permanen di seluruh sistem Dakota.</p>
         </div>
       </SheetContent>
     </Sheet>

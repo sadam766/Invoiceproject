@@ -1,4 +1,3 @@
-
 import { clsx, type ClassValue } from "clsx"
 import { twMerge } from "tailwind-merge"
 import * as XLSX from 'xlsx';
@@ -8,52 +7,53 @@ export function cn(...inputs: ClassValue[]) {
 }
 
 /**
- * Generate a default customer code based on name
- * E.g. "PT JEMBO CABLE" -> "JEM582"
+ * Generate a default customer code based on name following 3 Letter + 3 Digit pattern
+ * E.g. "PT JEMBO CABLE" -> "JEM001"
  */
 export function generateDefaultCode(name: string): string {
     if (!name) return '';
     const clean = name.replace(/PT\.|PT|CV\.|CV|UD\.|UD/gi, '').trim();
-    if (clean.length < 3) return clean.toUpperCase() + (Math.floor(Math.random() * 900) + 100);
-    
-    const prefix = clean.substring(0, 3).toUpperCase();
-    const random = Math.floor(Math.random() * 900) + 100;
-    return `${prefix}${random}`;
+    const prefix = clean.substring(0, 3).toUpperCase().padEnd(3, 'X');
+    // Default to 001 for suggestion, user expected to edit this
+    return `${prefix}001`;
 }
 
 /**
- * Generate a Virtual Account number based on Customer Code
- * Formula: 86625 (Bank) + 26 (Year) + Encoded Code
- * Target: 16 digits
+ * Generate a Virtual Account number based on User's Excel Formula
+ * Formula logic: 86625 (Bank) + 26 (Year) + ASCII Code logic
+ * Format: 86625 + 26 + (Char1-64) + (Char2-64) + (Char3-64) + Last 3 Digits
  */
 export function generateVirtualAccount(customerCode: string): string {
-  if (!customerCode) return '';
+  if (!customerCode || customerCode.length < 6) return '';
   
   const bankPrefix = "86625";
-  const yearPrefix = "26"; // 2026 short
+  const yearPrefix = "26"; // 2026
   const base = bankPrefix + yearPrefix;
   
-  // Extract letters and numbers
-  const letters = customerCode.replace(/[^A-Z]/gi, '').toUpperCase();
-  const digits = customerCode.replace(/[^0-9]/g, '');
+  // Extract 3 letters and last 3 digits (ADH004 -> letters: ADH, digits: 004)
+  const letters = customerCode.substring(0, 3).toUpperCase();
+  const lastDigits = customerCode.substring(customerCode.length - 3);
   
-  // Convert letters to numeric values (A=01, B=02...)
+  // Replicate Excel CODE() - 64 logic
+  // A = 65, 65-64 = 01
+  // D = 68, 68-64 = 04
+  // H = 72, 72-64 = 08
   let letterNumeric = "";
-  for (let i = 0; i < letters.length; i++) {
-    const code = letters.charCodeAt(i) - 64;
-    letterNumeric += Math.max(1, code).toString().padStart(2, '0');
+  for (let i = 0; i < 3; i++) {
+    const charCode = letters.charCodeAt(i);
+    // Ensure we handle non-letter characters gracefully, but target is A-Z
+    const rank = charCode >= 65 && charCode <= 90 ? charCode - 64 : 0;
+    letterNumeric += rank.toString().padStart(2, '0');
   }
   
-  // Construct the body: LetterMapping + Digits
-  // We need 16 - 7 = 9 digits for the body
-  const body = (letterNumeric + digits).slice(0, 9).padStart(9, '0');
+  // Final Assembly: 8662526 + 010408 + 004 = 16 digits
+  const result = base + letterNumeric + lastDigits;
   
-  return base + body;
+  return result.substring(0, 16);
 }
 
 /**
  * Memformat angka ke format mata uang/akuntansi Indonesia (1.234,56)
- * Membatasi maksimal 2 angka di belakang koma.
  */
 export function formatNumberWithCommas(value: number | string | undefined): string {
   if (value === undefined || value === null || value === '') {
@@ -68,7 +68,6 @@ export function formatNumberWithCommas(value: number | string | undefined): stri
     return '';
   }
 
-  // Gunakan Intl.NumberFormat dengan standar Indonesia
   return new Intl.NumberFormat('id-ID', {
     minimumFractionDigits: 0,
     maximumFractionDigits: 2
@@ -77,23 +76,17 @@ export function formatNumberWithCommas(value: number | string | undefined): stri
 
 /**
  * Mengonversi string berformat (dengan titik/koma) kembali menjadi angka murni (float)
- * Mendukung input fleksibel: "1.234,50", "1234.50", "1234,50"
  */
 export function parseFormattedNumber(value: string | number): number {
   if (typeof value === 'number') return value;
   if (!value || value === '') return 0;
 
-  // Hapus karakter yang bukan angka, koma, titik, atau minus
-  // Untuk format Indonesia, kita hapus titik (ribuan) dan ubah koma menjadi titik (desimal)
   let clean = value.toString().replace(/[^\d.,-]/g, '');
 
-  // Cek apakah ada titik sebagai pemisah ribuan (lebih dari satu titik atau titik di posisi ribuan)
   if ((clean.match(/\./g) || []).length > 0) {
-    // Jika ada titik, kita asumsikan itu pemisah ribuan dan kita hapus
     clean = clean.replace(/\./g, '');
   }
 
-  // Ubah koma menjadi titik untuk parseFloat
   clean = clean.replace(',', '.');
 
   return parseFloat(clean) || 0;
