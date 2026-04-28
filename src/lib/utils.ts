@@ -8,6 +8,20 @@ export function cn(...inputs: ClassValue[]) {
 }
 
 /**
+ * Generate a default customer code based on name
+ * E.g. "PT JEMBO CABLE" -> "JEM582"
+ */
+export function generateDefaultCode(name: string): string {
+    if (!name) return '';
+    const clean = name.replace(/PT\.|PT|CV\.|CV|UD\.|UD/gi, '').trim();
+    if (clean.length < 3) return clean.toUpperCase() + (Math.floor(Math.random() * 900) + 100);
+    
+    const prefix = clean.substring(0, 3).toUpperCase();
+    const random = Math.floor(Math.random() * 900) + 100;
+    return `${prefix}${random}`;
+}
+
+/**
  * Generate a Virtual Account number based on Customer Code
  * Formula: 86625 (Bank) + 26 (Year) + Encoded Code
  * Target: 16 digits
@@ -27,7 +41,7 @@ export function generateVirtualAccount(customerCode: string): string {
   let letterNumeric = "";
   for (let i = 0; i < letters.length; i++) {
     const code = letters.charCodeAt(i) - 64;
-    letterNumeric += code.toString().padStart(2, '0');
+    letterNumeric += Math.max(1, code).toString().padStart(2, '0');
   }
   
   // Construct the body: LetterMapping + Digits

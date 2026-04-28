@@ -33,12 +33,17 @@ import {
     Phone,
     Clock,
     CreditCard,
-    ShieldAlert
+    ShieldAlert,
+    Database,
+    Cpu,
+    Loader2
 } from 'lucide-react';
-import type { Customer, CustomerAddress } from '@/app/lib/data';
-import { cn, generateVirtualAccount } from '@/lib/utils';
+import type { Customer, CustomerAddress, VirtualAccount } from '@/app/lib/data';
+import { cn, generateVirtualAccount, generateDefaultCode } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
 import { useRouter } from 'next/navigation';
+import { useFirestore } from '@/firebase';
+import { collection, query, where, getDocs } from 'firebase/firestore';
 
 type CustomerDrawerProps = {
   isOpen: boolean;
@@ -50,6 +55,7 @@ type CustomerDrawerProps = {
 export function CustomerDrawer({ isOpen, onOpenChange, customerData, onSave }: CustomerDrawerProps) {
   const router = useRouter();
   const { toast } = useToast();
+  const firestore = useFirestore();
   
   const [name, setName] = useState('');
   const [customerCode, setCustomerCode] = useState('');
@@ -59,6 +65,9 @@ export function CustomerDrawer({ isOpen, onOpenChange, customerData, onSave }: C
   const [billingSchedule, setBillingSchedule] = useState('');
   const [addresses, setAddresses] = useState<CustomerAddress[]>([]);
   
+  const [vaNumber, setVaNumber] = useState('');
+  const [vaSource, setVaSource] = useState<'database' | 'system' | 'searching'>('system');
+
   const [newLabel, setNewLabel] = useState('');
   const [newAddress, setNewAddress] = useState('');
   const [newNpwp, setNewNpwp] = useState('');
@@ -73,6 +82,7 @@ export function CustomerDrawer({ isOpen, onOpenChange, customerData, onSave }: C
       setPhone(customerData.phone || '');
       setBillingSchedule(customerData.billingSchedule || '');
       setAddresses(customerData.addresses || []);
+      setVaNumber(customerData.virtualAccountNumber || '');
       setIsEditingMain(false);
     } else if (!isOpen) {
       setName('');
@@ -82,11 +92,56 @@ export function CustomerDrawer({ isOpen, onOpenChange, customerData, onSave }: C
       setPhone('');
       setBillingSchedule('');
       setAddresses([]);
+      setVaNumber('');
+      setVaSource('system');
       resetNewAddressForm();
     }
   }, [customerData, isOpen]);
 
-  const autoVa = useMemo(() => generateVirtualAccount(customerCode), [customerCode]);
+  // INTELLIGENT CODE GENERATOR
+  useEffect(() => {
+      if (!customerData && isOpen && name.length > 3 && !customerCode) {
+          const suggestedCode = generateDefaultCode(name);
+          setCustomerCode(suggestedCode);
+      }
+  }, [name, isOpen, customerData, customerCode]);
+
+  // INTELLIGENT VA LOOKUP & GENERATOR
+  useEffect(() => {
+      const fetchOrGenerateVa = async () => {
+          if (!customerCode || !firestore) {
+              setVaNumber('');
+              setVaSource('system');
+              return;
+          }
+
+          setVaSource('searching');
+          
+          try {
+              // Priority 1: Check in imported virtualAccounts collection
+              const vaRef = collection(firestore, 'virtualAccounts');
+              const q = query(vaRef, where('customerCode', '==', customerCode.toUpperCase()));
+              const snapshot = await getDocs(q);
+
+              if (!snapshot.empty) {
+                  const existingVa = snapshot.docs[0].data() as VirtualAccount;
+                  setVaNumber(existingVa.vaNumber);
+                  setVaSource('database');
+              } else {
+                  // Priority 2: Fallback to System Logic
+                  const generated = generateVirtualAccount(customerCode);
+                  setVaNumber(generated);
+                  setVaSource('system');
+              }
+          } catch (error) {
+              console.error("VA Lookup Error:", error);
+              setVaSource('system');
+          }
+      };
+
+      const timer = setTimeout(fetchOrGenerateVa, 500); // Debounce lookup
+      return () => clearTimeout(timer);
+  }, [customerCode, firestore]);
 
   const resetNewAddressForm = () => {
     setNewLabel('');
@@ -122,8 +177,8 @@ export function CustomerDrawer({ isOpen, onOpenChange, customerData, onSave }: C
         return;
     }
     
-    if (autoVa.length !== 16) {
-        toast({ variant: "destructive", title: "Format VA Tidak Valid", description: "Kode Customer tidak menghasilkan 16 digit VA. Gunakan format seperti ADH004." });
+    if (vaNumber.length !== 16) {
+        toast({ variant: "destructive", title: "Format VA Tidak Valid", description: "Nomor VA harus tepat 16 digit. Periksa kembali Kode Customer." });
         return;
     }
 
@@ -136,7 +191,7 @@ export function CustomerDrawer({ isOpen, onOpenChange, customerData, onSave }: C
         phone, 
         billingSchedule, 
         addresses,
-        virtualAccountNumber: autoVa
+        virtualAccountNumber: vaNumber
     });
   };
 
@@ -153,12 +208,12 @@ export function CustomerDrawer({ isOpen, onOpenChange, customerData, onSave }: C
              <div className="space-y-1">
                 <p className="text-[10px] font-black uppercase text-indigo-600 tracking-widest">Legal Customer Profile</p>
                 <SheetTitle className="text-2xl font-black uppercase tracking-tighter text-slate-900 leading-tight">
-                    {customerData ? customerData.name : 'Register New PT'}
+                    {customerData ? customerData.name : (name || 'Register New PT')}
                 </SheetTitle>
              </div>
-             {customerData && (
+             {customerCode && (
                 <Badge variant="outline" className="bg-indigo-50 border-indigo-200 text-indigo-700 text-[10px] font-black uppercase px-3 py-1">
-                    ID: {customerData.customerCode}
+                    ID: {customerCode}
                 </Badge>
              )}
           </div>
@@ -194,15 +249,30 @@ export function CustomerDrawer({ isOpen, onOpenChange, customerData, onSave }: C
                             </div>
                         </div>
 
-                        <div className="bg-emerald-50/50 p-4 rounded-xl border border-emerald-100 space-y-2">
-                            <Label className="text-[9px] font-black uppercase text-emerald-700 flex items-center gap-1.5"><CreditCard className="h-3 w-3" /> Auto-Generated Virtual Account (Mandiri)</Label>
-                            <div className="flex items-center justify-between">
-                                <span className={cn("font-mono font-black text-sm", autoVa.length === 16 ? "text-emerald-700" : "text-rose-600")}>
-                                    {autoVa || 'WAITING FOR CODE...'}
-                                </span>
-                                {autoVa.length > 0 && autoVa.length !== 16 && <ShieldAlert className="h-4 w-4 text-rose-500" />}
+                        <div className="bg-slate-900 p-5 rounded-2xl border border-slate-800 space-y-3 shadow-xl">
+                            <div className="flex justify-between items-center">
+                                <Label className="text-[9px] font-black uppercase text-indigo-400 flex items-center gap-1.5">
+                                    <CreditCard className="h-3 w-3" /> Mandatory Virtual Account (Mandiri)
+                                </Label>
+                                {vaSource === 'searching' ? (
+                                    <Loader2 className="h-3 w-3 animate-spin text-slate-500" />
+                                ) : vaSource === 'database' ? (
+                                    <Badge className="bg-emerald-600 text-[7px] font-black uppercase h-4 px-1.5"><Database className="h-2 w-2 mr-1" /> Linked from Database</Badge>
+                                ) : (
+                                    <Badge className="bg-indigo-600 text-[7px] font-black uppercase h-4 px-1.5"><Cpu className="h-2 w-2 mr-1" /> Generated by System</Badge>
+                                )}
                             </div>
-                            <p className="text-[8px] text-emerald-600 font-medium italic">Rumus: 86625 + 26 + Logic({customerCode || '?'})</p>
+                            <div className="flex items-center justify-between bg-slate-800/50 p-3 rounded-xl">
+                                <span className={cn("font-mono font-black text-lg tracking-widest", vaNumber.length === 16 ? "text-white" : "text-rose-400")}>
+                                    {vaNumber || 'AWAITING CODE...'}
+                                </span>
+                                {vaNumber.length > 0 && vaNumber.length !== 16 && (
+                                    <TooltipProvider>
+                                        <ShieldAlert className="h-5 w-5 text-rose-500 animate-pulse" />
+                                    </TooltipProvider>
+                                )}
+                            </div>
+                            <p className="text-[8px] text-slate-500 font-medium italic">Sistem otomatis mencocokkan kode dengan database impor sebelum meng-generate baru.</p>
                         </div>
 
                         <div className="grid grid-cols-2 gap-4">
@@ -233,10 +303,11 @@ export function CustomerDrawer({ isOpen, onOpenChange, customerData, onSave }: C
                             </div>
                             <div className="space-y-1">
                                 <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Active Virtual Account</p>
-                                <p className="text-sm font-mono font-black text-emerald-700 flex items-center gap-2">
-                                    {autoVa || 'NOT GENERATED'}
-                                    {autoVa && <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => copyToClipboard(autoVa)}><Copy className="h-3 w-3" /></Button>}
-                                </p>
+                                <div className="flex items-center gap-2">
+                                    <p className="text-sm font-mono font-black text-emerald-700">{vaNumber || 'NOT SET'}</p>
+                                    {vaNumber && <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => copyToClipboard(vaNumber)}><Copy className="h-3 w-3" /></Button>}
+                                </div>
+                                {vaSource === 'database' && <p className="text-[7px] font-black text-emerald-600 uppercase">Legacy Verified</p>}
                             </div>
                             <div className="space-y-1">
                                 <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Main Email</p>
