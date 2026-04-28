@@ -33,7 +33,8 @@ import {
     ShieldAlert,
     Database,
     Cpu,
-    Loader2
+    Loader2,
+    RefreshCw
 } from 'lucide-react';
 import type { Customer, CustomerAddress, VirtualAccount } from '@/app/lib/data';
 import { cn, generateVirtualAccount, generateDefaultCode } from '@/lib/utils';
@@ -41,7 +42,6 @@ import { useToast } from '@/hooks/use-toast';
 import { useRouter } from 'next/navigation';
 import { useFirestore } from '@/firebase';
 import { collection, query, where, getDocs } from 'firebase/firestore';
-import { TooltipProvider } from '@/components/ui/tooltip';
 
 type CustomerDrawerProps = {
   isOpen: boolean;
@@ -82,7 +82,7 @@ export function CustomerDrawer({ isOpen, onOpenChange, customerData, onSave }: C
       setAddresses(customerData.addresses || []);
       setVaNumber(customerData.virtualAccountNumber || '');
       setIsEditingMain(false);
-    } else if (!isOpen) {
+    } else if (isOpen && !customerData) {
       setName('');
       setCustomerCode('');
       setEmail('');
@@ -92,23 +92,16 @@ export function CustomerDrawer({ isOpen, onOpenChange, customerData, onSave }: C
       setAddresses([]);
       setVaNumber('');
       setVaSource('system');
+      setIsEditingMain(true);
       resetNewAddressForm();
     }
   }, [customerData, isOpen]);
 
-  // INTELLIGENT CODE SUGGESTION (3+3 Pattern)
-  useEffect(() => {
-      if (!customerData && isOpen && name.length > 3 && !customerCode) {
-          const suggestedCode = generateDefaultCode(name);
-          setCustomerCode(suggestedCode);
-      }
-  }, [name, isOpen, customerData, customerCode]);
-
-  // PRECISION VA LOOKUP & ASCII GENERATOR
+  // REACTIVE VA SYNC: Triggers on any code change
   useEffect(() => {
       const fetchOrGenerateVa = async () => {
           const trimmedCode = customerCode.trim().toUpperCase();
-          if (!trimmedCode || trimmedCode.length < 6 || !firestore) {
+          if (!trimmedCode || trimmedCode.length < 4 || !firestore) {
               setVaNumber('');
               setVaSource('system');
               return;
@@ -117,7 +110,7 @@ export function CustomerDrawer({ isOpen, onOpenChange, customerData, onSave }: C
           setVaSource('searching');
           
           try {
-              // Priority 1: Exact Case-Sensitive matching with Imported virtualAccounts
+              // Priority 1: Exact Case-Sensitive matching with Imported database
               const vaRef = collection(firestore, 'virtualAccounts');
               const q = query(vaRef, where('customerCode', '==', trimmedCode));
               const snapshot = await getDocs(q);
@@ -127,7 +120,7 @@ export function CustomerDrawer({ isOpen, onOpenChange, customerData, onSave }: C
                   setVaNumber(existingVa.vaNumber);
                   setVaSource('database');
               } else {
-                  // Priority 2: Replicate User's Excel ASCII logic for new customers
+                  // Priority 2: Replicate User's Excel ASCII logic (Fallback)
                   const generated = generateVirtualAccount(trimmedCode);
                   setVaNumber(generated);
                   setVaSource('system');
@@ -138,7 +131,7 @@ export function CustomerDrawer({ isOpen, onOpenChange, customerData, onSave }: C
           }
       };
 
-      const timer = setTimeout(fetchOrGenerateVa, 400); // Fast debounce
+      const timer = setTimeout(fetchOrGenerateVa, 350); // Fast Reactive Debounce
       return () => clearTimeout(timer);
   }, [customerCode, firestore]);
 
@@ -159,7 +152,6 @@ export function CustomerDrawer({ isOpen, onOpenChange, customerData, onSave }: C
     };
     setAddresses([...addresses, newEntry]);
     resetNewAddressForm();
-    toast({ title: "Alamat Ditambahkan", description: "Simpan profil untuk memperbarui data permanen." });
   };
 
   const handleRemoveAddress = (id: string) => {
@@ -172,12 +164,12 @@ export function CustomerDrawer({ isOpen, onOpenChange, customerData, onSave }: C
 
   const handleSave = () => {
     if (!name || !customerCode) {
-        toast({ variant: "destructive", title: "Data Tidak Lengkap", description: "Nama PT dan Kode Customer (3 Huruf + 3 Angka) wajib diisi." });
+        toast({ variant: "destructive", title: "Data Tidak Lengkap", description: "Nama PT dan Kode Unique (ERP) wajib diisi." });
         return;
     }
     
     if (vaNumber.length !== 16) {
-        toast({ variant: "destructive", title: "Format VA Tidak Valid", description: "Nomor VA harus tepat 16 digit. Periksa format Kode Customer Anda." });
+        toast({ variant: "destructive", title: "Format VA Tidak Valid", description: "Nomor VA harus tepat 16 digit. Periksa kembali Kode Customer Anda." });
         return;
     }
 
@@ -212,14 +204,14 @@ export function CustomerDrawer({ isOpen, onOpenChange, customerData, onSave }: C
              </div>
              {customerCode && (
                 <Badge variant="outline" className="bg-indigo-50 border-indigo-200 text-indigo-700 text-[10px] font-black uppercase px-3 py-1">
-                    ID: {customerCode}
+                    ERP ID: {customerCode}
                 </Badge>
              )}
           </div>
 
           <div className="flex gap-3">
              <Button size="sm" variant="outline" className="h-9 text-[10px] font-black uppercase border-slate-200 gap-2 rounded-xl" onClick={() => setIsEditingMain(!isEditingMain)}>
-                <Edit3 className="h-3.5 w-3.5" /> {isEditingMain ? 'Cancel Edit' : 'Edit Legal Info'}
+                <Edit3 className="h-3.5 w-3.5" /> {isEditingMain ? 'Cancel Edit' : 'Edit Identity'}
              </Button>
              <Button size="sm" className="h-9 text-[10px] font-black uppercase bg-indigo-600 hover:bg-indigo-700 gap-2 rounded-xl px-4 shadow-lg shadow-indigo-100" onClick={() => router.push(`/dashboard/invoices/number`)}>
                 <FilePlus className="h-3.5 w-3.5" /> Start Billing
@@ -230,10 +222,14 @@ export function CustomerDrawer({ isOpen, onOpenChange, customerData, onSave }: C
         <ScrollArea className="flex-1 p-8 pt-6">
           <div className="space-y-10">
             <div className={cn("space-y-6 transition-all", isEditingMain ? "bg-white p-6 rounded-2xl border-2 border-indigo-100 shadow-sm" : "")}>
-                <div className="flex items-center gap-2 mb-2">
-                    <User className="h-4 w-4 text-slate-400" />
-                    <h3 className="text-[10px] font-black uppercase text-slate-400 tracking-widest">Administrative Identity</h3>
+                <div className="flex items-center justify-between mb-2">
+                    <div className="flex items-center gap-2">
+                        <User className="h-4 w-4 text-slate-400" />
+                        <h3 className="text-[10px] font-black uppercase text-slate-400 tracking-widest">Administrative Identity</h3>
+                    </div>
+                    {isEditingMain && <Badge variant="secondary" className="bg-indigo-50 text-indigo-600 text-[8px] font-black">EDIT MODE ACTIVE</Badge>}
                 </div>
+
                 {isEditingMain ? (
                     <div className="grid gap-4">
                         <div className="grid grid-cols-3 gap-4">
@@ -242,8 +238,10 @@ export function CustomerDrawer({ isOpen, onOpenChange, customerData, onSave }: C
                                 <Input value={name} onChange={e => setName(e.target.value)} className="font-black uppercase h-11" placeholder="PT JEMBO CABLE" />
                             </div>
                             <div className="space-y-2">
-                                <Label className="text-[10px] font-black uppercase">Unique Code (3+3)</Label>
-                                <Input value={customerCode} onChange={e => setCustomerCode(e.target.value.toUpperCase())} className="font-black h-11 border-indigo-200" placeholder="ADH004" />
+                                <Label className="text-[10px] font-black uppercase flex items-center gap-1">
+                                    Unique Code <RefreshCw className={cn("h-2.5 w-2.5", vaSource === 'searching' && "animate-spin")} />
+                                </Label>
+                                <Input value={customerCode} onChange={e => setCustomerCode(e.target.value.toUpperCase())} className="font-black h-11 border-indigo-300 ring-2 ring-indigo-50" placeholder="ADH004" />
                             </div>
                         </div>
 
@@ -255,20 +253,20 @@ export function CustomerDrawer({ isOpen, onOpenChange, customerData, onSave }: C
                                 {vaSource === 'searching' ? (
                                     <Loader2 className="h-3 w-3 animate-spin text-slate-500" />
                                 ) : vaSource === 'database' ? (
-                                    <Badge className="bg-emerald-600 text-[7px] font-black uppercase h-4 px-1.5"><Database className="h-2 w-2 mr-1" /> Linked from Database</Badge>
+                                    <Badge className="bg-emerald-600 text-[7px] font-black uppercase h-4 px-1.5"><Database className="h-2 w-2 mr-1" /> Linked from ERP Database</Badge>
                                 ) : (
-                                    <Badge className="bg-indigo-600 text-[7px] font-black uppercase h-4 px-1.5"><Cpu className="h-2 w-2 mr-1" /> Generated by System</Badge>
+                                    <Badge className="bg-indigo-600 text-[7px] font-black uppercase h-4 px-1.5"><Cpu className="h-2 w-2 mr-1" /> Dynamic Generation</Badge>
                                 )}
                             </div>
                             <div className="flex items-center justify-between bg-slate-800/50 p-3 rounded-xl">
-                                <span className={cn("font-mono font-black text-lg tracking-widest", vaNumber.length === 16 ? "text-white" : "text-rose-400")}>
+                                <span className={cn("font-mono font-black text-lg tracking-widest", (vaNumber.length === 16) ? "text-white" : "text-rose-400 opacity-50")}>
                                     {vaNumber || 'AWAITING CODE...'}
                                 </span>
                                 {vaNumber.length > 0 && vaNumber.length !== 16 && (
                                     <ShieldAlert className="h-5 w-5 text-rose-500 animate-pulse" />
                                 )}
                             </div>
-                            <p className="text-[8px] text-slate-500 font-medium italic">Sistem otomatis mencocokkan kode ASCII dengan rumus Excel Anda.</p>
+                            <p className="text-[8px] text-slate-500 font-medium italic">Sistem memantau kode ERP Anda secara real-time untuk sinkronisasi VA.</p>
                         </div>
 
                         <div className="grid grid-cols-2 gap-4">

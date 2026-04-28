@@ -26,13 +26,6 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
-import {
-    Sheet,
-    SheetContent,
-    SheetHeader,
-    SheetTitle,
-    SheetTrigger,
-} from '@/components/ui/sheet';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import {
@@ -53,30 +46,20 @@ import {
   Lock,
   Hash,
   Wallet,
-  Scale,
-  History,
   Eye,
   Loader2,
   Trash2,
-  ListChecks,
-  CopyPlus,
-  Search,
-  Layers,
   MapPin,
-  FileText,
   Pencil,
-  Building2,
-  Home,
-  CheckCircle2,
-  Tag,
+  ShieldCheck,
   CreditCard,
-  Banknote,
-  ShieldCheck
+  Layers,
+  Database
 } from 'lucide-react';
-import { type Invoice, type SalesOrder, type UserProfile, type InvoiceItem, type InvoiceNumber, type ProductListItem, type SalesListItem, type Customer, type VirtualAccount } from '@/app/lib/data';
+import { type Invoice, type SalesOrder, type UserProfile, type InvoiceItem, type InvoiceNumber } from '@/app/lib/data';
 import { useToast } from '@/hooks/use-toast';
 import { useFirestore, useCollection, useMemoFirebase, useUser, useDoc, errorEmitter, FirestorePermissionError } from '@/firebase';
-import { collection, query, doc, setDoc, arrayUnion, updateDoc } from 'firebase/firestore';
+import { collection, query, doc, setDoc, arrayUnion } from 'firebase/firestore';
 import { Badge } from '@/components/ui/badge';
 import {
     Command,
@@ -91,9 +74,6 @@ import {
     PopoverContent,
     PopoverTrigger,
 } from '@/components/ui/popover';
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { ScrollArea } from '@/components/ui/scroll-area';
-import { TOOLTIP_CONTENT } from '@/app/lib/tooltip-content';
 import { useDashboardData } from '../../layout';
 
 export default function AddInvoicePage() {
@@ -107,7 +87,7 @@ export default function AddInvoicePage() {
   const invoiceNumberIdParam = searchParams.get('invoiceNumberId');
   
   // Consuming Cached Data for speed
-  const { customers: allCustomers, products: masterProducts, vas: allVAs } = useDashboardData();
+  const { customers: allCustomers, products: masterProducts } = useDashboardData();
 
   // --- DATA FETCHING ---
   const identityRef = useMemoFirebase(() => {
@@ -143,7 +123,6 @@ export default function AddInvoicePage() {
   const [issueDate, setIssueDate] = useState<Date>(new Date());
   const [dueDate, setDueDate] = useState<Date>(addDays(new Date(), 30));
   const [isDpInvoice, setIsDpInvoice] = useState(false);
-  const [selectedVaId, setSelectedVaId] = useState<string>('auto');
   const [manualVaNumber, setManualVaNumber] = useState('');
   const [productPopoverOpen, setProductPopoverOpen] = useState(false);
   const [isProcessing, setIsSaving] = useState(false);
@@ -155,18 +134,18 @@ export default function AddInvoicePage() {
   const [tempAddress, setTempAddress] = useState('');
   const [updateMaster, setUpdateMaster] = useState(true);
 
-  // --- CUSTOMER ADDR LOGIC ---
+  // --- CUSTOMER DATA SYNC ---
   const currentCustomer = useMemo(() => {
     if (!activeIdentity?.customer || !allCustomers) return null;
     return allCustomers.find(c => c.name.toLowerCase() === activeIdentity.customer.toLowerCase());
   }, [activeIdentity?.customer, allCustomers]);
 
-  // AUTO-POPULATE VA
+  // AUTO-POPULATE VA FROM CUSTOMER PROFILE (Reactive)
   useEffect(() => {
-    if (currentCustomer && selectedVaId === 'auto') {
+    if (currentCustomer && !manualVaNumber) {
         setManualVaNumber(currentCustomer.virtualAccountNumber || '');
     }
-  }, [currentCustomer, selectedVaId]);
+  }, [currentCustomer, manualVaNumber]);
 
   // CRITICAL: Pull Data from SO to items
   useEffect(() => {
@@ -193,9 +172,9 @@ export default function AddInvoicePage() {
           setDpValue(formatNumberWithCommas((activeIdentity as Invoice).dpValue || 0));
           setDpDeductionValue(formatNumberWithCommas((activeIdentity as Invoice).dpDeduction || 0));
           setRetentionValue(formatNumberWithCommas((activeIdentity as Invoice).retention || 0));
+          
           if ((activeIdentity as Invoice).vaNumber) {
               setManualVaNumber((activeIdentity as Invoice).vaNumber!);
-              setSelectedVaId('custom');
           }
       }
   }, [activeIdentity, activeSoData, editInvoiceId, items.length]);
@@ -400,13 +379,13 @@ export default function AddInvoicePage() {
                       <div className="relative group">
                           <Input 
                             value={manualVaNumber} 
-                            onChange={e => { setManualVaNumber(e.target.value); setSelectedVaId('custom'); }} 
+                            onChange={e => setManualVaNumber(e.target.value)} 
                             className="h-10 font-mono font-black text-xs border-emerald-100 bg-emerald-50/10 focus-visible:ring-emerald-500 rounded-xl"
-                            placeholder="Generated from Code..."
+                            placeholder="Tarik dari Profil..."
                             disabled={isLocked}
                           />
                           <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-1">
-                              {manualVaNumber.length === 16 ? <ShieldCheck className="h-3.5 w-3.5 text-emerald-500" /> : <Badge variant="outline" className="text-[7px] h-3 px-1">AUTO</Badge>}
+                              {manualVaNumber.length === 16 ? <ShieldCheck className="h-3.5 w-3.5 text-emerald-500" /> : <Badge variant="outline" className="text-[7px] h-3 px-1">SYNC</Badge>}
                           </div>
                       </div>
                   </div>

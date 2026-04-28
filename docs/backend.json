@@ -18,9 +18,11 @@
       "properties": {
         "id": { "type": "string" },
         "name": { "type": "string" },
+        "customerCode": { "type": "string", "description": "Unique ERP identity (e.g. ADH004)" },
         "email": { "type": "string" },
         "addresses": { "type": "array" },
         "billingSchedule": { "type": "string", "description": "Specific days/times for accepting invoices" },
+        "virtualAccountNumber": { "type": "string", "description": "16-digit Mandiri VA" },
         "createdBy": { "type": "string" }
       }
     },
@@ -33,10 +35,12 @@
         "soNumber": { "type": "string" },
         "poNumber": { "type": "string" },
         "customer": { "type": "string" },
+        "customerCode": { "type": "string" },
         "amount": { "type": "number" },
         "status": { "type": "string" },
         "date": { "type": "string" },
         "items": { "type": "array" },
+        "vaNumber": { "type": "string" },
         "revisionLogs": { "type": "array" }
       }
     },
@@ -46,6 +50,7 @@
       "properties": {
         "id": { "type": "string" },
         "customer": { "type": "string" },
+        "customerCode": { "type": "string" },
         "salesOrder": { "type": "string" },
         "poNumber": { "type": "string" },
         "date": { "type": "string" }

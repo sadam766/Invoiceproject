@@ -1,3 +1,4 @@
+
 import { clsx, type ClassValue } from "clsx"
 import { twMerge } from "tailwind-merge"
 import * as XLSX from 'xlsx';
@@ -14,40 +15,37 @@ export function generateDefaultCode(name: string): string {
     if (!name) return '';
     const clean = name.replace(/PT\.|PT|CV\.|CV|UD\.|UD/gi, '').trim();
     const prefix = clean.substring(0, 3).toUpperCase().padEnd(3, 'X');
-    // Default to 001 for suggestion, user expected to edit this
     return `${prefix}001`;
 }
 
 /**
- * Generate a Virtual Account number based on User's Excel Formula
- * Formula logic: 86625 (Bank) + 26 (Year) + ASCII Code logic
- * Format: 86625 + 26 + (Char1-64) + (Char2-64) + (Char3-64) + Last 3 Digits
+ * Generate a Virtual Account number based on refined Excel Formula
+ * Format: 86625 (Bank) + 2026 (Year) + ASCII Code logic + Last 3 Digits + 0
+ * Example: ADH004 -> 8662520261480040
  */
 export function generateVirtualAccount(customerCode: string): string {
-  if (!customerCode || customerCode.length < 6) return '';
+  const cleanCode = (customerCode || '').trim().toUpperCase();
+  if (cleanCode.length < 6) return '';
   
   const bankPrefix = "86625";
-  const yearPrefix = "26"; // 2026
-  const base = bankPrefix + yearPrefix;
+  const yearFull = "2026";
+  const base = bankPrefix + yearFull;
   
-  // Extract 3 letters and last 3 digits (ADH004 -> letters: ADH, digits: 004)
-  const letters = customerCode.substring(0, 3).toUpperCase();
-  const lastDigits = customerCode.substring(customerCode.length - 3);
+  // Extract 3 letters and last 3 digits
+  const letters = cleanCode.substring(0, 3);
+  const digits = cleanCode.substring(cleanCode.length - 3);
   
-  // Replicate Excel CODE() - 64 logic
-  // A = 65, 65-64 = 01
-  // D = 68, 68-64 = 04
-  // H = 72, 72-64 = 08
-  let letterNumeric = "";
+  // Excel CODE() - 64 logic (forces single digit per slot for length consistency)
+  // A=1, B=2 ... J=10 (uses 0), K=11 (uses 1)
+  let asciiSlots = "";
   for (let i = 0; i < 3; i++) {
     const charCode = letters.charCodeAt(i);
-    // Ensure we handle non-letter characters gracefully, but target is A-Z
     const rank = charCode >= 65 && charCode <= 90 ? charCode - 64 : 0;
-    letterNumeric += rank.toString().padStart(2, '0');
+    asciiSlots += (rank % 10).toString();
   }
   
-  // Final Assembly: 8662526 + 010408 + 004 = 16 digits
-  const result = base + letterNumeric + lastDigits;
+  // Assembly: 866252026 (9) + slots (3) + digits (3) + 0 (1) = 16 digits
+  const result = base + asciiSlots + digits + "0";
   
   return result.substring(0, 16);
 }
