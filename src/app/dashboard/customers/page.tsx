@@ -39,15 +39,19 @@ import {
   import { DeleteConfirmationDialog } from '@/app/components/delete-confirmation-dialog';
   import { useToast } from '@/hooks/use-toast';
   import { exportToExcel, generateExcelTemplate, importFromExcel } from '@/lib/utils';
-  import { useFirestore, useUser, useCollection, useMemoFirebase, errorEmitter, FirestorePermissionError, useDoc } from '@/firebase';
-  import { collection, doc, setDoc, deleteDoc, writeBatch, query } from 'firebase/firestore';
+  import { useFirestore, useUser, useMemoFirebase, errorEmitter, FirestorePermissionError, useDoc } from '@/firebase';
+  import { collection, doc, setDoc, deleteDoc, writeBatch } from 'firebase/firestore';
   import { cn } from '@/lib/utils';
+  import { useDashboardData } from '../layout';
 
   export default function CustomerListPage() {
     const firestore = useFirestore();
     const { user } = useUser();
     const { toast } = useToast();
     const fileInputRef = useRef<HTMLInputElement>(null);
+
+    // Consume Cached Data
+    const { customers, invoices, isLoading: isGlobalLoading } = useDashboardData();
 
     const [selectedCustomer, setSelectedCustomer] = useState<Customer | undefined>(undefined);
     const [isDrawerOpen, setIsDrawerOpen] = useState(false);
@@ -64,18 +68,6 @@ import {
     
     const isSuperAdmin = user?.email?.toLowerCase() === 'fa@gmail.com' || userProfile?.email?.toLowerCase() === 'fa@gmail.com';
     const isAdmin = isSuperAdmin || userProfile?.role === 'admin';
-
-    const customersCollection = useMemoFirebase(() => {
-        if (!firestore) return null;
-        return query(collection(firestore, 'customers'));
-    }, [firestore]);
-    const { data: customers, isLoading } = useCollection<Customer>(customersCollection);
-
-    const invoicesCollection = useMemoFirebase(() => {
-        if (!firestore) return null;
-        return query(collection(firestore, 'invoices'));
-    }, [firestore]);
-    const { data: invoices } = useCollection<Invoice>(invoicesCollection);
 
     const filteredCustomers = useMemo(() => {
         if (!customers) return [];
@@ -292,7 +284,7 @@ import {
                             </TableRow>
                         </TableHeader>
                         <TableBody>
-                            {isLoading ? (
+                            {(isGlobalLoading && !customers) ? (
                                 <TableRow><TableCell colSpan={6} className="text-center py-20 font-black uppercase text-slate-400 animate-pulse tracking-widest">Reconciling Legal Database...</TableCell></TableRow>
                             ) : filteredCustomers.length === 0 ? (
                                 <TableRow><TableCell colSpan={6} className="text-center py-32 text-slate-400 font-bold italic">Belum ada customer terdaftar.</TableCell></TableRow>

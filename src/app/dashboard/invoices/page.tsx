@@ -1,3 +1,4 @@
+
 'use client';
 import { useState, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
@@ -38,12 +39,13 @@ import {
     DropdownMenuTrigger,
   } from '@/components/ui/dropdown-menu';
   import { useToast } from '@/hooks/use-toast';
-  import { useFirestore, useCollection, useMemoFirebase, useUser, useDoc, errorEmitter, FirestorePermissionError } from '@/firebase';
+  import { useFirestore, useUser, useMemoFirebase, errorEmitter, FirestorePermissionError, useDoc } from '@/firebase';
   import { collection, query, doc, updateDoc, arrayUnion, deleteDoc } from 'firebase/firestore';
   import { exportToExcel, cn } from '@/lib/utils';
   import { DateRangePicker } from '@/app/components/date-range-picker';
   import { isWithinInterval, parseISO, startOfToday, format } from 'date-fns';
   import { DeleteConfirmationDialog } from '@/app/components/delete-confirmation-dialog';
+  import { useDashboardData } from '../layout';
 
   export default function InvoiceListPage() {
     const router = useRouter();
@@ -57,6 +59,9 @@ import {
     const { toast } = useToast();
     const firestore = useFirestore();
     const { user } = useUser();
+
+    // Consume Cached Data
+    const { invoices, isLoading: isGlobalLoading } = useDashboardData();
 
     // Void State
     const [voidDialogOpen, setVoidDialogOpen] = useState(false);
@@ -75,12 +80,6 @@ import {
 
     const isSuperAdmin = user?.email?.toLowerCase() === 'fa@gmail.com' || userProfile?.email?.toLowerCase() === 'fa@gmail.com';
 
-    const invoicesCollection = useMemoFirebase(() => {
-        if (!firestore) return null;
-        return query(collection(firestore, 'invoices'));
-    }, [firestore]);
-    const { data: invoices, isLoading } = useCollection<Invoice>(invoicesCollection);
-    
     const filteredInvoices = useMemo(() => {
         if (!invoices) return [];
         let filtered = invoices;
@@ -251,7 +250,7 @@ import {
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
-                                {isLoading ? <TableRow><TableCell colSpan={7} className="text-center py-20 font-bold animate-pulse text-muted-foreground">Menganalisa Data Invoices...</TableCell></TableRow> : 
+                                {(isGlobalLoading && !invoices) ? <TableRow><TableCell colSpan={7} className="text-center py-20 font-bold animate-pulse text-muted-foreground">Menganalisa Data Invoices...</TableCell></TableRow> : 
                                     filteredInvoices.map((invoice) => {
                                     const isERP = !(invoice.id.startsWith('SAR') || invoice.id.startsWith('KW'));
                                     

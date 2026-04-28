@@ -29,14 +29,18 @@ import {
   import { DeleteConfirmationDialog } from '@/app/components/delete-confirmation-dialog';
   import { useToast } from '@/hooks/use-toast';
   import { exportToExcel, importFromExcel, generateExcelTemplate, parseFormattedNumber } from '@/lib/utils';
-  import { useFirestore, useUser, useCollection, useMemoFirebase, errorEmitter, FirestorePermissionError, useDoc } from '@/firebase';
+  import { useFirestore, useUser, useMemoFirebase, errorEmitter, FirestorePermissionError, useDoc } from '@/firebase';
   import { collection, doc, setDoc, deleteDoc, writeBatch, query } from 'firebase/firestore';
+  import { useDashboardData } from '../layout';
   
   export default function ProductListPage() {
     const firestore = useFirestore();
     const { user } = useUser();
     const { toast } = useToast();
     const fileInputRef = useRef<HTMLInputElement>(null);
+
+    // Consume Cached Data
+    const { products, isLoading: isGlobalLoading } = useDashboardData();
 
     const [editingProduct, setEditingProduct] = useState<ProductListItem | undefined>(undefined);
     const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -54,13 +58,6 @@ import {
     
     const isSuperAdmin = user?.email?.toLowerCase() === 'fa@gmail.com' || userProfile?.email?.toLowerCase() === 'fa@gmail.com';
     const isAdmin = isSuperAdmin || userProfile?.role === 'admin';
-
-    const productsCollection = useMemoFirebase(() => {
-        if (!firestore) return null;
-        return query(collection(firestore, 'products'));
-    }, [firestore]);
-
-    const { data: products, isLoading } = useCollection<ProductListItem>(productsCollection);
 
     const filteredProducts = useMemo(() => {
         if (!products) return [];
@@ -307,7 +304,7 @@ import {
                             </TableRow>
                         </TableHeader>
                         <TableBody>
-                            {isLoading ? (
+                            {(isGlobalLoading && !products) ? (
                                 <TableRow><TableCell colSpan={8} className="text-center py-8">Memuat data...</TableCell></TableRow>
                             ) : filteredProducts?.map((product) => (
                                 <TableRow key={product.id} className={selectedIds.has(product.id!) ? "bg-muted/50" : ""}>
