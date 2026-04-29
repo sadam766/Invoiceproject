@@ -75,7 +75,7 @@ import {
         if (searchQuery) {
             data = data.filter((customer) =>
               customer.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-              customer.addresses.some(a => a.address.toLowerCase().includes(searchQuery.toLowerCase()))
+              (customer.customerCode && customer.customerCode.toLowerCase().includes(searchQuery.toLowerCase()))
             );
         }
         return data.sort((a, b) => a.name.localeCompare(b.name));
@@ -89,26 +89,6 @@ import {
                 const totalPaid = inv.payments?.reduce((s, p) => s + p.amount, 0) || 0;
                 return sum + (inv.amount - totalPaid);
             }, 0);
-    };
-
-    const getInitials = (name: string) => {
-        return name.split(' ').map(n => n[0]).slice(0, 2).join('').toUpperCase();
-    };
-
-    const getIdentityColor = (name: string) => {
-        const colors = [
-            'bg-indigo-100 text-indigo-700 border-indigo-200',
-            'bg-emerald-100 text-emerald-700 border-emerald-200',
-            'bg-rose-100 text-rose-700 border-rose-200',
-            'bg-amber-100 text-amber-700 border-amber-200',
-            'bg-blue-100 text-blue-700 border-blue-200',
-            'bg-purple-100 text-purple-700 border-purple-200'
-        ];
-        let hash = 0;
-        for (let i = 0; i < name.length; i++) {
-            hash = name.charCodeAt(i) + ((hash << 5) - hash);
-        }
-        return colors[Math.abs(hash) % colors.length];
     };
 
     const handleSelectAll = (checked: boolean) => {
@@ -152,14 +132,6 @@ import {
         setDeleteDialogState({ isOpen: false });
     };
 
-    const openDeleteDialog = (customerId: string) => {
-        if (!isAdmin) {
-            toast({ variant: "destructive", title: "Akses Ditolak", description: "Hanya Admin yang boleh menghapus data." });
-            return;
-        }
-        setDeleteDialogState({ isOpen: true, customerId, isBulk: false });
-    };
-
     const handleSave = (customer: Omit<Customer, 'id'> & { id?: string }) => {
         if (!firestore || !user) return;
         
@@ -194,7 +166,7 @@ import {
     };
 
     const handleDownloadTemplate = () => {
-        generateExcelTemplate(['name', 'email'], 'customer_template');
+        generateExcelTemplate(['Customer_Code', 'Customer_Name', 'VA_Number', 'Contact_Person', 'Phone'], 'template_customer_import');
     };
 
     const handleImportClick = () => fileInputRef.current?.click();
@@ -203,20 +175,32 @@ import {
         const file = event.target.files?.[0];
         if (file && firestore && user) {
             try {
-                const data = await importFromExcel(file) as Omit<Customer, 'id' | 'ownerId'>[];
+                const data = await importFromExcel(file);
                 const batch = writeBatch(firestore);
+                let count = 0;
+
                 data.forEach(item => {
-                    const newDocRef = doc(collection(firestore, 'customers'));
-                    batch.set(newDocRef, { 
-                        ...item, 
-                        id: newDocRef.id, 
-                        ownerId: user.uid, 
-                        addresses: [],
-                        createdBy: userProfile?.displayName || user.email || 'System'
-                    });
+                    const name = item.Customer_Name || item.name;
+                    const code = item.Customer_Code || item.customerCode;
+                    const va = item.VA_Number || item.virtualAccountNumber;
+
+                    if (name) {
+                        const newDocRef = doc(collection(firestore, 'customers'));
+                        batch.set(newDocRef, { 
+                            id: newDocRef.id, 
+                            name: name,
+                            customerCode: code || '',
+                            virtualAccountNumber: va || '',
+                            ownerId: user.uid, 
+                            addresses: [],
+                            createdBy: userProfile?.displayName || user.email || 'Excel Importer'
+                        });
+                        count++;
+                    }
                 });
+
                 await batch.commit();
-                toast({ title: "Import Berhasil", description: `${data.length} pelanggan ditambahkan.` });
+                toast({ title: "Import Berhasil", description: `${count} pelanggan ditambahkan ke database.` });
             } catch (error) {
                 toast({ variant: "destructive", title: "Gagal Import" });
             }
@@ -228,7 +212,7 @@ import {
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
             <div>
                 <h1 className="text-3xl font-black tracking-tighter uppercase text-slate-900">Legal Customer Hub</h1>
-                <p className="text-slate-400 font-medium text-sm">Database profil perusahaan pusat dan jaringan kantor cabang Dakota.</p>
+                <p className="text-slate-400 font-medium text-sm">Database profil perusahaan dan integrasi Virtual Account otomatis.</p>
             </div>
             <div className="flex items-center gap-2">
                 <input type="file" ref={fileInputRef} onChange={handleFileChange} className="hidden" accept=".xlsx, .xls" />
@@ -236,7 +220,7 @@ import {
                 <Button variant="outline" className="h-10 font-bold text-[10px] uppercase tracking-widest" onClick={handleDownloadTemplate}><FileSpreadsheet className="mr-2 h-4 w-4"/> Template</Button>
                 <Button variant="outline" className="h-10 font-bold text-[10px] uppercase tracking-widest" onClick={handleExport}><Download className="mr-2 h-4 w-4"/> Export</Button>
                 <Button onClick={handleAddClick} className="bg-indigo-600 hover:bg-indigo-700 h-10 font-black uppercase text-[10px] tracking-widest px-6 shadow-lg shadow-indigo-100">
-                    <UserCheck className="mr-2 h-4 w-4" /> Add Legal PT
+                    <Plus className="mr-2 h-4 w-4" /> Add Legal PT
                 </Button>
             </div>
         </div>
@@ -247,22 +231,11 @@ import {
                     <div className="relative w-full md:w-1/3">
                         <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
                         <Input 
-                            placeholder="Cari PT Pusat atau alamat cabang..." 
+                            placeholder="Cari PT Pusat atau Kode ERP..." 
                             className="pl-11 h-12 bg-slate-50 border-none font-medium rounded-2xl focus-visible:ring-indigo-500" 
                             value={searchQuery} 
                             onChange={(e) => setSearchQuery(e.target.value)} 
                         />
-                    </div>
-                    <div className="flex items-center gap-4">
-                        {selectedIds.size > 0 && isAdmin && (
-                            <Button variant="destructive" size="sm" className="h-9 rounded-xl font-bold uppercase text-[10px] tracking-widest" onClick={() => setDeleteDialogState({ isOpen: true, isBulk: true })}>
-                                <Trash2 className="mr-2 h-4 w-4" /> Hapus Terpilih ({selectedIds.size})
-                            </Button>
-                        )}
-                        <div className="flex items-center gap-1.5 text-[10px] font-black uppercase text-slate-400 tracking-tighter">
-                           <div className="w-2 h-2 rounded-full bg-indigo-500" /> Aktif
-                           <div className="w-2 h-2 rounded-full bg-slate-300 ml-2" /> Inaktif
-                        </div>
                     </div>
                 </div>
 
@@ -276,24 +249,20 @@ import {
                                         onCheckedChange={handleSelectAll}
                                     />
                                 </TableHead>
-                                <TableHead className="text-[10px] font-black uppercase tracking-widest py-5">Legal Entity (HQ)</TableHead>
-                                <TableHead className="text-[10px] font-black uppercase tracking-widest text-center">Network Scale</TableHead>
+                                <TableHead className="text-[10px] font-black uppercase tracking-widest py-5">Legal Entity</TableHead>
+                                <TableHead className="text-[10px] font-black uppercase tracking-widest">Unique Code</TableHead>
+                                <TableHead className="text-[10px] font-black uppercase tracking-widest">Mandiri VA</TableHead>
                                 <TableHead className="text-[10px] font-black uppercase tracking-widest text-right">Outstanding AR</TableHead>
-                                <TableHead className="text-[10px] font-black uppercase tracking-widest">Added By</TableHead>
                                 <TableHead className="text-right px-8"></TableHead>
                             </TableRow>
                         </TableHeader>
                         <TableBody>
                             {(isGlobalLoading && !customers) ? (
-                                <TableRow><TableCell colSpan={6} className="text-center py-20 font-black uppercase text-slate-400 animate-pulse tracking-widest">Reconciling Legal Database...</TableCell></TableRow>
+                                <TableRow><TableCell colSpan={6} className="text-center py-20 font-black uppercase text-slate-400 animate-pulse tracking-widest">Synchronizing Accounts...</TableCell></TableRow>
                             ) : filteredCustomers.length === 0 ? (
-                                <TableRow><TableCell colSpan={6} className="text-center py-32 text-slate-400 font-bold italic">Belum ada customer terdaftar.</TableCell></TableRow>
+                                <TableRow><TableCell colSpan={6} className="text-center py-32 text-slate-400 font-bold italic">No customers found.</TableCell></TableRow>
                             ) : filteredCustomers?.map((customer) => {
-                                const hqAddr = customer.addresses?.find(a => a.isDefault) || customer.addresses?.[0];
-                                const branches = customer.addresses?.length || 0;
                                 const outstanding = getCustomerOutstanding(customer.name);
-                                const idColor = getIdentityColor(customer.name);
-
                                 return (
                                     <TableRow key={customer.id} className={cn("hover:bg-indigo-50/10 transition-colors border-b-slate-50 last:border-0", selectedIds.has(customer.id!) ? "bg-indigo-50/30" : "")}>
                                         <TableCell className="px-6 py-4">
@@ -303,57 +272,30 @@ import {
                                             />
                                         </TableCell>
                                         <TableCell>
-                                            <div className="flex items-center gap-4">
-                                                <Avatar className={cn("h-12 w-12 border-2", idColor)}>
-                                                    <AvatarFallback className="bg-transparent font-black text-sm">{getInitials(customer.name)}</AvatarFallback>
-                                                </Avatar>
-                                                <div className="flex flex-col gap-0.5">
-                                                    <span className="font-black text-slate-900 uppercase tracking-tight text-sm">{customer.name}</span>
-                                                    <span className="text-[10px] font-bold text-slate-400 lowercase">{customer.email || 'no-email@customer.com'}</span>
-                                                </div>
-                                            </div>
-                                        </TableCell>
-                                        <TableCell className="text-center">
-                                            <div className="flex items-center justify-center gap-3">
-                                                <div className="flex items-center gap-1.5 bg-slate-100 px-2 py-1 rounded-lg">
-                                                    <Home className="h-3 w-3 text-indigo-600" />
-                                                    <span className="text-[10px] font-black">1 HQ</span>
-                                                </div>
-                                                <div className="flex items-center gap-1.5 bg-blue-50 px-2 py-1 rounded-lg">
-                                                    <Building2 className="h-3 w-3 text-blue-600" />
-                                                    <span className="text-[10px] font-black text-blue-700">{branches > 1 ? branches - 1 : 0} Branches</span>
-                                                </div>
-                                            </div>
-                                        </TableCell>
-                                        <TableCell className="text-right">
-                                            <div className="flex flex-col items-end">
-                                                <span className={cn("font-black text-sm", outstanding > 0 ? "text-rose-600" : "text-emerald-600")}>
-                                                    Rp {outstanding.toLocaleString('id-ID')}
-                                                </span>
-                                                {outstanding > 0 && <span className="text-[8px] font-bold text-rose-400 uppercase tracking-widest">Unpaid Balance</span>}
+                                            <div className="flex flex-col gap-0.5">
+                                                <span className="font-black text-slate-900 uppercase tracking-tight text-sm">{customer.name}</span>
+                                                <span className="text-[10px] font-bold text-slate-400">{customer.email || 'no-email@customer.com'}</span>
                                             </div>
                                         </TableCell>
                                         <TableCell>
-                                            <div className="flex items-center gap-2">
-                                                <UserCheck className="h-3.5 w-3.5 text-indigo-400" />
-                                                <span className="text-[10px] font-black uppercase text-slate-400 tracking-tighter">{customer.createdBy || 'System'}</span>
-                                            </div>
+                                            <Badge variant="outline" className="font-black text-[10px] bg-slate-50 text-indigo-600 border-indigo-100">{customer.customerCode || '-'}</Badge>
+                                        </TableCell>
+                                        <TableCell>
+                                            <span className="text-[10px] font-mono font-black text-emerald-700">{customer.virtualAccountNumber || 'Not Set'}</span>
+                                        </TableCell>
+                                        <TableCell className="text-right">
+                                            <span className={cn("font-black text-sm", outstanding > 0 ? "text-rose-600" : "text-emerald-600")}>
+                                                Rp {outstanding.toLocaleString('id-ID')}
+                                            </span>
                                         </TableCell>
                                         <TableCell className="text-right px-8">
-                                            <div className="flex justify-end gap-2">
-                                                <Button 
-                                                    variant="ghost" 
-                                                    className="h-10 px-4 gap-2 text-[10px] font-black uppercase tracking-widest text-indigo-600 hover:bg-indigo-50 rounded-xl"
-                                                    onClick={() => handleViewDetail(customer)}
-                                                >
-                                                    View Details <ArrowRight className="h-3.5 w-3.5" />
-                                                </Button>
-                                                {isAdmin && (
-                                                    <Button variant="ghost" size="icon" className="h-10 w-10 text-rose-400 hover:text-rose-600 hover:bg-rose-50 rounded-full" onClick={() => openDeleteDialog(customer.id!)}>
-                                                        <Trash2 className="h-4 w-4" />
-                                                    </Button>
-                                                )}
-                                            </div>
+                                            <Button 
+                                                variant="ghost" 
+                                                className="h-10 px-4 gap-2 text-[10px] font-black uppercase tracking-widest text-indigo-600 hover:bg-indigo-50 rounded-xl"
+                                                onClick={() => handleViewDetail(customer)}
+                                            >
+                                                Edit Profile <ArrowRight className="h-3.5 w-3.5" />
+                                            </Button>
                                         </TableCell>
                                     </TableRow>
                                 );
@@ -373,7 +315,7 @@ import {
 
         <DeleteConfirmationDialog 
             open={deleteDialogState.isOpen}
-            onOpenChange={(open) => setDeleteDialogState(prev => ({...prev, isOpen: open, customerId: open ? deleteDialogState.customerId : undefined, isBulk: false}))}
+            onOpenChange={(open) => setDeleteDialogState(prev => ({...prev, isOpen: open}))}
             onConfirm={handleDeleteConfirm}
         >
             <div className="hidden" />

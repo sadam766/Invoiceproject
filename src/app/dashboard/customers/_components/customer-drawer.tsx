@@ -35,7 +35,8 @@ import {
     Cpu,
     Loader2,
     RefreshCw,
-    Sparkles
+    Sparkles,
+    Search
 } from 'lucide-react';
 import type { Customer, CustomerAddress, VirtualAccount } from '@/app/lib/data';
 import { cn, generateVirtualAccount } from '@/lib/utils';
@@ -73,6 +74,7 @@ export function CustomerDrawer({ isOpen, onOpenChange, customerData, onSave }: C
   const [isEditingMain, setIsEditingMain] = useState(false);
 
   // LOGIC: Smart Initial Extraction (Reactive)
+  // Menghasilkan inisial 3 huruf + 001 dari Nama PT
   const generateInitialCode = useCallback((ptName: string) => {
       if (!ptName) return '';
       // Clean PT, CV, Tbk, UD
@@ -92,7 +94,7 @@ export function CustomerDrawer({ isOpen, onOpenChange, customerData, onSave }: C
       return initial.toUpperCase().padEnd(3, 'X') + "001";
   }, []);
 
-  // EFFECT: Reactive Code Generation on Name Change
+  // EFFECT 1: Reactive Code Generation on Name Change
   useEffect(() => {
       if (isOpen && !customerData && name && !isEditingMain) {
           const autoCode = generateInitialCode(name);
@@ -122,11 +124,10 @@ export function CustomerDrawer({ isOpen, onOpenChange, customerData, onSave }: C
       setVaNumber('');
       setVaSource('system');
       setIsEditingMain(true);
-      resetNewAddressForm();
     }
   }, [customerData, isOpen]);
 
-  // REACTIVE VA SYNC: Triggers on any code change
+  // EFFECT 2: REACTIVE VA SYNC (Mapping Database vs Auto-Generate)
   useEffect(() => {
       const fetchOrGenerateVa = async () => {
           const trimmedCode = customerCode.trim().toUpperCase();
@@ -160,15 +161,9 @@ export function CustomerDrawer({ isOpen, onOpenChange, customerData, onSave }: C
           }
       };
 
-      const timer = setTimeout(fetchOrGenerateVa, 350); // Fast Reactive Debounce
+      const timer = setTimeout(fetchOrGenerateVa, 350); // Debounce
       return () => clearTimeout(timer);
   }, [customerCode, firestore]);
-
-  const resetNewAddressForm = () => {
-    setNewLabel('');
-    setNewAddress('');
-    setNewNpwp('');
-  };
 
   const handleAddAddress = () => {
     if (!newLabel || !newAddress) return;
@@ -180,28 +175,17 @@ export function CustomerDrawer({ isOpen, onOpenChange, customerData, onSave }: C
       isDefault: addresses.length === 0,
     };
     setAddresses([...addresses, newEntry]);
-    resetNewAddressForm();
-  };
-
-  const handleRemoveAddress = (id: string) => {
-    setAddresses(addresses.filter(a => a.id !== id));
-  };
-
-  const handleSetDefault = (id: string) => {
-    setAddresses(addresses.map(a => ({ ...a, isDefault: a.id === id })));
+    setNewLabel('');
+    setNewAddress('');
+    setNewNpwp('');
   };
 
   const handleSave = () => {
     if (!name || !customerCode) {
-        toast({ variant: "destructive", title: "Data Tidak Lengkap", description: "Nama PT dan Kode Unique (ERP) wajib diisi." });
+        toast({ variant: "destructive", title: "Data Incomplete", description: "Nama PT dan Kode ERP wajib diisi." });
         return;
     }
     
-    if (vaNumber.length !== 16) {
-        toast({ variant: "destructive", title: "Format VA Tidak Valid", description: "Nomor VA harus tepat 16 digit. Periksa kembali Kode Customer Anda." });
-        return;
-    }
-
     onSave({ 
         id: customerData?.id, 
         name, 
@@ -215,18 +199,13 @@ export function CustomerDrawer({ isOpen, onOpenChange, customerData, onSave }: C
     });
   };
 
-  const copyToClipboard = (text: string) => {
-      navigator.clipboard.writeText(text);
-      toast({ title: "Teks Disalin" });
-  };
-
   return (
     <Sheet open={isOpen} onOpenChange={onOpenChange}>
       <SheetContent className="sm:max-w-xl w-full p-0 flex flex-col bg-slate-50 overflow-hidden border-l-0 shadow-2xl">
         <SheetHeader className="p-8 bg-white border-b space-y-4">
           <div className="flex justify-between items-start">
              <div className="space-y-1">
-                <p className="text-[10px] font-black uppercase text-indigo-600 tracking-widest">Legal Customer Profile</p>
+                <p className="text-[10px] font-black uppercase text-indigo-600 tracking-widest">Legal Identity Module</p>
                 <SheetTitle className="text-2xl font-black uppercase tracking-tighter text-slate-900 leading-tight">
                     {customerData ? customerData.name : (name || 'Register New PT')}
                 </SheetTitle>
@@ -240,7 +219,7 @@ export function CustomerDrawer({ isOpen, onOpenChange, customerData, onSave }: C
 
           <div className="flex gap-3">
              <Button size="sm" variant="outline" className="h-9 text-[10px] font-black uppercase border-slate-200 gap-2 rounded-xl" onClick={() => setIsEditingMain(!isEditingMain)}>
-                <Edit3 className="h-3.5 w-3.5" /> {isEditingMain ? 'Cancel Edit' : 'Edit Identity'}
+                <Edit3 className="h-3.5 w-3.5" /> {isEditingMain ? 'Finish Editing' : 'Edit Identity'}
              </Button>
              <Button size="sm" className="h-9 text-[10px] font-black uppercase bg-indigo-600 hover:bg-indigo-700 gap-2 rounded-xl px-4 shadow-lg shadow-indigo-100" onClick={() => router.push(`/dashboard/invoices/number`)}>
                 <FilePlus className="h-3.5 w-3.5" /> Start Billing
@@ -254,9 +233,8 @@ export function CustomerDrawer({ isOpen, onOpenChange, customerData, onSave }: C
                 <div className="flex items-center justify-between mb-2">
                     <div className="flex items-center gap-2">
                         <User className="h-4 w-4 text-slate-400" />
-                        <h3 className="text-[10px] font-black uppercase text-slate-400 tracking-widest">Administrative Identity</h3>
+                        <h3 className="text-[10px] font-black uppercase text-slate-400 tracking-widest">Core Profile</h3>
                     </div>
-                    {isEditingMain && <Badge variant="secondary" className="bg-indigo-50 text-indigo-600 text-[8px] font-black">EDIT MODE ACTIVE</Badge>}
                 </div>
 
                 {isEditingMain ? (
@@ -271,7 +249,7 @@ export function CustomerDrawer({ isOpen, onOpenChange, customerData, onSave }: C
                                 <Label className="text-[10px] font-black uppercase flex items-center gap-1">
                                     Unique Code <RefreshCw className={cn("h-2.5 w-2.5", vaSource === 'searching' && "animate-spin")} />
                                 </Label>
-                                <Input value={customerCode} onChange={e => setCustomerCode(e.target.value.toUpperCase())} className="font-black h-11 border-indigo-300 ring-2 ring-indigo-50" placeholder="ADH001" />
+                                <Input value={customerCode} onChange={e => setCustomerCode(e.target.value.toUpperCase())} className="font-black h-11 border-indigo-300 ring-2 ring-indigo-50" placeholder="ADH004" />
                             </div>
                         </div>
 
@@ -283,9 +261,9 @@ export function CustomerDrawer({ isOpen, onOpenChange, customerData, onSave }: C
                                 {vaSource === 'searching' ? (
                                     <Loader2 className="h-3 w-3 animate-spin text-slate-500" />
                                 ) : vaSource === 'database' ? (
-                                    <Badge className="bg-emerald-600 text-[7px] font-black uppercase h-4 px-1.5"><Database className="h-2 w-2 mr-1" /> Linked from ERP Database</Badge>
+                                    <Badge className="bg-emerald-600 text-[7px] font-black uppercase h-4 px-1.5"><Database className="h-2 w-2 mr-1" /> Linked from ERP</Badge>
                                 ) : (
-                                    <Badge className="bg-indigo-600 text-[7px] font-black uppercase h-4 px-1.5"><Cpu className="h-2 w-2 mr-1" /> Dynamic Generation</Badge>
+                                    <Badge className="bg-indigo-600 text-[7px] font-black uppercase h-4 px-1.5"><Cpu className="h-2 w-2 mr-1" /> Auto-Generated</Badge>
                                 )}
                             </div>
                             <div className="flex items-center justify-between bg-slate-800/50 p-3 rounded-xl">
@@ -296,7 +274,6 @@ export function CustomerDrawer({ isOpen, onOpenChange, customerData, onSave }: C
                                     <ShieldAlert className="h-5 w-5 text-rose-500 animate-pulse" />
                                 )}
                             </div>
-                            <p className="text-[8px] text-slate-500 font-medium italic">Sistem memantau kode ERP Anda secara real-time untuk sinkronisasi VA.</p>
                         </div>
 
                         <div className="grid grid-cols-2 gap-4">
@@ -325,16 +302,7 @@ export function CustomerDrawer({ isOpen, onOpenChange, customerData, onSave }: C
                                 <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Active Virtual Account</p>
                                 <div className="flex items-center gap-2">
                                     <p className="text-sm font-mono font-black text-emerald-700">{vaNumber || 'NOT SET'}</p>
-                                    {vaNumber && <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => copyToClipboard(vaNumber)}><Copy className="h-3 w-3" /></Button>}
                                 </div>
-                            </div>
-                            <div className="space-y-1">
-                                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Main Email</p>
-                                <p className="text-sm font-bold flex items-center gap-2 text-slate-700"><Mail className="h-3.5 w-3.5 text-indigo-400" /> {email || '-'}</p>
-                            </div>
-                            <div className="space-y-1">
-                                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Contact Point</p>
-                                <p className="text-sm font-bold flex items-center gap-2 text-slate-700"><User className="h-3.5 w-3.5 text-indigo-400" /> {contactPerson || '-'}</p>
                             </div>
                             <div className="space-y-1 col-span-2 bg-amber-50 p-3 rounded-xl border border-amber-100">
                                 <p className="text-[9px] font-black text-amber-600 uppercase tracking-widest flex items-center gap-1.5"><Clock className="h-3 w-3" /> Jadwal Terima Tagihan</p>
@@ -358,62 +326,48 @@ export function CustomerDrawer({ isOpen, onOpenChange, customerData, onSave }: C
                 <div className="grid gap-4">
                     {addresses.map((addr) => (
                         <Card key={addr.id} className={cn(
-                            "relative group overflow-hidden border-none shadow-sm ring-1 transition-all duration-300 rounded-2xl",
-                            addr.isDefault ? "ring-indigo-600 bg-white" : "ring-slate-200 bg-slate-100/50 hover:ring-indigo-300 hover:bg-white"
+                            "relative group overflow-hidden border-none shadow-sm ring-1 transition-all rounded-2xl",
+                            addr.isDefault ? "ring-indigo-600 bg-white" : "ring-slate-200 bg-slate-100/50"
                         )}>
-                            <div className={cn("absolute top-0 left-0 w-1.5 h-full", addr.isDefault ? "bg-indigo-600" : "bg-slate-300")} />
-                            <CardContent className="p-5 pl-7">
-                                <div className="flex justify-between items-start mb-3">
+                            <CardContent className="p-5">
+                                <div className="flex justify-between items-start mb-2">
                                     <div className="flex items-center gap-2">
                                         {addr.label.toLowerCase().includes('office') ? <Home className="h-4 w-4 text-indigo-600" /> : <Building2 className="h-4 w-4 text-slate-400" />}
-                                        <span className={cn("text-[10px] font-black uppercase tracking-wider", addr.isDefault ? "text-indigo-700" : "text-slate-500")}>
-                                            {addr.label}
-                                        </span>
+                                        <span className="text-[10px] font-black uppercase tracking-wider">{addr.label}</span>
                                         {addr.isDefault && <BadgeCheck className="h-3.5 w-3.5 text-indigo-600" />}
                                     </div>
-                                    <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                        <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full text-rose-400 hover:text-rose-600" onClick={() => handleRemoveAddress(addr.id)}>
-                                            <Trash2 className="h-3.5 w-3.5" />
-                                        </Button>
-                                    </div>
+                                    <Button variant="ghost" size="icon" className="h-7 w-7 text-rose-400" onClick={() => setAddresses(addresses.filter(a => a.id !== addr.id))}>
+                                        <Trash2 className="h-3.5 w-3.5" />
+                                    </Button>
                                 </div>
-                                <p className="text-[11px] leading-relaxed font-medium text-slate-600 italic mb-4">{addr.address}</p>
-                                <div className="flex justify-between items-center pt-3 border-t border-slate-100">
-                                    <span className="text-[10px] font-mono font-black text-slate-700">{addr.npwp || 'NPWP CABANG: NOT SET'}</span>
-                                    {!addr.isDefault && (
-                                        <Button variant="link" size="sm" className="h-auto p-0 text-[9px] font-black uppercase text-indigo-600" onClick={() => handleSetDefault(addr.id)}>
-                                            Set as HQ
-                                        </Button>
-                                    )}
-                                </div>
+                                <p className="text-[11px] font-medium text-slate-600 italic">{addr.address}</p>
                             </CardContent>
                         </Card>
                     ))}
 
                     <Card className="border-2 border-dashed border-indigo-200 bg-indigo-50/20 rounded-2xl">
                         <CardContent className="p-6 space-y-4">
-                            <p className="text-[9px] font-black uppercase text-indigo-400 tracking-widest text-center">Registrasi Alamat Cabang Baru</p>
                             <div className="grid grid-cols-2 gap-3">
                                 <div className="space-y-1.5">
-                                    <Label className="text-[9px] font-black uppercase text-slate-500">Label Cabang</Label>
-                                    <Input placeholder="E.g. Cabang Bandung" value={newLabel} onChange={e => setNewLabel(e.target.value)} className="h-9 text-xs" />
+                                    <Label className="text-[9px] font-black uppercase">Label Cabang</Label>
+                                    <Input placeholder="Cabang / Site" value={newLabel} onChange={e => setNewLabel(e.target.value)} className="h-9 text-xs" />
                                 </div>
                                 <div className="space-y-1.5">
-                                    <Label className="text-[9px] font-black uppercase text-slate-500">NPWP Unit</Label>
-                                    <Input placeholder="00.000.000.0-000.000" value={newNpwp} onChange={e => setNewNpwp(e.target.value)} className="h-9 text-xs font-mono" />
+                                    <Label className="text-[9px] font-black uppercase">NPWP</Label>
+                                    <Input placeholder="00.000..." value={newNpwp} onChange={e => setNewNpwp(e.target.value)} className="h-9 text-xs" />
                                 </div>
                             </div>
                             <div className="space-y-1.5">
-                                <Label className="text-[9px] font-black uppercase text-slate-500">Alamat Lengkap</Label>
+                                <Label className="text-[9px] font-black uppercase">Alamat Lengkap</Label>
                                 <textarea 
-                                    className="w-full rounded-xl border border-indigo-100 bg-white px-4 py-3 text-xs min-h-[80px] outline-none"
-                                    placeholder="Jalan, No, Blok..."
+                                    className="w-full rounded-xl border border-indigo-100 bg-white px-4 py-3 text-xs min-h-[80px]"
+                                    placeholder="Jalan, Blok, No..."
                                     value={newAddress}
                                     onChange={e => setNewAddress(e.target.value)}
                                 />
                             </div>
-                            <Button type="button" size="sm" className="w-full h-10 bg-white border-2 border-indigo-600 text-indigo-700 hover:bg-indigo-600 hover:text-white font-black uppercase text-[10px] rounded-xl" onClick={handleAddAddress} disabled={!newLabel || !newAddress}>
-                                <Plus className="h-3.5 w-3.5 mr-2" /> Simpan ke Address Book
+                            <Button type="button" size="sm" className="w-full bg-white border-2 border-indigo-600 text-indigo-700 font-black uppercase text-[10px] rounded-xl" onClick={handleAddAddress}>
+                                <Plus className="h-3.5 w-3.5 mr-2" /> Add to Address Book
                             </Button>
                         </CardContent>
                     </Card>
@@ -424,7 +378,7 @@ export function CustomerDrawer({ isOpen, onOpenChange, customerData, onSave }: C
 
         <div className="p-8 bg-white border-t-2 border-slate-100">
           <Button type="button" onClick={handleSave} className="w-full h-14 bg-indigo-600 hover:bg-indigo-700 font-black uppercase text-xs tracking-[0.2em] rounded-2xl">
-              Kunci Perubahan Profil
+              Simpan Profil Pelanggan
           </Button>
         </div>
       </SheetContent>

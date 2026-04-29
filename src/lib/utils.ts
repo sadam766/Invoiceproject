@@ -8,46 +8,40 @@ export function cn(...inputs: ClassValue[]) {
 }
 
 /**
- * Generate a default customer code based on name following 3 Letter + 3 Digit pattern
- * E.g. "PT JEMBO CABLE" -> "JEM001"
- */
-export function generateDefaultCode(name: string): string {
-    if (!name) return '';
-    const clean = name.replace(/PT\.|PT|CV\.|CV|UD\.|UD/gi, '').trim();
-    const prefix = clean.substring(0, 3).toUpperCase().padEnd(3, 'X');
-    return `${prefix}001`;
-}
-
-/**
  * Generate a Virtual Account number based on refined Excel Formula
  * Format: 86625 (Bank) + 2026 (Year) + ASCII Code logic + Last 3 Digits + 0
  * Example: ADH004 -> 8662520261480040
  */
 export function generateVirtualAccount(customerCode: string): string {
   const cleanCode = (customerCode || '').trim().toUpperCase();
-  if (cleanCode.length < 6) return '';
+  if (cleanCode.length < 4) return '';
   
   const bankPrefix = "86625";
   const yearFull = "2026";
   const base = bankPrefix + yearFull;
   
   // Extract 3 letters and last 3 digits
+  // If code is "ADH004", letters = ADH, digits = 004
   const letters = cleanCode.substring(0, 3);
-  const digits = cleanCode.substring(cleanCode.length - 3);
+  const digits = cleanCode.match(/\d+$/)?.[0]?.padStart(3, '0') || '000';
   
-  // Excel CODE() - 64 logic (forces single digit per slot for length consistency)
-  // A=1, B=2 ... J=10 (uses 0), K=11 (uses 1)
+  // Excel CODE() - 64 logic
+  // A=1, B=2 ... J=10, K=11
   let asciiSlots = "";
   for (let i = 0; i < 3; i++) {
     const charCode = letters.charCodeAt(i);
+    // Standard ASCII: A=65. 65-64 = 1.
     const rank = charCode >= 65 && charCode <= 90 ? charCode - 64 : 0;
-    asciiSlots += (rank % 10).toString();
+    // To maintain 16 digits, we need a stable number of digits from ASCII.
+    // If rank is 10 (J), it adds "10" (2 digits).
+    asciiSlots += rank.toString();
   }
   
-  // Assembly: 866252026 (9) + slots (3) + digits (3) + 0 (1) = 16 digits
+  // Final Assembly
   const result = base + asciiSlots + digits + "0";
   
-  return result.substring(0, 16);
+  // Force trim to 16 if too long (e.g. if ASCII ranks were all double digits)
+  return result.substring(0, 16).padEnd(16, '0');
 }
 
 /**
