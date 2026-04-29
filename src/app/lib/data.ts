@@ -74,6 +74,7 @@ export type Invoice = {
   payments?: PaymentRecord[];
   items?: InvoiceItem[];
   isDpInvoice?: boolean;
+  isOriginalPrinted?: boolean;
 };
 
 export type InvoiceNumber = {
