@@ -23,14 +23,14 @@ import {
   import { Button } from '@/components/ui/button';
   import { Badge } from '@/components/ui/badge';
   import { type InvoiceNumber, type Invoice, type UserProfile } from '@/app/lib/data';
-  import { Search, Download, MoreHorizontal, Edit, Trash2, Lock, Database, Hash, Info, FilePlus } from 'lucide-react';
+  import { Search, Download, MoreHorizontal, Edit, Trash2, Lock, Database, Hash, Info, FilePlus, AlertTriangle } from 'lucide-react';
   import { AddInvoiceNumberDialog } from './_components/add-invoice-number-dialog';
   import { DeleteConfirmationDialog } from '@/app/components/delete-confirmation-dialog';
   import { Skeleton } from '@/components/ui/skeleton';
   import { cn, exportToExcel } from '@/lib/utils';
   import { useToast } from '@/hooks/use-toast';
   import { useFirestore, useUser, useCollection, useMemoFirebase, errorEmitter, FirestorePermissionError, useDoc } from '@/firebase';
-  import { collection, doc, deleteDoc, query, setDoc } from 'firebase/firestore';
+  import { collection, doc, deleteDoc, query, setDoc, writeBatch } from 'firebase/firestore';
 
   export default function InvoiceNumberPage() {
     const router = useRouter();
@@ -108,22 +108,48 @@ import {
     const handleDeleteConfirm = () => {
         if (!firestore || !deleteDialogState.invoiceId) return;
 
-        const isLinked = linkedInvoices?.some(inv => inv.id === deleteDialogState.invoiceId);
-        if (isLinked) {
-            toast({ variant: "destructive", title: "Aksi Ditolak", description: "Nomor ini sudah memiliki data item di Invoice List." });
+        // Smart Check: Only block if the invoice is finalized or has actual items/amount
+        const linkedInv = linkedInvoices?.find(inv => inv.id === deleteDialogState.invoiceId);
+        
+        // Allowed to delete if:
+        // 1. No linked invoice document exists yet
+        // 2. Linked doc is draft AND has 0 amount AND has 0 items
+        const canDelete = !linkedInv || (
+            linkedInv.status === 'draft' && 
+            (linkedInv.amount === 0 || !linkedInv.items || linkedInv.items.length === 0)
+        );
+
+        if (!canDelete) {
+            toast({ 
+                variant: "destructive", 
+                title: "Aksi Ditolak", 
+                description: "Nomor ini sudah memiliki data transaksi (Item/Nilai) yang terkunci di Invoice List." 
+            });
             setDeleteDialogState({ isOpen: false, invoiceId: undefined });
             return;
         }
 
         const safeId = deleteDialogState.invoiceId.replace(/\//g, '_');
         const docRef = doc(firestore, 'invoiceNumbers', safeId);
-        deleteDoc(docRef)
+        const invRef = doc(firestore, 'invoices', safeId);
+        
+        const batch = writeBatch(firestore);
+        batch.delete(docRef);
+        // Cascade delete placeholder if it exists and is empty
+        if (linkedInv) {
+            batch.delete(invRef);
+        }
+
+        batch.commit()
             .then(() => {
-                toast({ title: 'Identitas Berhasil Dihapus' });
+                toast({ title: 'Identitas Berhasil Dibersihkan' });
                 setDeleteDialogState({ isOpen: false, invoiceId: undefined });
             })
-            .catch(async () => {
-                errorEmitter.emit('permission-error', new FirestorePermissionError({ path: docRef.path, operation: 'delete' }));
+            .catch(async (error) => {
+                errorEmitter.emit('permission-error', new FirestorePermissionError({ 
+                    path: docRef.path, 
+                    operation: 'delete' 
+                }));
                 setDeleteDialogState({ isOpen: false, invoiceId: undefined });
             });
     };
@@ -245,10 +271,12 @@ import {
                                 <TableRow><TableCell colSpan={5} className="text-center py-20 text-slate-400 italic font-black uppercase tracking-widest opacity-30">Belum ada identitas terdaftar.</TableCell></TableRow>
                             ) : (
                                 filteredInvoices?.map((invoice) => {
-                                    const isLinked = linkedInvoices?.some(inv => inv.id === invoice.id && (inv.status !== 'draft' || inv.amount > 0));
+                                    const linkedInv = linkedInvoices?.find(inv => inv.id === invoice.id);
+                                    // Visual lock only if it has content or is not a draft
+                                    const isLocked = linkedInv && (linkedInv.status !== 'draft' || (linkedInv.amount > 0 && linkedInv.items && linkedInv.items.length > 0));
                                     const isERP = !(invoice.id.startsWith('SAR') || invoice.id.startsWith('KW'));
                                     return (
-                                        <TableRow key={invoice.id} className={cn("hover:bg-indigo-50/10 border-b last:border-0", isLinked ? "bg-slate-50/50 dark:bg-slate-800/20" : "")}>
+                                        <TableRow key={invoice.id} className={cn("hover:bg-indigo-50/10 border-b last:border-0", isLocked ? "bg-slate-50/50 dark:bg-slate-800/20" : "")}>
                                             <TableCell className="py-4">
                                                 <div className="flex items-center gap-2">
                                                     <div className="flex flex-col">
@@ -258,7 +286,7 @@ import {
                                                             {isERP ? 'ERP Pusat' : 'Manual SAR'}
                                                         </span>
                                                     </div>
-                                                    {isLinked && <Lock className="h-3 w-3 text-slate-300" />}
+                                                    {isLocked && <Lock className="h-3 w-3 text-slate-300" />}
                                                 </div>
                                             </TableCell>
                                             <TableCell className="text-xs font-black uppercase text-slate-700 dark:text-slate-300">{invoice.customer}</TableCell>
@@ -269,13 +297,13 @@ import {
                                                 </div>
                                             </TableCell>
                                             <TableCell className="text-center">
-                                                <Badge variant={isLinked ? "default" : "secondary"} className={cn("text-[8px] uppercase font-black tracking-widest h-4", isLinked ? "bg-indigo-600" : "bg-slate-100 dark:bg-slate-800 text-slate-500")}>
-                                                    {isLinked ? 'FINALIZED / ACTIVE' : 'DRAFT / REGISTERED'}
+                                                <Badge variant={isLocked ? "default" : "secondary"} className={cn("text-[8px] uppercase font-black tracking-widest h-4", isLocked ? "bg-indigo-600" : "bg-slate-100 dark:bg-slate-800 text-slate-500")}>
+                                                    {isLocked ? 'FINALIZED / ACTIVE' : 'DRAFT / REGISTERED'}
                                                 </Badge>
                                             </TableCell>
                                             <TableCell className="text-right py-4">
                                                 <div className="flex justify-end gap-2">
-                                                    {!isLinked && (
+                                                    {!isLocked && (
                                                         <Button 
                                                             size="sm" 
                                                             className="h-8 bg-indigo-600 hover:bg-indigo-700 font-black uppercase text-[10px] tracking-widest shadow-md"
@@ -291,25 +319,25 @@ import {
                                                             </Button>
                                                         </DropdownMenuTrigger>
                                                         <DropdownMenuContent align="end" className="w-48">
-                                                            <DropdownMenuItem onClick={() => handleEdit(invoice)} className="text-[10px] font-black uppercase tracking-widest">
+                                                            <DropdownMenuItem onClick={() => handleEdit(invoice)} className="text-[10px] font-black uppercase tracking-widest" disabled={isLocked}>
                                                                 <Edit className="mr-2 h-4 w-4" /> Edit Identitas
                                                             </DropdownMenuItem>
                                                             <DropdownMenuItem
                                                                 className={cn(
                                                                     "text-rose-600 font-black uppercase text-[10px] tracking-widest focus:text-rose-600 focus:bg-rose-50",
-                                                                    isLinked && "opacity-50 cursor-not-allowed"
+                                                                    isLocked && "opacity-50 cursor-not-allowed"
                                                                 )}
                                                                 onSelect={(e) => {
                                                                     e.preventDefault();
-                                                                    if (isLinked) {
-                                                                        toast({ variant: "destructive", title: "Data Terkunci", description: "Nomor ini sudah memiliki item barang di Invoice List." });
+                                                                    if (isLocked) {
+                                                                        toast({ variant: "destructive", title: "Data Terkunci", description: "Nomor ini sudah memiliki item barang yang valid. Batalkan invoice di repository jika ingin menghapus." });
                                                                         return;
                                                                     }
                                                                     openDeleteDialog(invoice.id);
                                                                 }}
                                                             >
                                                                 <Trash2 className="mr-2 h-4 w-4" />
-                                                                {isLinked ? 'Hapus (Terkunci)' : 'Hapus Identitas'}
+                                                                {isLocked ? 'Hapus (Terkunci)' : 'Hapus Identitas'}
                                                             </DropdownMenuItem>
                                                         </DropdownMenuContent>
                                                     </DropdownMenu>

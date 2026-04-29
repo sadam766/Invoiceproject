@@ -39,7 +39,7 @@ import {
   } from '@/components/ui/dropdown-menu';
   import { useToast } from '@/hooks/use-toast';
   import { useFirestore, useUser, useMemoFirebase, errorEmitter, FirestorePermissionError, useDoc } from '@/firebase';
-  import { collection, query, doc, updateDoc, arrayUnion, deleteDoc } from 'firebase/firestore';
+  import { collection, query, doc, updateDoc, arrayUnion, deleteDoc, writeBatch } from 'firebase/firestore';
   import { exportToExcel, cn } from '@/lib/utils';
   import { DateRangePicker } from '@/app/components/date-range-picker';
   import { isWithinInterval, parseISO, startOfToday, format, subDays, startOfMonth, endOfMonth } from 'date-fns';
@@ -155,12 +155,15 @@ import {
         const invoiceRef = doc(firestore, 'invoices', safeId);
         const identityRef = doc(firestore, 'invoiceNumbers', safeId);
 
-        deleteDoc(invoiceRef)
+        const batch = writeBatch(firestore);
+        batch.delete(invoiceRef);
+        batch.delete(identityRef); // Cascade cleanup of identity registry
+
+        batch.commit()
             .then(() => {
-                deleteDoc(identityRef).catch(() => {});
                 toast({ 
                     title: "Data Dihapus Permanen", 
-                    description: `Nomor ${deleteTargetId} telah dihapus total.` 
+                    description: `Nomor ${deleteTargetId} telah dihapus total dari repository dan identitas.` 
                 });
                 setDeleteDialogOpen(false);
                 setDeleteTargetId(null);
@@ -255,6 +258,7 @@ import {
                                     filteredInvoices.map((invoice) => {
                                     const totalPaid = invoice.payments?.reduce((s, p) => s + p.amount, 0) || (invoice.status === 'paid' ? invoice.amount : 0);
                                     const outstandingDoc = Math.max(0, invoice.amount - totalPaid);
+                                    const isEmpty = invoice.amount === 0 || !invoice.items || invoice.items.length === 0;
                                     
                                     return (
                                         <TableRow key={invoice.id} className={cn("hover:bg-muted/5 transition-colors", invoice.status === 'cancelled' && "opacity-40 grayscale")}>
@@ -301,7 +305,7 @@ import {
                                                                 className="text-red-600 font-bold" 
                                                                 onClick={() => { setDeleteTargetId(invoice.id); setDeleteDialogOpen(true); }}
                                                             >
-                                                                <Trash2 className="mr-2 h-4 w-4" /> Hapus Permanen
+                                                                <Trash2 className="mr-2 h-4 w-4" /> {isEmpty ? 'Hapus Kosong' : 'Hapus Permanen'}
                                                             </DropdownMenuItem>
                                                         )}
                                                         {invoice.status !== 'cancelled' && (
@@ -352,7 +356,7 @@ import {
                         <AlertTriangle className="h-5 w-5" /> Hapus Total
                     </DialogTitle>
                     <DialogDescription>
-                        Data invoice <b>{deleteTargetId}</b> akan dihapus permanen.
+                        Data invoice <b>{deleteTargetId}</b> akan dihapus permanen dari seluruh sistem, termasuk registrasi identitasnya.
                     </DialogDescription>
                 </DialogHeader>
                 <DialogFooter className="mt-4">
