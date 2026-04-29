@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useEffect, useState, useMemo } from 'react';
@@ -54,7 +53,8 @@ import {
   ShieldCheck,
   CreditCard,
   Layers,
-  Database
+  Database,
+  UserCircle2
 } from 'lucide-react';
 import { type Invoice, type SalesOrder, type UserProfile, type InvoiceItem, type InvoiceNumber } from '@/app/lib/data';
 import { useToast } from '@/hooks/use-toast';
@@ -140,12 +140,16 @@ export default function AddInvoicePage() {
     return allCustomers.find(c => c.name.toLowerCase() === activeIdentity.customer.toLowerCase());
   }, [activeIdentity?.customer, allCustomers]);
 
-  // AUTO-POPULATE VA FROM CUSTOMER PROFILE (Reactive)
+  // AUTO-POPULATE VA & ADDRESS FROM CUSTOMER PROFILE (Reactive)
   useEffect(() => {
-    if (currentCustomer && !manualVaNumber) {
-        setManualVaNumber(currentCustomer.virtualAccountNumber || '');
+    if (currentCustomer && !editInvoiceId) {
+        if (!manualVaNumber) setManualVaNumber(currentCustomer.virtualAccountNumber || '');
+        if (!billingAddress) {
+            const defAddr = currentCustomer.addresses?.find(a => a.isDefault) || currentCustomer.addresses?.[0];
+            if (defAddr) setBillingAddress(defAddr.address);
+        }
     }
-  }, [currentCustomer, manualVaNumber]);
+  }, [currentCustomer, manualVaNumber, billingAddress, editInvoiceId]);
 
   // CRITICAL: Pull Data from SO to items
   useEffect(() => {
@@ -370,6 +374,11 @@ export default function AddInvoicePage() {
                           {activeIdentity?.customer}
                           {currentCustomer?.customerCode && <span className="text-[9px] bg-indigo-100 text-indigo-700 px-1.5 rounded">{currentCustomer.customerCode}</span>}
                       </div>
+                      {currentCustomer?.contactPerson && (
+                          <div className="flex items-center gap-2 text-[9px] font-bold text-slate-400 mt-1">
+                              <UserCircle2 className="h-3 w-3" /> {currentCustomer.contactPerson}
+                          </div>
+                      )}
                   </div>
 
                   <div className="space-y-2">

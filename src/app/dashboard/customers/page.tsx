@@ -16,24 +16,18 @@ import {
   import { Button } from '@/components/ui/button';
   import { Checkbox } from '@/components/ui/checkbox';
   import { Badge } from '@/components/ui/badge';
-  import { Avatar, AvatarFallback } from '@/components/ui/avatar';
-  import type { Customer, UserProfile, Invoice } from '@/app/lib/data';
+  import type { Customer, UserProfile } from '@/app/lib/data';
   import { 
     Search, 
     Upload, 
     Download, 
     Trash2, 
-    Edit, 
     FileSpreadsheet, 
-    MapPin, 
-    UserCheck, 
-    Building2, 
-    Home, 
-    Eye, 
-    Wallet,
-    Layers,
     ArrowRight,
-    Plus
+    Plus,
+    UserCircle2,
+    MapPin,
+    PhoneCall
   } from 'lucide-react';
   import { CustomerDrawer } from './_components/customer-drawer';
   import { DeleteConfirmationDialog } from '@/app/components/delete-confirmation-dialog';
@@ -166,7 +160,7 @@ import {
     };
 
     const handleDownloadTemplate = () => {
-        generateExcelTemplate(['Customer_Code', 'Customer_Name', 'VA_Number', 'Contact_Person', 'Phone'], 'template_customer_import');
+        generateExcelTemplate(['Customer_Code', 'Customer_Name', 'VA_Number', 'Contact_Person', 'Phone', 'Address'], 'template_customer_import');
     };
 
     const handleImportClick = () => fileInputRef.current?.click();
@@ -177,30 +171,85 @@ import {
             try {
                 const data = await importFromExcel(file);
                 const batch = writeBatch(firestore);
-                let count = 0;
+                
+                // Fetch local code map for auto-merge
+                const codeToDocId: Record<string, string> = {};
+                customers?.forEach(c => {
+                    if (c.customerCode) codeToDocId[c.customerCode.toUpperCase()] = c.id!;
+                });
+
+                let createdCount = 0;
+                let updatedCount = 0;
 
                 data.forEach(item => {
+                    const code = (item.Customer_Code || item.customerCode || '').toString().trim().toUpperCase();
                     const name = item.Customer_Name || item.name;
-                    const code = item.Customer_Code || item.customerCode;
                     const va = item.VA_Number || item.virtualAccountNumber;
+                    const address = item.Address || item.address;
+                    const cp = item.Contact_Person || item.contactPerson;
+                    const phone = item.Phone || item.phone;
 
-                    if (name) {
+                    if (!code && !name) return;
+
+                    const existingId = code ? codeToDocId[code] : null;
+
+                    if (existingId) {
+                        // PHASE 2 / UPDATE LOGIC
+                        const docRef = doc(firestore, 'customers', existingId);
+                        const existingCustomer = customers?.find(c => c.id === existingId);
+                        
+                        const updateData: any = {};
+                        if (name) updateData.name = name;
+                        if (va) updateData.virtualAccountNumber = va;
+                        if (cp) updateData.contactPerson = cp;
+                        if (phone) updateData.phone = phone;
+                        
+                        if (address) {
+                            const currentAddresses = existingCustomer?.addresses || [];
+                            const addrExists = currentAddresses.some(a => a.address === address);
+                            if (!addrExists) {
+                                updateData.addresses = [
+                                    ...currentAddresses,
+                                    { 
+                                        id: Math.random().toString(36).substr(2, 9), 
+                                        label: 'Imported Address', 
+                                        address: address, 
+                                        isDefault: currentAddresses.length === 0 
+                                    }
+                                ];
+                            }
+                        }
+                        
+                        batch.set(docRef, updateData, { merge: true });
+                        updatedCount++;
+                    } else {
+                        // PHASE 1 / NEW RECORD
                         const newDocRef = doc(collection(firestore, 'customers'));
-                        batch.set(newDocRef, { 
-                            id: newDocRef.id, 
-                            name: name,
-                            customerCode: code || '',
+                        const newCustomer: any = {
+                            id: newDocRef.id,
+                            name: name || 'Unnamed PT',
+                            customerCode: code,
                             virtualAccountNumber: va || '',
-                            ownerId: user.uid, 
-                            addresses: [],
-                            createdBy: userProfile?.displayName || user.email || 'Excel Importer'
-                        });
-                        count++;
+                            contactPerson: cp || '',
+                            phone: phone || '',
+                            ownerId: user.uid,
+                            addresses: address ? [
+                                { id: Math.random().toString(36).substr(2, 9), label: 'Main Office', address, isDefault: true }
+                            ] : [],
+                            createdBy: userProfile?.displayName || user.email || 'Smart Importer'
+                        };
+                        batch.set(newDocRef, newCustomer);
+                        createdCount++;
+                        if (code) codeToDocId[code] = newDocRef.id;
                     }
                 });
 
                 await batch.commit();
-                toast({ title: "Import Berhasil", description: `${count} pelanggan ditambahkan ke database.` });
+                toast({ 
+                    title: "Import Selesai", 
+                    description: `${createdCount} data baru dibuat, ${updatedCount} data diperbarui melalui auto-mapping.` 
+                });
+                event.target.value = '';
             } catch (error) {
                 toast({ variant: "destructive", title: "Gagal Import" });
             }
@@ -249,7 +298,7 @@ import {
                                         onCheckedChange={handleSelectAll}
                                     />
                                 </TableHead>
-                                <TableHead className="text-[10px] font-black uppercase tracking-widest py-5">Legal Entity</TableHead>
+                                <TableHead className="text-[10px] font-black uppercase tracking-widest py-5">Legal Entity & Contact</TableHead>
                                 <TableHead className="text-[10px] font-black uppercase tracking-widest">Unique Code</TableHead>
                                 <TableHead className="text-[10px] font-black uppercase tracking-widest">Mandiri VA</TableHead>
                                 <TableHead className="text-[10px] font-black uppercase tracking-widest text-right">Outstanding AR</TableHead>
@@ -263,6 +312,8 @@ import {
                                 <TableRow><TableCell colSpan={6} className="text-center py-32 text-slate-400 font-bold italic">No customers found.</TableCell></TableRow>
                             ) : filteredCustomers?.map((customer) => {
                                 const outstanding = getCustomerOutstanding(customer.name);
+                                const defaultAddr = customer.addresses?.find(a => a.isDefault) || customer.addresses?.[0];
+                                
                                 return (
                                     <TableRow key={customer.id} className={cn("hover:bg-indigo-50/10 transition-colors border-b-slate-50 last:border-0", selectedIds.has(customer.id!) ? "bg-indigo-50/30" : "")}>
                                         <TableCell className="px-6 py-4">
@@ -272,9 +323,21 @@ import {
                                             />
                                         </TableCell>
                                         <TableCell>
-                                            <div className="flex flex-col gap-0.5">
+                                            <div className="flex flex-col gap-1.5">
                                                 <span className="font-black text-slate-900 uppercase tracking-tight text-sm">{customer.name}</span>
-                                                <span className="text-[10px] font-bold text-slate-400">{customer.email || 'no-email@customer.com'}</span>
+                                                <div className="flex flex-col gap-0.5">
+                                                    <div className="flex items-center gap-1.5 text-[10px] font-bold text-slate-400">
+                                                        <UserCircle2 className="h-3 w-3 text-indigo-400" /> {customer.contactPerson || 'No Contact Person'}
+                                                        <span className="opacity-30">|</span>
+                                                        <PhoneCall className="h-3 w-3 text-indigo-400" /> {customer.phone || '-'}
+                                                    </div>
+                                                    {defaultAddr && (
+                                                        <div className="flex items-start gap-1.5 text-[9px] font-medium text-slate-400 italic">
+                                                            <MapPin className="h-3 w-3 shrink-0 mt-0.5 text-rose-400" />
+                                                            <span className="line-clamp-1">{defaultAddr.address}</span>
+                                                        </div>
+                                                    )}
+                                                </div>
                                             </div>
                                         </TableCell>
                                         <TableCell>
