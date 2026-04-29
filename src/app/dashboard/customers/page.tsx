@@ -1,4 +1,3 @@
-
 'use client';
 import { useState, useMemo, useRef } from 'react';
 import {
@@ -33,7 +32,8 @@ import {
     Eye, 
     Wallet,
     Layers,
-    ArrowRight
+    ArrowRight,
+    Plus
   } from 'lucide-react';
   import { CustomerDrawer } from './_components/customer-drawer';
   import { DeleteConfirmationDialog } from '@/app/components/delete-confirmation-dialog';
