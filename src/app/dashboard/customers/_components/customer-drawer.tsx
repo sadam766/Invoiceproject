@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import {
     Sheet,
     SheetContent,
@@ -34,10 +34,11 @@ import {
     Database,
     Cpu,
     Loader2,
-    RefreshCw
+    RefreshCw,
+    Sparkles
 } from 'lucide-react';
 import type { Customer, CustomerAddress, VirtualAccount } from '@/app/lib/data';
-import { cn, generateVirtualAccount, generateDefaultCode } from '@/lib/utils';
+import { cn, generateVirtualAccount } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
 import { useRouter } from 'next/navigation';
 import { useFirestore } from '@/firebase';
@@ -70,6 +71,34 @@ export function CustomerDrawer({ isOpen, onOpenChange, customerData, onSave }: C
   const [newAddress, setNewAddress] = useState('');
   const [newNpwp, setNewNpwp] = useState('');
   const [isEditingMain, setIsEditingMain] = useState(false);
+
+  // LOGIC: Smart Initial Extraction (Reactive)
+  const generateInitialCode = useCallback((ptName: string) => {
+      if (!ptName) return '';
+      // Clean PT, CV, Tbk, UD
+      const clean = ptName.replace(/PT\.|PT|CV\.|CV|UD\.|UD|Tbk\.|Tbk/gi, '').trim();
+      const words = clean.split(/\s+/).filter(w => w.length > 0);
+      
+      let initial = "";
+      if (words.length >= 2) {
+          // ABA logic: First letter of each word
+          initial = words.map(w => w[0]).join('').substring(0, 3);
+          // If ABA logic results in only 2 chars, add one more from 1st word
+          if (initial.length < 3) initial = clean.substring(0, 3);
+      } else if (words.length === 1) {
+          initial = words[0].substring(0, 3);
+      }
+      
+      return initial.toUpperCase().padEnd(3, 'X') + "001";
+  }, []);
+
+  // EFFECT: Reactive Code Generation on Name Change
+  useEffect(() => {
+      if (isOpen && !customerData && name && !isEditingMain) {
+          const autoCode = generateInitialCode(name);
+          setCustomerCode(autoCode);
+      }
+  }, [name, isOpen, customerData, isEditingMain, generateInitialCode]);
 
   useEffect(() => {
     if (customerData && isOpen) {
@@ -234,14 +263,15 @@ export function CustomerDrawer({ isOpen, onOpenChange, customerData, onSave }: C
                     <div className="grid gap-4">
                         <div className="grid grid-cols-3 gap-4">
                             <div className="col-span-2 space-y-2">
-                                <Label className="text-[10px] font-black uppercase">Official PT Name</Label>
+                                <Label className="text-[10px] font-black uppercase flex items-center gap-2">Official PT Name <Sparkles className="h-2.5 w-2.5 text-indigo-500 animate-pulse" /></Label>
                                 <Input value={name} onChange={e => setName(e.target.value)} className="font-black uppercase h-11" placeholder="PT JEMBO CABLE" />
+                                <p className="text-[8px] text-slate-400 font-bold uppercase italic">Ketik nama untuk auto-generate Kode & VA secara real-time.</p>
                             </div>
                             <div className="space-y-2">
                                 <Label className="text-[10px] font-black uppercase flex items-center gap-1">
                                     Unique Code <RefreshCw className={cn("h-2.5 w-2.5", vaSource === 'searching' && "animate-spin")} />
                                 </Label>
-                                <Input value={customerCode} onChange={e => setCustomerCode(e.target.value.toUpperCase())} className="font-black h-11 border-indigo-300 ring-2 ring-indigo-50" placeholder="ADH004" />
+                                <Input value={customerCode} onChange={e => setCustomerCode(e.target.value.toUpperCase())} className="font-black h-11 border-indigo-300 ring-2 ring-indigo-50" placeholder="ADH001" />
                             </div>
                         </div>
 
