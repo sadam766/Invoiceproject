@@ -2,7 +2,7 @@
 'use client';
 import React, { useRef, useEffect, useState } from 'react';
 import { useRouter, useParams } from 'next/navigation';
-import { Download, ArrowLeft, Loader2, Printer, CreditCard, Banknote, ShieldCheck } from 'lucide-react';
+import { Download, ArrowLeft, Loader2, Printer } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { useFirestore, useDoc, useMemoFirebase, useCollection } from '@/firebase';
@@ -195,143 +195,138 @@ const InvoicePreviewPage = () => {
                 </div>
             </div>
             
-            <div ref={invoiceContainerRef}>
-                {documentTypes.map((docType) => {
-                    const isCopy = docType === 'COPY';
-                    const mainColorClass = isCopy ? 'text-slate-500' : 'text-indigo-600';
-                    const badgeColorClass = isCopy ? 'bg-slate-100 text-slate-500 border-slate-200' : 'bg-indigo-50 text-indigo-700 border-indigo-200';
-                    const displayLabel = (docType === 'ORIGINAL' && invoiceData.isOriginalPrinted) ? 'DUPLICATE ORIGINAL' : docType;
+            <div ref={invoiceContainerRef} className="print-container">
+                {documentTypes.map((printType) => {
+                    const isCopy = printType === 'COPY';
+                    const totalPages = itemChunks.length;
 
                     return (
-                        <div key={docType} className={cn("w-full", isCopy && "grayscale-version")}>
-                            {itemChunks.map((chunk, pageIndex) => (
-                                <div key={`${docType}-${pageIndex}`} className={cn(
-                                    "w-full max-w-4xl mx-auto bg-white shadow-lg p-12 my-8 text-[11px] leading-tight flex flex-col relative",
-                                    (pageIndex > 0 || isCopy) && "page-break"
-                                )} style={{ minHeight: '297mm' }}>
-                                    
-                                    {/* DOCUMENT TYPE BADGE */}
-                                    <div className={cn(
-                                        "absolute top-8 right-12 px-4 py-1.5 border-2 rounded-full font-black uppercase text-[10px] tracking-[0.2em] shadow-sm",
-                                        badgeColorClass
-                                    )}>
-                                        {displayLabel}
-                                    </div>
+                        <div key={printType} className={cn("document-version", isCopy && "grayscale opacity-80")}>
+                            {itemChunks.map((chunk, pageIndex) => {
+                                const isLastPage = pageIndex === totalPages - 1;
+                                const { id: displayInvoiceId, customer, soNumber, date, subtotal: subTotalItems, negotiation, dpValue, poNumber, grandTotal, dppVat, vat12, paymentTerms } = invoiceData;
 
-                                    <header className="relative border-b-2 border-black pb-6 mb-6 mt-4">
-                                        <div className="flex justify-between items-center mb-8">
-                                            <div className="space-y-1">
-                                                <h1 className="font-black text-xl uppercase italic tracking-tighter">PT. JEMBO CABLE COMPANY Tbk</h1>
-                                                <p className="text-[9px] font-bold text-slate-500 uppercase tracking-widest">Commercial Billing Center — Official Records</p>
+                                return (
+                                    <div key={`${printType}-${pageIndex}`} className={`w-full max-w-4xl mx-auto bg-white shadow-lg p-4 my-8 text-[10px] leading-tight flex flex-col page-break`} style={{ height: '280mm' }}>
+                                        <header className="relative pt-0 pb-0 text-[10px] leading-snug">
+                                            <p className="absolute right-0 top-0 font-black text-sm uppercase tracking-widest text-slate-300">{printType}</p>
+                                            <div className="w-full text-center mb-1 leading-none">
+                                                <p className="font-bold uppercase text-xs tracking-tighter mb-0.5">{invoiceTitle}</p>
+                                                <p className="font-bold uppercase text-xs">{displayInvoiceId}</p>
                                             </div>
-                                            <div className="text-right mr-32">
-                                                <p className={cn("font-black uppercase text-xs tracking-[0.3em] mb-1", mainColorClass)}>{invoiceTitle}</p>
-                                                <p className="font-black text-lg">{invoiceData.id}</p>
+                                            <div className='flex justify-between items-start mt-4'>
+                                                <div className='w-[45%]'>
+                                                    <p className="font-black text-[10px] mb-0">{customer.name}</p>
+                                                    <p className="italic text-[9px] text-slate-600 leading-tight mt-1">{customer.address}</p>
+                                                </div>
+                                                <div className="w-[30%] text-[10px] text-left leading-normal space-y-0 font-bold">
+                                                    <p className="mb-0">Sales Order: {soNumber}</p> 
+                                                    <p className="mb-0">Ref PO: {poNumber}</p>
+                                                    <p className="mb-0">Date: {formatDate(date)}</p>
+                                                </div>
                                             </div>
-                                        </div>
-                                        <div className='flex justify-between items-start'>
-                                            <div className='w-[50%]'>
-                                                <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">Bill To:</p>
-                                                <p className="font-black text-sm uppercase">{invoiceData.customer.name}</p>
-                                                <p className="text-[10px] mt-1 whitespace-pre-line leading-relaxed italic">{invoiceData.customer.address}</p>
-                                                {invoiceData.customer.npwp && <p className="text-[10px] mt-2 font-black">NPWP: {invoiceData.customer.npwp}</p>}
-                                            </div>
-                                            <div className="w-[30%] space-y-2">
-                                                <div className="flex justify-between border-b pb-1"><span className="text-slate-400 font-bold uppercase text-[8px]">Sales Order:</span><span className="font-black">{invoiceData.soNumber}</span></div>
-                                                <div className="flex justify-between border-b pb-1"><span className="text-slate-400 font-bold uppercase text-[8px]">Purchase Order:</span><span className="font-black">{invoiceData.poNumber}</span></div>
-                                                <div className="flex justify-between border-b pb-1"><span className="text-slate-400 font-bold uppercase text-[8px]">Issue Date:</span><span className="font-black">{formatDate(invoiceData.date)}</span></div>
-                                            </div>
-                                        </div>
-                                    </header>
+                                        </header>
 
-                                    <main className='flex-grow'>
-                                        <table className="w-full border-collapse">
-                                            <thead>
-                                                <tr className={cn('text-white', isCopy ? 'bg-slate-500' : 'bg-slate-900')}>
-                                                    <th className="p-3 text-left w-[5%] font-black text-[9px]">NO</th>
-                                                    <th className="p-3 text-left font-black text-[9px]">DESCRIPTION OF GOODS</th>
-                                                    <th className="p-3 text-center w-[15%] font-black text-[9px]">QTY</th>
-                                                    <th className="p-3 text-right w-[18%] font-black text-[9px]">PRICE (IDR)</th>
-                                                    <th className="p-3 text-right w-[20%] font-black text-[9px]">TOTAL (IDR)</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody>
-                                                {chunk.map((item, itemIdx) => (
-                                                    <tr key={item.id} className='border-b border-slate-200'>
-                                                        <td className="p-3 align-top font-bold text-slate-400">{pageIndex * ITEMS_PER_PAGE + itemIdx + 1}</td>
-                                                        <td className="p-3 font-black uppercase text-xs">{item.name}</td>
-                                                        <td className="p-3 text-center font-black">{item.quantity} <span className="text-[9px] text-slate-400">{item.unit}</span></td>
-                                                        <td className="p-3 text-right font-bold">{formatCurrency(item.price)}</td>
-                                                        <td className="p-3 text-right font-black">Rp {formatCurrency(item.total)}</td>
+                                        <main className='mt-6 flex-grow'>
+                                            <table className="w-full border-collapse text-[10px] mt-0">
+                                                <thead>
+                                                    <tr className='bg-slate-50 border border-black'>
+                                                        <th className="p-1 text-left w-[8%] border-r border-black border-b border-black font-bold">No.</th>
+                                                        <th className="p-1 text-left w-[40%] border-r border-black border-b border-black font-bold">Item Description</th>
+                                                        <th className="p-1 text-center w-[15%] border-r border-black border-b border-black font-bold">Qty</th>
+                                                        <th className="p-1 text-right w-[17%] border-r border-black border-b border-black font-bold">Unit Price</th>
+                                                        <th className="p-1 text-right flex-1 border-b border-black font-bold">Total</th>
                                                     </tr>
-                                                ))}
-                                            </tbody>
-                                        </table>
-                                    </main>
-                                    
-                                    {pageIndex === itemChunks.length - 1 && (
-                                        <footer className="mt-12 pt-8 border-t-2 border-black">
-                                            <div className="flex justify-between gap-12">
-                                                <div className="flex-1 space-y-6">
-                                                    <div className={cn("p-6 rounded-2xl border-2 border-dashed", isCopy ? "bg-slate-50 border-slate-200" : "bg-slate-50 border-slate-200")}>
-                                                        {invoiceData.paymentMethod === 'va' ? (
-                                                            <>
-                                                                <p className={cn("font-black uppercase text-[8px] mb-2 tracking-[0.2em] flex items-center gap-1.5", mainColorClass)}><CreditCard className="h-3 w-3" /> Mandatory Payment Instruction (VA):</p>
-                                                                <p className="font-black text-xs">PT JEMBO CABLE COMPANY Tbk</p>
-                                                                <p className="text-[10px] font-bold text-slate-500 uppercase">Bank Mandiri — Virtual Account Center</p>
-                                                                <p className={cn("font-mono font-black text-lg mt-1 tracking-widest", isCopy ? "text-slate-800" : "text-indigo-700")}>
-                                                                    A/C: {invoiceData.virtualAccount || '86625...'} (IDR)
-                                                                </p>
-                                                                {!isCopy && <p className="text-[7px] font-black text-emerald-600 uppercase mt-1">Verified Unique Customer Account</p>}
-                                                            </>
-                                                        ) : (
-                                                            <>
-                                                                <p className="font-black uppercase text-[8px] text-emerald-600 mb-2 tracking-[0.2em] flex items-center gap-1.5"><Banknote className="h-3 w-3" /> Manual Transfer Account:</p>
-                                                                <p className="font-black text-xs">PT JEMBO CABLE COMPANY Tbk</p>
-                                                                <p className="text-[10px] font-bold text-slate-500 uppercase">Bank Mandiri — Cabang Kemayoran</p>
-                                                                <p className="font-mono font-black text-slate-900 text-lg mt-1 tracking-tighter">
-                                                                    A/C: 102-0005000218 (IDR)
-                                                                </p>
-                                                            </>
-                                                        )}
-                                                    </div>
-                                                    
-                                                    {isCopy ? (
-                                                        <div className="bg-slate-100 p-3 rounded-xl border-l-4 border-slate-400">
-                                                            <p className="text-[9px] font-black uppercase text-slate-500 flex items-center gap-2">
-                                                                <ShieldCheck className="h-3.5 w-3.5" /> Arsip Internal - Dokumen ini adalah salinan sah dari dokumen asli.
-                                                            </p>
+                                                </thead>
+                                                <tbody>
+                                                    {chunk.map((item, itemIdx) => (
+                                                        <tr key={item.id} className='align-top border-x border-black'>
+                                                            <td className="p-1 border-r border-black">{pageIndex * ITEMS_PER_PAGE + itemIdx + 1}</td>
+                                                            <td className="p-1 border-r border-black font-bold uppercase">{item.name}</td>
+                                                            <td className="p-1 border-r border-black text-center">{item.quantity.toLocaleString('id-ID')} {item.unit}</td>
+                                                            <td className="p-1 border-r border-black text-right">{formatCurrency(item.price)}</td>
+                                                            <td className="p-1 text-right">{formatCurrency(item.total)}</td>
+                                                        </tr>
+                                                    ))}
+                                                    {/* Row Fillers for alignment */}
+                                                    {Array.from({ length: ITEMS_PER_PAGE - chunk.length }).map((_, i) => (
+                                                        <tr key={`empty-${i}`} className='border-x border-black'>
+                                                            <td className="p-1 h-[25px] border-r border-black">&nbsp;</td>
+                                                            <td className="p-1 border-r border-black">&nbsp;</td>
+                                                            <td className="p-1 border-r border-black">&nbsp;</td>
+                                                            <td className="p-1 border-r border-black">&nbsp;</td>
+                                                            <td className="p-1">&nbsp;</td>
+                                                        </tr>
+                                                    ))}
+                                                    <tr className="border border-black"><td colSpan={5} className="h-0"></td></tr>
+                                                </tbody>
+                                            </table>
+                                        </main>
+                                        
+                                        {isLastPage ? (
+                                            <footer className="pt-4 text-black mt-auto text-[10px]">
+                                                <div className="flex justify-between items-start mb-6">
+                                                    <div className="w-[55%] space-y-4">
+                                                        <div className="p-4 bg-slate-50 border border-slate-200 rounded-xl">
+                                                            <p className="font-bold text-[9px] uppercase tracking-widest text-slate-400 mb-2">Payment Instructions:</p>
+                                                            <p className="font-black text-slate-800">PT. JEMBO CABLE COMPANY Tbk</p>
+                                                            <div className="grid grid-cols-2 gap-4 mt-2">
+                                                                <div>
+                                                                    <p className="text-[8px] font-bold text-slate-500 uppercase">Mandiri Account (IDR)</p>
+                                                                    <p className="font-mono font-black">102-0100206827</p>
+                                                                </div>
+                                                                {invoiceData.virtualAccount && (
+                                                                    <div>
+                                                                        <p className="text-[8px] font-bold text-indigo-500 uppercase">Mandiri Virtual Account</p>
+                                                                        <p className="font-mono font-black text-indigo-700">{invoiceData.virtualAccount}</p>
+                                                                    </div>
+                                                                )}
+                                                            </div>
                                                         </div>
-                                                    ) : (
-                                                        <p className="text-[8px] font-medium text-slate-400 leading-relaxed uppercase">
-                                                            * Validasi pembayaran sah apabila dana telah efektif di rekening kami. <br />
-                                                            * Jatuh tempo pembayaran adalah 30 hari kalender dari tanggal invoice.
-                                                        </p>
-                                                    )}
-                                                </div>
-                                                <div className="w-[300px] space-y-2">
-                                                    <div className="flex justify-between text-slate-500 font-bold"><span>GROSS SUB-TOTAL</span><span>{formatCurrency(invoiceData.subtotal)}</span></div>
-                                                    {invoiceData.negotiation > 0 && <div className="flex justify-between text-rose-600 font-bold"><span>NEGOTIATION</span><span>({formatCurrency(invoiceData.negotiation)})</span></div>}
-                                                    {invoiceData.dpValue > 0 && <div className="flex justify-between text-blue-600 font-bold"><span>DP / RETENTION</span><span>({formatCurrency(invoiceData.dpValue)})</span></div>}
-                                                    <div className="flex justify-between font-bold"><span>DPP PPN</span><span>{formatCurrency(invoiceData.dppVat)}</span></div>
-                                                    <div className="flex justify-between font-bold"><span>PPN (12%)</span><span>{formatCurrency(invoiceData.vat12)}</span></div>
-                                                    <div className="flex justify-between pt-4 border-t-4 border-black font-black text-sm">
-                                                        <span>NET TOTAL:</span>
-                                                        <span className={cn(isCopy ? "text-slate-900" : "text-indigo-700")}>Rp {formatCurrency(invoiceData.grandTotal)}</span>
+                                                        <p className="text-[8px] italic text-slate-400">Note: Please include the Invoice Number in your payment reference.</p>
+                                                    </div>
+
+                                                    <div className="w-[40%] space-y-1">
+                                                        <div className="flex justify-between py-1 border-b">
+                                                            <span className="font-bold uppercase text-slate-500">Subtotal</span>
+                                                            <span className="font-black">Rp {formatCurrency(subTotalItems)}</span>
+                                                        </div>
+                                                        {negotiation > 0 && (
+                                                            <div className="flex justify-between py-1 border-b text-rose-600">
+                                                                <span className="font-bold uppercase">Discount/Neg.</span>
+                                                                <span className="font-black">({formatCurrency(negotiation)})</span>
+                                                            </div>
+                                                        )}
+                                                        <div className="flex justify-between py-1 border-b">
+                                                            <span className="font-bold uppercase text-slate-500">VAT (12%)</span>
+                                                            <span className="font-black">Rp {formatCurrency(vat12)}</span>
+                                                        </div>
+                                                        <div className="flex justify-between py-2 bg-slate-900 text-white px-2 rounded-lg mt-2">
+                                                            <span className="font-black uppercase tracking-widest text-[9px] mt-1">Grand Total</span>
+                                                            <span className="text-sm font-black">Rp {formatCurrency(grandTotal)}</span>
+                                                        </div>
                                                     </div>
                                                 </div>
-                                            </div>
-                                            <div className="flex justify-end mt-20">
-                                                <div className="text-center w-64 space-y-20">
-                                                    <p className="font-black text-[10px] uppercase tracking-[0.2em]">Authorized Signature</p>
-                                                    <div className="border-b-4 border-black w-full" />
-                                                    <p className="font-black text-xs uppercase">PT JEMBO CABLE COMPANY Tbk</p>
+
+                                                <div className="flex justify-between items-end mt-10">
+                                                    <div className="text-center w-40">
+                                                        <p className="mb-16 uppercase font-bold text-slate-400 text-[8px] tracking-widest">Received By</p>
+                                                        <div className="border-t border-black w-full pt-1 font-bold">( ............................ )</div>
+                                                    </div>
+                                                    <div className="text-center w-40">
+                                                        <p className="mb-16 uppercase font-bold text-slate-400 text-[8px] tracking-widest">Authorized Signature</p>
+                                                        <div className="border-t border-black w-full pt-1 font-bold">Finance Department</div>
+                                                    </div>
                                                 </div>
-                                            </div>
-                                        </footer>
-                                    )}
-                                </div>
-                            ))}
+                                                {isCopy && <p className="text-center mt-6 text-[8px] font-black uppercase tracking-[0.3em] text-slate-400">Arsip Internal - Dokumen ini adalah salinan sah dari dokumen asli</p>}
+                                            </footer>
+                                        ) : null}
+                                        <div className="text-right text-gray-400 text-[8px] mt-auto pt-4 font-bold">
+                                            {printType} | Halaman {pageIndex + 1} dari {totalPages}
+                                        </div>
+                                    </div>
+                                );
+                            })}
                         </div>
                     );
                 })}
