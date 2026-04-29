@@ -27,6 +27,7 @@ import {
 } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import {
     Dialog,
     DialogContent,
@@ -54,9 +55,12 @@ import {
   CreditCard,
   Layers,
   Database,
-  UserCircle2
+  UserCircle2,
+  Banknote,
+  Search,
+  ChevronsUpDown
 } from 'lucide-react';
-import { type Invoice, type SalesOrder, type UserProfile, type InvoiceItem, type InvoiceNumber } from '@/app/lib/data';
+import { type Invoice, type SalesOrder, type UserProfile, type InvoiceItem, type InvoiceNumber, type Customer } from '@/app/lib/data';
 import { useToast } from '@/hooks/use-toast';
 import { useFirestore, useCollection, useMemoFirebase, useUser, useDoc, errorEmitter, FirestorePermissionError } from '@/firebase';
 import { collection, query, doc, setDoc, arrayUnion } from 'firebase/firestore';
@@ -86,8 +90,8 @@ export default function AddInvoicePage() {
   const editInvoiceId = searchParams.get('editInvoiceId');
   const invoiceNumberIdParam = searchParams.get('invoiceNumberId');
   
-  // Consuming Cached Data for speed
-  const { customers: allCustomers, products: masterProducts } = useDashboardData();
+  // Consuming Cached Data
+  const { customers: allCustomers, products: masterProducts, salesOrders: allSalesOrders } = useDashboardData();
 
   // --- DATA FETCHING ---
   const identityRef = useMemoFirebase(() => {
@@ -104,26 +108,20 @@ export default function AddInvoicePage() {
 
   const activeIdentity = existingInvoiceData || identityData;
 
-  // Master Data Pull
-  const soHeadersCollection = useMemoFirebase(() => firestore ? query(collection(firestore, 'salesOrders')) : null, [firestore]);
-  const { data: allSalesOrders } = useCollection<SalesOrder>(soHeadersCollection);
-
-  const activeSoData = useMemo(() => {
-    if (!allSalesOrders || !activeIdentity?.salesOrder) return null;
-    return allSalesOrders.find(so => so.soNumber === activeIdentity.salesOrder);
-  }, [allSalesOrders, activeIdentity?.salesOrder]);
-
   const userProfileRef = useMemoFirebase(() => (!firestore || !user) ? null : doc(firestore, 'users', user.uid), [firestore, user]);
   const { data: userProfile } = useDoc<UserProfile>(userProfileRef);
   const isAdmin = user?.email?.toLowerCase() === 'fa@gmail.com' || userProfile?.role === 'admin';
 
   // --- FORM STATES ---
   const [items, setItems] = useState<InvoiceItem[]>([]);
+  const [selectedSoNumber, setSelectedSoNumber] = useState('');
   const [billingAddress, setBillingAddress] = useState('');
   const [issueDate, setIssueDate] = useState<Date>(new Date());
   const [dueDate, setDueDate] = useState<Date>(addDays(new Date(), 30));
   const [isDpInvoice, setIsDpInvoice] = useState(false);
+  const [paymentMethod, setPaymentMethod] = useState<'bank' | 'va'>('va');
   const [manualVaNumber, setManualVaNumber] = useState('');
+  const [soPopoverOpen, setSoPopoverOpen] = useState(false);
   const [productPopoverOpen, setProductPopoverOpen] = useState(false);
   const [isProcessing, setIsSaving] = useState(false);
 
@@ -134,65 +132,67 @@ export default function AddInvoicePage() {
   const [tempAddress, setTempAddress] = useState('');
   const [updateMaster, setUpdateMaster] = useState(true);
 
+  // --- LOGIC: Auto-Pull Items from SO ---
+  useEffect(() => {
+    if (selectedSoNumber && allSalesOrders) {
+        const foundSo = allSalesOrders.find(so => so.soNumber === selectedSoNumber);
+        if (foundSo && items.length === 0) {
+            setItems(foundSo.items.map((item, idx) => ({
+                id: item.id || `so-item-${idx}`,
+                name: item.productName,
+                quantity: item.quantity,
+                unit: item.unit || 'Meter',
+                price: item.price,
+                total: item.total,
+                originalPrice: item.price,
+                originalQty: item.quantity,
+                originalName: item.productName
+            })));
+            if (foundSo.customerAddress && !billingAddress) {
+                setBillingAddress(foundSo.customerAddress);
+            }
+            toast({ title: "SO Data Integrated", description: `Berhasil menarik ${foundSo.items.length} item dari SO ${selectedSoNumber}` });
+        }
+    }
+  }, [selectedSoNumber, allSalesOrders, items.length]);
+
   // --- CUSTOMER DATA SYNC ---
   const currentCustomer = useMemo(() => {
     if (!activeIdentity?.customer || !allCustomers) return null;
     return allCustomers.find(c => c.name.toLowerCase() === activeIdentity.customer.toLowerCase());
   }, [activeIdentity?.customer, allCustomers]);
 
-  // AUTO-POPULATE VA & ADDRESS FROM CUSTOMER PROFILE (Reactive)
+  // INITIAL STATE SYNC
   useEffect(() => {
-    if (currentCustomer && !editInvoiceId) {
-        if (!manualVaNumber) setManualVaNumber(currentCustomer.virtualAccountNumber || '');
-        if (!billingAddress) {
-            const defAddr = currentCustomer.addresses?.find(a => a.isDefault) || currentCustomer.addresses?.[0];
-            if (defAddr) setBillingAddress(defAddr.address);
-        }
-    }
-  }, [currentCustomer, manualVaNumber, billingAddress, editInvoiceId]);
-
-  // CRITICAL: Pull Data from SO to items
-  useEffect(() => {
-      if (activeIdentity && items.length === 0) {
-          if (activeIdentity.items && activeIdentity.items.length > 0) {
-             setItems(activeIdentity.items);
-          } else if (activeSoData && !editInvoiceId) {
-             setItems(activeSoData.items.map((item, idx) => ({
-                 id: item.id || `so-${idx}`,
-                 name: item.productName,
-                 quantity: item.quantity,
-                 unit: item.unit || 'Meter',
-                 price: item.price,
-                 total: item.total,
-                 originalPrice: item.price,
-                 originalQty: item.quantity
-             })));
-             if (activeSoData.customerAddress) setBillingAddress(activeSoData.customerAddress);
+      if (activeIdentity) {
+          if (!selectedSoNumber) setSelectedSoNumber(activeIdentity.salesOrder || '');
+          if (activeIdentity.items && activeIdentity.items.length > 0 && items.length === 0) {
+              setItems(activeIdentity.items);
           }
-
-          if (activeIdentity.billingAddress && !billingAddress) setBillingAddress(activeIdentity.billingAddress);
+          if (activeIdentity.billingAddress) setBillingAddress(activeIdentity.billingAddress);
+          if ((activeIdentity as Invoice).paymentMethod) setPaymentMethod((activeIdentity as Invoice).paymentMethod as any);
+          if ((activeIdentity as Invoice).vaNumber) setManualVaNumber((activeIdentity as Invoice).vaNumber!);
           setIsDpInvoice(!!(activeIdentity as Invoice).isDpInvoice);
-          setNegotiationValue(formatNumberWithCommas((activeIdentity as Invoice).negotiation || 0));
-          setDpValue(formatNumberWithCommas((activeIdentity as Invoice).dpValue || 0));
-          setDpDeductionValue(formatNumberWithCommas((activeIdentity as Invoice).dpDeduction || 0));
-          setRetentionValue(formatNumberWithCommas((activeIdentity as Invoice).retention || 0));
-          
-          if ((activeIdentity as Invoice).vaNumber) {
-              setManualVaNumber((activeIdentity as Invoice).vaNumber!);
-          }
       }
-  }, [activeIdentity, activeSoData, editInvoiceId, items.length]);
+  }, [activeIdentity]);
+
+  // AUTO-POPULATE VA FROM CUSTOMER PROFILE
+  useEffect(() => {
+    if (currentCustomer && paymentMethod === 'va' && !manualVaNumber) {
+        setManualVaNumber(currentCustomer.virtualAccountNumber || '');
+    }
+  }, [currentCustomer, paymentMethod]);
 
   // --- CALCULATION STATES ---
   const [subtotal, setSubtotal] = useState(0);
-  const [negotiationValue, setNegotiationValue] = useState<string>('');
-  const [negotiationMode, setNegotiationMode] = useState<'percent' | 'nominal'| any>('nominal');
-  const [dpValue, setDpValue] = useState<string>('');
-  const [dpMode, setDpMode] = useState<'percent' | 'nominal'| any>('percent');
-  const [retentionValue, setRetentionValue] = useState<string>('');
-  const [retentionMode, setRetentionMode] = useState<'percent' | 'nominal'| any>('nominal');
-  const [dpDeductionValue, setDpDeductionValue] = useState<string>('');
-  const [dpDeductionMode, setDpDeductionMode] = useState<'percent' | 'nominal'| any>('nominal');
+  const [negotiationValue, setNegotiationValue] = useState<string>('0');
+  const [negotiationMode, setNegotiationMode] = useState<'percent' | 'nominal'>('nominal');
+  const [dpValue, setDpValue] = useState<string>('0');
+  const [dpMode, setDpMode] = useState<'percent' | 'nominal'>('percent');
+  const [retentionValue, setRetentionValue] = useState<string>('0');
+  const [retentionMode, setRetentionMode] = useState<'percent' | 'nominal'>('nominal');
+  const [dpDeductionValue, setDpDeductionValue] = useState<string>('0');
+  const [dpDeductionMode, setDpDeductionMode] = useState<'percent' | 'nominal'>('nominal');
   const [isTaxManual, setIsTaxManual] = useState(false);
   const [dppVat, setDppVat] = useState<string>('0');
   const [vat12, setVat12] = useState<string>('0');
@@ -244,30 +244,6 @@ export default function AddInvoicePage() {
     }
   };
 
-  const removeItem = (id: string | number) => {
-      setItems(items.filter(it => it.id !== id));
-      toast({ title: "Baris Item Dihapus" });
-  };
-
-  const handleQuickEditSave = async () => {
-    if (!firestore || !user || !currentCustomer) return;
-    if (editTarget === 'name') {
-        if (updateMaster) {
-            await setDoc(doc(firestore, 'customers', currentCustomer.id!), { name: tempName }, { merge: true });
-            toast({ title: "Master Data Updated" });
-        }
-    } else {
-        if (updateMaster) {
-            const currentAddresses = currentCustomer.addresses || [];
-            const updatedAddresses = currentAddresses.map(a => a.address === billingAddress ? { ...a, address: tempAddress } : a);
-            await setDoc(doc(firestore, 'customers', currentCustomer.id!), { addresses: updatedAddresses }, { merge: true });
-            toast({ title: "Master Address Updated" });
-        }
-        setBillingAddress(tempAddress);
-    }
-    setIsQuickEditOpen(false);
-  };
-
   const handleSaveInvoice = async (invoiceStatus: any = 'sent', redirectToPreview = false) => {
     if (!firestore || !user || !activeIdentity) return;
 
@@ -280,7 +256,7 @@ export default function AddInvoicePage() {
 
     const dataToSave: any = {
         id: activeIdentity.id,
-        soNumber: activeIdentity.salesOrder || '',
+        soNumber: selectedSoNumber,
         poNumber: activeIdentity.poNumber || '',
         customer: activeIdentity.customer,
         customerCode: currentCustomer?.customerCode || '',
@@ -290,11 +266,12 @@ export default function AddInvoicePage() {
         amount: grandTotalNumeric,
         status: invoiceStatus,
         isDpInvoice: isDpInvoice,
+        paymentMethod: paymentMethod,
+        vaNumber: paymentMethod === 'va' ? manualVaNumber : '',
         negotiation: parseFormattedNumber(negotiationValue),
         dpValue: parseFormattedNumber(dpValue),
         dpDeduction: parseFormattedNumber(dpDeductionValue),
         retention: parseFormattedNumber(retentionValue),
-        vaNumber: manualVaNumber,
         items: items,
         lastUpdatedAt: timestamp,
         lastUpdatedBy: updater,
@@ -323,7 +300,7 @@ export default function AddInvoicePage() {
   };
 
   if (isIdentityLoading || isExistingLoading) {
-      return <div className="flex h-[80vh] items-center justify-center font-bold text-slate-400 animate-pulse uppercase tracking-widest text-xs">Syncing Constructor...</div>;
+      return <div className="flex h-[80vh] items-center justify-center font-bold text-slate-400 animate-pulse uppercase tracking-widest text-xs">Synchronizing Modules...</div>;
   }
 
   const isLocked = (existingInvoiceData?.status === 'finalized' || existingInvoiceData?.status === 'paid' || existingInvoiceData?.status === 'received') && !isAdmin;
@@ -336,11 +313,11 @@ export default function AddInvoicePage() {
                 <ChevronLeft className="h-5 w-5" />
             </Button>
             <div>
-                <h1 className="text-xl font-black tracking-tight uppercase text-slate-900">Invoice Constructor</h1>
+                <h1 className="text-xl font-black tracking-tight uppercase text-slate-900">Billing Constructor</h1>
                 <div className="flex items-center gap-2 mt-1">
                     <span className="text-slate-400 text-[10px] font-bold uppercase tracking-widest">Ref PO: {activeIdentity?.poNumber}</span>
                     <Badge variant="outline" className="text-[9px] font-black uppercase bg-indigo-50 border-slate-200 text-slate-500 h-4">
-                        <Lock className="h-2.5 w-2.5 mr-1" /> Financial Secure
+                        <Lock className="h-2.5 w-2.5 mr-1" /> Verified Financial Record
                     </Badge>
                 </div>
             </div>
@@ -352,7 +329,7 @@ export default function AddInvoicePage() {
           <Card className={cn("shadow-sm border-none ring-1 ring-slate-200 overflow-hidden", isLocked && "opacity-60")}>
             <CardHeader className="bg-slate-50/50 border-b py-3 px-6">
                 <CardTitle className="text-[10px] font-black uppercase flex items-center gap-2 text-slate-500 tracking-widest">
-                    <ReceiptText className="h-4 w-4 text-indigo-600" /> Identitas Penagihan
+                    <ReceiptText className="h-4 w-4 text-indigo-600" /> Identitas Penagihan & Mapping SO
                 </CardTitle>
             </CardHeader>
             <CardContent className="p-8">
@@ -365,44 +342,52 @@ export default function AddInvoicePage() {
                       </div>
                   </div>
 
-                  <div className="space-y-2 group">
-                      <div className="flex justify-between items-center">
-                          <Label className="text-[10px] font-black uppercase text-slate-400 tracking-widest">Nama Customer</Label>
-                          <Button variant="ghost" size="icon" className="h-5 w-5 opacity-0 group-hover:opacity-100 transition-opacity" onClick={() => { setEditTarget('name'); setTempName(activeIdentity?.customer || ''); setIsQuickEditOpen(true); }}><Pencil className="h-3 w-3 text-indigo-600" /></Button>
-                      </div>
-                      <div className="bg-slate-50 px-4 py-2.5 rounded-xl border border-slate-200 text-xs font-black uppercase truncate text-slate-700 flex justify-between items-center">
-                          {activeIdentity?.customer}
-                          {currentCustomer?.customerCode && <span className="text-[9px] bg-indigo-100 text-indigo-700 px-1.5 rounded">{currentCustomer.customerCode}</span>}
-                      </div>
-                      {currentCustomer?.contactPerson && (
-                          <div className="flex items-center gap-2 text-[9px] font-bold text-slate-400 mt-1">
-                              <UserCircle2 className="h-3 w-3" /> {currentCustomer.contactPerson}
-                          </div>
-                      )}
+                  <div className="space-y-2">
+                      <Label className="text-[10px] font-black uppercase text-slate-400 tracking-widest">Referensi Sales Order (SO)</Label>
+                      <Popover open={soPopoverOpen} onOpenChange={setSoPopoverOpen}>
+                        <PopoverTrigger asChild>
+                            <Button variant="outline" className="w-full justify-between h-10 font-bold border-indigo-100 bg-indigo-50/10">
+                                {selectedSoNumber || "Cari No. SO..."}
+                                <ChevronsUpDown className="ml-2 h-4 w-4 opacity-50" />
+                            </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-[400px] p-0 shadow-2xl" align="start">
+                            <Command>
+                                <CommandInput placeholder="Cari SO dari kontrak aktif..." className="h-11" />
+                                <CommandList>
+                                    <CommandEmpty>SO tidak ditemukan.</CommandEmpty>
+                                    <CommandGroup>
+                                        {allSalesOrders?.filter(so => so.customer === activeIdentity?.customer).map((so) => (
+                                            <CommandItem
+                                                key={so.soNumber}
+                                                value={so.soNumber}
+                                                onSelect={(v) => { setSelectedSoNumber(v); setSoPopoverOpen(false); }}
+                                                className="p-3 border-b"
+                                            >
+                                                <div className="flex flex-col">
+                                                    <span className="font-black text-indigo-700">{so.soNumber}</span>
+                                                    <span className="text-[9px] font-bold text-slate-400 uppercase">PO: {so.poNumber} • Rp {so.grandTotal.toLocaleString()}</span>
+                                                </div>
+                                            </CommandItem>
+                                        ))}
+                                    </CommandGroup>
+                                </CommandList>
+                            </Command>
+                        </PopoverContent>
+                      </Popover>
                   </div>
 
                   <div className="space-y-2">
-                      <Label className="text-[10px] font-black uppercase text-slate-400 tracking-widest flex items-center gap-1.5">
-                        <CreditCard className="h-3.5 w-3.5 text-emerald-600" /> Mandiri Virtual Account
-                      </Label>
-                      <div className="relative group">
-                          <Input 
-                            value={manualVaNumber} 
-                            onChange={e => setManualVaNumber(e.target.value)} 
-                            className="h-10 font-mono font-black text-xs border-emerald-100 bg-emerald-50/10 focus-visible:ring-emerald-500 rounded-xl"
-                            placeholder="Tarik dari Profil..."
-                            disabled={isLocked}
-                          />
-                          <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-1">
-                              {manualVaNumber.length === 16 ? <ShieldCheck className="h-3.5 w-3.5 text-emerald-500" /> : <Badge variant="outline" className="text-[7px] h-3 px-1">SYNC</Badge>}
-                          </div>
+                      <Label className="text-[10px] font-black uppercase text-slate-400 tracking-widest">Customer Profile</Label>
+                      <div className="bg-slate-50 px-4 py-2.5 rounded-xl border border-slate-200 text-xs font-black uppercase truncate text-slate-700 flex justify-between items-center">
+                          {activeIdentity?.customer}
                       </div>
                   </div>
 
                   <div className="md:col-span-3 space-y-4">
                       <div className="flex justify-between items-center">
                         <Label className="text-[10px] font-black uppercase text-slate-400 tracking-widest flex items-center gap-1">
-                            <MapPin className="h-3 w-3" /> Alamat Penagihan Spesifik
+                            <MapPin className="h-3 w-3" /> Specific Billing Address
                         </Label>
                         <div className="flex gap-2">
                              {currentCustomer?.addresses?.map(addr => (
@@ -431,13 +416,13 @@ export default function AddInvoicePage() {
 
           <Card className={cn("shadow-sm border-none ring-1 ring-slate-200 overflow-hidden", isLocked && "opacity-60")}>
             <CardHeader className="bg-slate-50/50 border-b py-4 px-6 flex flex-row items-center justify-between">
-                <CardTitle className="text-sm font-black uppercase text-slate-800 tracking-tighter">Line Items Constructor</CardTitle>
+                <CardTitle className="text-sm font-black uppercase text-slate-800 tracking-tighter">Items Constructor</CardTitle>
                 <Badge 
                     variant={isDpInvoice ? "default" : "outline"} 
-                    className={cn("text-[9px] uppercase cursor-pointer py-1.5 px-4 font-black tracking-widest transition-all", isDpInvoice ? "bg-indigo-600" : "text-indigo-600 border-indigo-200")} 
+                    className={cn("text-[9px] uppercase cursor-pointer py-1.5 px-4 font-black tracking-widest transition-all", isDpInvoice ? "bg-indigo-600 shadow-lg shadow-indigo-100" : "text-indigo-600 border-indigo-200")} 
                     onClick={() => !isLocked && setIsDpInvoice(!isDpInvoice)}
                 >
-                    {isDpInvoice ? "DP Mode" : "Regular Billing"}
+                    {isDpInvoice ? "Uang Muka / DP Mode" : "Regular Commercial"}
                 </Badge>
             </CardHeader>
             <CardContent className="p-0">
@@ -447,14 +432,14 @@ export default function AddInvoicePage() {
                             <TableHead className="text-[10px] font-black uppercase py-4 px-6">Deskripsi Barang</TableHead>
                             <TableHead className="w-[120px] text-center text-[10px] font-black uppercase">Qty</TableHead>
                             <TableHead className="w-[100px] text-center text-[10px] font-black uppercase">Satuan</TableHead>
-                            <TableHead className="w-[160px] text-right text-[10px] font-black uppercase">Harga Satuan (IDR)</TableHead>
+                            <TableHead className="w-[160px] text-right text-[10px] font-black uppercase">Harga Satuan</TableHead>
                             <TableHead className="w-[160px] text-right text-[10px] font-black uppercase">Total</TableHead>
                             <TableHead className="w-[60px]"></TableHead>
                         </TableRow>
                     </TableHeader>
                     <TableBody>
                         {items.length === 0 ? (
-                            <TableRow><TableCell colSpan={6} className="text-center py-20 text-slate-400 italic font-black opacity-30 tracking-widest">Belum ada item yang ditarik.</TableCell></TableRow>
+                            <TableRow><TableCell colSpan={6} className="text-center py-20 text-slate-400 italic font-black opacity-30 tracking-widest">Tarik nomor SO untuk mengisi baris item otomatis.</TableCell></TableRow>
                         ) : items.map(item => (
                                 <TableRow key={item.id} className="hover:bg-slate-50/50 transition-colors">
                                     <TableCell className="px-6">
@@ -499,7 +484,7 @@ export default function AddInvoicePage() {
                                     </TableCell>
                                     <TableCell className="text-right font-black text-xs px-2">Rp {formatNumberWithCommas(item.total)}</TableCell>
                                     <TableCell className="px-4">
-                                        <Button variant="ghost" size="icon" className="h-8 w-8 text-rose-500 hover:text-rose-700 hover:bg-rose-50 rounded-full" onClick={() => removeItem(item.id)} disabled={isLocked}>
+                                        <Button variant="ghost" size="icon" className="h-8 w-8 text-rose-500 hover:text-rose-700 hover:bg-rose-50 rounded-full" onClick={() => setItems(items.filter(it => it.id !== item.id))} disabled={isLocked}>
                                             <Trash2 className="h-4 w-4" />
                                         </Button>
                                     </TableCell>
@@ -512,33 +497,30 @@ export default function AddInvoicePage() {
                 <div className="p-6 bg-slate-50/50 border-t flex flex-wrap gap-3">
                     <Popover open={productPopoverOpen} onOpenChange={setProductPopoverOpen}>
                         <PopoverTrigger asChild>
-                            <Button variant="outline" size="sm" className="h-10 text-[10px] font-black uppercase text-indigo-600 rounded-xl px-6 border-slate-200 shadow-sm" disabled={isLocked}>
-                                <Plus className="mr-2 h-3.5 w-3.5" /> Tambah dari Katalog Master
+                            <Button variant="outline" size="sm" className="h-10 text-[10px] font-black uppercase text-indigo-600 rounded-xl px-6 border-slate-200" disabled={isLocked}>
+                                <Plus className="mr-2 h-3.5 w-3.5" /> Sisipkan Baris Manual
                             </Button>
                         </PopoverTrigger>
-                        <PopoverContent className="w-[400px] p-0 shadow-2xl border-none ring-1 ring-slate-200" align="start">
+                        <PopoverContent className="w-[400px] p-0 shadow-2xl" align="start">
                             <Command>
-                                <CommandInput placeholder="Cari di database produk..." className="h-12" />
+                                <CommandInput placeholder="Cari di katalog produk..." />
                                 <CommandList>
                                     <CommandEmpty>Produk tidak ditemukan.</CommandEmpty>
                                     <CommandGroup>
                                         {masterProducts?.map((p) => (
                                             <CommandItem
                                                 key={p.id}
-                                                value={`${p.name}|${p.id}`}
+                                                value={p.name}
                                                 onSelect={() => {
-                                                    const newItem: InvoiceItem = { id: `manual-${Date.now()}`, name: p.name, quantity: 1, unit: p.unit || 'Meter', price: p.price, total: p.price };
+                                                    const newItem: InvoiceItem = { id: `man-${Date.now()}`, name: p.name, quantity: 1, unit: p.unit || 'Meter', price: p.price, total: p.price };
                                                     setItems([...items, newItem]);
                                                     setProductPopoverOpen(false);
                                                 }}
-                                                className="p-4 border-b last:border-0"
+                                                className="p-3 border-b"
                                             >
                                                 <div className="flex justify-between w-full">
-                                                    <div className="flex flex-col">
-                                                        <span className="font-bold text-slate-800 uppercase text-xs">{p.name}</span>
-                                                        <span className="text-[9px] font-bold text-slate-400">{p.unit || 'Meter'}</span>
-                                                    </div>
-                                                    <span className="text-[10px] font-black text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded">Rp {p.price.toLocaleString()}</span>
+                                                    <span className="font-bold text-xs uppercase">{p.name}</span>
+                                                    <span className="text-[10px] font-black text-indigo-600">Rp {p.price.toLocaleString()}</span>
                                                 </div>
                                             </CommandItem>
                                         ))}
@@ -547,12 +529,67 @@ export default function AddInvoicePage() {
                             </Command>
                         </PopoverContent>
                     </Popover>
+                    <Button variant="ghost" className="h-10 text-[10px] font-black uppercase text-rose-500 rounded-xl px-6" onClick={() => setItems([])} disabled={isLocked || items.length === 0}>
+                        Bersihkan Tabel
+                    </Button>
                 </div>
             </CardContent>
           </Card>
         </div>
 
         <div className="lg:col-span-4 space-y-8 sticky top-24">
+          {/* PAYMENT METHOD MATRIX */}
+          <Card className="shadow-lg border-none ring-1 ring-emerald-100 bg-white overflow-hidden rounded-3xl">
+            <CardHeader className="bg-emerald-50/30 py-5 px-8 border-b border-emerald-50">
+                <CardTitle className="text-[10px] font-black uppercase tracking-[0.2em] text-emerald-600 flex items-center gap-2">
+                    <Banknote className="h-4 w-4" /> Payment Matrix Selector
+                </CardTitle>
+            </CardHeader>
+            <CardContent className="p-8 space-y-6">
+                <RadioGroup value={paymentMethod} onValueChange={(v: any) => setPaymentMethod(v)} className="grid grid-cols-2 gap-4">
+                    <div>
+                        <RadioGroupItem value="bank" id="bank" className="peer sr-only" disabled={isLocked} />
+                        <Label htmlFor="bank" className="flex flex-col items-center justify-between rounded-2xl border-2 border-muted bg-popover p-4 hover:bg-slate-50 hover:text-accent-foreground peer-data-[state=checked]:border-emerald-500 [&:has([data-state=checked])]:border-emerald-500 transition-all cursor-pointer">
+                            <Database className="mb-2 h-5 w-5 text-slate-400" />
+                            <span className="text-[9px] font-black uppercase">Manual Bank</span>
+                        </Label>
+                    </div>
+                    <div>
+                        <RadioGroupItem value="va" id="va" className="peer sr-only" disabled={isLocked} />
+                        <Label htmlFor="va" className="flex flex-col items-center justify-between rounded-2xl border-2 border-muted bg-popover p-4 hover:bg-slate-50 hover:text-accent-foreground peer-data-[state=checked]:border-emerald-500 [&:has([data-state=checked])]:border-emerald-500 transition-all cursor-pointer">
+                            <CreditCard className="mb-2 h-5 w-5 text-indigo-400" />
+                            <span className="text-[9px] font-black uppercase">Virtual Account</span>
+                        </Label>
+                    </div>
+                </RadioGroup>
+
+                {paymentMethod === 'va' ? (
+                    <div className="bg-indigo-900 p-5 rounded-2xl space-y-3 shadow-xl">
+                         <div className="flex justify-between items-center">
+                            <Label className="text-[9px] font-black uppercase text-indigo-300 flex items-center gap-1.5">
+                                <ShieldCheck className="h-3 w-3" /> Active Mandiri VA
+                            </Label>
+                            <Badge className="bg-emerald-500 text-[7px] font-black uppercase px-2 h-4">Verified 16-Digit</Badge>
+                         </div>
+                         <Input 
+                            value={manualVaNumber} 
+                            onChange={e => setManualVaNumber(e.target.value)} 
+                            className="bg-indigo-800 border-indigo-700 text-white font-mono font-black text-center tracking-[0.2em] h-11 text-sm rounded-xl focus-visible:ring-indigo-400"
+                            placeholder="Awaiting Sync..."
+                            disabled={isLocked}
+                         />
+                         <p className="text-[8px] text-indigo-400 font-bold uppercase italic text-center">Ditarik otomatis dari Master Profile.</p>
+                    </div>
+                ) : (
+                    <div className="bg-slate-50 p-5 rounded-2xl border border-slate-100 space-y-2">
+                        <p className="text-[10px] font-black uppercase text-slate-500">Rekening Transfer Pusat:</p>
+                        <p className="text-xs font-black text-slate-800">Bank Mandiri — Jakarta</p>
+                        <p className="text-xs font-mono font-bold text-slate-600">102-0005000218</p>
+                    </div>
+                )}
+            </CardContent>
+          </Card>
+
           <Card className="shadow-lg border-none ring-1 ring-indigo-100 bg-white overflow-hidden rounded-3xl">
             <CardHeader className="bg-indigo-50/20 py-5 px-8 border-b border-indigo-50">
                 <CardTitle className="text-[10px] font-black uppercase tracking-[0.2em] text-indigo-400">Financial Audit Matrix</CardTitle>
@@ -693,7 +730,11 @@ export default function AddInvoicePage() {
               </div>
               <DialogFooter className="bg-slate-50 -mx-6 -mb-6 p-6 rounded-b-3xl">
                   <Button variant="ghost" onClick={() => setIsQuickEditOpen(false)}>Batal</Button>
-                  <Button className="bg-indigo-600 hover:bg-indigo-700 font-black uppercase px-8" onClick={handleQuickEditSave}>Simpan</Button>
+                  <Button className="bg-indigo-600 hover:bg-indigo-700 font-black uppercase px-8" onClick={() => {
+                      if (editTarget === 'address') setBillingAddress(tempAddress);
+                      setIsQuickEditOpen(false);
+                      toast({ title: "Local Draft Updated" });
+                  }}>Gunakan Perubahan</Button>
               </DialogFooter>
           </DialogContent>
       </Dialog>

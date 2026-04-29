@@ -1,17 +1,13 @@
-
 'use client';
 import React, { useRef, useEffect, useState } from 'react';
 import { useRouter, useParams } from 'next/navigation';
-import { Download, Upload, ArrowLeft, Loader2, Globe, Printer, CreditCard } from 'lucide-react';
+import { Download, ArrowLeft, Loader2, Printer, CreditCard, Banknote } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { exportToExcel, cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
 import { useFirestore, useDoc, useMemoFirebase, useCollection } from '@/firebase';
 import { doc, collection, query } from 'firebase/firestore';
 import html2pdf from 'html2pdf.js';
 import type { Invoice, Customer } from '@/app/lib/data';
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { TOOLTIP_CONTENT } from '@/app/lib/tooltip-content';
 
 // --- DEFINISI TIPE DATA ---
 interface Item {
@@ -40,7 +36,7 @@ interface InvoiceData {
     dppVat: number;
     vat12: number;
     paymentTerms: string;
-    printType: 'original' | 'copy';
+    paymentMethod: 'bank' | 'va';
     negotiation: number;
     dpValue: number;
     virtualAccount?: string;
@@ -63,7 +59,7 @@ const formatDate = (dateString: string): string => {
     }).replace(/\//g, '-');
 };
 
-const ITEMS_PER_PAGE = 10;
+const ITEMS_PER_PAGE = 12;
 
 const InvoicePreviewPage = () => {
     const invoiceContainerRef = useRef<HTMLDivElement>(null);
@@ -82,16 +78,10 @@ const InvoicePreviewPage = () => {
 
     useEffect(() => {
         if (dbInvoice && !isDbLoading) {
-            let finalNpwp = dbInvoice.billingNpwp || '';
             let vaFromMaster = '';
-            
             if (allCustomers) {
                 const found = allCustomers.find(c => c.name.toLowerCase() === dbInvoice.customer.toLowerCase());
-                if (found) {
-                    const defaultAddr = found.addresses?.find(a => a.isDefault) || found.addresses?.[0];
-                    if (defaultAddr?.npwp) finalNpwp = defaultAddr.npwp;
-                    vaFromMaster = found.virtualAccountNumber || '';
-                }
+                if (found) vaFromMaster = found.virtualAccountNumber || '';
             }
 
             const mappedData: InvoiceData = {
@@ -108,7 +98,7 @@ const InvoicePreviewPage = () => {
                 customer: {
                     name: dbInvoice.customer,
                     address: dbInvoice.billingAddress,
-                    npwp: finalNpwp
+                    npwp: dbInvoice.billingNpwp || ''
                 },
                 date: dbInvoice.date,
                 soNumber: dbInvoice.soNumber,
@@ -118,9 +108,9 @@ const InvoicePreviewPage = () => {
                 dppVat: dbInvoice.amount / 1.12, 
                 vat12: dbInvoice.amount - (dbInvoice.amount / 1.12),
                 paymentTerms: '30 Days',
-                printType: 'original',
+                paymentMethod: (dbInvoice.paymentMethod as any) || 'va',
                 negotiation: dbInvoice.negotiation || 0,
-                dpValue: dbInvoice.isDpInvoice ? dbInvoice.amount : ((dbInvoice.dpDeduction || 0) + (dbInvoice.retention || 0)),
+                dpValue: dbInvoice.dpValue || 0,
                 virtualAccount: dbInvoice.vaNumber || vaFromMaster
             };
             setInvoiceData(mappedData);
@@ -134,7 +124,7 @@ const InvoicePreviewPage = () => {
           margin: [10, 10, 10, 10], 
           filename: `Invoice-${invoiceData.id.replace(/\//g, '_')}.pdf`,
           image: { type: 'jpeg', quality: 0.98 },
-          html2canvas: { scale: 2, useCORS: true },
+          html2canvas: { scale: 3, useCORS: true },
           jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
         };
         html2pdf().from(element).set(opt).save();
@@ -156,7 +146,7 @@ const InvoicePreviewPage = () => {
     const invoiceTitle = invoiceData.id.startsWith('KW') ? 'PROFORMA INVOICE' : 'INVOICE / OFFICIAL RECEIPT';
 
     return (
-        <div className="bg-gray-100 min-h-screen p-4 sm:p-6 font-sans text-black">
+        <div className="bg-gray-100 min-h-screen p-4 sm:p-6 font-sans text-black animate-in fade-in duration-700">
             <style>{`
                 @media print {
                     body { background-color: #fff !important; }
@@ -245,13 +235,26 @@ const InvoicePreviewPage = () => {
                                 <div className="flex justify-between gap-12">
                                     <div className="flex-1 space-y-6">
                                         <div className="bg-slate-50 p-6 rounded-2xl border-2 border-dashed border-slate-200">
-                                            <p className="font-black uppercase text-[8px] text-indigo-600 mb-2 tracking-[0.2em] flex items-center gap-1.5"><CreditCard className="h-3 w-3" /> Mandatory Payment Instruction:</p>
-                                            <p className="font-black text-xs">PT JEMBO CABLE COMPANY Tbk</p>
-                                            <p className="text-[10px] font-bold text-slate-500 uppercase">Bank Mandiri — Virtual Account Center</p>
-                                            <p className="font-mono font-black text-indigo-700 text-lg mt-1 tracking-tighter">
-                                                A/C: {invoiceData.virtualAccount || '102-0005000218'} (IDR)
-                                            </p>
-                                            {invoiceData.virtualAccount && <p className="text-[8px] font-black text-emerald-600 uppercase mt-1">Verified Unique Customer Account</p>}
+                                            {invoiceData.paymentMethod === 'va' ? (
+                                                <>
+                                                    <p className="font-black uppercase text-[8px] text-indigo-600 mb-2 tracking-[0.2em] flex items-center gap-1.5"><CreditCard className="h-3 w-3" /> Mandatory Payment Instruction (VA):</p>
+                                                    <p className="font-black text-xs">PT JEMBO CABLE COMPANY Tbk</p>
+                                                    <p className="text-[10px] font-bold text-slate-500 uppercase">Bank Mandiri — Virtual Account Center</p>
+                                                    <p className="font-mono font-black text-indigo-700 text-lg mt-1 tracking-widest">
+                                                        A/C: {invoiceData.virtualAccount || '86625...'} (IDR)
+                                                    </p>
+                                                    <p className="text-[7px] font-black text-emerald-600 uppercase mt-1">Verified Unique Customer Account</p>
+                                                </>
+                                            ) : (
+                                                <>
+                                                    <p className="font-black uppercase text-[8px] text-emerald-600 mb-2 tracking-[0.2em] flex items-center gap-1.5"><Banknote className="h-3 w-3" /> Manual Transfer Account:</p>
+                                                    <p className="font-black text-xs">PT JEMBO CABLE COMPANY Tbk</p>
+                                                    <p className="text-[10px] font-bold text-slate-500 uppercase">Bank Mandiri — Cabang Kemayoran</p>
+                                                    <p className="font-mono font-black text-slate-900 text-lg mt-1 tracking-tighter">
+                                                        A/C: 102-0005000218 (IDR)
+                                                    </p>
+                                                </>
+                                            )}
                                         </div>
                                         <p className="text-[8px] font-medium text-slate-400 leading-relaxed uppercase">
                                             * Validasi pembayaran sah apabila dana telah efektif di rekening kami. <br />
