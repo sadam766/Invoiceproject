@@ -204,7 +204,7 @@ const InvoicePreviewPage = () => {
                         <div key={printType} className={cn("document-version", isCopy && "grayscale opacity-80")}>
                             {itemChunks.map((chunk, pageIndex) => {
                                 const isLastPage = pageIndex === totalPages - 1;
-                                const { id: displayInvoiceId, customer, soNumber, date, subtotal: subTotalItems, negotiation, dpValue, poNumber, grandTotal, dppVat, vat12, paymentTerms } = invoiceData;
+                                const { id: displayInvoiceId, customer, soNumber, date, subtotal: subTotalItems, negotiation, dpValue, poNumber, grandTotal, dppVat, vat12, paymentTerms, paymentMethod, virtualAccount } = invoiceData;
 
                                 return (
                                     <div key={`${printType}-${pageIndex}`} className={`w-full max-w-4xl mx-auto bg-white shadow-lg p-4 my-8 text-[10px] leading-tight flex flex-col page-break`} style={{ height: '280mm' }}>
@@ -266,24 +266,58 @@ const InvoicePreviewPage = () => {
                                         {isLastPage ? (
                                             <footer className="pt-4 text-black mt-auto text-[10px]">
                                                 <div className="flex justify-between items-start mb-6">
-                                                    <div className="w-[55%] space-y-4">
-                                                        <div className="p-4 bg-slate-50 border border-slate-200 rounded-xl">
-                                                            <p className="font-bold text-[9px] uppercase tracking-widest text-slate-400 mb-2">Payment Instructions:</p>
-                                                            <p className="font-black text-slate-800">PT. JEMBO CABLE COMPANY Tbk</p>
-                                                            <div className="grid grid-cols-2 gap-4 mt-2">
-                                                                <div>
-                                                                    <p className="text-[8px] font-bold text-slate-500 uppercase">Mandiri Account (IDR)</p>
-                                                                    <p className="font-mono font-black">102-0100206827</p>
+                                                    <div className="w-[55%] space-y-2">
+                                                        <p className='mt-2 mb-1 font-semibold uppercase tracking-tight'>
+                                                            {paymentMethod === 'va' ? 'Payment Instruction (Virtual Account):' : 'For payment, please transfer to our account:'}
+                                                        </p>
+
+                                                        <p className="font-bold text-[10px] mb-1">PT. JEMBO CABLE COMPANY Tbk</p>
+
+                                                        {paymentMethod === 'va' ? (
+                                                            /* TAMPILAN BARU: UNTUK VIRTUAL ACCOUNT */
+                                                            <div className="bg-slate-50 p-4 border border-slate-200 rounded-xl shadow-sm">
+                                                                <div className="flex flex-col">
+                                                                    <span className="text-[8px] text-slate-500 uppercase tracking-widest mb-1">Mandiri Virtual Account (IDR)</span>
+                                                                    <span className="text-sm font-mono font-black tracking-[0.2em] text-indigo-700">
+                                                                        {virtualAccount || '86625XXXXXXXXXXX'}
+                                                                    </span>
+                                                                    <p className='mt-2 text-[8px] italic text-slate-400 leading-tight'>
+                                                                        *Pembayaran ini akan terverifikasi secara otomatis oleh sistem pusat Dakota Hub.
+                                                                    </p>
                                                                 </div>
-                                                                {invoiceData.virtualAccount && (
-                                                                    <div>
-                                                                        <p className="text-[8px] font-bold text-indigo-500 uppercase">Mandiri Virtual Account</p>
-                                                                        <p className="font-mono font-black text-indigo-700">{invoiceData.virtualAccount}</p>
-                                                                    </div>
-                                                                )}
                                                             </div>
-                                                        </div>
-                                                        <p className="text-[8px] italic text-slate-400">Note: Please include the Invoice Number in your payment reference.</p>
+                                                        ) : (
+                                                            /* TAMPILAN LAMA: REKENING MANUAL */
+                                                            <div className="p-4 bg-white border border-slate-200 rounded-xl space-y-3">
+                                                                <div className="space-y-1.5 leading-tight">
+                                                                    <div className="flex items-center">
+                                                                        <span className="w-24 text-slate-500 italic">Bank Mandiri -</span>
+                                                                        <span className="font-bold">A/C No. : 102-0100206827 (IDR)</span>
+                                                                    </div>
+                                                                    <div className="flex items-center">
+                                                                        <span className="w-24 text-slate-500 italic">Jakarta Cabang</span>
+                                                                        <span className="font-bold">A/C No. : 102-0005000218 (IDR)</span>
+                                                                    </div>
+                                                                    <div className="flex items-center">
+                                                                        <span className="w-24 text-slate-500 italic">Sudirman</span>
+                                                                        <span className="font-bold text-indigo-600">A/C No. : 102-0005000226 (USD)</span>
+                                                                    </div>
+                                                                </div>
+                                                                
+                                                                <div className="text-center py-1 font-bold text-[8px] text-slate-300 italic tracking-[0.3em]">--- OR ---</div>
+                                                                
+                                                                <div className="flex">
+                                                                    <div className="w-24 leading-tight">
+                                                                        <p className='mb-0 italic'>Bank BCA</p>
+                                                                        <p className='mt-0 text-[8px] text-slate-400'>Cab. KEM TOWER</p>
+                                                                    </div>
+                                                                    <div className="flex-1 self-center">
+                                                                        <p className='mb-0 font-bold text-[10px]'>A/C No. : 684-0198977 (IDR)</p>
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+                                                        )}
+                                                        <p className="text-[8px] italic text-slate-400 pt-2">Note: Please include the Invoice Number in your payment reference.</p>
                                                     </div>
 
                                                     <div className="w-[40%] space-y-1">
@@ -301,7 +335,7 @@ const InvoicePreviewPage = () => {
                                                             <span className="font-bold uppercase text-slate-500">VAT (12%)</span>
                                                             <span className="font-black">Rp {formatCurrency(vat12)}</span>
                                                         </div>
-                                                        <div className="flex justify-between py-2 bg-slate-900 text-white px-2 rounded-lg mt-2">
+                                                        <div className="flex justify-between py-2 bg-slate-900 text-white px-2 rounded-lg mt-2 shadow-lg">
                                                             <span className="font-black uppercase tracking-widest text-[9px] mt-1">Grand Total</span>
                                                             <span className="text-sm font-black">Rp {formatCurrency(grandTotal)}</span>
                                                         </div>
