@@ -230,133 +230,112 @@ const InvoicePreviewPage = () => {
                                         <main className='mt-6 flex-grow'>
                                             <table className="w-full border-collapse text-[10px] mt-0">
                                                 <thead>
-                                                    <tr className='bg-slate-50 border border-black'>
-                                                        <th className="p-1 text-left w-[8%] border-r border-black border-b border-black font-bold">No.</th>
-                                                        <th className="p-1 text-left w-[40%] border-r border-black border-b border-black font-bold">Item Description</th>
-                                                        <th className="p-1 text-center w-[15%] border-r border-black border-b border-black font-bold">Qty</th>
-                                                        <th className="p-1 text-right w-[17%] border-r border-black border-b border-black font-bold">Unit Price</th>
-                                                        <th className="p-1 text-right flex-1 border-b border-black font-bold">Total</th>
+                                                    <tr className='bg-white border border-black'>
+                                                        <th className="p-1 text-left w-[8%] border-r border-black border-b border-black font-normal">No.</th>
+                                                        <th className="p-1 text-left w-[40%] border-r border-black border-b border-black font-normal">Item</th>
+                                                        <th className="p-1 text-center w-[15%] border-r border-black border-b border-black font-normal">Quantity Unit</th>
+                                                        <th className="p-1 text-right w-[17%] border-r border-black border-b border-black font-normal">Price</th>
+                                                        <th className="p-1 text-right flex-1 border-b border-black font-normal">Amount</th>
                                                     </tr>
                                                 </thead>
                                                 <tbody>
                                                     {chunk.map((item, itemIdx) => (
-                                                        <tr key={item.id} className='align-top border-x border-black'>
-                                                            <td className="p-1 border-r border-black">{pageIndex * ITEMS_PER_PAGE + itemIdx + 1}</td>
+                                                        <tr key={item.id} className='align-top'>
+                                                            <td className="p-1 h-[18px] border-r border-black">{pageIndex * ITEMS_PER_PAGE + itemIdx + 1}</td>
                                                             <td className="p-1 border-r border-black font-bold uppercase">{item.name}</td>
-                                                            <td className="p-1 border-r border-black text-center">{item.quantity.toLocaleString('id-ID')} {item.unit}</td>
-                                                            <td className="p-1 border-r border-black text-right">{formatCurrency(item.price)}</td>
+                                                            <td className="p-1 text-center border-r border-black">{item.quantity.toLocaleString('id-ID')} {item.unit}</td>
+                                                            <td className="p-1 text-right border-r border-black">{formatCurrency(item.price)}</td>
                                                             <td className="p-1 text-right">{formatCurrency(item.total)}</td>
                                                         </tr>
                                                     ))}
-                                                    {/* Row Fillers for alignment */}
+                                                    {/* Baris kosong untuk menjaga tinggi tabel tetap konsisten */}
                                                     {Array.from({ length: ITEMS_PER_PAGE - chunk.length }).map((_, i) => (
-                                                        <tr key={`empty-${i}`} className='border-x border-black'>
-                                                            <td className="p-1 h-[25px] border-r border-black">&nbsp;</td>
+                                                        <tr key={`empty-${i}`}>
+                                                            <td className="p-1 h-[18px] border-r border-black">&nbsp;</td>
                                                             <td className="p-1 border-r border-black">&nbsp;</td>
                                                             <td className="p-1 border-r border-black">&nbsp;</td>
                                                             <td className="p-1 border-r border-black">&nbsp;</td>
                                                             <td className="p-1">&nbsp;</td>
                                                         </tr>
                                                     ))}
-                                                    <tr className="border border-black"><td colSpan={5} className="h-0"></td></tr>
+                                                    <tr className="border-t border-black"><td colSpan={5} className="h-0"></td></tr>
                                                 </tbody>
                                             </table>
                                         </main>
                                         
-                                        {isLastPage ? (
-                                            <footer className="pt-4 text-black mt-auto text-[10px]">
-                                                <div className="flex justify-between items-start mb-6">
-                                                    <div className="w-[55%] space-y-2">
-                                                        <p className='mt-2 mb-1 font-semibold uppercase tracking-tight'>
-                                                            {paymentMethod === 'va' ? 'Payment Instruction (Virtual Account):' : 'For payment, please transfer to our account:'}
+                                        {isLastPage && (
+                                            <footer className="mt-2 text-black">
+                                                <div className="flex justify-end">
+                                                    <div className="w-[40%] space-y-1 text-[10px]">
+                                                        <div className="flex justify-between py-1 border-b border-black">
+                                                            <span className="font-normal uppercase">Subtotal</span>
+                                                            <span className="font-bold">Rp {formatCurrency(subTotalItems)}</span>
+                                                        </div>
+                                                        {negotiation > 0 && (
+                                                            <div className="flex justify-between py-1 border-b border-black text-rose-600">
+                                                                <span className="font-normal uppercase">Discount/Neg.</span>
+                                                                <span className="font-bold">({formatCurrency(negotiation)})</span>
+                                                            </div>
+                                                        )}
+                                                        <div className="flex justify-between py-1 border-b border-black">
+                                                            <span className="font-normal uppercase">VAT (12%)</span>
+                                                            <span className="font-bold">Rp {formatCurrency(vat12)}</span>
+                                                        </div>
+                                                        <div className="flex justify-between py-1 font-bold border-b-2 border-black mt-1">
+                                                            <span className="uppercase">Grand Total</span>
+                                                            <span>Rp {formatCurrency(grandTotal)}</span>
+                                                        </div>
+                                                    </div>
+                                                </div>
+
+                                                <div className="flex mt-4">
+                                                    {/* Sisi Kiri: Instruksi Pembayaran */}
+                                                    <div className="w-[60%] text-[10px]">
+                                                        <p className="mb-1">Please state with your payment: <span className="font-bold">{displayInvoiceId}</span></p>
+                                                        
+                                                        <p className='mt-2 mb-1 font-semibold underline'>
+                                                            {paymentMethod === 'va' ? 'PAYMENT VIA VIRTUAL ACCOUNT:' : 'FOR PAYMENT, PLEASE TRANSFER TO:'}
                                                         </p>
 
-                                                        <p className="font-bold text-[10px] mb-1">PT. JEMBO CABLE COMPANY Tbk</p>
-
                                                         {paymentMethod === 'va' ? (
-                                                            /* TAMPILAN BARU: UNTUK VIRTUAL ACCOUNT */
-                                                            <div className="bg-slate-50 p-4 border border-slate-200 rounded-xl shadow-sm">
+                                                            /* Box Virtual Account - Styling mengikuti instruksi user */
+                                                            <div className="border border-gray-300 bg-gray-50 p-3 rounded w-[90%] shadow-sm">
                                                                 <div className="flex flex-col">
-                                                                    <span className="text-[8px] text-slate-500 uppercase tracking-widest mb-1">Mandiri Virtual Account (IDR)</span>
-                                                                    <span className="text-sm font-mono font-black tracking-[0.2em] text-indigo-700">
+                                                                    <p className="text-[9px] uppercase text-gray-500 font-bold tracking-wider mb-1">Mandiri Virtual Account (IDR)</p>
+                                                                    <p className="text-lg font-black tracking-widest text-indigo-700">
                                                                         {virtualAccount || '86625XXXXXXXXXXX'}
-                                                                    </span>
-                                                                    <p className='mt-2 text-[8px] italic text-slate-400 leading-tight'>
-                                                                        *Pembayaran ini akan terverifikasi secara otomatis oleh sistem pusat Dakota Hub.
+                                                                    </p>
+                                                                    <p className='mt-1 text-[8px] italic text-gray-400'>
+                                                                        *Pembayaran ini akan terverifikasi secara otomatis oleh sistem Dakota Hub.
                                                                     </p>
                                                                 </div>
                                                             </div>
                                                         ) : (
-                                                            /* TAMPILAN LAMA: REKENING MANUAL */
-                                                            <div className="p-4 bg-white border border-slate-200 rounded-xl space-y-3">
-                                                                <div className="space-y-1.5 leading-tight">
-                                                                    <div className="flex items-center">
-                                                                        <span className="w-24 text-slate-500 italic">Bank Mandiri -</span>
-                                                                        <span className="font-bold">A/C No. : 102-0100206827 (IDR)</span>
-                                                                    </div>
-                                                                    <div className="flex items-center">
-                                                                        <span className="w-24 text-slate-500 italic">Jakarta Cabang</span>
-                                                                        <span className="font-bold">A/C No. : 102-0005000218 (IDR)</span>
-                                                                    </div>
-                                                                    <div className="flex items-center">
-                                                                        <span className="w-24 text-slate-500 italic">Sudirman</span>
-                                                                        <span className="font-bold text-indigo-600">A/C No. : 102-0005000226 (USD)</span>
-                                                                    </div>
-                                                                </div>
-                                                                
-                                                                <div className="text-center py-1 font-bold text-[8px] text-slate-300 italic tracking-[0.3em]">--- OR ---</div>
-                                                                
-                                                                <div className="flex">
-                                                                    <div className="w-24 leading-tight">
-                                                                        <p className='mb-0 italic'>Bank BCA</p>
-                                                                        <p className='mt-0 text-[8px] text-slate-400'>Cab. KEM TOWER</p>
-                                                                    </div>
-                                                                    <div className="flex-1 self-center">
-                                                                        <p className='mb-0 font-bold text-[10px]'>A/C No. : 684-0198977 (IDR)</p>
-                                                                    </div>
-                                                                </div>
+                                                            /* Daftar Rekening Manual - Sesuai image_29d85a.png */
+                                                            <div className="space-y-0.5 leading-tight">
+                                                                <p className="font-bold">PT. JEMBO CABLE COMPANY Tbk</p>
+                                                                <div className="flex"><span className="w-24 italic">Bank Mandiri</span> <span>: 102-0100206827 (IDR)</span></div>
+                                                                <div className="flex"><span className="w-24 italic">Bank BCA</span> <span>: 684-0198977 (IDR)</span></div>
                                                             </div>
                                                         )}
-                                                        <p className="text-[8px] italic text-slate-400 pt-2">Note: Please include the Invoice Number in your payment reference.</p>
                                                     </div>
 
-                                                    <div className="w-[40%] space-y-1">
-                                                        <div className="flex justify-between py-1 border-b">
-                                                            <span className="font-bold uppercase text-slate-500">Subtotal</span>
-                                                            <span className="font-black">Rp {formatCurrency(subTotalItems)}</span>
+                                                    {/* Sisi Kanan: Tanda Tangan Finance */}
+                                                    <div className="w-[40%] text-center text-[10px] flex flex-col justify-between">
+                                                        <div>
+                                                            <p className="mb-1 font-bold uppercase">PT. JEMBO CABLE COMPANY Tbk</p>
                                                         </div>
-                                                        {negotiation > 0 && (
-                                                            <div className="flex justify-between py-1 border-b text-rose-600">
-                                                                <span className="font-bold uppercase">Discount/Neg.</span>
-                                                                <span className="font-black">({formatCurrency(negotiation)})</span>
-                                                            </div>
-                                                        )}
-                                                        <div className="flex justify-between py-1 border-b">
-                                                            <span className="font-bold uppercase text-slate-500">VAT (12%)</span>
-                                                            <span className="font-black">Rp {formatCurrency(vat12)}</span>
-                                                        </div>
-                                                        <div className="flex justify-between py-2 bg-slate-900 text-white px-2 rounded-lg mt-2 shadow-lg">
-                                                            <span className="font-black uppercase tracking-widest text-[9px] mt-1">Grand Total</span>
-                                                            <span className="text-sm font-black">Rp {formatCurrency(grandTotal)}</span>
+                                                        <div className="mt-16">
+                                                            <p className="font-bold underline">Finance Department</p>
                                                         </div>
                                                     </div>
                                                 </div>
-
-                                                <div className="flex justify-between items-end mt-10">
-                                                    <div className="text-center w-40">
-                                                        <p className="mb-16 uppercase font-bold text-slate-400 text-[8px] tracking-widest">Received By</p>
-                                                        <div className="border-t border-black w-full pt-1 font-bold">( ............................ )</div>
-                                                    </div>
-                                                    <div className="text-center w-40">
-                                                        <p className="mb-16 uppercase font-bold text-slate-400 text-[8px] tracking-widest">Authorized Signature</p>
-                                                        <div className="border-t border-black w-full pt-1 font-bold">Finance Department</div>
-                                                    </div>
-                                                </div>
+                                                
                                                 {isCopy && <p className="text-center mt-6 text-[8px] font-black uppercase tracking-[0.3em] text-slate-400">Arsip Internal - Dokumen ini adalah salinan sah dari dokumen asli</p>}
                                             </footer>
-                                        ) : null}
+                                        )}
                                         <div className="text-right text-gray-400 text-[8px] mt-auto pt-4 font-bold">
-                                            {printType} | Halaman {pageIndex + 1} dari {totalPages}
+                                            {printType} | Page {pageIndex + 1} of {totalPages}
                                         </div>
                                     </div>
                                 );
