@@ -264,31 +264,52 @@ const InvoicePreviewPage = () => {
                                         </main>
                                         
                                         {isLastPage && (
-                                            <footer className="mt-2 text-black">
-                                                <div className="flex justify-end">
-                                                    <div className="w-[40%] space-y-1 text-[10px]">
-                                                        <div className="flex justify-between py-1 border-b border-black">
-                                                            <span className="font-normal uppercase">Subtotal</span>
-                                                            <span className="font-bold">Rp {formatCurrency(subTotalItems)}</span>
-                                                        </div>
+                                            <footer className="pt-0 text-black mt-auto text-[10px]">
+                                                {/* 1. Baris Sub Total (Total sebelum diskon/DP) */}
+                                                <div className="w-full flex justify-end items-center leading-normal">
+                                                    <div className="w-[40%] flex justify-end border-t border-black pt-1">
+                                                        <p className="text-[10px] font-normal">{formatCurrency(subTotalItems)}</p>
+                                                    </div>
+                                                </div>
+
+                                                {/* 2. Area Kalkulasi Pajak & Potongan */}
+                                                <div className="w-full flex flex-col items-end leading-normal mt-1">
+                                                    <div className="w-[60%] space-y-1">
+                                                        {/* Row Diskon / Negotiation */}
                                                         {negotiation > 0 && (
-                                                            <div className="flex justify-between py-1 border-b border-black text-rose-600">
-                                                                <span className="font-normal uppercase">Discount/Neg.</span>
-                                                                <span className="font-bold">({formatCurrency(negotiation)})</span>
+                                                            <div className="grid grid-cols-[1fr_80px_150px] items-center text-right">
+                                                                <span className="pr-4">Discount</span>
+                                                                <span className=""></span>
+                                                                <span className="font-normal">({formatCurrency(negotiation)})</span>
                                                             </div>
                                                         )}
-                                                        <div className="flex justify-between py-1 border-b border-black">
-                                                            <span className="font-normal uppercase">VAT (12%)</span>
-                                                            <span className="font-bold">Rp {formatCurrency(vat12)}</span>
+
+                                                        {/* Row VAT (PPN 12%) */}
+                                                        <div className="grid grid-cols-[1fr_80px_150px] items-center text-right">
+                                                            <span className="pr-4">VAT</span>
+                                                            <span className="text-center">12%</span>
+                                                            <span className="font-normal">{formatCurrency(vat12)}</span>
                                                         </div>
-                                                        <div className="flex justify-between py-1 font-bold border-b-2 border-black mt-1">
-                                                            <span className="uppercase">Grand Total</span>
-                                                            <span>Rp {formatCurrency(grandTotal)}</span>
+
+                                                        {/* Row Down Payment (DP) */}
+                                                        {dpValue > 0 && (
+                                                            <div className="grid grid-cols-[1fr_80px_150px] items-center text-right">
+                                                                <span className="pr-4">DP</span>
+                                                                <span className="text-center">{Math.round((dpValue / subTotalItems) * 100)}%</span>
+                                                                <span className="font-normal">({formatCurrency(dpValue)})</span>
+                                                            </div>
+                                                        )}
+
+                                                        {/* Row Grand Total */}
+                                                        <div className="grid grid-cols-[1fr_80px_150px] items-center text-right border-t border-black mt-1 pt-1">
+                                                            <span className="pr-4 font-bold uppercase">Grand Total</span>
+                                                            <span className=""></span>
+                                                            <span className="font-bold text-[11px]">Rp {formatCurrency(grandTotal)}</span>
                                                         </div>
                                                     </div>
                                                 </div>
 
-                                                <div className="flex mt-4">
+                                                <div className="flex mt-6">
                                                     {/* Sisi Kiri: Instruksi Pembayaran */}
                                                     <div className="w-[60%] text-[10px]">
                                                         <p className="mb-1">Please state with your payment: <span className="font-bold">{displayInvoiceId}</span></p>
