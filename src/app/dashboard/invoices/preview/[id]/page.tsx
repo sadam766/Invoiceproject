@@ -1,303 +1,273 @@
 
 'use client';
 
-import React, { useRef, useEffect, useState, useMemo } from 'react';
-import { useRouter, useParams } from 'next/navigation';
-import { Download, ArrowLeft, Loader2, Printer } from 'lucide-react';
+import React, { useEffect, useState } from 'react';
+import { useParams, useRouter } from 'next/navigation';
+import { doc } from 'firebase/firestore';
+import { useFirestore, useDoc, useMemoFirebase } from '@/firebase';
 import { Button } from '@/components/ui/button';
-import { useToast } from '@/hooks/use-toast';
-import { useFirestore, useDoc, useMemoFirebase, useCollection } from '@/firebase';
-import { doc, collection, query, updateDoc } from 'firebase/firestore';
-import html2pdf from 'html2pdf.js';
-import type { Invoice, Customer } from '@/app/lib/data';
-import { cn, formatCurrency } from '@/lib/utils';
+import { ArrowLeft, Printer } from 'lucide-react';
+import { type Invoice } from '@/app/lib/data';
 
-// --- HELPER: TERBILANG (In Words) ---
-const toWords = (amount: number): string => {
-    // Placeholder function - can be replaced with a real Indonesian spelling library if needed
-    if (amount <= 0) return "NOL RUPIAH";
-    return "TERBILANG SESUAI NOMINAL TOTAL";
-};
+/**
+ * Fungsi pembantu untuk mengonversi angka ke teks (Terbilang)
+ */
+function angkaKeTerbilang(n: number): string {
+  const bilangan = [
+    '', 'Satu', 'Dua', 'Tiga', 'Empat', 'Lima', 'Enam', 'Tujuh', 'Delapan', 'Sembilan', 'Sepuluh', 'Sebelas'
+  ];
+  let hasil = '';
 
-const ITEMS_PER_PAGE = 15;
+  if (n < 12) hasil = bilangan[n];
+  else if (n < 20) hasil = angkaKeTerbilang(n - 10) + ' Belas';
+  else if (n < 100) hasil = angkaKeTerbilang(Math.floor(n / 10)) + ' Puluh ' + angkaKeTerbilang(n % 10);
+  else if (n < 200) hasil = ' Seratus ' + angkaKeTerbilang(n - 100);
+  else if (n < 1000) hasil = angkaKeTerbilang(Math.floor(n / 100)) + ' Ratus ' + angkaKeTerbilang(n % 100);
+  else if (n < 2000) hasil = ' Seribu ' + angkaKeTerbilang(n - 1000);
+  else if (n < 1000000) hasil = angkaKeTerbilang(Math.floor(n / 1000)) + ' Ribu ' + angkaKeTerbilang(n % 1000);
+  else if (n < 1000000000) hasil = angkaKeTerbilang(Math.floor(n / 1000000)) + ' Juta ' + angkaKeTerbilang(n % 1000000);
+  else hasil = "Angka terlalu besar";
+
+  return hasil.trim();
+}
 
 const InvoicePreviewPage = () => {
-    const invoiceContainerRef = useRef<HTMLDivElement>(null);
-    const { toast } = useToast();
-    const router = useRouter();
-    const params = useParams();
-    const firestore = useFirestore();
-    const invoiceIdParam = decodeURIComponent(params.id as string).replace(/\//g, '_');
+  const params = useParams();
+  const router = useRouter();
+  const firestore = useFirestore();
+  const invoiceId = params.id as string;
 
-    // --- DATA FETCHING ---
-    const invoiceRef = useMemoFirebase(() => (!firestore || !invoiceIdParam) ? null : doc(firestore, 'invoices', invoiceIdParam), [firestore, invoiceIdParam]);
-    const { data: dbInvoice, isLoading: isDbLoading } = useDoc<Invoice>(invoiceRef);
+  const safeId = invoiceId?.replace(/\//g, '_');
+  const invoiceRef = useMemoFirebase(() => (firestore && safeId ? doc(firestore, 'invoices', safeId) : null), [firestore, safeId]);
+  const { data: invoiceData, isLoading } = useDoc<Invoice>(invoiceRef);
 
-    const customersCollection = useMemoFirebase(() => firestore ? query(collection(firestore, 'customers')) : null, [firestore]);
-    const { data: allCustomers } = useCollection<Customer>(customersCollection);
+  if (isLoading) {
+    return <div className="p-20 text-center font-black uppercase text-slate-400 animate-pulse tracking-widest">Memuat Dokumen Penagihan...</div>;
+  }
 
-    // --- LOGIC: RENDER & PRINT ---
-    const markAsPrinted = async () => {
-        if (firestore && invoiceIdParam) {
-            const ref = doc(firestore, 'invoices', invoiceIdParam);
-            await updateDoc(ref, { isOriginalPrinted: true });
-        }
-    };
-
-    const handleDownloadPdf = () => {
-        const element = invoiceContainerRef.current;
-        if (!element || !dbInvoice) return;
-        
-        const opt = {
-          margin: [10, 10, 10, 10], 
-          filename: `Invoice-${dbInvoice.id.replace(/\//g, '_')}.pdf`,
-          image: { type: 'jpeg', quality: 0.98 },
-          html2canvas: { scale: 2.5, useCORS: true },
-          jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
-        };
-        
-        html2pdf().from(element).set(opt).save().then(markAsPrinted);
-    };
-
-    const handlePrint = () => {
-        markAsPrinted();
-        window.print();
-    };
-
-    if (isDbLoading || !dbInvoice) {
-        return (
-            <div className="flex flex-col items-center justify-center h-[80vh] gap-4">
-                <Loader2 className="h-10 w-10 animate-spin text-indigo-600" />
-                <div className="text-center font-black text-slate-400 uppercase tracking-[0.4em] animate-pulse text-xs">Membangun Dual-Layout Dakota Hub...</div>
-            </div>
-        );
-    }
-
-    // --- ENRICH DATA & CALCULATIONS ---
-    const customerProfile = allCustomers?.find(c => c.name.toLowerCase() === dbInvoice.customer.toLowerCase());
-    
-    // Internal Financial Logic (Back-calculation for Coretax Standard)
-    const totalRp = dbInvoice.amount || 0;
-    const dppVat = totalRp / 1.12;           // Dasar Pengenaan Pajak
-    const vat12 = totalRp - dppVat;           // PPN 12%
-    
-    const items = dbInvoice.items || [];
-    const subTotalItems = items.reduce((acc, curr) => acc + (curr.total || 0), 0);
-    const negotiation = dbInvoice.negotiation || 0;
-    const dpValue = dbInvoice.dpValue || 0;
-    const dpPercent = totalRp > 0 ? Math.round((dpValue / totalRp) * 100) : 0;
-    const pelunasan = totalRp - dpValue;
-    
-    const displayInvoiceId = dbInvoice.id.replace(/_/g, '/');
-    const formalNo = `PS/${displayInvoiceId}-J/KEU/2026/DK`;
-
-    const itemChunks = Array.from({ length: Math.ceil(items.length / ITEMS_PER_PAGE) }, (_, i) =>
-        items.slice(i * ITEMS_PER_PAGE, i * ITEMS_PER_PAGE + ITEMS_PER_PAGE)
-    );
-    
-    const documentTypes = ['ORIGINAL', 'COPY'] as const;
-
+  if (!invoiceData) {
     return (
-        <div className="bg-slate-100 min-h-screen p-4 sm:p-6 font-sans text-black animate-in fade-in duration-700">
-            <style>{`
-                @media print {
-                    body { background-color: #fff !important; }
-                    .page-break { page-break-before: always; }
-                    .print-hidden { display: none !important; }
-                    .shadow-lg { box-shadow: none !important; }
-                    .max-w-4xl { max-width: 100% !important; margin: 0 !important; }
-                }
-            `}</style>
-            
-            {/* ACTION BAR */}
-            <div className="flex justify-center items-center gap-4 mb-8 print-hidden">
-                <Button 
-                    onClick={() => router.push('/dashboard/invoices')} 
-                    variant="outline" 
-                    className="font-bold hover:bg-slate-50 rounded-xl px-6 h-10 shadow-sm border-slate-200 bg-white"
-                >
-                    <ArrowLeft size={16} className="mr-2" /> Kembali ke List
-                </Button>
-
-                <div className="flex gap-2 bg-white p-1 rounded-2xl shadow-sm ring-1 ring-slate-200">
-                    <Button onClick={handlePrint} className="bg-indigo-900 hover:bg-blue-900 text-white rounded-xl h-10 px-8 font-black uppercase text-[10px] tracking-widest shadow-lg">
-                        <Printer size={16} className="mr-2" /> Cetak Invoice Dakota
-                    </Button>
-                    <Button onClick={handleDownloadPdf} variant="ghost" className="rounded-xl h-10 px-4">
-                        <Download size={16} className="text-slate-400" />
-                    </Button>
-                </div>
-            </div>
-            
-            <div ref={invoiceContainerRef} className="print-container">
-                {documentTypes.map((type) => (
-                    <div key={type} className={cn("document-version", type === 'COPY' && "grayscale opacity-75")}>
-                        {itemChunks.map((chunk, pageIndex) => {
-                            const isLastPage = pageIndex === itemChunks.length - 1;
-                            const totalPages = itemChunks.length;
-
-                            return (
-                                <div key={`${type}-${pageIndex}`} className={`w-full max-w-4xl mx-auto bg-white shadow-lg p-10 mb-12 flex flex-col page-break`} style={{ minHeight: '297mm', color: '#1a1a1a' }}>
-                                    
-                                    {/* HEADER PERUSAHAAN (FIXED) */}
-                                    <div className="flex justify-between items-start border-b-4 border-blue-900 pb-5">
-                                        <div>
-                                            <h1 className="text-2xl font-black text-blue-900 leading-tight">PT. JEMBO CABLE COMPANY Tbk</h1>
-                                            <div className="text-[10px] mt-1 text-gray-700 leading-relaxed uppercase">
-                                                <p>Mega Glodok Kemayoran Office Tower B 6th Floor</p>
-                                                <p>Jl. Angkasa Kav. B-6 Kota Baru Bandar Kemayoran</p>
-                                                <p>Jakarta Pusat</p>
-                                            </div>
-                                        </div>
-                                        <div className="text-right">
-                                            <h2 className="text-4xl font-black text-gray-200 tracking-tighter italic leading-none">{type}</h2>
-                                            <h3 className="text-xl font-bold mt-2 tracking-widest text-gray-800 underline">INVOICE</h3>
-                                            <p className="text-xs font-bold mt-1">No: {formalNo}</p>
-                                        </div>
-                                    </div>
-
-                                    {/* DETAIL PELANGGAN */}
-                                    <div className="mt-8 flex justify-between text-sm">
-                                        <div className="w-1/2">
-                                            <span className="text-[9px] font-bold text-gray-400 block mb-1">DITUJUKAN KEPADA / BILL TO:</span>
-                                            <p className="font-extrabold text-base border-l-4 border-blue-900 pl-2 uppercase">{dbInvoice.customer}</p>
-                                            <p className="text-[11px] mt-1 leading-tight text-gray-600 italic">{dbInvoice.billingAddress || "Alamat Pelanggan"}</p>
-                                        </div>
-                                        <div className="text-right">
-                                            <table className="text-[11px] inline-block">
-                                                <tbody>
-                                                    <tr>
-                                                        <td className="text-gray-400 font-bold px-2 text-right">TANGGAL:</td>
-                                                        <td className="font-bold">{new Date(dbInvoice.date).toLocaleDateString('id-ID', { day: '2-digit', month: 'long', year: 'numeric' })}</td>
-                                                    </tr>
-                                                    <tr>
-                                                        <td className="text-gray-400 font-bold px-2 text-right uppercase italic">PO NUMBER:</td>
-                                                        <td className="font-bold">{dbInvoice.poNumber || "-"}</td>
-                                                    </tr>
-                                                </tbody>
-                                            </table>
-                                        </div>
-                                    </div>
-
-                                    {/* TABEL ITEM */}
-                                    <div className="flex-grow mt-10">
-                                        <table className="w-full border-collapse">
-                                            <thead>
-                                                <tr className="bg-blue-900 text-white text-[10px] uppercase tracking-wider">
-                                                    <th className="py-2 px-3 text-left border border-blue-900">Deskripsi Pekerjaan / Barang</th>
-                                                    <th className="py-2 px-1 text-center border border-blue-900 w-24">Kuantitas</th>
-                                                    <th className="py-2 px-3 text-right border border-blue-900 w-36">Harga Satuan</th>
-                                                    <th className="py-2 px-3 text-right border border-blue-900 w-40">Total Harga</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody className="text-[12px]">
-                                                {chunk.map((item, index) => (
-                                                    <tr key={index} className="border-b border-gray-300">
-                                                        <td className="py-3 px-3 font-semibold text-gray-800 uppercase">{item.name}</td>
-                                                        <td className="py-3 px-1 text-center">{item.quantity.toLocaleString('id-ID')} {item.unit}</td>
-                                                        <td className="py-3 px-3 text-right">Rp {item.price?.toLocaleString('id-ID')}</td>
-                                                        <td className="py-3 px-3 text-right font-bold">Rp {item.total?.toLocaleString('id-ID')}</td>
-                                                    </tr>
-                                                ))}
-                                                {/* Baris kosong penyeimbang layout */}
-                                                {Array.from({ length: ITEMS_PER_PAGE - chunk.length }).map((_, i) => (
-                                                    <tr key={`empty-${i}`} className="h-10">
-                                                        <td className="border-r border-transparent"></td>
-                                                        <td className="border-r border-transparent"></td>
-                                                        <td className="border-r border-transparent"></td>
-                                                        <td></td>
-                                                    </tr>
-                                                ))}
-                                            </tbody>
-                                        </table>
-                                    </div>
-
-                                    {/* FOOTER & RINCIAN BIAYA (Hanya di halaman terakhir) */}
-                                    {isLastPage && (
-                                        <div className="mt-8">
-                                            <div className="grid grid-cols-12 gap-6">
-                                                {/* Sisi Kiri: Pembayaran */}
-                                                <div className="col-span-7">
-                                                    <p className="text-[9px] font-bold text-gray-400 italic mb-1 uppercase">Terbilang / In Words:</p>
-                                                    <div className="bg-gray-100 p-2 border-l-4 border-gray-500 rounded-r shadow-inner mb-4">
-                                                        <p className="text-[11px] font-black italic">*** {toWords(totalRp)} ***</p>
-                                                    </div>
-
-                                                    <div className="text-[10px] p-3 border-2 border-dotted border-blue-200 rounded-xl bg-blue-50/20">
-                                                        <p className="font-bold underline text-blue-900 mb-1 uppercase">Informasi Pembayaran:</p>
-                                                        <div className="grid grid-cols-3 gap-1">
-                                                            <span className="text-gray-500 font-semibold italic">Nama Rekening</span>
-                                                            <span className="col-span-2 font-bold">: PT. JEMBO CABLE COMPANY Tbk</span>
-                                                            <span className="text-gray-500 font-semibold italic">Bank</span>
-                                                            <span className="col-span-2 font-bold">: BANK CENTRAL ASIA (BCA)</span>
-                                                            <span className="text-gray-500 font-semibold italic uppercase">VA Number</span>
-                                                            <span className="col-span-2 font-black text-blue-700 text-sm tracking-widest">: {dbInvoice.vaNumber || customerProfile?.virtualAccountNumber || "KODE CUSTOMER"}</span>
-                                                        </div>
-                                                    </div>
-                                                </div>
-
-                                                {/* Sisi Kanan: Summary */}
-                                                <div className="col-span-5 text-sm">
-                                                    <div className="space-y-1 text-[12px]">
-                                                        <div className="flex justify-between items-center text-gray-500">
-                                                            <span>Sub Total</span>
-                                                            <span>Rp {subTotalItems.toLocaleString('id-ID')}</span>
-                                                        </div>
-                                                        {negotiation > 0 && (
-                                                            <div className="flex justify-between items-center text-red-500 italic">
-                                                                <span>Potongan Negosiasi</span>
-                                                                <span>- Rp {negotiation.toLocaleString('id-ID')}</span>
-                                                            </div>
-                                                        )}
-                                                        <div className="flex justify-between items-center font-bold">
-                                                            <span>DP {dpPercent}%</span>
-                                                            <span>Rp {dpValue.toLocaleString('id-ID')}</span>
-                                                        </div>
-                                                        <div className="border-t border-gray-300 pt-1 mt-1">
-                                                            <div className="flex justify-between items-center text-[10px] uppercase text-gray-400 font-bold leading-tight">
-                                                                <span>DPP (Dasar Pengenaan Pajak)</span>
-                                                                <span>Rp {dppVat.toLocaleString('id-ID')}</span>
-                                                            </div>
-                                                            <div className="flex justify-between items-center text-[10px] uppercase text-gray-400 font-bold leading-tight">
-                                                                <span>PPN / VAT 12%</span>
-                                                                <span>Rp {vat12.toLocaleString('id-ID')}</span>
-                                                            </div>
-                                                        </div>
-                                                        <div className="flex justify-between items-center font-black text-lg border-t-2 border-black pt-1 mt-2 text-blue-900">
-                                                            <span>TOTAL</span>
-                                                            <span>Rp {totalRp.toLocaleString('id-ID')}</span>
-                                                        </div>
-                                                        <div className="flex justify-between items-center italic text-[10px] text-gray-400 border-t border-dotted border-gray-400 pt-1">
-                                                            <span>Sisa Pelunasan</span>
-                                                            <span>Rp {pelunasan.toLocaleString('id-ID')}</span>
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                            </div>
-
-                                            {/* TANDA TANGAN */}
-                                            <div className="flex justify-end mt-12 mr-5">
-                                                <div className="text-center w-56">
-                                                    <p className="text-[10px] mb-24 text-gray-500">Jakarta, {new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}</p>
-                                                    <div className="border-b-2 border-black w-full mb-1"></div>
-                                                    <p className="font-bold text-xs uppercase">Finance Department</p>
-                                                    <p className="text-[8px] text-gray-400 font-bold">PT. JEMBO CABLE COMPANY Tbk</p>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    )}
-
-                                    <div className="absolute bottom-4 left-0 right-0 text-center text-[8px] text-gray-400 uppercase tracking-widest">
-                                        Halaman {pageIndex + 1} dari {totalPages} | {type} | Printed by Dakota Hub
-                                    </div>
-                                </div>
-                            );
-                        })}
-                    </div>
-                ))}
-            </div>
-        </div>
+      <div className="p-20 text-center space-y-4">
+        <p className="text-rose-600 font-bold">Dokumen tidak ditemukan.</p>
+        <Button onClick={() => router.back()}>Kembali</Button>
+      </div>
     );
+  }
+
+  // LOGIKA KALKULASI FINANSIAL
+  const items = invoiceData.items || [];
+  const subTotalItems = items.reduce((acc, curr) => acc + (curr.total || 0), 0);
+  const negotiation = invoiceData.negotiation || 0;
+  const totalRp = invoiceData.amount || 0;
+  
+  // Back-calculation PPN 12% (Tax Inclusive)
+  const dppVat = totalRp / 1.12;
+  const vat12 = totalRp - dppVat;
+  
+  const dpValue = invoiceData.dpValue || 0;
+  const dpPercent = subTotalItems > 0 ? Math.round((dpValue / subTotalItems) * 100) : 0;
+  const pelunasan = totalRp - dpValue;
+
+  const displayInvoiceId = invoiceData.id.replace(/_/g, '/');
+  const spdNumber = `PS/${displayInvoiceId.split('/').pop()}-J/KEU/2026/DK`;
+
+  const terbilang = `${angkaKeTerbilang(Math.floor(totalRp))} Rupiah`.toUpperCase();
+
+  const InvoiceTemplate = ({ type }: { type: 'ORIGINAL' | 'COPY' }) => (
+    <div 
+      className={`relative bg-white shadow-2xl mx-auto p-12 flex flex-col font-sans text-slate-900 border border-slate-200 ${type === 'COPY' ? 'grayscale opacity-70 print:opacity-60' : ''}`}
+      style={{ width: '210mm', minHeight: '297mm', color: '#000' }}
+    >
+      {/* HEADER */}
+      <header className="flex justify-between items-start border-b-4 border-indigo-900 pb-6 mb-8">
+        <div className="space-y-1">
+          <h1 className="text-2xl font-black text-indigo-900 leading-none">PT. JEMBO CABLE COMPANY Tbk</h1>
+          <div className="text-[10px] font-bold text-slate-600 leading-relaxed uppercase tracking-tighter">
+            <p>Mega Glodok Kemayoran Office Tower B 6th Floor</p>
+            <p>Jl. Angkasa Kav. B-6 Kota Baru Bandar Kemayoran</p>
+            <p>Jakarta Pusat</p>
+          </div>
+        </div>
+        <div className="text-right flex flex-col items-end">
+          <h2 className="text-4xl font-black text-slate-100 italic leading-none mb-2">{type}</h2>
+          <h3 className="text-xl font-bold tracking-[0.2em] underline decoration-2 underline-offset-4">INVOICE</h3>
+          <p className="text-xs font-black mt-2 bg-slate-900 text-white px-3 py-1 rounded">No: {displayInvoiceId}</p>
+        </div>
+      </header>
+
+      {/* CUSTOMER INFO */}
+      <div className="grid grid-cols-2 gap-10 mb-10">
+        <div className="space-y-2">
+          <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Ditujukan Kepada / Bill To:</span>
+          <div className="border-l-4 border-indigo-900 pl-4 space-y-1">
+            <p className="text-lg font-black uppercase leading-tight">{invoiceData.customer}</p>
+            <p className="text-[10px] font-medium leading-normal text-slate-600 italic">{invoiceData.billingAddress}</p>
+          </div>
+        </div>
+        <div className="flex justify-end">
+          <table className="text-[11px] font-bold">
+            <tbody>
+              <tr>
+                <td className="text-slate-400 pr-4 py-1 text-right">TANGGAL:</td>
+                <td className="uppercase">{new Date(invoiceData.date).toLocaleDateString('id-ID', { day: '2-digit', month: 'long', year: 'numeric' })}</td>
+              </tr>
+              <tr>
+                <td className="text-slate-400 pr-4 py-1 text-right italic uppercase">PO Number:</td>
+                <td className="font-black text-indigo-700">{invoiceData.poNumber}</td>
+              </tr>
+              <tr>
+                <td className="text-slate-400 pr-4 py-1 text-right uppercase">SPD Ref:</td>
+                <td className="font-mono text-[9px]">{spdNumber}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* ITEM TABLE */}
+      <div className="flex-1">
+        <table className="w-full border-collapse">
+          <thead>
+            <tr className="bg-indigo-900 text-white text-[9px] font-black uppercase tracking-widest">
+              <th className="py-3 px-4 text-left border border-indigo-900 w-[5%]">No</th>
+              <th className="py-3 px-4 text-left border border-indigo-900">Deskripsi Pekerjaan / Barang</th>
+              <th className="py-3 px-2 text-center border border-indigo-900 w-[15%]">Kuantitas</th>
+              <th className="py-3 px-4 text-right border border-indigo-900 w-[20%]">Harga Satuan</th>
+              <th className="py-3 px-4 text-right border border-indigo-900 w-[20%]">Total Harga</th>
+            </tr>
+          </thead>
+          <tbody className="text-[11px]">
+            {items.map((item, idx) => (
+              <tr key={idx} className="border-b border-slate-200 hover:bg-slate-50 transition-colors">
+                <td className="py-3 px-4 text-center font-bold text-slate-400">{idx + 1}</td>
+                <td className="py-3 px-4 font-black uppercase text-slate-800">{item.name}</td>
+                <td className="py-3 px-2 text-center font-bold">{item.quantity.toLocaleString('id-ID')} {item.unit}</td>
+                <td className="py-3 px-4 text-right">Rp {item.price.toLocaleString('id-ID')}</td>
+                <td className="py-3 px-4 text-right font-black">Rp {item.total.toLocaleString('id-ID')}</td>
+              </tr>
+            ))}
+            {/* Fill empty rows */}
+            {items.length < 8 && Array.from({ length: 8 - items.length }).map((_, i) => (
+              <tr key={`empty-${i}`} className="border-b border-slate-50 h-10">
+                <td colSpan={5}></td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      {/* FOOTER AREA */}
+      <div className="mt-10 border-t-2 border-slate-100 pt-8">
+        <div className="grid grid-cols-12 gap-10">
+          {/* LEFT: PAYMENT INFO */}
+          <div className="col-span-7 space-y-6">
+            <div className="space-y-2">
+              <p className="text-[8px] font-black text-slate-400 uppercase tracking-[0.2em]">Terbilang / In Words:</p>
+              <div className="bg-slate-50 p-4 border-l-4 border-slate-400 rounded-r shadow-inner">
+                <p className="text-[10px] font-black italic text-slate-700">*** {terbilang} ***</p>
+              </div>
+            </div>
+
+            <div className="p-5 border-2 border-dashed border-indigo-100 rounded-2xl bg-indigo-50/20 space-y-3">
+              <p className="text-[10px] font-black underline text-indigo-900 uppercase tracking-widest">Informasi Pembayaran:</p>
+              <div className="grid grid-cols-3 gap-y-2 text-[10px] font-bold">
+                <span className="text-slate-500 italic">Nama Rekening</span>
+                <span className="col-span-2">: PT. JEMBO CABLE COMPANY Tbk</span>
+                <span className="text-slate-500 italic">Bank Penerima</span>
+                <span className="col-span-2">: BANK CENTRAL ASIA (BCA)</span>
+                <span className="text-slate-500 italic uppercase tracking-tighter">Virtual Account</span>
+                <span className="col-span-2 font-black text-indigo-700 text-sm tracking-[0.2em]">: {invoiceData.vaNumber || "KODE CUSTOMER"}</span>
+              </div>
+              <p className="text-[8px] text-slate-400 italic font-medium pt-2">* Mohon cantumkan Nomor Invoice pada berita transfer.</p>
+            </div>
+          </div>
+
+          {/* RIGHT: CALCULATION SUMMARY */}
+          <div className="col-span-5">
+            <div className="space-y-2 text-[11px] font-bold">
+              <div className="flex justify-between items-center text-slate-500">
+                <span>Sub-Total Bruto</span>
+                <span>Rp {subTotalItems.toLocaleString('id-ID')}</span>
+              </div>
+              {negotiation > 0 && (
+                <div className="flex justify-between items-center text-rose-600 italic">
+                  <span>Potongan Negosiasi</span>
+                  <span>- Rp {negotiation.toLocaleString('id-ID')}</span>
+                </div>
+              )}
+              {dpValue > 0 && (
+                <div className="flex justify-between items-center text-indigo-600">
+                  <span>Uang Muka (DP) {dpPercent}%</span>
+                  <span>(Rp {dpValue.toLocaleString('id-ID')})</span>
+                </div>
+              )}
+              
+              <div className="border-t border-slate-200 pt-2 space-y-1">
+                <div className="flex justify-between items-center text-[9px] text-slate-400 uppercase">
+                  <span>Dasar Pengenaan Pajak (DPP)</span>
+                  <span>Rp {Math.floor(dppVat).toLocaleString('id-ID')}</span>
+                </div>
+                <div className="flex justify-between items-center text-[9px] text-slate-400 uppercase">
+                  <span>PPN / VAT 12% (Coretax Standard)</span>
+                  <span>Rp {Math.ceil(vat12).toLocaleString('id-ID')}</span>
+                </div>
+              </div>
+
+              <div className="flex justify-between items-center font-black text-xl border-t-4 border-indigo-900 pt-3 mt-4 text-indigo-950">
+                <span className="tracking-tighter uppercase">Total Akhir</span>
+                <span className="tracking-tight">Rp {totalRp.toLocaleString('id-ID')}</span>
+              </div>
+
+              <div className="flex justify-between items-center italic text-[10px] text-slate-400 border-t border-dotted border-slate-300 pt-2">
+                <span>Sisa Saldo Kontrak</span>
+                <span>Rp {pelunasan.toLocaleString('id-ID')}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* SIGNATURE SECTION */}
+        <div className="flex justify-end mt-16">
+          <div className="text-center w-64 space-y-20">
+            <p className="text-[10px] font-bold text-slate-500">Jakarta, {new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}</p>
+            <div className="space-y-1">
+              <div className="border-b-2 border-slate-900 w-full"></div>
+              <p className="font-black text-xs uppercase tracking-widest text-slate-900">Finance Department</p>
+              <p className="text-[8px] font-black text-slate-400 uppercase tracking-tighter">PT. JEMBO CABLE COMPANY Tbk</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* SYSTEM WATERMARK */}
+      <div className="absolute bottom-6 left-12 text-[8px] font-black text-slate-300 uppercase tracking-[0.5em]">
+        Verified by Dakota Hub Intelligence
+      </div>
+    </div>
+  );
+
+  return (
+    <main className="min-h-screen bg-slate-100 py-12 px-4 flex flex-col items-center gap-12 print:p-0 print:bg-white animate-in fade-in duration-700">
+      <div className="fixed top-6 left-1/2 -translate-x-1/2 z-50 flex gap-4 print:hidden">
+        <Button variant="outline" onClick={() => router.back()} className="bg-white/80 backdrop-blur-md shadow-xl rounded-2xl h-12 px-6 font-black uppercase text-[10px] tracking-widest border-none">
+          <ArrowLeft className="mr-2 h-4 w-4" /> Batal & Kembali
+        </Button>
+        <Button onClick={() => window.print()} className="bg-indigo-600 hover:bg-indigo-700 text-white shadow-xl shadow-indigo-100 rounded-2xl h-12 px-10 font-black uppercase text-[10px] tracking-widest transition-all hover:scale-105 active:scale-95">
+          <Printer className="mr-2 h-4 w-4" /> Cetak Dokumen Hub
+        </Button>
+      </div>
+
+      <div className="space-y-20 print:space-y-0">
+        <InvoiceTemplate type="ORIGINAL" />
+        <div className="print:page-break-after-always" style={{ pageBreakBefore: 'always' }}></div>
+        <InvoiceTemplate type="COPY" />
+      </div>
+
+      <div className="print:hidden text-center opacity-30 pb-20">
+        <p className="text-[10px] font-black uppercase tracking-[0.5em]">Dakota Digital Print Engine — Professional Render</p>
+      </div>
+    </main>
+  );
 };
 
 export default InvoicePreviewPage;
