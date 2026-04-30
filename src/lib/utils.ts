@@ -32,20 +32,40 @@ export function generateVirtualAccount(customerCode: string): string {
     const charCode = letters.charCodeAt(i);
     // Standard ASCII: A=65. 65-64 = 1.
     const rank = charCode >= 65 && charCode <= 90 ? charCode - 64 : 0;
-    // To maintain 16 digits, we need a stable number of digits from ASCII.
-    // If rank is 10 (J), it adds "10" (2 digits).
     asciiSlots += rank.toString();
   }
   
   // Final Assembly
   const result = base + asciiSlots + digits + "0";
   
-  // Force trim to 16 if too long (e.g. if ASCII ranks were all double digits)
+  // Force trim to 16 if too long
   return result.substring(0, 16).padEnd(16, '0');
 }
 
 /**
  * Memformat angka ke format mata uang/akuntansi Indonesia (1.234,56)
+ */
+export function formatCurrency(value: number | string | undefined): string {
+  if (value === undefined || value === null || value === '') {
+    return '0,00';
+  }
+  
+  const num = typeof value === 'string' 
+    ? parseFormattedNumber(value) 
+    : value;
+
+  if (isNaN(num)) {
+    return '0,00';
+  }
+
+  return new Intl.NumberFormat('id-ID', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2
+  }).format(num);
+}
+
+/**
+ * Memformat angka ke format mata uang/akuntansi Indonesia (Tanpa desimal jika bulat)
  */
 export function formatNumberWithCommas(value: number | string | undefined): string {
   if (value === undefined || value === null || value === '') {

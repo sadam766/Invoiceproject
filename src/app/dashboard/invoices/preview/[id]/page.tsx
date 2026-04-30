@@ -9,7 +9,7 @@ import { useFirestore, useDoc, useMemoFirebase, useCollection } from '@/firebase
 import { doc, collection, query, updateDoc } from 'firebase/firestore';
 import html2pdf from 'html2pdf.js';
 import type { Invoice, Customer } from '@/app/lib/data';
-import { cn } from '@/lib/utils';
+import { cn, formatCurrency } from '@/lib/utils';
 
 // --- DEFINISI TIPE DATA ---
 interface Item {
@@ -28,29 +28,23 @@ interface InvoiceData {
     customer: {
         name: string;
         address: string;
-        npwp?: string;
+        code?: string;
     };
     date: string; 
     soNumber: string;
     poNumber: string;
-    grandTotal: number;
+    grandTotal: number; // Subtotal items
     subtotal: number;
-    dppVat: number;
     vat12: number;
+    totalRp: number; // Grand Total Akhir
     paymentTerms: string;
     paymentMethod: 'bank' | 'va';
     negotiation: number;
     dpValue: number;
+    retensiValue: number;
     virtualAccount?: string;
     isOriginalPrinted: boolean;
 }
-
-const formatCurrency = (amount: number): string => {
-    return amount.toLocaleString('id-ID', {
-        minimumFractionDigits: 2,
-        maximumFractionDigits: 2,
-    });
-};
 
 const formatDate = (dateString: string): string => {
     if (!dateString || isNaN(new Date(dateString).getTime())) return dateString || '';
@@ -62,7 +56,7 @@ const formatDate = (dateString: string): string => {
     }).replace(/\//g, '-');
 };
 
-const ITEMS_PER_PAGE = 12;
+const ITEMS_PER_PAGE = 15;
 
 const InvoicePreviewPage = () => {
     const invoiceContainerRef = useRef<HTMLDivElement>(null);
@@ -82,9 +76,13 @@ const InvoicePreviewPage = () => {
     useEffect(() => {
         if (dbInvoice && !isDbLoading) {
             let vaFromMaster = '';
+            let custCode = '';
             if (allCustomers) {
                 const found = allCustomers.find(c => c.name.toLowerCase() === dbInvoice.customer.toLowerCase());
-                if (found) vaFromMaster = found.virtualAccountNumber || '';
+                if (found) {
+                    vaFromMaster = found.virtualAccountNumber || '';
+                    custCode = found.customerCode || '';
+                }
             }
 
             const mappedData: InvoiceData = {
@@ -101,19 +99,20 @@ const InvoicePreviewPage = () => {
                 customer: {
                     name: dbInvoice.customer,
                     address: dbInvoice.billingAddress,
-                    npwp: dbInvoice.billingNpwp || ''
+                    code: custCode
                 },
                 date: dbInvoice.date,
                 soNumber: dbInvoice.soNumber,
                 poNumber: dbInvoice.poNumber,
-                grandTotal: dbInvoice.amount,
+                grandTotal: (dbInvoice.items || []).reduce((s, i) => s + i.total, 0),
                 subtotal: (dbInvoice.items || []).reduce((s, i) => s + i.total, 0),
-                dppVat: dbInvoice.amount / 1.12, 
-                vat12: dbInvoice.amount - (dbInvoice.amount / 1.12),
+                vat12: dbInvoice.amount - (dbInvoice.amount / 1.12), // Ini kalkulasi estimasi, idealnya ditarik dari record
+                totalRp: dbInvoice.amount,
                 paymentTerms: '30 Days',
                 paymentMethod: (dbInvoice.paymentMethod as any) || 'va',
                 negotiation: dbInvoice.negotiation || 0,
                 dpValue: dbInvoice.dpValue || 0,
+                retensiValue: dbInvoice.retention || 0,
                 virtualAccount: dbInvoice.vaNumber || vaFromMaster,
                 isOriginalPrinted: !!dbInvoice.isOriginalPrinted
             };
@@ -163,6 +162,7 @@ const InvoicePreviewPage = () => {
     
     const invoiceTitle = invoiceData.id.startsWith('KW') ? 'PROFORMA INVOICE' : 'INVOICE / OFFICIAL RECEIPT';
     const documentTypes = ['ORIGINAL', 'COPY'] as const;
+    const displayInvoiceId = invoiceData.id.replace(/_/g, '/');
 
     return (
         <div className="bg-slate-100 min-h-screen p-4 sm:p-6 font-sans text-black animate-in fade-in duration-700">
@@ -204,59 +204,52 @@ const InvoicePreviewPage = () => {
                         <div key={printType} className={cn("document-version", isCopy && "grayscale opacity-80")}>
                             {itemChunks.map((chunk, pageIndex) => {
                                 const isLastPage = pageIndex === totalPages - 1;
-                                const { 
-                                    id: displayInvoiceId, 
-                                    customer, 
-                                    soNumber, 
-                                    date, 
-                                    subtotal, 
-                                    negotiation, 
-                                    dpValue, 
-                                    poNumber, 
-                                    grandTotal, 
-                                    vat12, 
-                                    paymentMethod, 
-                                    virtualAccount 
-                                } = invoiceData;
-
-                                const dpPercent = subtotal > 0 ? Math.round((dpValue / subtotal) * 100) : 0;
 
                                 return (
-                                    <div key={`${printType}-${pageIndex}`} className={`w-full max-w-4xl mx-auto bg-white shadow-lg p-4 my-8 text-[10px] leading-tight flex flex-col page-break`} style={{ height: '280mm' }}>
-                                        <header className="relative pt-0 pb-0 text-[10px] leading-snug">
-                                            <p className="absolute right-0 top-0 font-black text-sm uppercase tracking-widest text-slate-300">{printType}</p>
-                                            <div className="w-full text-center mb-1 leading-none">
-                                                <p className="font-bold uppercase text-xs tracking-tighter mb-0.5">{invoiceTitle}</p>
-                                                <p className="font-bold uppercase text-xs">{displayInvoiceId}</p>
+                                    <div key={`${printType}-${pageIndex}`} className={`w-full max-w-4xl mx-auto bg-white shadow-lg p-[12mm] my-8 text-[10px] leading-tight flex flex-col page-break`} style={{ height: '280mm' }}>
+                                        {/* Header Section */}
+                                        <div className="flex justify-between items-start mb-2">
+                                            <div className="w-2/3">
+                                                <h1 className="font-bold text-sm uppercase">{invoiceData.customer.name}</h1>
+                                                <p className="text-[10px] w-3/4 leading-tight">{invoiceData.customer.address}</p>
                                             </div>
-                                            <div className='flex justify-between items-start mt-4'>
-                                                <div className='w-[45%]'>
-                                                    <p className="font-black text-[10px] mb-0">{customer.name}</p>
-                                                    <p className="italic text-[9px] text-slate-600 leading-tight mt-1">{customer.address}</p>
-                                                </div>
-                                                <div className="w-[30%] text-[10px] text-left leading-normal space-y-0 font-bold">
-                                                    <p className="mb-0">Sales Order: {soNumber}</p> 
-                                                    <p className="mb-0">Ref PO: {poNumber}</p>
-                                                    <p className="mb-0">Date: {formatDate(date)}</p>
-                                                </div>
+                                            <div className="text-right">
+                                                <p className="text-xs font-black uppercase tracking-widest text-slate-300">{printType}</p>
                                             </div>
-                                        </header>
+                                        </div>
 
-                                        <main className='mt-6 flex-grow'>
-                                            <table className="w-full border-collapse text-[10px] mt-0">
+                                        <div className="text-center my-4">
+                                            <h2 className="font-bold text-xs underline tracking-widest uppercase">{invoiceTitle}</h2>
+                                            <p className="text-xs font-bold">{displayInvoiceId}</p>
+                                        </div>
+
+                                        <div className="flex justify-between text-[10px] mb-4">
+                                            <div>
+                                                <p>Customer Code: {invoiceData.customer.code || '-'}</p>
+                                            </div>
+                                            <div className="grid grid-cols-2 gap-x-4 font-medium">
+                                                <span>Sales Order</span><span>: {invoiceData.soNumber}</span>
+                                                <span>Ref PO</span><span>: {invoiceData.poNumber}</span>
+                                                <span>Date</span><span>: {formatDate(invoiceData.date)}</span>
+                                            </div>
+                                        </div>
+
+                                        {/* Table Section */}
+                                        <main className='mt-0 flex-grow'>
+                                            <table className="w-full border-collapse border border-black text-[10px]">
                                                 <thead>
-                                                    <tr className='bg-white border border-black'>
-                                                        <th className="p-1 text-left w-[8%] border-r border-black border-b border-black font-normal">No.</th>
-                                                        <th className="p-1 text-left w-[40%] border-r border-black border-b border-black font-normal">Item</th>
-                                                        <th className="p-1 text-center w-[15%] border-r border-black border-b border-black font-normal">Quantity Unit</th>
-                                                        <th className="p-1 text-right w-[17%] border-r border-black border-b border-black font-normal">Price</th>
-                                                        <th className="p-1 text-right flex-1 border-b border-black font-normal">Amount</th>
+                                                    <tr className='bg-white border-b border-black font-bold'>
+                                                        <th className="p-1 text-left w-[5%] border-r border-black">No.</th>
+                                                        <th className="p-1 text-left w-[50%] border-r border-black">Item</th>
+                                                        <th className="p-1 text-center w-[15%] border-r border-black">Quantity Unit</th>
+                                                        <th className="p-1 text-right w-[15%] border-r border-black">Price</th>
+                                                        <th className="p-1 w-[15%] text-right">Amount</th>
                                                     </tr>
                                                 </thead>
                                                 <tbody>
-                                                    {chunk.map((item, itemIdx) => (
-                                                        <tr key={item.id} className='align-top'>
-                                                            <td className="p-1 h-[18px] border-r border-black">{pageIndex * ITEMS_PER_PAGE + itemIdx + 1}</td>
+                                                    {chunk.map((item, idx) => (
+                                                        <tr key={item.id} className="border-b border-gray-200 align-top">
+                                                            <td className="p-1 h-[22px] border-r border-black text-center">{pageIndex * ITEMS_PER_PAGE + idx + 1}</td>
                                                             <td className="p-1 border-r border-black font-bold uppercase">{item.name}</td>
                                                             <td className="p-1 text-center border-r border-black">{item.quantity.toLocaleString('id-ID')} {item.unit}</td>
                                                             <td className="p-1 text-right border-r border-black">{formatCurrency(item.price)}</td>
@@ -265,15 +258,14 @@ const InvoicePreviewPage = () => {
                                                     ))}
                                                     {/* Baris kosong untuk menjaga tinggi tabel tetap konsisten */}
                                                     {Array.from({ length: ITEMS_PER_PAGE - chunk.length }).map((_, i) => (
-                                                        <tr key={`empty-${i}`}>
-                                                            <td className="p-1 h-[18px] border-r border-black">&nbsp;</td>
-                                                            <td className="p-1 border-r border-black">&nbsp;</td>
-                                                            <td className="p-1 border-r border-black">&nbsp;</td>
-                                                            <td className="p-1 border-r border-black">&nbsp;</td>
-                                                            <td className="p-1">&nbsp;</td>
+                                                        <tr key={`empty-${i}`} className="h-[22px]">
+                                                            <td className="border-r border-black">&nbsp;</td>
+                                                            <td className="border-r border-black">&nbsp;</td>
+                                                            <td className="border-r border-black">&nbsp;</td>
+                                                            <td className="border-r border-black">&nbsp;</td>
+                                                            <td>&nbsp;</td>
                                                         </tr>
                                                     ))}
-                                                    <tr className="border-t border-black"><td colSpan={5} className="h-0"></td></tr>
                                                 </tbody>
                                             </table>
                                         </main>
@@ -281,50 +273,31 @@ const InvoicePreviewPage = () => {
                                         {isLastPage ? (
                                             <footer className="pt-2 text-black mt-auto text-[10px]">
                                                 {/* AREA KALKULASI TOTAL */}
-                                                <div className="w-full flex flex-col items-end leading-normal">
-                                                    <div className="w-[45%]">
-                                                        {/* Garis atas Subtotal */}
-                                                        <div className="border-t border-black w-full mb-1"></div>
-                                                        
-                                                        <div className="space-y-1">
-                                                            {/* Subtotal Items */}
-                                                            <div className="grid grid-cols-[1fr_80px_120px] items-center text-right">
-                                                                <span></span>
-                                                                <span></span>
-                                                                <span className="font-normal">{formatCurrency(subtotal)}</span>
+                                                <div className="flex justify-end mb-4">
+                                                    <div className="w-1/2 text-[10px] space-y-1">
+                                                        <div className="flex justify-between border-t border-black pt-1">
+                                                            <span>Subtotal</span><span>{formatCurrency(invoiceData.grandTotal)}</span>
+                                                        </div>
+                                                        {invoiceData.negotiation > 0 && (
+                                                            <div className="flex justify-between text-rose-600">
+                                                                <span>Discount/Negotiation</span><span>({formatCurrency(invoiceData.negotiation)})</span>
                                                             </div>
-
-                                                            {/* Row Diskon / Negotiation (Jika ada) */}
-                                                            {negotiation > 0 && (
-                                                                <div className="grid grid-cols-[1fr_80px_120px] items-center text-right">
-                                                                    <span className="pr-2">Discount</span>
-                                                                    <span></span>
-                                                                    <span className="font-normal">({formatCurrency(negotiation)})</span>
-                                                                </div>
-                                                            )}
-
-                                                            {/* Row DP (Jika ada) */}
-                                                            {dpValue > 0 && (
-                                                                <div className="grid grid-cols-[1fr_80px_120px] items-center text-right">
-                                                                    <span className="pr-2">DP</span>
-                                                                    <span className="text-center">{dpPercent ? `${dpPercent}%` : ''}</span>
-                                                                    <span className="font-normal">({formatCurrency(dpValue)})</span>
-                                                                </div>
-                                                            )}
-
-                                                            {/* Row VAT */}
-                                                            <div className="grid grid-cols-[1fr_80px_120px] items-center text-right">
-                                                                <span className="pr-2 uppercase">VAT</span>
-                                                                <span className="text-center">12%</span>
-                                                                <span className="font-normal">{formatCurrency(vat12)}</span>
+                                                        )}
+                                                        <div className="flex justify-between">
+                                                            <span>VAT 12%</span><span>{formatCurrency(invoiceData.vat12)}</span>
+                                                        </div>
+                                                        {invoiceData.dpValue > 0 && (
+                                                            <div className="flex justify-between text-indigo-600">
+                                                                <span>Down Payment (DP)</span><span>({formatCurrency(invoiceData.dpValue)})</span>
                                                             </div>
-
-                                                            {/* Grand Total */}
-                                                            <div className="border-t border-black w-full my-1"></div>
-                                                            <div className="grid grid-cols-[1fr_150px] items-center text-right font-bold text-[11px]">
-                                                                <span className="uppercase pr-2">Grand Total</span>
-                                                                <span>Rp {formatCurrency(grandTotal)}</span>
+                                                        )}
+                                                        {invoiceData.retensiValue > 0 && (
+                                                            <div className="flex justify-between text-amber-600">
+                                                                <span>Retensi</span><span>({formatCurrency(invoiceData.retensiValue)})</span>
                                                             </div>
+                                                        )}
+                                                        <div className="flex justify-between font-bold border-t border-black text-[11px] pt-1 mt-1">
+                                                            <span className="uppercase">Grand Total</span><span>Rp {formatCurrency(invoiceData.totalRp)}</span>
                                                         </div>
                                                     </div>
                                                 </div>
@@ -332,55 +305,62 @@ const InvoicePreviewPage = () => {
                                                 {/* AREA TANDA TANGAN & PAYMENT INFO */}
                                                 <div className="mt-4 flex justify-between items-end">
                                                     {/* Bagian Kiri: Info Pembayaran */}
-                                                    <div className="w-[55%] space-y-0.5 leading-tight">
-                                                        <p>Please state with your payment: <span className="font-bold">{displayInvoiceId}</span></p>
+                                                    <div className="w-[55%] space-y-1 leading-tight">
+                                                        <p>Payment Terms: {invoiceData.paymentTerms}</p>
+                                                        <p className="font-bold">Please state with your payment: {displayInvoiceId}</p>
                                                         
-                                                        <p className='mt-2 mb-1 font-bold underline uppercase'>
-                                                            {paymentMethod === 'va' ? 'PAYMENT VIA VIRTUAL ACCOUNT:' : 'FOR PAYMENT, PLEASE TRANSFER TO:'}
-                                                        </p>
+                                                        <div className="mt-3">
+                                                            <p className='font-bold underline uppercase mb-1'>
+                                                                {invoiceData.paymentMethod === 'va' ? 'PAYMENT VIA VIRTUAL ACCOUNT:' : 'FOR PAYMENT, PLEASE TRANSFER TO:'}
+                                                            </p>
 
-                                                        {paymentMethod === 'va' ? (
-                                                            /* Box Virtual Account - Styling mengikuti instruksi user */
-                                                            <div className="border border-gray-300 bg-gray-50 p-3 rounded w-[95%] shadow-sm">
-                                                                <div className="flex flex-col">
-                                                                    <p className="text-[9px] uppercase text-gray-500 font-bold tracking-wider mb-1">Mandiri Virtual Account (IDR)</p>
-                                                                    <p className="text-lg font-black tracking-widest text-indigo-700">
-                                                                        {virtualAccount || '86625XXXXXXXXXXX'}
-                                                                    </p>
-                                                                    <p className='mt-1 text-[8px] italic text-gray-400'>
-                                                                        *Pembayaran ini akan terverifikasi secara otomatis oleh sistem Dakota Hub.
-                                                                    </p>
+                                                            {invoiceData.paymentMethod === 'va' ? (
+                                                                <div className="border border-gray-300 bg-gray-50 p-2 rounded w-[90%] shadow-sm">
+                                                                    <div className="flex flex-col">
+                                                                        <p className="text-[8px] uppercase text-gray-500 font-bold tracking-wider mb-0.5">Mandiri Virtual Account (IDR)</p>
+                                                                        <p className="text-base font-black tracking-widest text-indigo-700">
+                                                                            {invoiceData.virtualAccount || '86625XXXXXXXXXXX'}
+                                                                        </p>
+                                                                        <p className='mt-0.5 text-[7px] italic text-gray-400'>
+                                                                            *Pembayaran ini akan terverifikasi secara otomatis oleh sistem Dakota Hub.
+                                                                        </p>
+                                                                    </div>
                                                                 </div>
-                                                            </div>
-                                                        ) : (
-                                                            /* Daftar Rekening Manual */
-                                                            <>
-                                                                <p className="font-bold">PT. JEMBO CABLE COMPANY Tbk</p>
-                                                                <div className="grid grid-cols-[80px_auto] gap-x-1">
-                                                                    <span>Bank Mandiri</span>
-                                                                    <span>: 102-0100206827 (IDR)</span>
-                                                                    <span>Bank BCA</span>
-                                                                    <span>: 684-0198977 (IDR)</span>
+                                                            ) : (
+                                                                <div className="space-y-0.5">
+                                                                    <p className="font-bold">PT. JEMBO CABLE COMPANY Tbk</p>
+                                                                    <div className="grid grid-cols-[80px_auto] gap-x-1">
+                                                                        <span>Bank Mandiri</span>
+                                                                        <span>: 102-0100206827 (IDR)</span>
+                                                                        <span>Bank BCA</span>
+                                                                        <span>: 684-0198977 (IDR)</span>
+                                                                    </div>
                                                                 </div>
-                                                            </>
-                                                        )}
+                                                            )}
+                                                        </div>
                                                     </div>
 
                                                     {/* Bagian Kanan: Tanda Tangan */}
-                                                    <div className="w-[40%] text-center">
-                                                        <p className="font-bold uppercase mb-12 text-[11px]">PT. JEMBO CABLE COMPANY Tbk</p>
-                                                        <div className="w-40 mx-auto border-b border-black"></div>
-                                                        <p className="font-bold mt-1">Finance Department</p>
+                                                    <div className="w-[40%] text-center flex flex-col items-center">
+                                                        <p className="font-bold uppercase text-[10px]">PT. JEMBO CABLE COMPANY Tbk</p>
+                                                        <div className="mt-16 text-center w-full">
+                                                            <div className="border-b border-black w-40 mx-auto mb-1"></div>
+                                                            <p className="font-bold text-[10px]">Finance Department</p>
+                                                        </div>
                                                     </div>
                                                 </div>
                                                 
-                                                {isCopy && <p className="text-center mt-6 text-[8px] font-black uppercase tracking-[0.3em] text-slate-400">Arsip Internal - Dokumen ini adalah salinan sah dari dokumen asli</p>}
+                                                {isCopy && <p className="text-center mt-6 text-[8px] font-black uppercase tracking-[0.3em] text-slate-300">Arsip Internal - Dokumen ini adalah salinan sah dari dokumen asli</p>}
                                             </footer>
                                         ) : (
                                             <div className="mt-auto pt-4 text-right text-gray-400 text-[8px] font-bold">
                                                 {printType} | Page {pageIndex + 1} of {totalPages}
                                             </div>
                                         )}
+
+                                        <div className="absolute bottom-4 left-0 right-0 text-center text-[8px] text-gray-300 uppercase tracking-widest">
+                                            Halaman {pageIndex + 1} dari {totalPages} | Printed by Dakota Hub
+                                        </div>
                                     </div>
                                 );
                             })}
