@@ -204,7 +204,22 @@ const InvoicePreviewPage = () => {
                         <div key={printType} className={cn("document-version", isCopy && "grayscale opacity-80")}>
                             {itemChunks.map((chunk, pageIndex) => {
                                 const isLastPage = pageIndex === totalPages - 1;
-                                const { id: displayInvoiceId, customer, soNumber, date, subtotal: subTotalItems, negotiation, dpValue, poNumber, grandTotal, dppVat, vat12, paymentTerms, paymentMethod, virtualAccount } = invoiceData;
+                                const { 
+                                    id: displayInvoiceId, 
+                                    customer, 
+                                    soNumber, 
+                                    date, 
+                                    subtotal, 
+                                    negotiation, 
+                                    dpValue, 
+                                    poNumber, 
+                                    grandTotal, 
+                                    vat12, 
+                                    paymentMethod, 
+                                    virtualAccount 
+                                } = invoiceData;
+
+                                const dpPercent = subtotal > 0 ? Math.round((dpValue / subtotal) * 100) : 0;
 
                                 return (
                                     <div key={`${printType}-${pageIndex}`} className={`w-full max-w-4xl mx-auto bg-white shadow-lg p-4 my-8 text-[10px] leading-tight flex flex-col page-break`} style={{ height: '280mm' }}>
@@ -263,64 +278,70 @@ const InvoicePreviewPage = () => {
                                             </table>
                                         </main>
                                         
-                                        {isLastPage && (
-                                            <footer className="pt-0 text-black mt-auto text-[10px]">
-                                                {/* 1. Baris Sub Total (Total sebelum diskon/DP) */}
-                                                <div className="w-full flex justify-end items-center leading-normal">
-                                                    <div className="w-[40%] flex justify-end border-t border-black pt-1">
-                                                        <p className="text-[10px] font-normal">{formatCurrency(subTotalItems)}</p>
-                                                    </div>
-                                                </div>
-
-                                                {/* 2. Area Kalkulasi Pajak & Potongan */}
-                                                <div className="w-full flex flex-col items-end leading-normal mt-1">
-                                                    <div className="w-[60%] space-y-1">
-                                                        {/* Row Diskon / Negotiation */}
-                                                        {negotiation > 0 && (
-                                                            <div className="grid grid-cols-[1fr_80px_150px] items-center text-right">
-                                                                <span className="pr-4">Discount</span>
-                                                                <span className=""></span>
-                                                                <span className="font-normal">({formatCurrency(negotiation)})</span>
-                                                            </div>
-                                                        )}
-
-                                                        {/* Row VAT (PPN 12%) */}
-                                                        <div className="grid grid-cols-[1fr_80px_150px] items-center text-right">
-                                                            <span className="pr-4">VAT</span>
-                                                            <span className="text-center">12%</span>
-                                                            <span className="font-normal">{formatCurrency(vat12)}</span>
-                                                        </div>
-
-                                                        {/* Row Down Payment (DP) */}
-                                                        {dpValue > 0 && (
-                                                            <div className="grid grid-cols-[1fr_80px_150px] items-center text-right">
-                                                                <span className="pr-4">DP</span>
-                                                                <span className="text-center">{Math.round((dpValue / subTotalItems) * 100)}%</span>
-                                                                <span className="font-normal">({formatCurrency(dpValue)})</span>
-                                                            </div>
-                                                        )}
-
-                                                        {/* Row Grand Total */}
-                                                        <div className="grid grid-cols-[1fr_80px_150px] items-center text-right border-t border-black mt-1 pt-1">
-                                                            <span className="pr-4 font-bold uppercase">Grand Total</span>
-                                                            <span className=""></span>
-                                                            <span className="font-bold text-[11px]">Rp {formatCurrency(grandTotal)}</span>
-                                                        </div>
-                                                    </div>
-                                                </div>
-
-                                                <div className="flex mt-6">
-                                                    {/* Sisi Kiri: Instruksi Pembayaran */}
-                                                    <div className="w-[60%] text-[10px]">
-                                                        <p className="mb-1">Please state with your payment: <span className="font-bold">{displayInvoiceId}</span></p>
+                                        {isLastPage ? (
+                                            <footer className="pt-2 text-black mt-auto text-[10px]">
+                                                {/* AREA KALKULASI TOTAL */}
+                                                <div className="w-full flex flex-col items-end leading-normal">
+                                                    <div className="w-[45%]">
+                                                        {/* Garis atas Subtotal */}
+                                                        <div className="border-t border-black w-full mb-1"></div>
                                                         
-                                                        <p className='mt-2 mb-1 font-semibold underline'>
+                                                        <div className="space-y-1">
+                                                            {/* Subtotal Items */}
+                                                            <div className="grid grid-cols-[1fr_80px_120px] items-center text-right">
+                                                                <span></span>
+                                                                <span></span>
+                                                                <span className="font-normal">{formatCurrency(subtotal)}</span>
+                                                            </div>
+
+                                                            {/* Row Diskon / Negotiation (Jika ada) */}
+                                                            {negotiation > 0 && (
+                                                                <div className="grid grid-cols-[1fr_80px_120px] items-center text-right">
+                                                                    <span className="pr-2">Discount</span>
+                                                                    <span></span>
+                                                                    <span className="font-normal">({formatCurrency(negotiation)})</span>
+                                                                </div>
+                                                            )}
+
+                                                            {/* Row DP (Jika ada) */}
+                                                            {dpValue > 0 && (
+                                                                <div className="grid grid-cols-[1fr_80px_120px] items-center text-right">
+                                                                    <span className="pr-2">DP</span>
+                                                                    <span className="text-center">{dpPercent ? `${dpPercent}%` : ''}</span>
+                                                                    <span className="font-normal">({formatCurrency(dpValue)})</span>
+                                                                </div>
+                                                            )}
+
+                                                            {/* Row VAT */}
+                                                            <div className="grid grid-cols-[1fr_80px_120px] items-center text-right">
+                                                                <span className="pr-2 uppercase">VAT</span>
+                                                                <span className="text-center">12%</span>
+                                                                <span className="font-normal">{formatCurrency(vat12)}</span>
+                                                            </div>
+
+                                                            {/* Grand Total */}
+                                                            <div className="border-t border-black w-full my-1"></div>
+                                                            <div className="grid grid-cols-[1fr_150px] items-center text-right font-bold text-[11px]">
+                                                                <span className="uppercase pr-2">Grand Total</span>
+                                                                <span>Rp {formatCurrency(grandTotal)}</span>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+
+                                                {/* AREA TANDA TANGAN & PAYMENT INFO */}
+                                                <div className="mt-4 flex justify-between items-end">
+                                                    {/* Bagian Kiri: Info Pembayaran */}
+                                                    <div className="w-[55%] space-y-0.5 leading-tight">
+                                                        <p>Please state with your payment: <span className="font-bold">{displayInvoiceId}</span></p>
+                                                        
+                                                        <p className='mt-2 mb-1 font-bold underline uppercase'>
                                                             {paymentMethod === 'va' ? 'PAYMENT VIA VIRTUAL ACCOUNT:' : 'FOR PAYMENT, PLEASE TRANSFER TO:'}
                                                         </p>
 
                                                         {paymentMethod === 'va' ? (
                                                             /* Box Virtual Account - Styling mengikuti instruksi user */
-                                                            <div className="border border-gray-300 bg-gray-50 p-3 rounded w-[90%] shadow-sm">
+                                                            <div className="border border-gray-300 bg-gray-50 p-3 rounded w-[95%] shadow-sm">
                                                                 <div className="flex flex-col">
                                                                     <p className="text-[9px] uppercase text-gray-500 font-bold tracking-wider mb-1">Mandiri Virtual Account (IDR)</p>
                                                                     <p className="text-lg font-black tracking-widest text-indigo-700">
@@ -332,32 +353,34 @@ const InvoicePreviewPage = () => {
                                                                 </div>
                                                             </div>
                                                         ) : (
-                                                            /* Daftar Rekening Manual - Sesuai image_29d85a.png */
-                                                            <div className="space-y-0.5 leading-tight">
+                                                            /* Daftar Rekening Manual */
+                                                            <>
                                                                 <p className="font-bold">PT. JEMBO CABLE COMPANY Tbk</p>
-                                                                <div className="flex"><span className="w-24 italic">Bank Mandiri</span> <span>: 102-0100206827 (IDR)</span></div>
-                                                                <div className="flex"><span className="w-24 italic">Bank BCA</span> <span>: 684-0198977 (IDR)</span></div>
-                                                            </div>
+                                                                <div className="grid grid-cols-[80px_auto] gap-x-1">
+                                                                    <span>Bank Mandiri</span>
+                                                                    <span>: 102-0100206827 (IDR)</span>
+                                                                    <span>Bank BCA</span>
+                                                                    <span>: 684-0198977 (IDR)</span>
+                                                                </div>
+                                                            </>
                                                         )}
                                                     </div>
 
-                                                    {/* Sisi Kanan: Tanda Tangan Finance */}
-                                                    <div className="w-[40%] text-center text-[10px] flex flex-col justify-between">
-                                                        <div>
-                                                            <p className="mb-1 font-bold uppercase">PT. JEMBO CABLE COMPANY Tbk</p>
-                                                        </div>
-                                                        <div className="mt-16">
-                                                            <p className="font-bold underline">Finance Department</p>
-                                                        </div>
+                                                    {/* Bagian Kanan: Tanda Tangan */}
+                                                    <div className="w-[40%] text-center">
+                                                        <p className="font-bold uppercase mb-12 text-[11px]">PT. JEMBO CABLE COMPANY Tbk</p>
+                                                        <div className="w-40 mx-auto border-b border-black"></div>
+                                                        <p className="font-bold mt-1">Finance Department</p>
                                                     </div>
                                                 </div>
                                                 
                                                 {isCopy && <p className="text-center mt-6 text-[8px] font-black uppercase tracking-[0.3em] text-slate-400">Arsip Internal - Dokumen ini adalah salinan sah dari dokumen asli</p>}
                                             </footer>
+                                        ) : (
+                                            <div className="mt-auto pt-4 text-right text-gray-400 text-[8px] font-bold">
+                                                {printType} | Page {pageIndex + 1} of {totalPages}
+                                            </div>
                                         )}
-                                        <div className="text-right text-gray-400 text-[8px] mt-auto pt-4 font-bold">
-                                            {printType} | Page {pageIndex + 1} of {totalPages}
-                                        </div>
                                     </div>
                                 );
                             })}
