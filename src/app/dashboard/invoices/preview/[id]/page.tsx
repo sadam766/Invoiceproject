@@ -1,6 +1,7 @@
+
 'use client';
 
-import React from 'react';
+import React, { useRef } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { doc } from 'firebase/firestore';
 import { useFirestore, useDoc, useMemoFirebase } from '@/firebase';
@@ -8,7 +9,6 @@ import { Button } from '@/components/ui/button';
 import { ArrowLeft, Printer, Download } from 'lucide-react';
 import { type Invoice } from '@/app/lib/data';
 import { InvoiceTemplate } from '@/app/components/invoice/invoice-layout';
-import { format } from 'date-fns';
 
 const InvoicePreviewPage = () => {
   const params = useParams();
@@ -20,75 +20,64 @@ const InvoicePreviewPage = () => {
   const invoiceRef = useMemoFirebase(() => (firestore && safeId ? doc(firestore, 'invoices', safeId) : null), [firestore, safeId]);
   const { data: invoiceData, isLoading } = useDoc<Invoice>(invoiceRef);
 
-  if (isLoading) return <div className="p-20 text-center font-black uppercase text-slate-400 animate-pulse tracking-widest">Memuat...</div>;
+  if (isLoading) return <div className="p-20 text-center font-black uppercase text-slate-400 animate-pulse tracking-widest">Synchronizing Document...</div>;
   if (!invoiceData) return <div className="p-20 text-center text-rose-600 font-bold">Dokumen tidak ditemukan.</div>;
 
   const items = invoiceData.items || [];
-  const subTotalItems = items.reduce((acc, curr) => acc + (curr.total || 0), 0);
   
-  const negotiation = invoiceData.negotiation || 0;
-  const dpValue = invoiceData.dpValue || 0;
-  const retensiValue = invoiceData.retention || 0;
-  
-  // MANDATORY SINKRON LOGIC (11/12)
-  const totalRp = invoiceData.amount || 0;
-  const dppVat = (subTotalItems - negotiation) * (11 / 12);
-  const vat12 = dppVat * 0.12;
-
-  const dpPercent = subTotalItems > 0 ? Math.round((dpValue / subTotalItems) * 100) : 0;
-
-  const calculations = {
-      subTotalItems,
-      negotiation,
-      dpValue,
-      dpPercent,
-      retensiValue,
-      dppVat,
-      vat12,
-      totalRp
+  // Directly use pre-calculated values from Billing Constructor
+  const calcs = {
+      subTotalItems: items.reduce((acc, curr) => acc + (curr.total || 0), 0),
+      negotiation: invoiceData.negotiation || 0,
+      dpValue: invoiceData.dpValue || 0,
+      dpPercent: 0, // Visual only
+      retensiValue: invoiceData.retention || 0,
+      dppVat: invoiceData.dppVat || 0,
+      vat12: invoiceData.vat12 || 0,
+      totalRp: invoiceData.amount || 0
   };
 
   return (
-    <main className="min-h-screen bg-slate-100 py-12 px-4 flex flex-col items-center print:p-0 print:bg-white">
-      {/* Action Buttons */}
-      <div className="w-full max-w-[210mm] flex justify-center gap-4 mb-6 print:hidden">
-        <Button variant="outline" onClick={() => router.back()} className="rounded-xl font-bold h-11 px-8">
-            <ArrowLeft className="mr-2 h-4 w-4" /> Kembali
+    <main className="min-h-screen bg-slate-100 py-12 px-4 flex flex-col items-center">
+      
+      {/* NAVIGATION & CONTROLS: DYNAMIC TOPBAR */}
+      <div className="w-full max-w-[210mm] flex justify-center gap-4 mb-8 print:hidden">
+        <Button variant="outline" onClick={() => router.back()} className="rounded-xl font-bold border-slate-200 bg-white">
+          <ArrowLeft size={16} className="mr-2"/> Kembali
         </Button>
-        <Button variant="secondary" onClick={() => window.print()} className="rounded-xl font-black uppercase text-[10px] tracking-widest h-11 px-8">
-            <Download className="mr-2 h-4 w-4" /> Download PDF
+        <Button variant="secondary" onClick={() => window.print()} className="rounded-xl font-bold shadow-md bg-white">
+          <Download size={16} className="mr-2"/> Download PDF
         </Button>
-        <Button onClick={() => window.print()} className="bg-indigo-600 hover:bg-indigo-700 text-white shadow-xl shadow-indigo-100 rounded-xl font-black uppercase text-[10px] tracking-widest h-11 px-10">
-            <Printer className="mr-2 h-4 w-4" /> Cetak Sekarang
+        <Button onClick={() => window.print()} className="bg-indigo-600 hover:bg-indigo-700 text-white shadow-xl rounded-xl px-8 font-black uppercase text-[10px] tracking-widest">
+          <Printer size={16} className="mr-2"/> Cetak Sekarang
         </Button>
       </div>
 
-      <div className="print-container">
-          <InvoiceTemplate 
-            type="Original" 
-            invoiceData={{
-                ...invoiceData,
-                customerName: invoiceData.customerName || invoiceData.customer,
-                date: format(new Date(invoiceData.date), 'dd MMM yyyy')
-            }} 
-            items={items} 
-            calculations={calculations} 
-          />
+      <div className="shadow-2xl">
+        <InvoiceTemplate 
+          type="Original" 
+          invoiceData={invoiceData} 
+          items={items} 
+          calculations={calcs} 
+        />
 
-          <div className="my-10 border-b-2 border-dashed border-slate-300 print:hidden text-center relative">
-              <span className="bg-slate-100 px-4 text-slate-400 text-[10px] font-black uppercase tracking-widest">Halaman Berikutnya (Copy)</span>
-          </div>
+        {/* PAGE DIVIDER FOR PREVIEW */}
+        <div className="my-10 border-b-2 border-dashed border-slate-300 print:hidden text-center">
+          <span className="bg-slate-100 px-4 py-1 text-slate-400 text-[10px] font-black uppercase tracking-[0.3em] rounded-full border border-slate-200 shadow-sm">
+            Halaman Berikutnya (Copy)
+          </span>
+        </div>
 
-          <InvoiceTemplate 
-            type="Copy" 
-            invoiceData={{
-                ...invoiceData,
-                customerName: invoiceData.customerName || invoiceData.customer,
-                date: format(new Date(invoiceData.date), 'dd MMM yyyy')
-            }} 
-            items={items} 
-            calculations={calculations} 
-          />
+        <InvoiceTemplate 
+          type="Copy" 
+          invoiceData={invoiceData} 
+          items={items} 
+          calculations={calcs} 
+        />
+      </div>
+
+      <div className="mt-12 text-center text-slate-400 print:hidden mb-20">
+          <p className="text-[10px] font-black uppercase tracking-[0.5em]">Dakota Hub — Professional Render Engine</p>
       </div>
     </main>
   );

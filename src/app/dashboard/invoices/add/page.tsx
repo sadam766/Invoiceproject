@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useEffect, useState, useMemo } from 'react';
@@ -39,7 +40,7 @@ import {
   Eye,
   ChevronsUpDown
 } from 'lucide-react';
-import { type Invoice, type SalesOrder, type UserProfile, type InvoiceItem, type InvoiceNumber } from '@/app/lib/data';
+import { type Invoice, type UserProfile, type InvoiceItem, type InvoiceNumber } from '@/app/lib/data';
 import { useToast } from '@/hooks/use-toast';
 import { useFirestore, useMemoFirebase, useUser, useDoc, errorEmitter, FirestorePermissionError } from '@/firebase';
 import { collection, query, doc, setDoc, arrayUnion } from 'firebase/firestore';
@@ -122,6 +123,11 @@ export default function AddInvoicePage() {
           if ((activeIdentity as Invoice).paymentMethod) setPaymentMethod((activeIdentity as Invoice).paymentMethod as any);
           if ((activeIdentity as Invoice).vaNumber) setManualVaNumber((activeIdentity as Invoice).vaNumber!);
           setIsDpInvoice(!!(activeIdentity as Invoice).isDpInvoice);
+          
+          if ((activeIdentity as Invoice).negotiation) setNegotiationValue(formatNumberWithCommas((activeIdentity as Invoice).negotiation!));
+          if ((activeIdentity as Invoice).dpValue) setDpValue(formatNumberWithCommas((activeIdentity as Invoice).dpValue!));
+          if ((activeIdentity as Invoice).retention) setRetentionValue(formatNumberWithCommas((activeIdentity as Invoice).retention!));
+          if ((activeIdentity as Invoice).dpDeduction) setDpDeductionValue(formatNumberWithCommas((activeIdentity as Invoice).dpDeduction!));
       }
   }, [activeIdentity]);
 
@@ -154,21 +160,24 @@ export default function AddInvoicePage() {
     
     const negInputVal = parseFormattedNumber(negotiationValue);
     const negotiation = negotiationMode === 'percent' ? (subTotalItems * (negInputVal / 100)) : negInputVal;
-    const baseAfterNeg = Math.max(0, subTotalItems - negotiation);
     
     const dpInputVal = parseFormattedNumber(dpValue);
-    const dpVal = dpMode === 'percent' ? (baseAfterNeg * (dpInputVal / 100)) : dpInputVal;
+    const dpVal = dpMode === 'percent' ? (subTotalItems * (dpInputVal / 100)) : dpInputVal;
     
     const retInputVal = parseFormattedNumber(retentionValue);
-    const retNominal = retentionMode === 'percent' ? (baseAfterNeg * (retInputVal / 100)) : retInputVal;
+    const retNominal = retentionMode === 'percent' ? (subTotalItems * (retInputVal / 100)) : retInputVal;
     
     const dpDedInputVal = parseFormattedNumber(dpDeductionValue);
-    const dpDedNominal = dpDeductionMode === 'percent' ? (baseAfterNeg * (dpDedInputVal / 100)) : dpDedInputVal;
+    const dpDedNominal = dpDeductionMode === 'percent' ? (subTotalItems * (dpDedInputVal / 100)) : dpDedInputVal;
 
-    const dppVat = baseAfterNeg * (11 / 12);
+    // Goods = Total Barang - DP - Diskon (As per Instruction #13)
+    const goodsValue = subTotalItems - dpVal - negotiation;
+    
+    // Back-calculation PPN 12% from Goods
+    const dppVat = goodsValue * (11 / 12);
     const vat12 = dppVat * 0.12;
     
-    let totalRp = isDpInvoice ? dpVal : (baseAfterNeg + vat12 - dpDedNominal - retNominal);
+    let totalRp = isDpInvoice ? dpVal : (goodsValue + vat12 - dpDedNominal - retNominal);
     totalRp = Math.max(0, totalRp);
 
     return {
@@ -211,6 +220,8 @@ export default function AddInvoicePage() {
         dpValue: calcs.dpValue,
         dpDeduction: parseFormattedNumber(dpDeductionValue),
         retention: calcs.retensiValue,
+        dppVat: calcs.dppVat,
+        vat12: calcs.vat12,
         items: items,
         lastUpdatedAt: timestamp,
         lastUpdatedBy: updater,
@@ -542,7 +553,7 @@ export default function AddInvoicePage() {
               </div>
           </div>
 
-          {/* PREVIEW COLUMN */}
+          {/* PREVIEW COLUMN: SYNCED TO SHARED LAYOUT */}
           <div className="flex-1 bg-slate-200/50 overflow-y-auto scroll-smooth py-12 px-8">
               <div className="max-w-[210mm] mx-auto scale-[0.85] origin-top shadow-2xl">
                   <InvoiceTemplate 

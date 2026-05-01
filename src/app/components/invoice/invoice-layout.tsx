@@ -1,3 +1,4 @@
+
 'use client';
 
 import React from 'react';
@@ -29,13 +30,16 @@ const formatCurrency = (value: number) => {
 export const InvoiceTemplate = ({ type, invoiceData, items, calculations }: InvoiceLayoutProps) => {
     const isCopy = type === 'Copy';
     
-    // Paging logic
+    // Paging logic: Max 8 items per page
     const itemChunks = Array.from({ length: Math.ceil(items.length / ITEMS_PER_PAGE) || 1 }, (_, i) =>
         items.slice(i * ITEMS_PER_PAGE, i * ITEMS_PER_PAGE + ITEMS_PER_PAGE)
     );
 
     const totalPages = itemChunks.length;
     const displayInvoiceId = invoiceData.id?.replace(/_/g, '/') || 'DRAFT';
+
+    // Goods calculation: Subtotal Items - DP - Discount
+    const goodsValue = calculations.subTotalItems - (calculations.dpValue || 0) - (calculations.negotiation || 0);
 
     return (
         <div className={cn("flex flex-col", isCopy && "print:page-break-before-always")}>
@@ -46,7 +50,7 @@ export const InvoiceTemplate = ({ type, invoiceData, items, calculations }: Invo
                         key={`${type}-${pageIndex}`} 
                         className={cn(
                             "relative mx-auto pt-12 pb-6 px-12 flex flex-col font-sans text-black shadow-lg mb-8",
-                            isCopy ? "bg-slate-200 brightness-95 print:bg-white print:brightness-100" : "bg-white",
+                            isCopy ? "bg-slate-50 opacity-90 print:bg-white print:opacity-100" : "bg-white",
                             pageIndex > 0 && "mt-12"
                         )}
                         style={{ width: '210mm', minHeight: '297mm', fontSize: '9pt' }}
@@ -56,16 +60,20 @@ export const InvoiceTemplate = ({ type, invoiceData, items, calculations }: Invo
                             {type}
                         </div>
 
-                        {/* HEADER: TITLE & NO INVOICE */}
-                        <header className="text-center mb-8">
-                            <h1 className="font-bold text-[11pt] uppercase tracking-wider">INVOICE/OFFICIAL RECEIPT</h1>
-                            <p className="font-bold text-[10pt]">No: {displayInvoiceId}</p>
+                        {/* HEADER: TITLE & NO INVOICE (Left Aligned for ID) */}
+                        <header className="relative mb-8">
+                             <div className="text-center w-full">
+                                <h1 className="font-bold text-[11pt] uppercase tracking-wider">INVOICE/OFFICIAL RECEIPT</h1>
+                             </div>
+                             <div className="absolute left-0 top-0 text-[10pt] font-bold">
+                                No: {displayInvoiceId}
+                             </div>
                         </header>
 
                         {/* INFO BAR: CUSTOMER & DATES */}
                         <div className="flex justify-between items-start mb-6 text-[9pt]">
                             <div className="w-[60%] space-y-1">
-                                <p className="font-bold uppercase">{invoiceData.customerName || invoiceData.customer || '-'}</p>
+                                <p className="font-bold uppercase text-[10pt]">{invoiceData.customerName || invoiceData.customer || '-'}</p>
                                 <p className="text-[8.5pt] leading-tight italic max-w-[350px]">
                                     {invoiceData.billingAddress || invoiceData.customerAddress || '-'}
                                 </p>
@@ -127,43 +135,43 @@ export const InvoiceTemplate = ({ type, invoiceData, items, calculations }: Invo
                         {/* FOOTER AREA */}
                         {isLastPage && (
                             <footer className="pt-4 text-black text-[9pt]">
-                                {/* CALCULATION MATRIX */}
+                                {/* CALCULATION MATRIX: PRECISION ALIGNMENT */}
                                 <div className="w-full flex flex-col items-end leading-tight mb-6">
-                                    <div className="w-[50%]">
-                                        <div className="space-y-1">
-                                            {calculations.negotiation > 0 && (
-                                                <div className="grid grid-cols-[1fr_80px_120px] items-center text-right">
-                                                    <span className="pr-2 text-rose-600">Discount</span>
-                                                    <span></span>
-                                                    <span className="text-rose-600">({formatCurrency(calculations.negotiation)})</span>
-                                                </div>
-                                            )}
+                                    <div className="w-[45%] font-serif text-right space-y-1">
+                                        {/* BLOK 1: RINCIAN KOMERSIAL */}
+                                        <div className="grid grid-cols-2">
+                                            <span>Subtotal Item:</span>
+                                            <span>{formatCurrency(calculations.subTotalItems)}</span>
+                                        </div>
+                                        {calculations.dpValue > 0 && (
+                                            <div className="grid grid-cols-2">
+                                                <span>DP/Retensi:</span>
+                                                <span>({formatCurrency(calculations.dpValue)})</span>
+                                            </div>
+                                        )}
+                                        {calculations.negotiation > 0 && (
+                                            <div className="grid grid-cols-2">
+                                                <span>Diskon:</span>
+                                                <span>({formatCurrency(calculations.negotiation)})</span>
+                                            </div>
+                                        )}
 
-                                            {calculations.dpValue > 0 && (
-                                                <div className="grid grid-cols-[1fr_80px_120px] items-center text-right">
-                                                    <span className="pr-2">DP</span>
-                                                    <span className="text-center">{calculations.dpPercent}%</span>
-                                                    <span>({formatCurrency(calculations.dpValue)})</span>
-                                                </div>
-                                            )}
-
-                                            {calculations.retensiValue > 0 && (
-                                                <div className="grid grid-cols-[1fr_80px_120px] items-center text-right">
-                                                    <span className="pr-2">Retention</span>
-                                                    <span></span>
-                                                    <span>({formatCurrency(calculations.retensiValue)})</span>
-                                                </div>
-                                            )}
-
-                                            <div className="grid grid-cols-[1fr_80px_120px] items-center text-right">
-                                                <span className="pr-2 uppercase">VAT</span>
-                                                <span className="text-center">12%</span>
+                                        {/* BLOK 2: KALKULASI FISKAL (Sesuai Gambar) */}
+                                        <div className="border-t border-black mt-2 pt-2 space-y-1">
+                                            <div className="grid grid-cols-2">
+                                                <span>Goods:</span>
+                                                <span>{formatCurrency(goodsValue)}</span>
+                                            </div>
+                                            <div className="grid grid-cols-2">
+                                                <span>DPP VAT:</span>
+                                                <span>{formatCurrency(calculations.dppVat)}</span>
+                                            </div>
+                                            <div className="grid grid-cols-2">
+                                                <span>VAT 12%:</span>
                                                 <span>{formatCurrency(calculations.vat12)}</span>
                                             </div>
-
-                                            <div className="border-t border-black w-full my-1"></div>
-                                            <div className="grid grid-cols-[1fr_150px] items-center text-right font-black text-[11pt]">
-                                                <span className="uppercase pr-4">Total Rp</span>
+                                            <div className="grid grid-cols-2 font-bold border-t border-black mt-1 pt-1 text-[10pt]">
+                                                <span>Total Rp:</span>
                                                 <span>{formatCurrency(calculations.totalRp)}</span>
                                             </div>
                                         </div>
@@ -173,6 +181,10 @@ export const InvoiceTemplate = ({ type, invoiceData, items, calculations }: Invo
                                 {/* SIGNATURE & PAYMENT INFO */}
                                 <div className="flex justify-between items-end mt-4">
                                     <div className="w-[60%] space-y-1 leading-tight text-[8.5pt]">
+                                        <div className="flex mb-1">
+                                            <span className="font-bold w-[90px]">Payment:</span>
+                                            <span>{invoiceData.paymentTerm || '90 Hari'}</span>
+                                        </div>
                                         <p>Please state with your payment: <span className="font-bold">{displayInvoiceId}</span></p>
                                         
                                         <p className="font-bold underline uppercase pt-2">
@@ -190,10 +202,15 @@ export const InvoiceTemplate = ({ type, invoiceData, items, calculations }: Invo
                                         ) : (
                                             <div className="space-y-0.5">
                                                 <p className="font-bold text-[9pt]">PT. JEMBO CABLE COMPANY Tbk</p>
-                                                <div className="grid grid-cols-[100px_auto] gap-x-1 text-[8.5pt]">
-                                                    <span className="italic">Bank Mandiri</span><span>: 102-0100206827 (IDR)</span>
-                                                    <span className="italic">Bank BCA</span><span>: 684-0198977 (IDR)</span>
-                                                    <span className="italic">Bank Mandiri</span><span>: 102-0005000218 (IDR)</span>
+                                                <div className="flex gap-4">
+                                                    <div className="grid grid-cols-[85px_auto] gap-x-1 text-[8.5pt]">
+                                                        <span className="italic">Bank Mandiri</span><span>: 102-0100206827 (IDR)</span>
+                                                        <span className="italic">Bank BCA</span><span>: 684-0198977 (IDR)</span>
+                                                    </div>
+                                                    <div className="grid grid-cols-[85px_auto] gap-x-1 text-[8.5pt]">
+                                                        <span className="italic">Bank Mandiri</span><span>: 102-0005000218 (IDR)</span>
+                                                        <span className="italic">Bank Mandiri</span><span>: 102-0005000226 (USD)</span>
+                                                    </div>
                                                 </div>
                                             </div>
                                         )}
