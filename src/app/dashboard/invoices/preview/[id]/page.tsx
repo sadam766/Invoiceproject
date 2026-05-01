@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useRef } from 'react';
+import React from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { doc } from 'firebase/firestore';
 import { useFirestore, useDoc, useMemoFirebase } from '@/firebase';
@@ -8,12 +8,12 @@ import { Button } from '@/components/ui/button';
 import { ArrowLeft, Printer, Download } from 'lucide-react';
 import { type Invoice } from '@/app/lib/data';
 import { InvoiceTemplate } from '@/app/components/invoice/invoice-layout';
+import { format } from 'date-fns';
 
 const InvoicePreviewPage = () => {
   const params = useParams();
   const router = useRouter();
   const firestore = useFirestore();
-  const invoiceContainerRef = useRef<HTMLDivElement>(null);
   const invoiceId = params.id as string;
   const safeId = invoiceId?.replace(/\//g, '_');
 
@@ -30,10 +30,10 @@ const InvoicePreviewPage = () => {
   const dpValue = invoiceData.dpValue || 0;
   const retensiValue = invoiceData.retention || 0;
   
-  // PPN 12% calculation based on total amount or back-calculated
+  // MANDATORY SINKRON LOGIC (11/12)
   const totalRp = invoiceData.amount || 0;
-  const dppVat = totalRp / 1.12;
-  const vat12 = totalRp - dppVat;
+  const dppVat = (subTotalItems - negotiation) * (11 / 12);
+  const vat12 = dppVat * 0.12;
 
   const dpPercent = subTotalItems > 0 ? Math.round((dpValue / subTotalItems) * 100) : 0;
 
@@ -50,7 +50,7 @@ const InvoicePreviewPage = () => {
 
   return (
     <main className="min-h-screen bg-slate-100 py-12 px-4 flex flex-col items-center print:p-0 print:bg-white">
-      {/* Action Buttons - Relative to content */}
+      {/* Action Buttons */}
       <div className="w-full max-w-[210mm] flex justify-center gap-4 mb-6 print:hidden">
         <Button variant="outline" onClick={() => router.back()} className="rounded-xl font-bold h-11 px-8">
             <ArrowLeft className="mr-2 h-4 w-4" /> Kembali
@@ -63,10 +63,14 @@ const InvoicePreviewPage = () => {
         </Button>
       </div>
 
-      <div ref={invoiceContainerRef} className="print-container">
+      <div className="print-container">
           <InvoiceTemplate 
             type="Original" 
-            invoiceData={invoiceData} 
+            invoiceData={{
+                ...invoiceData,
+                customerName: invoiceData.customerName || invoiceData.customer,
+                date: format(new Date(invoiceData.date), 'dd MMM yyyy')
+            }} 
             items={items} 
             calculations={calculations} 
           />
@@ -77,7 +81,11 @@ const InvoicePreviewPage = () => {
 
           <InvoiceTemplate 
             type="Copy" 
-            invoiceData={invoiceData} 
+            invoiceData={{
+                ...invoiceData,
+                customerName: invoiceData.customerName || invoiceData.customer,
+                date: format(new Date(invoiceData.date), 'dd MMM yyyy')
+            }} 
             items={items} 
             calculations={calculations} 
           />

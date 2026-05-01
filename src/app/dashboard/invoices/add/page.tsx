@@ -27,43 +27,21 @@ import {
 } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
-import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
-import {
-    Dialog,
-    DialogContent,
-    DialogDescription,
-    DialogFooter,
-    DialogHeader,
-    DialogTitle,
-} from '@/components/ui/dialog';
-import { Checkbox } from '@/components/ui/checkbox';
 import { cn, formatNumberWithCommas, parseFormattedNumber } from '@/lib/utils';
 import { format, addDays } from 'date-fns';
 import {
   ChevronLeft,
   Plus,
   ReceiptText,
-  Lock,
-  Hash,
-  Wallet,
-  Eye,
   Loader2,
   Trash2,
-  MapPin,
-  Pencil,
-  ShieldCheck,
-  CreditCard,
-  Layers,
-  Database,
-  UserCircle2,
-  Banknote,
-  Search,
-  ChevronsUpDown,
-  History
+  History,
+  Eye,
+  ChevronsUpDown
 } from 'lucide-react';
-import { type Invoice, type SalesOrder, type UserProfile, type InvoiceItem, type InvoiceNumber, type Customer } from '@/app/lib/data';
+import { type Invoice, type SalesOrder, type UserProfile, type InvoiceItem, type InvoiceNumber } from '@/app/lib/data';
 import { useToast } from '@/hooks/use-toast';
-import { useFirestore, useCollection, useMemoFirebase, useUser, useDoc, errorEmitter, FirestorePermissionError } from '@/firebase';
+import { useFirestore, useMemoFirebase, useUser, useDoc, errorEmitter, FirestorePermissionError } from '@/firebase';
 import { collection, query, doc, setDoc, arrayUnion } from 'firebase/firestore';
 import { Badge } from '@/components/ui/badge';
 import {
@@ -133,10 +111,6 @@ export default function AddInvoicePage() {
   const [retentionMode, setRetentionMode] = useState<'percent' | 'nominal'>('nominal');
   const [dpDeductionValue, setDpDeductionValue] = useState<string>('0');
   const [dpDeductionMode, setDpDeductionMode] = useState<'percent' | 'nominal'>('nominal');
-  const [isTaxManual, setIsTaxManual] = useState(false);
-  const [dppVatState, setDppVat] = useState<string>('0');
-  const [vat12State, setVat12] = useState<string>('0');
-  const [totalAmount, setTotalAmount] = useState<string>('0');
 
   useEffect(() => {
       if (activeIdentity) {
@@ -178,10 +152,11 @@ export default function AddInvoicePage() {
     const dpDedInputVal = parseFormattedNumber(dpDeductionValue);
     const dpDedNominal = dpDeductionMode === 'percent' ? (baseAfterNeg * (dpDedInputVal / 100)) : dpDedInputVal;
 
-    const dppVat = baseAfterNeg;
+    // MANDATORY CALCULATION SINKRON (11/12)
+    const dppVat = baseAfterNeg * (11 / 12);
     const vat12 = dppVat * 0.12;
     
-    let totalRp = isDpInvoice ? dpVal : (dppVat + vat12 - dpDedNominal - retNominal);
+    let totalRp = isDpInvoice ? dpVal : (baseAfterNeg + vat12 - dpDedNominal - retNominal);
     totalRp = Math.max(0, totalRp);
 
     return {
@@ -195,10 +170,6 @@ export default function AddInvoicePage() {
         totalRp
     };
   }, [items, negotiationValue, negotiationMode, dpValue, dpMode, retentionValue, retentionMode, dpDeductionValue, dpDeductionMode, isDpInvoice]);
-
-  useEffect(() => {
-    setTotalAmount(formatNumberWithCommas(calcs.totalRp));
-  }, [calcs]);
 
   const handleSaveInvoice = async (invoiceStatus: any = 'sent', redirectToPreview = false) => {
     if (!firestore || !user || !activeIdentity) return;
@@ -214,6 +185,7 @@ export default function AddInvoicePage() {
         soNumber: selectedSoNumber,
         poNumber: activeIdentity.poNumber || '',
         customer: activeIdentity.customer,
+        customerName: activeIdentity.customer, // ADDED FOR PREVIEW SYNC
         customerCode: currentCustomer?.customerCode || '',
         billingAddress: billingAddress,
         date: format(issueDate, 'yyyy-MM-dd'),
@@ -275,7 +247,7 @@ export default function AddInvoicePage() {
 
   const previewInvoiceData = {
       ...activeIdentity,
-      customer: activeIdentity?.customer,
+      customerName: activeIdentity?.customer,
       billingAddress,
       paymentMethod,
       vaNumber: manualVaNumber,
@@ -312,7 +284,6 @@ export default function AddInvoicePage() {
           <div className="w-[45%] overflow-y-auto p-8 border-r bg-slate-50/30">
               <div className="space-y-8 max-w-2xl mx-auto pb-20">
                   
-                  {/* IDENTITY CARD */}
                   <Card className={cn("shadow-sm border-none ring-1 ring-slate-200 overflow-hidden", isLocked && "opacity-60")}>
                     <CardHeader className="bg-white border-b py-3 px-6">
                         <CardTitle className="text-[10px] font-black uppercase flex items-center gap-2 text-slate-500 tracking-widest">
@@ -394,7 +365,6 @@ export default function AddInvoicePage() {
                     </CardContent>
                   </Card>
 
-                  {/* ITEMS CARD */}
                   <Card className={cn("shadow-sm border-none ring-1 ring-slate-200 overflow-hidden", isLocked && "opacity-60")}>
                     <CardHeader className="bg-white border-b py-3 px-6 flex flex-row items-center justify-between">
                         <CardTitle className="text-[10px] font-black uppercase text-slate-500 tracking-widest">Line Items</CardTitle>
@@ -487,7 +457,6 @@ export default function AddInvoicePage() {
                     </CardContent>
                   </Card>
 
-                  {/* FINANCIAL AUDIT CARD */}
                   <Card className={cn("shadow-sm border-none ring-1 ring-slate-200 overflow-hidden", isLocked && "opacity-60")}>
                     <CardHeader className="bg-white border-b py-3 px-6">
                         <CardTitle className="text-[10px] font-black uppercase text-slate-500 tracking-widest flex items-center gap-2">
@@ -572,9 +541,6 @@ export default function AddInvoicePage() {
                     items={items}
                     calculations={calcs}
                   />
-              </div>
-              <div className="text-center mt-10">
-                  <p className="text-[10px] font-black uppercase text-slate-400 tracking-[0.4em]">Real-time Live Render Engine</p>
               </div>
           </div>
       </div>

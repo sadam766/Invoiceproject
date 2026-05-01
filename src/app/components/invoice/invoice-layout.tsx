@@ -64,7 +64,7 @@ export const InvoiceTemplate = ({ type, invoiceData, items, calculations }: Invo
                         {/* INFO BAR: CUSTOMER & DATES */}
                         <div className="flex justify-between items-start mb-6 text-[9pt]">
                             <div className="w-[60%] space-y-1">
-                                <p className="font-bold uppercase">{invoiceData.customer || invoiceData.customerName || '-'}</p>
+                                <p className="font-bold uppercase">{invoiceData.customerName || invoiceData.customer || '-'}</p>
                                 <p className="text-[8.5pt] leading-tight italic max-w-[350px]">
                                     {invoiceData.billingAddress || invoiceData.customerAddress || '-'}
                                 </p>
