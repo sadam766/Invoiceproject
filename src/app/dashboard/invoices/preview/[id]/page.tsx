@@ -37,7 +37,6 @@ const InvoicePreviewPage = () => {
     items.slice(i * ITEMS_PER_PAGE, i * ITEMS_PER_PAGE + ITEMS_PER_PAGE)
   );
 
-  // LOGIKA FINANSIAL
   const totalAmount = invoiceData.amount || 0;
   const dppVat = totalAmount / 1.12;
   const vat12 = totalAmount - dppVat;
@@ -64,24 +63,22 @@ const InvoicePreviewPage = () => {
         )}
         style={{ width: '210mm', minHeight: '297mm', fontSize: '9pt' }}
       >
-        {/* HEADER PERUSAHAAN (Kiri Atas - Sesuai Contoh User) */}
+        {/* HEADER PERUSAHAAN - TENGAH SESUAI MANDAT */}
         <header className="relative mb-6">
-          <div className="flex justify-between items-start">
-            <div className="space-y-1">
-              <h1 className="font-bold text-[11pt] uppercase text-blue-900">PT. JEMBO CABLE COMPANY Tbk</h1>
-              <div className="text-[8pt] leading-tight text-slate-600 uppercase">
-                <p>Mega Glodok Kemayoran Office Tower B 6th Floor</p>
-                <p>Jl. Angkasa Kav. B-6 Kota Baru Bandar Kemayoran</p>
-                <p>Jakarta Pusat</p>
-              </div>
-            </div>
-            <div className="text-right">
-              <h2 className="text-4xl font-black text-slate-100 tracking-tighter italic print:text-slate-100/50">{type}</h2>
+          <div className="text-center space-y-1">
+            <h1 className="font-bold text-[11pt] uppercase text-blue-900">PT. JEMBO CABLE COMPANY Tbk</h1>
+            <div className="text-[8pt] leading-tight text-slate-600 uppercase">
+              <p>Mega Glodok Kemayoran Office Tower B 6th Floor</p>
+              <p>Jl. Angkasa Kav. B-6 Kota Baru Bandar Kemayoran</p>
+              <p>Jakarta Pusat</p>
             </div>
           </div>
           
-          {/* JUDUL TENGAH (MANDAT) */}
-          <div className="text-center mt-4 mb-2">
+          <div className="absolute top-0 right-0">
+            <h2 className="text-3xl font-black text-slate-100 tracking-tighter italic print:text-slate-100/50">{type}</h2>
+          </div>
+
+          <div className="text-center mt-6 mb-2">
             <h1 className="font-bold text-[11pt] uppercase underline underline-offset-4">INVOICE/OFFICIAL RECEIPT</h1>
             <p className="text-[10pt] font-bold mt-1">No: {invoiceId.replace(/_/g, '/')}</p>
           </div>
@@ -103,7 +100,7 @@ const InvoicePreviewPage = () => {
           </div>
         </div>
 
-        {/* TABLE SECTION - GARIS TIPIS (MANDAT) */}
+        {/* TABLE SECTION - GARIS TIPIS */}
         <div className="flex-grow">
           <table className="w-full border-collapse text-[9pt]">
             <thead>
@@ -135,33 +132,28 @@ const InvoicePreviewPage = () => {
                   <td></td>
                 </tr>
               ))}
-              {/* Bottom Border Table */}
               <tr className="border-t border-black"><td colSpan={5}></td></tr>
             </tbody>
           </table>
         </div>
 
-        {/* FOOTER & CALCULATIONS (Only on last page) */}
+        {/* FOOTER & CALCULATIONS */}
         {isLastPage && (
           <div className="mt-4">
-            {/* FINANCIAL MATRIX (MANDAT: SEJAJAR KANAN SEBELUM PPN) */}
             <div className="flex flex-col items-end mb-6">
               <div className="w-[45%] space-y-1">
-                
                 <div className="grid grid-cols-[1fr_80px_120px] items-center text-right leading-tight">
                   <span className="pr-2 font-medium">Sub Total Item</span>
                   <span></span>
                   <span className="font-bold">{formatAccounting(subTotalItems)}</span>
                 </div>
-
                 {dpValue > 0 && (
                   <div className="grid grid-cols-[1fr_80px_120px] items-center text-right leading-tight">
                     <span className="pr-2">Down Payment / DP</span>
-                    <span className="text-center italic opacity-60"></span>
+                    <span></span>
                     <span className="text-rose-600">({formatAccounting(dpValue)})</span>
                   </div>
                 )}
-
                 {retensi > 0 && (
                   <div className="grid grid-cols-[1fr_80px_120px] items-center text-right leading-tight">
                     <span className="pr-2">Retention</span>
@@ -169,7 +161,6 @@ const InvoicePreviewPage = () => {
                     <span className="text-rose-600">({formatAccounting(retensi)})</span>
                   </div>
                 )}
-
                 {negotiation > 0 && (
                   <div className="grid grid-cols-[1fr_80px_120px] items-center text-right leading-tight text-amber-600">
                     <span className="pr-2">Discount / Negotiation</span>
@@ -177,15 +168,12 @@ const InvoicePreviewPage = () => {
                     <span>({formatAccounting(negotiation)})</span>
                   </div>
                 )}
-
                 <div className="grid grid-cols-[1fr_80px_120px] items-center text-right leading-tight text-slate-500">
                   <span className="pr-2 uppercase font-bold text-[8pt]">VAT / PPN</span>
                   <span className="text-center font-bold">12%</span>
                   <span className="font-bold">{formatAccounting(vat12)}</span>
                 </div>
-
                 <div className="border-t-2 border-black w-full my-1"></div>
-                
                 <div className="grid grid-cols-[1fr_200px] items-center text-right">
                   <span className="uppercase pr-4 font-black text-blue-900">Grand Total</span>
                   <span className="text-lg font-black text-blue-900 leading-none">Rp {formatAccounting(totalAmount)}</span>
@@ -193,17 +181,13 @@ const InvoicePreviewPage = () => {
               </div>
             </div>
 
-            {/* PAYMENT & SIGNATURE */}
             <div className="flex justify-between items-end">
-              {/* Payment Instruction */}
               <div className="w-[55%] text-[8.5pt] space-y-1 border-t border-dashed pt-4">
                 <p>Please state with your payment: <span className="font-bold">{invoiceId.replace(/_/g, '/')}</span></p>
-                
                 <div className="pt-2">
                   <p className="font-bold underline uppercase text-blue-900 mb-1">
                     {isVA ? 'Payment via Virtual Account:' : 'For payment, please transfer to:'}
                   </p>
-                  
                   {isVA ? (
                     <div className="bg-slate-50 p-3 border-2 border-indigo-100 rounded-xl w-[90%]">
                        <p className="text-[7pt] font-black uppercase text-indigo-400 tracking-widest mb-1">Mandiri Virtual Account (IDR)</p>
@@ -221,8 +205,6 @@ const InvoicePreviewPage = () => {
                   )}
                 </div>
               </div>
-
-              {/* Signature */}
               <div className="w-[40%] flex flex-col items-center">
                 <p className="font-bold text-[9pt] uppercase mb-20">PT. JEMBO CABLE COMPANY Tbk</p>
                 <div className="border-b-2 border-black w-48 mb-1"></div>
@@ -232,7 +214,6 @@ const InvoicePreviewPage = () => {
           </div>
         )}
 
-        {/* PAGE NUMBER */}
         <div className="absolute bottom-6 left-0 right-0 text-center text-[7pt] text-slate-400 uppercase tracking-widest print:hidden">
           Page {pageIndex + 1} of {totalPages} | Printed by Dakota Hub
         </div>
@@ -242,8 +223,8 @@ const InvoicePreviewPage = () => {
 
   return (
     <main className="min-h-screen bg-slate-100 py-12 px-4 flex flex-col items-center print:p-0 print:bg-white animate-in fade-in duration-700">
-      {/* ACTION BAR (MANDAT: KANAN ATAS BERJAJAR) */}
-      <div className="fixed top-6 right-6 z-50 flex gap-3 print:hidden">
+      {/* AREA ACTION BUTTONS - RELATIVE ABOVE INVOICE */}
+      <div className="w-full max-w-[210mm] flex justify-center gap-4 mb-8 print:hidden">
         <Button variant="outline" onClick={() => router.back()} className="rounded-xl shadow-md border-slate-200 bg-white">
           <ArrowLeft size={16} className="mr-2"/> Kembali
         </Button>
@@ -256,19 +237,19 @@ const InvoicePreviewPage = () => {
       </div>
 
       <div ref={invoiceContainerRef} className="print:w-full">
-        {/* ORIGINAL SET (All Pages) */}
+        {/* ORIGINAL SET */}
         {itemChunks.map((chunk, i) => (
           <InvoiceTemplate key={`orig-${i}`} type="ORIGINAL" chunk={chunk} pageIndex={i} totalPages={itemChunks.length} />
         ))}
 
         {/* VISUAL DIVIDER */}
-        <div className="my-12 border-b-4 border-dashed border-slate-300 print:hidden text-center relative">
+        <div className="my-12 border-b-4 border-dashed border-slate-300 print:hidden text-center relative max-w-[210mm] w-full">
           <span className="bg-slate-100 px-6 py-2 text-slate-500 text-xs font-black uppercase tracking-[0.4em] rounded-full ring-4 ring-slate-100 absolute left-1/2 -translate-x-1/2 -top-5">
             Halaman Berikutnya (Copy)
           </span>
         </div>
 
-        {/* COPY SET (All Pages) */}
+        {/* COPY SET */}
         {itemChunks.map((chunk, i) => (
           <InvoiceTemplate key={`copy-${i}`} type="COPY" chunk={chunk} pageIndex={i} totalPages={itemChunks.length} />
         ))}
