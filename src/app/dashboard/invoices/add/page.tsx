@@ -58,7 +58,8 @@ import {
   UserCircle2,
   Banknote,
   Search,
-  ChevronsUpDown
+  ChevronsUpDown,
+  History
 } from 'lucide-react';
 import { type Invoice, type SalesOrder, type UserProfile, type InvoiceItem, type InvoiceNumber, type Customer } from '@/app/lib/data';
 import { useToast } from '@/hooks/use-toast';
@@ -79,6 +80,7 @@ import {
     PopoverTrigger,
 } from '@/components/ui/popover';
 import { useDashboardData } from '../../layout';
+import { InvoiceTemplate } from '@/app/components/invoice/invoice-layout';
 
 export default function AddInvoicePage() {
   const router = useRouter();
@@ -90,10 +92,8 @@ export default function AddInvoicePage() {
   const editInvoiceId = searchParams.get('editInvoiceId');
   const invoiceNumberIdParam = searchParams.get('invoiceNumberId');
   
-  // Consuming Cached Data
   const { customers: allCustomers, products: masterProducts, salesOrders: allSalesOrders } = useDashboardData();
 
-  // --- DATA FETCHING ---
   const identityRef = useMemoFirebase(() => {
       if (!firestore || !invoiceNumberIdParam) return null;
       return doc(firestore, 'invoiceNumbers', invoiceNumberIdParam);
@@ -112,7 +112,6 @@ export default function AddInvoicePage() {
   const { data: userProfile } = useDoc<UserProfile>(userProfileRef);
   const isAdmin = user?.email?.toLowerCase() === 'fa@gmail.com' || userProfile?.role === 'admin';
 
-  // --- FORM STATES ---
   const [items, setItems] = useState<InvoiceItem[]>([]);
   const [selectedSoNumber, setSelectedSoNumber] = useState('');
   const [billingAddress, setBillingAddress] = useState('');
@@ -125,44 +124,20 @@ export default function AddInvoicePage() {
   const [productPopoverOpen, setProductPopoverOpen] = useState(false);
   const [isProcessing, setIsSaving] = useState(false);
 
-  // QUICK EDIT STATES
-  const [isQuickEditOpen, setIsQuickEditOpen] = useState(false);
-  const [editTarget, setEditTarget] = useState<'name' | 'address'>('name');
-  const [tempName, setTempName] = useState('');
-  const [tempAddress, setTempAddress] = useState('');
-  const [updateMaster, setUpdateMaster] = useState(true);
+  // Calculation States
+  const [negotiationValue, setNegotiationValue] = useState<string>('0');
+  const [negotiationMode, setNegotiationMode] = useState<'percent' | 'nominal'>('nominal');
+  const [dpValue, setDpValue] = useState<string>('0');
+  const [dpMode, setDpMode] = useState<'percent' | 'nominal'>('percent');
+  const [retentionValue, setRetentionValue] = useState<string>('0');
+  const [retentionMode, setRetentionMode] = useState<'percent' | 'nominal'>('nominal');
+  const [dpDeductionValue, setDpDeductionValue] = useState<string>('0');
+  const [dpDeductionMode, setDpDeductionMode] = useState<'percent' | 'nominal'>('nominal');
+  const [isTaxManual, setIsTaxManual] = useState(false);
+  const [dppVatState, setDppVat] = useState<string>('0');
+  const [vat12State, setVat12] = useState<string>('0');
+  const [totalAmount, setTotalAmount] = useState<string>('0');
 
-  // --- LOGIC: Auto-Pull Items from SO ---
-  useEffect(() => {
-    if (selectedSoNumber && allSalesOrders) {
-        const foundSo = allSalesOrders.find(so => so.soNumber === selectedSoNumber);
-        if (foundSo && items.length === 0) {
-            setItems(foundSo.items.map((item, idx) => ({
-                id: item.id || `so-item-${idx}`,
-                name: item.productName,
-                quantity: item.quantity,
-                unit: item.unit || 'Meter',
-                price: item.price,
-                total: item.total,
-                originalPrice: item.price,
-                originalQty: item.quantity,
-                originalName: item.productName
-            })));
-            if (foundSo.customerAddress && !billingAddress) {
-                setBillingAddress(foundSo.customerAddress);
-            }
-            toast({ title: "SO Data Integrated", description: `Berhasil menarik ${foundSo.items.length} item dari SO ${selectedSoNumber}` });
-        }
-    }
-  }, [selectedSoNumber, allSalesOrders, items.length]);
-
-  // --- CUSTOMER DATA SYNC ---
-  const currentCustomer = useMemo(() => {
-    if (!activeIdentity?.customer || !allCustomers) return null;
-    return allCustomers.find(c => c.name.toLowerCase() === activeIdentity.customer.toLowerCase());
-  }, [activeIdentity?.customer, allCustomers]);
-
-  // INITIAL STATE SYNC
   useEffect(() => {
       if (activeIdentity) {
           if (!selectedSoNumber) setSelectedSoNumber(activeIdentity.salesOrder || '');
@@ -176,38 +151,26 @@ export default function AddInvoicePage() {
       }
   }, [activeIdentity]);
 
-  // AUTO-POPULATE VA FROM CUSTOMER PROFILE
+  const currentCustomer = useMemo(() => {
+    if (!activeIdentity?.customer || !allCustomers) return null;
+    return allCustomers.find(c => c.name.toLowerCase() === activeIdentity.customer.toLowerCase());
+  }, [activeIdentity?.customer, allCustomers]);
+
   useEffect(() => {
     if (currentCustomer && paymentMethod === 'va' && !manualVaNumber) {
         setManualVaNumber(currentCustomer.virtualAccountNumber || '');
     }
   }, [currentCustomer, paymentMethod]);
 
-  // --- CALCULATION STATES ---
-  const [subtotal, setSubtotal] = useState(0);
-  const [negotiationValue, setNegotiationValue] = useState<string>('0');
-  const [negotiationMode, setNegotiationMode] = useState<'percent' | 'nominal'>('nominal');
-  const [dpValue, setDpValue] = useState<string>('0');
-  const [dpMode, setDpMode] = useState<'percent' | 'nominal'>('percent');
-  const [retentionValue, setRetentionValue] = useState<string>('0');
-  const [retentionMode, setRetentionMode] = useState<'percent' | 'nominal'>('nominal');
-  const [dpDeductionValue, setDpDeductionValue] = useState<string>('0');
-  const [dpDeductionMode, setDpDeductionMode] = useState<'percent' | 'nominal'>('nominal');
-  const [isTaxManual, setIsTaxManual] = useState(false);
-  const [dppVat, setDppVat] = useState<string>('0');
-  const [vat12, setVat12] = useState<string>('0');
-  const [totalAmount, setTotalAmount] = useState<string>('0');
-
-  useEffect(() => {
-    const currentSubtotal = items.reduce((acc, item) => acc + (item.quantity * item.price), 0);
-    setSubtotal(currentSubtotal);
+  const calcs = useMemo(() => {
+    const subTotalItems = items.reduce((acc, item) => acc + (item.quantity * item.price), 0);
     
     const negInputVal = parseFormattedNumber(negotiationValue);
-    const negNominal = negotiationMode === 'percent' ? (currentSubtotal * (negInputVal / 100)) : negInputVal;
-    const baseAfterNeg = Math.max(0, currentSubtotal - negNominal);
+    const negotiation = negotiationMode === 'percent' ? (subTotalItems * (negInputVal / 100)) : negInputVal;
+    const baseAfterNeg = Math.max(0, subTotalItems - negotiation);
     
     const dpInputVal = parseFormattedNumber(dpValue);
-    const dpNominal = dpMode === 'percent' ? (baseAfterNeg * (dpInputVal / 100)) : dpInputVal;
+    const dpVal = dpMode === 'percent' ? (baseAfterNeg * (dpInputVal / 100)) : dpInputVal;
     
     const retInputVal = parseFormattedNumber(retentionValue);
     const retNominal = retentionMode === 'percent' ? (baseAfterNeg * (retInputVal / 100)) : retInputVal;
@@ -215,39 +178,31 @@ export default function AddInvoicePage() {
     const dpDedInputVal = parseFormattedNumber(dpDeductionValue);
     const dpDedNominal = dpDeductionMode === 'percent' ? (baseAfterNeg * (dpDedInputVal / 100)) : dpDedInputVal;
 
-    if (!isTaxManual) {
-        const calculatedDpp = baseAfterNeg;
-        const calculatedVat = calculatedDpp * 0.12;
-        setDppVat(formatNumberWithCommas(calculatedDpp));
-        setVat12(formatNumberWithCommas(calculatedVat));
-    }
+    const dppVat = baseAfterNeg;
+    const vat12 = dppVat * 0.12;
     
-    const currentDpp = parseFormattedNumber(dppVat);
-    const currentVat = parseFormattedNumber(vat12);
-    
-    let grand = isDpInvoice ? dpNominal : (currentDpp + currentVat - dpDedNominal - retNominal);
-    grand = Math.max(0, grand);
-    setTotalAmount(formatNumberWithCommas(grand));
-  }, [items, negotiationValue, negotiationMode, dpValue, dpMode, retentionValue, retentionMode, dpDeductionValue, dpDeductionMode, isTaxManual, dppVat, vat12, isDpInvoice]);
+    let totalRp = isDpInvoice ? dpVal : (dppVat + vat12 - dpDedNominal - retNominal);
+    totalRp = Math.max(0, totalRp);
 
-  const handleNumericChange = (setter: (v: string) => void) => (e: React.ChangeEvent<HTMLInputElement>) => {
-    const value = e.target.value;
-    if (value === '') { setter(''); return; }
-    const cleanValue = value.replace(/[^\d.,]/g, '');
-    const num = parseFormattedNumber(cleanValue);
-    if (!isNaN(num)) {
-        let formatted = formatNumberWithCommas(num);
-        if (value.endsWith(',') || value.endsWith('.')) {
-            if (!formatted.includes(',')) formatted += ',';
-        }
-        setter(formatted);
-    }
-  };
+    return {
+        subTotalItems,
+        negotiation,
+        dpValue: dpVal,
+        dpPercent: subTotalItems > 0 ? Math.round((dpVal / subTotalItems) * 100) : 0,
+        retensiValue: retNominal,
+        dppVat,
+        vat12,
+        totalRp
+    };
+  }, [items, negotiationValue, negotiationMode, dpValue, dpMode, retentionValue, retentionMode, dpDeductionValue, dpDeductionMode, isDpInvoice]);
+
+  useEffect(() => {
+    setTotalAmount(formatNumberWithCommas(calcs.totalRp));
+  }, [calcs]);
 
   const handleSaveInvoice = async (invoiceStatus: any = 'sent', redirectToPreview = false) => {
     if (!firestore || !user || !activeIdentity) return;
 
-    const grandTotalNumeric = parseFormattedNumber(totalAmount);
     setIsSaving(true);
     const safeInvoiceId = activeIdentity.id.replace(/\//g, '_');
     const invoiceDocRef = doc(firestore, 'invoices', safeInvoiceId);
@@ -263,15 +218,15 @@ export default function AddInvoicePage() {
         billingAddress: billingAddress,
         date: format(issueDate, 'yyyy-MM-dd'),
         dueDate: format(dueDate, 'yyyy-MM-dd'),
-        amount: grandTotalNumeric,
+        amount: calcs.totalRp,
         status: invoiceStatus,
         isDpInvoice: isDpInvoice,
         paymentMethod: paymentMethod,
         vaNumber: paymentMethod === 'va' ? manualVaNumber : '',
-        negotiation: parseFormattedNumber(negotiationValue),
-        dpValue: parseFormattedNumber(dpValue),
+        negotiation: calcs.negotiation,
+        dpValue: calcs.dpValue,
         dpDeduction: parseFormattedNumber(dpDeductionValue),
-        retention: parseFormattedNumber(retentionValue),
+        retention: calcs.retensiValue,
         items: items,
         lastUpdatedAt: timestamp,
         lastUpdatedBy: updater,
@@ -299,445 +254,330 @@ export default function AddInvoicePage() {
         .finally(() => setIsSaving(false));
   };
 
+  const handleNumericChange = (setter: (v: string) => void) => (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    if (value === '') { setter(''); return; }
+    const num = parseFormattedNumber(value);
+    if (!isNaN(num)) {
+        let formatted = formatNumberWithCommas(num);
+        if (value.endsWith(',') || value.endsWith('.')) {
+            if (!formatted.includes(',')) formatted += ',';
+        }
+        setter(formatted);
+    }
+  };
+
   if (isIdentityLoading || isExistingLoading) {
       return <div className="flex h-[80vh] items-center justify-center font-bold text-slate-400 animate-pulse uppercase tracking-widest text-xs">Synchronizing Modules...</div>;
   }
 
   const isLocked = (existingInvoiceData?.status === 'finalized' || existingInvoiceData?.status === 'paid' || existingInvoiceData?.status === 'received') && !isAdmin;
 
+  const previewInvoiceData = {
+      ...activeIdentity,
+      customer: activeIdentity?.customer,
+      billingAddress,
+      paymentMethod,
+      vaNumber: manualVaNumber,
+      date: format(issueDate, 'dd MMM yyyy'),
+  };
+
   return (
-    <main className="flex flex-1 flex-col gap-6 p-4 md:p-8 max-w-[1600px] mx-auto bg-background animate-in fade-in duration-500">
-      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
-        <div className="flex items-center gap-4">
-            <Button variant="outline" size="icon" onClick={() => router.back()} className="rounded-full h-10 w-10 border-slate-200">
-                <ChevronLeft className="h-5 w-5" />
-            </Button>
-            <div>
-                <h1 className="text-xl font-black tracking-tight uppercase text-slate-900">Billing Constructor</h1>
-                <div className="flex items-center gap-2 mt-1">
-                    <span className="text-slate-400 text-[10px] font-bold uppercase tracking-widest">Ref PO: {activeIdentity?.poNumber}</span>
-                    <Badge variant="outline" className="text-[9px] font-black uppercase bg-indigo-50 border-slate-200 text-slate-500 h-4">
-                        <Lock className="h-2.5 w-2.5 mr-1" /> Verified Financial Record
-                    </Badge>
-                </div>
-            </div>
-        </div>
+    <main className="flex flex-1 flex-col h-full bg-background animate-in fade-in duration-500 overflow-hidden">
+      {/* TOPBAR */}
+      <div className="flex items-center justify-between px-8 py-4 border-b bg-white z-10">
+          <div className="flex items-center gap-4">
+              <Button variant="ghost" size="icon" onClick={() => router.back()} className="rounded-full h-10 w-10">
+                  <ChevronLeft className="h-5 w-5" />
+              </Button>
+              <div>
+                  <h1 className="text-lg font-black tracking-tight uppercase text-slate-900 leading-tight">Billing Constructor</h1>
+                  <p className="text-slate-400 text-[10px] font-bold uppercase tracking-widest">Constructing Invoice ID: {activeIdentity?.id}</p>
+              </div>
+          </div>
+          <div className="flex items-center gap-3">
+              <Button variant="ghost" className="font-bold text-xs uppercase" onClick={() => handleSaveInvoice('draft')}>Save Draft</Button>
+              <Button 
+                  className="bg-indigo-600 hover:bg-indigo-700 font-black uppercase text-[10px] tracking-widest px-8 h-10 rounded-xl shadow-lg shadow-indigo-100" 
+                  onClick={() => handleSaveInvoice('sent', true)}
+                  disabled={isProcessing}
+              >
+                  {isProcessing ? <Loader2 className="h-4 w-4 animate-spin" /> : <><Eye className="mr-2 h-4 w-4" /> Save & Preview</>}
+              </Button>
+          </div>
       </div>
 
-      <div className="grid gap-8 lg:grid-cols-12 items-start">
-        <div className="lg:col-span-8 space-y-8">
-          <Card className={cn("shadow-sm border-none ring-1 ring-slate-200 overflow-hidden", isLocked && "opacity-60")}>
-            <CardHeader className="bg-slate-50/50 border-b py-3 px-6">
-                <CardTitle className="text-[10px] font-black uppercase flex items-center gap-2 text-slate-500 tracking-widest">
-                    <ReceiptText className="h-4 w-4 text-indigo-600" /> Identitas Penagihan & Mapping SO
-                </CardTitle>
-            </CardHeader>
-            <CardContent className="p-8">
-              <div className="grid gap-8 md:grid-cols-3">
-                  <div className="space-y-2">
-                      <Label className="text-[10px] font-black uppercase text-slate-400 tracking-widest">Nomor Invoice</Label>
-                      <div className="flex items-center gap-2 bg-indigo-50/30 px-4 py-2.5 rounded-xl border-2 border-indigo-100/50">
-                          <Hash className="h-4 w-4 text-indigo-600" />
-                          <span className="font-black text-indigo-700 text-sm tracking-tight">{activeIdentity?.id || 'N/A'}</span>
-                      </div>
-                  </div>
-
-                  <div className="space-y-2">
-                      <Label className="text-[10px] font-black uppercase text-slate-400 tracking-widest">Referensi Sales Order (SO)</Label>
-                      <Popover open={soPopoverOpen} onOpenChange={setSoPopoverOpen}>
-                        <PopoverTrigger asChild>
-                            <Button variant="outline" className="w-full justify-between h-10 font-bold border-indigo-100 bg-indigo-50/10">
-                                {selectedSoNumber || "Cari No. SO..."}
-                                <ChevronsUpDown className="ml-2 h-4 w-4 opacity-50" />
-                            </Button>
-                        </PopoverTrigger>
-                        <PopoverContent className="w-[400px] p-0 shadow-2xl" align="start">
-                            <Command>
-                                <CommandInput placeholder="Cari SO dari kontrak aktif..." className="h-11" />
-                                <CommandList>
-                                    <CommandEmpty>SO tidak ditemukan.</CommandEmpty>
-                                    <CommandGroup>
-                                        {allSalesOrders?.filter(so => so.customer === activeIdentity?.customer).map((so) => (
-                                            <CommandItem
-                                                key={so.soNumber}
-                                                value={so.soNumber}
-                                                onSelect={(v) => { setSelectedSoNumber(v); setSoPopoverOpen(false); }}
-                                                className="p-3 border-b"
-                                            >
-                                                <div className="flex flex-col">
-                                                    <span className="font-black text-indigo-700">{so.soNumber}</span>
-                                                    <span className="text-[9px] font-bold text-slate-400 uppercase">PO: {so.poNumber} • Rp {so.grandTotal.toLocaleString()}</span>
-                                                </div>
-                                            </CommandItem>
-                                        ))}
-                                    </CommandGroup>
-                                </CommandList>
-                            </Command>
-                        </PopoverContent>
-                      </Popover>
-                  </div>
-
-                  <div className="space-y-2">
-                      <Label className="text-[10px] font-black uppercase text-slate-400 tracking-widest">Customer Profile</Label>
-                      <div className="bg-slate-50 px-4 py-2.5 rounded-xl border border-slate-200 text-xs font-black uppercase truncate text-slate-700 flex justify-between items-center">
-                          {activeIdentity?.customer}
-                      </div>
-                  </div>
-
-                  <div className="md:col-span-3 space-y-4">
-                      <div className="flex justify-between items-center">
-                        <Label className="text-[10px] font-black uppercase text-slate-400 tracking-widest flex items-center gap-1">
-                            <MapPin className="h-3 w-3" /> Specific Billing Address
-                        </Label>
-                        <div className="flex gap-2">
-                             {currentCustomer?.addresses?.map(addr => (
-                                 <Badge 
-                                    key={addr.id} 
-                                    variant="outline" 
-                                    className={cn("text-[8px] uppercase cursor-pointer hover:bg-indigo-50 transition-all font-black", billingAddress === addr.address ? "bg-indigo-600 text-white border-indigo-600" : "bg-white text-slate-400")}
-                                    onClick={() => setBillingAddress(addr.address)}
-                                 >
-                                    {addr.label}
-                                 </Badge>
-                             ))}
-                             <Button variant="ghost" size="icon" className="h-6 w-6 rounded-full" onClick={() => { setEditTarget('address'); setTempAddress(billingAddress); setIsQuickEditOpen(true); }}><Pencil className="h-3 w-3" /></Button>
-                        </div>
-                      </div>
-
-                      <div className="bg-slate-50/50 p-5 rounded-2xl border-2 border-slate-100 shadow-inner">
-                             <p className="text-[11px] leading-snug font-medium text-slate-700 italic">
-                                 {billingAddress || 'Pilih alamat dari daftar di atas.'}
-                             </p>
-                      </div>
-                  </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className={cn("shadow-sm border-none ring-1 ring-slate-200 overflow-hidden", isLocked && "opacity-60")}>
-            <CardHeader className="bg-slate-50/50 border-b py-4 px-6 flex flex-row items-center justify-between">
-                <CardTitle className="text-sm font-black uppercase text-slate-800 tracking-tighter">Items Constructor</CardTitle>
-                <Badge 
-                    variant={isDpInvoice ? "default" : "outline"} 
-                    className={cn("text-[9px] uppercase cursor-pointer py-1.5 px-4 font-black tracking-widest transition-all", isDpInvoice ? "bg-indigo-600 shadow-lg shadow-indigo-100" : "text-indigo-600 border-indigo-200")} 
-                    onClick={() => !isLocked && setIsDpInvoice(!isDpInvoice)}
-                >
-                    {isDpInvoice ? "Uang Muka / DP Mode" : "Regular Commercial"}
-                </Badge>
-            </CardHeader>
-            <CardContent className="p-0">
-                <Table>
-                    <TableHeader className="bg-slate-50">
-                        <TableRow>
-                            <TableHead className="text-[10px] font-black uppercase py-4 px-6">Deskripsi Barang</TableHead>
-                            <TableHead className="w-[120px] text-center text-[10px] font-black uppercase">Qty</TableHead>
-                            <TableHead className="w-[100px] text-center text-[10px] font-black uppercase">Satuan</TableHead>
-                            <TableHead className="w-[160px] text-right text-[10px] font-black uppercase">Harga Satuan</TableHead>
-                            <TableHead className="w-[160px] text-right text-[10px] font-black uppercase">Total</TableHead>
-                            <TableHead className="w-[60px]"></TableHead>
-                        </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                        {items.length === 0 ? (
-                            <TableRow><TableCell colSpan={6} className="text-center py-20 text-slate-400 italic font-black opacity-30 tracking-widest">Tarik nomor SO untuk mengisi baris item otomatis.</TableCell></TableRow>
-                        ) : items.map(item => (
-                                <TableRow key={item.id} className="hover:bg-slate-50/50 transition-colors">
-                                    <TableCell className="px-6">
-                                        <Input 
-                                            value={item.name} 
-                                            onChange={e => setItems(items.map(it => it.id === item.id ? { ...it, name: e.target.value } : it))}
-                                            className="h-9 text-xs font-bold border-dashed shadow-none bg-transparent"
-                                            disabled={isLocked}
-                                        />
-                                    </TableCell>
-                                    <TableCell>
-                                        <Input 
-                                            type="text"
-                                            value={formatNumberWithCommas(item.quantity)} 
-                                            onChange={e => {
-                                                const val = parseFormattedNumber(e.target.value);
-                                                setItems(items.map(it => it.id === item.id ? { ...it, quantity: val, total: val * it.price } : it));
-                                            }} 
-                                            className="text-center text-xs h-9 font-black rounded-lg border-indigo-100 bg-indigo-50/10" 
-                                            disabled={isLocked}
-                                        />
-                                    </TableCell>
-                                    <TableCell>
-                                        <Input 
-                                            value={item.unit} 
-                                            onChange={e => setItems(items.map(it => it.id === item.id ? { ...it, unit: e.target.value } : it))}
-                                            className="text-center text-[10px] h-9 font-bold border-none uppercase text-slate-400"
-                                            disabled={isLocked}
-                                        />
-                                    </TableCell>
-                                    <TableCell>
-                                        <Input 
-                                            type="text"
-                                            value={formatNumberWithCommas(item.price)} 
-                                            onChange={e => {
-                                                const val = parseFormattedNumber(e.target.value);
-                                                setItems(items.map(it => it.id === item.id ? { ...it, price: val, total: it.quantity * val } : it));
-                                            }}
-                                            className="h-9 text-right text-xs font-black border-dashed rounded-lg"
-                                            disabled={isLocked}
-                                        />
-                                    </TableCell>
-                                    <TableCell className="text-right font-black text-xs px-2">Rp {formatNumberWithCommas(item.total)}</TableCell>
-                                    <TableCell className="px-4">
-                                        <Button variant="ghost" size="icon" className="h-8 w-8 text-rose-500 hover:text-rose-700 hover:bg-rose-50 rounded-full" onClick={() => setItems(items.filter(it => it.id !== item.id))} disabled={isLocked}>
-                                            <Trash2 className="h-4 w-4" />
-                                        </Button>
-                                    </TableCell>
-                                </TableRow>
-                            )
-                        )}
-                    </TableBody>
-                </Table>
-                
-                <div className="p-6 bg-slate-50/50 border-t flex flex-wrap gap-3">
-                    <Popover open={productPopoverOpen} onOpenChange={setProductPopoverOpen}>
-                        <PopoverTrigger asChild>
-                            <Button variant="outline" size="sm" className="h-10 text-[10px] font-black uppercase text-indigo-600 rounded-xl px-6 border-slate-200" disabled={isLocked}>
-                                <Plus className="mr-2 h-3.5 w-3.5" /> Sisipkan Baris Manual
-                            </Button>
-                        </PopoverTrigger>
-                        <PopoverContent className="w-[400px] p-0 shadow-2xl" align="start">
-                            <Command>
-                                <CommandInput placeholder="Cari di katalog produk..." />
-                                <CommandList>
-                                    <CommandEmpty>Produk tidak ditemukan.</CommandEmpty>
-                                    <CommandGroup>
-                                        {masterProducts?.map((p) => (
-                                            <CommandItem
-                                                key={p.id}
-                                                value={p.name}
-                                                onSelect={() => {
-                                                    const newItem: InvoiceItem = { id: `man-${Date.now()}`, name: p.name, quantity: 1, unit: p.unit || 'Meter', price: p.price, total: p.price };
-                                                    setItems([...items, newItem]);
-                                                    setProductPopoverOpen(false);
-                                                }}
-                                                className="p-3 border-b"
-                                            >
-                                                <div className="flex justify-between w-full">
-                                                    <span className="font-bold text-xs uppercase">{p.name}</span>
-                                                    <span className="text-[10px] font-black text-indigo-600">Rp {p.price.toLocaleString()}</span>
-                                                </div>
-                                            </CommandItem>
-                                        ))}
-                                    </CommandGroup>
-                                </CommandList>
-                            </Command>
-                        </PopoverContent>
-                    </Popover>
-                    <Button variant="ghost" className="h-10 text-[10px] font-black uppercase text-rose-500 rounded-xl px-6" onClick={() => setItems([])} disabled={isLocked || items.length === 0}>
-                        Bersihkan Tabel
-                    </Button>
-                </div>
-            </CardContent>
-          </Card>
-        </div>
-
-        <div className="lg:col-span-4 space-y-8 sticky top-24">
-          {/* PAYMENT METHOD MATRIX */}
-          <Card className="shadow-lg border-none ring-1 ring-emerald-100 bg-white overflow-hidden rounded-3xl">
-            <CardHeader className="bg-emerald-50/30 py-5 px-8 border-b border-emerald-50">
-                <CardTitle className="text-[10px] font-black uppercase tracking-[0.2em] text-emerald-600 flex items-center gap-2">
-                    <Banknote className="h-4 w-4" /> Payment Matrix Selector
-                </CardTitle>
-            </CardHeader>
-            <CardContent className="p-8 space-y-6">
-                <RadioGroup value={paymentMethod} onValueChange={(v: any) => setPaymentMethod(v)} className="grid grid-cols-2 gap-4">
-                    <div>
-                        <RadioGroupItem value="bank" id="bank" className="peer sr-only" disabled={isLocked} />
-                        <Label htmlFor="bank" className="flex flex-col items-center justify-between rounded-2xl border-2 border-muted bg-popover p-4 hover:bg-slate-50 hover:text-accent-foreground peer-data-[state=checked]:border-emerald-500 [&:has([data-state=checked])]:border-emerald-500 transition-all cursor-pointer">
-                            <Database className="mb-2 h-5 w-5 text-slate-400" />
-                            <span className="text-[9px] font-black uppercase">Manual Bank</span>
-                        </Label>
-                    </div>
-                    <div>
-                        <RadioGroupItem value="va" id="va" className="peer sr-only" disabled={isLocked} />
-                        <Label htmlFor="va" className="flex flex-col items-center justify-between rounded-2xl border-2 border-muted bg-popover p-4 hover:bg-slate-50 hover:text-accent-foreground peer-data-[state=checked]:border-emerald-500 [&:has([data-state=checked])]:border-emerald-500 transition-all cursor-pointer">
-                            <CreditCard className="mb-2 h-5 w-5 text-indigo-400" />
-                            <span className="text-[9px] font-black uppercase">Virtual Account</span>
-                        </Label>
-                    </div>
-                </RadioGroup>
-
-                {paymentMethod === 'va' ? (
-                    <div className="bg-indigo-900 p-5 rounded-2xl space-y-3 shadow-xl">
-                         <div className="flex justify-between items-center">
-                            <Label className="text-[9px] font-black uppercase text-indigo-300 flex items-center gap-1.5">
-                                <ShieldCheck className="h-3 w-3" /> Active Mandiri VA
-                            </Label>
-                            <Badge className="bg-emerald-500 text-[7px] font-black uppercase px-2 h-4">Verified 16-Digit</Badge>
-                         </div>
-                         <Input 
-                            value={manualVaNumber} 
-                            onChange={e => setManualVaNumber(e.target.value)} 
-                            className="bg-indigo-800 border-indigo-700 text-white font-mono font-black text-center tracking-[0.2em] h-11 text-sm rounded-xl focus-visible:ring-indigo-400"
-                            placeholder="Awaiting Sync..."
-                            disabled={isLocked}
-                         />
-                         <p className="text-[8px] text-indigo-400 font-bold uppercase italic text-center">Ditarik otomatis dari Master Profile.</p>
-                    </div>
-                ) : (
-                    <div className="bg-slate-50 p-5 rounded-2xl border border-slate-100 space-y-2">
-                        <p className="text-[10px] font-black uppercase text-slate-500">Rekening Transfer Pusat:</p>
-                        <p className="text-xs font-black text-slate-800">Bank Mandiri — Jakarta</p>
-                        <p className="text-xs font-mono font-bold text-slate-600">102-0005000218</p>
-                    </div>
-                )}
-            </CardContent>
-          </Card>
-
-          <Card className="shadow-lg border-none ring-1 ring-indigo-100 bg-white overflow-hidden rounded-3xl">
-            <CardHeader className="bg-indigo-50/20 py-5 px-8 border-b border-indigo-50">
-                <CardTitle className="text-[10px] font-black uppercase tracking-[0.2em] text-indigo-400">Financial Audit Matrix</CardTitle>
-            </CardHeader>
-            <CardContent className="p-8 space-y-8">
-              <div className="space-y-6">
-                <div className="flex justify-between items-center">
-                    <span className="text-[10px] font-black uppercase text-slate-400 tracking-wider">Subtotal Bruto</span>
-                    <span className="font-black text-slate-900">Rp {formatNumberWithCommas(subtotal)}</span>
-                </div>
-                
-                <div className="space-y-2">
-                    <div className="flex justify-between items-center">
-                        <Label className="text-[10px] font-black uppercase text-amber-600">Potongan Negosiasi</Label>
-                        <Select value={negotiationMode} onValueChange={(v: any) => setNegotiationMode(v)} disabled={isLocked}>
-                            <SelectTrigger className="h-6 w-16 text-[9px] font-black shadow-none border-none bg-amber-50 text-amber-700 rounded-lg"><SelectValue /></SelectTrigger>
-                            <SelectContent><SelectItem value="nominal">IDR</SelectItem><SelectItem value="percent">%</SelectItem></SelectContent>
-                        </Select>
-                    </div>
-                    <Input value={negotiationValue} onChange={handleNumericChange(setNegotiationValue)} className="h-10 text-right font-black text-amber-600 border-amber-100 rounded-xl bg-amber-50/10" placeholder="0" disabled={isLocked} />
-                </div>
-
-                {isDpInvoice ? (
-                    <div className="space-y-2 bg-indigo-50/30 p-5 rounded-2xl border border-indigo-100">
-                        <div className="flex justify-between items-center mb-1">
-                            <Label className="text-[10px] font-black uppercase text-indigo-700">Down Payment (DP)</Label>
-                            <Select value={dpMode} onValueChange={(v: any) => setDpMode(v)} disabled={isLocked}>
-                                <SelectTrigger className="h-6 w-16 text-[9px] font-black shadow-none border-none bg-indigo-100 text-indigo-700 rounded-lg"><SelectValue /></SelectTrigger>
-                                <SelectContent><SelectItem value="nominal">IDR</SelectItem><SelectItem value="percent">%</SelectItem></SelectContent>
-                            </Select>
-                        </div>
-                        <Input value={dpValue} onChange={handleNumericChange(setDpValue)} className="h-10 text-right font-black border-indigo-200 rounded-xl bg-white" placeholder="0" disabled={isLocked} />
-                    </div>
-                ) : (
-                    <>
-                        <div className="space-y-3 bg-emerald-50/20 p-5 rounded-2xl border border-emerald-100 border-dashed">
-                            <div className="flex justify-between items-center mb-1">
-                                <Label className="text-[10px] font-black uppercase text-emerald-700 flex items-center gap-1.5">
-                                    <Wallet className="h-3.5 w-3.5" /> Potongan Saldo DP
-                                </Label>
-                                <Select value={dpDeductionMode} onValueChange={(v: any) => setDpDeductionMode(v)} disabled={isLocked}>
-                                    <SelectTrigger className="h-6 w-16 text-[9px] font-black shadow-none border-none bg-emerald-100 text-emerald-700 rounded-lg"><SelectValue /></SelectTrigger>
-                                    <SelectContent><SelectItem value="nominal">IDR</SelectItem><SelectItem value="percent">%</SelectItem></SelectContent>
-                                </Select>
+      <div className="flex flex-1 overflow-hidden">
+          {/* EDITOR COLUMN */}
+          <div className="w-[45%] overflow-y-auto p-8 border-r bg-slate-50/30">
+              <div className="space-y-8 max-w-2xl mx-auto pb-20">
+                  
+                  {/* IDENTITY CARD */}
+                  <Card className={cn("shadow-sm border-none ring-1 ring-slate-200 overflow-hidden", isLocked && "opacity-60")}>
+                    <CardHeader className="bg-white border-b py-3 px-6">
+                        <CardTitle className="text-[10px] font-black uppercase flex items-center gap-2 text-slate-500 tracking-widest">
+                            <ReceiptText className="h-4 w-4 text-indigo-600" /> Header Info
+                        </CardTitle>
+                    </CardHeader>
+                    <CardContent className="p-6 space-y-6">
+                        <div className="grid grid-cols-2 gap-4">
+                            <div className="space-y-1.5">
+                                <Label className="text-[9px] font-black uppercase text-slate-400 tracking-widest">Invoice Date</Label>
+                                <Input type="date" value={format(issueDate, 'yyyy-MM-dd')} onChange={e => setIssueDate(new Date(e.target.value))} className="h-10 font-bold" />
                             </div>
-                            <Input value={dpDeductionValue} onChange={handleNumericChange(setDpDeductionValue)} className="h-10 text-right font-black border-emerald-200 text-emerald-700 rounded-xl bg-white" placeholder="0" disabled={isLocked} />
+                            <div className="space-y-1.5">
+                                <Label className="text-[9px] font-black uppercase text-slate-400 tracking-widest">Due Date</Label>
+                                <Input type="date" value={format(dueDate, 'yyyy-MM-dd')} onChange={e => setDueDate(new Date(e.target.value))} className="h-10 font-bold border-rose-100 bg-rose-50/10" />
+                            </div>
                         </div>
 
-                        <div className="space-y-2">
+                        <div className="space-y-1.5">
+                            <Label className="text-[9px] font-black uppercase text-slate-400 tracking-widest">Sales Order (Mapping)</Label>
+                            <Popover open={soPopoverOpen} onOpenChange={setSoPopoverOpen}>
+                                <PopoverTrigger asChild>
+                                    <Button variant="outline" className="w-full justify-between h-10 font-bold border-slate-200">
+                                        {selectedSoNumber || "Search SO..."}
+                                        <ChevronsUpDown className="ml-2 h-4 w-4 opacity-50" />
+                                    </Button>
+                                </PopoverTrigger>
+                                <PopoverContent className="w-[400px] p-0" align="start">
+                                    <Command>
+                                        <CommandInput placeholder="Search SO from active contracts..." />
+                                        <CommandList>
+                                            <CommandEmpty>No SO found.</CommandEmpty>
+                                            <CommandGroup>
+                                                {allSalesOrders?.filter(so => so.customer === activeIdentity?.customer).map((so) => (
+                                                    <CommandItem
+                                                        key={so.soNumber}
+                                                        value={so.soNumber}
+                                                        onSelect={(v) => { setSelectedSoNumber(v); setSoPopoverOpen(false); }}
+                                                    >
+                                                        <div className="flex flex-col">
+                                                            <span className="font-black text-indigo-700">{so.soNumber}</span>
+                                                            <span className="text-[9px] font-bold text-slate-400 uppercase">PO: {so.poNumber} • Rp {so.grandTotal.toLocaleString()}</span>
+                                                        </div>
+                                                    </CommandItem>
+                                                ))}
+                                            </CommandGroup>
+                                        </CommandList>
+                                    </Command>
+                                </PopoverContent>
+                            </Popover>
+                        </div>
+
+                        <div className="space-y-3">
                             <div className="flex justify-between items-center">
-                                <Label className="text-[10px] font-black uppercase text-slate-400">Potongan Retensi</Label>
-                                <Select value={retentionMode} onValueChange={(v: any) => setRetentionMode(v)} disabled={isLocked}>
-                                    <SelectTrigger className="h-6 w-16 text-[9px] font-black shadow-none border-none bg-slate-100 text-slate-700 rounded-lg"><SelectValue /></SelectTrigger>
-                                    <SelectContent><SelectItem value="nominal">IDR</SelectItem><SelectItem value="percent">%</SelectItem></SelectContent>
-                                </Select>
+                                <Label className="text-[9px] font-black uppercase text-slate-400 tracking-widest">Billing Address</Label>
+                                <div className="flex gap-1.5">
+                                    {currentCustomer?.addresses?.map(addr => (
+                                        <Badge 
+                                            key={addr.id} 
+                                            variant="outline" 
+                                            className={cn(
+                                                "text-[8px] font-black uppercase cursor-pointer px-2 h-4", 
+                                                billingAddress === addr.address ? "bg-indigo-600 text-white border-indigo-600" : "bg-white text-slate-400"
+                                            )}
+                                            onClick={() => setBillingAddress(addr.address)}
+                                        >
+                                            {addr.label}
+                                        </Badge>
+                                    ))}
+                                </div>
                             </div>
-                            <Input value={retentionValue} onChange={handleNumericChange(setRetentionValue)} className="h-10 text-right font-black border-slate-200 rounded-xl bg-slate-50/20" placeholder="0" disabled={isLocked} />
+                            <textarea 
+                                className="w-full rounded-xl border border-slate-200 bg-slate-50/50 p-4 text-[10px] leading-tight font-medium italic min-h-[80px]"
+                                value={billingAddress}
+                                onChange={e => setBillingAddress(e.target.value)}
+                                placeholder="Enter specific billing address..."
+                            />
                         </div>
-                    </>
-                )}
-              </div>
+                    </CardContent>
+                  </Card>
 
-              <div className="bg-slate-50 p-6 rounded-2xl space-y-4 border border-slate-100">
-                <div className="flex justify-between items-center">
-                    <Label className="text-[10px] font-black uppercase text-indigo-600 tracking-widest">Sinkronisasi PPN (12%)</Label>
-                    <Switch checked={isTaxManual} onCheckedChange={setIsTaxManual} disabled={isLocked} />
-                </div>
-                <div className="grid gap-4">
-                    <div className="flex justify-between items-center"><span className="text-[9px] font-black uppercase text-slate-400">Nilai DPP</span> <Input value={dppVat} onChange={handleNumericChange(setDppVat)} disabled={!isTaxManual || isLocked} className="h-7 w-36 text-right font-mono text-xs font-black bg-transparent border-none p-0 focus-visible:ring-0" /></div>
-                    <div className="flex justify-between items-center"><span className="text-[9px] font-black uppercase text-slate-400">PPN Terutang</span> <Input value={vat12} onChange={handleNumericChange(setVat12)} disabled={!isTaxManual || isLocked} className="h-7 w-36 text-right font-mono text-xs font-black bg-transparent border-none p-0 focus-visible:ring-0" /></div>
-                </div>
-              </div>
+                  {/* ITEMS CARD */}
+                  <Card className={cn("shadow-sm border-none ring-1 ring-slate-200 overflow-hidden", isLocked && "opacity-60")}>
+                    <CardHeader className="bg-white border-b py-3 px-6 flex flex-row items-center justify-between">
+                        <CardTitle className="text-[10px] font-black uppercase text-slate-500 tracking-widest">Line Items</CardTitle>
+                        <Switch checked={isDpInvoice} onCheckedChange={setIsDpInvoice} id="dp-mode" />
+                    </CardHeader>
+                    <CardContent className="p-0">
+                        <div className="max-h-[300px] overflow-y-auto">
+                            <Table>
+                                <TableHeader className="bg-slate-50/50 sticky top-0 z-10 shadow-sm">
+                                    <TableRow>
+                                        <TableHead className="py-3 px-6 text-[8pt]">Description</TableHead>
+                                        <TableHead className="w-[80px] text-center text-[8pt]">Qty</TableHead>
+                                        <TableHead className="w-[120px] text-right text-[8pt]">Price</TableHead>
+                                        <TableHead className="w-[40px]"></TableHead>
+                                    </TableRow>
+                                </TableHeader>
+                                <TableBody>
+                                    {items.length === 0 ? (
+                                        <TableRow><TableCell colSpan={4} className="text-center py-12 text-[10px] font-bold text-slate-300 uppercase tracking-widest italic">Add items or link SO...</TableCell></TableRow>
+                                    ) : items.map(item => (
+                                        <TableRow key={item.id} className="hover:bg-slate-50/50 group">
+                                            <TableCell className="px-6 py-3">
+                                                <Input 
+                                                    value={item.name} 
+                                                    onChange={e => setItems(items.map(it => it.id === item.id ? { ...it, name: e.target.value } : it))}
+                                                    className="h-8 text-[10px] font-bold border-none shadow-none bg-transparent p-0"
+                                                />
+                                            </TableCell>
+                                            <TableCell className="py-3">
+                                                <Input 
+                                                    value={item.quantity} 
+                                                    onChange={e => {
+                                                        const val = parseFormattedNumber(e.target.value);
+                                                        setItems(items.map(it => it.id === item.id ? { ...it, quantity: val, total: val * it.price } : it));
+                                                    }} 
+                                                    className="text-center h-8 text-[10px] font-black border-slate-200" 
+                                                />
+                                            </TableCell>
+                                            <TableCell className="py-3 text-right">
+                                                <Input 
+                                                    value={formatNumberWithCommas(item.price)} 
+                                                    onChange={e => {
+                                                        const val = parseFormattedNumber(e.target.value);
+                                                        setItems(items.map(it => it.id === item.id ? { ...it, price: val, total: it.quantity * val } : it));
+                                                    }}
+                                                    className="h-8 text-right text-[10px] font-black border-none shadow-none bg-transparent pr-0"
+                                                />
+                                            </TableCell>
+                                            <TableCell className="py-3">
+                                                <Button variant="ghost" size="icon" className="h-6 w-6 text-rose-300 hover:text-rose-600 opacity-0 group-hover:opacity-100 transition-opacity" onClick={() => setItems(items.filter(it => it.id !== item.id))}>
+                                                    <Trash2 className="h-3.5 w-3.5" />
+                                                </Button>
+                                            </TableCell>
+                                        </TableRow>
+                                    ))}
+                                </TableBody>
+                            </Table>
+                        </div>
+                        <div className="p-4 bg-slate-50 border-t flex justify-center">
+                            <Popover open={productPopoverOpen} onOpenChange={setProductPopoverOpen}>
+                                <PopoverTrigger asChild>
+                                    <Button variant="ghost" size="sm" className="h-8 text-[9px] font-black uppercase text-indigo-600">
+                                        <Plus className="mr-1.5 h-3.5 w-3.5" /> Insert Manual Row
+                                    </Button>
+                                </PopoverTrigger>
+                                <PopoverContent className="w-[300px] p-0" align="center">
+                                    <Command>
+                                        <CommandInput placeholder="Search catalog..." />
+                                        <CommandList>
+                                            <CommandEmpty>Not found.</CommandEmpty>
+                                            <CommandGroup>
+                                                {masterProducts?.map((p) => (
+                                                    <CommandItem
+                                                        key={p.id}
+                                                        onSelect={() => {
+                                                            const newItem: InvoiceItem = { id: `man-${Date.now()}`, name: p.name, quantity: 1, unit: p.unit || 'Meter', price: p.price, total: p.price };
+                                                            setItems([...items, newItem]);
+                                                            setProductPopoverOpen(false);
+                                                        }}
+                                                    >
+                                                        <span className="text-[10px] font-bold">{p.name}</span>
+                                                    </CommandItem>
+                                                ))}
+                                            </CommandGroup>
+                                        </CommandList>
+                                    </Command>
+                                </PopoverContent>
+                            </Popover>
+                        </div>
+                    </CardContent>
+                  </Card>
 
-              <div className="pt-4 border-t-4 border-indigo-600/10">
-                  <div className="flex justify-between items-center mb-1">
-                      <span className="text-[10px] font-black uppercase text-slate-400 tracking-[0.2em]">Total Tagihan Akhir</span>
-                  </div>
-                  <div className="text-3xl font-black text-slate-900 leading-none tracking-tighter">Rp {totalAmount}</div>
-              </div>
+                  {/* FINANCIAL AUDIT CARD */}
+                  <Card className={cn("shadow-sm border-none ring-1 ring-slate-200 overflow-hidden", isLocked && "opacity-60")}>
+                    <CardHeader className="bg-white border-b py-3 px-6">
+                        <CardTitle className="text-[10px] font-black uppercase text-slate-500 tracking-widest flex items-center gap-2">
+                            <History className="h-4 w-4 text-emerald-600" /> Financial Adjustments
+                        </CardTitle>
+                    </CardHeader>
+                    <CardContent className="p-6 space-y-6">
+                        <div className="grid grid-cols-2 gap-6">
+                            <div className="space-y-2">
+                                <div className="flex justify-between items-center">
+                                    <Label className="text-[9px] font-black uppercase text-slate-400">Negotiation</Label>
+                                    <Select value={negotiationMode} onValueChange={(v: any) => setNegotiationMode(v)}>
+                                        <SelectTrigger className="h-6 w-14 text-[8px] font-black uppercase px-2"><SelectValue /></SelectTrigger>
+                                        <SelectContent><SelectItem value="nominal">IDR</SelectItem><SelectItem value="percent">%</SelectItem></SelectContent>
+                                    </Select>
+                                </div>
+                                <Input value={negotiationValue} onChange={handleNumericChange(setNegotiationValue)} className="h-9 text-right font-black" />
+                            </div>
+                            
+                            <div className="space-y-2">
+                                <div className="flex justify-between items-center">
+                                    <Label className="text-[9px] font-black uppercase text-slate-400">Retention</Label>
+                                    <Select value={retentionMode} onValueChange={(v: any) => setRetentionMode(v)}>
+                                        <SelectTrigger className="h-6 w-14 text-[8px] font-black uppercase px-2"><SelectValue /></SelectTrigger>
+                                        <SelectContent><SelectItem value="nominal">IDR</SelectItem><SelectItem value="percent">%</SelectItem></SelectContent>
+                                    </Select>
+                                </div>
+                                <Input value={retentionValue} onChange={handleNumericChange(setRetentionValue)} className="h-9 text-right font-black" />
+                            </div>
+                        </div>
 
-              <div className="space-y-4 pt-4">
-                  {!isLocked && (
-                    <div className="grid gap-3">
-                      <Button 
-                          className="w-full h-14 bg-indigo-600 hover:bg-indigo-700 font-black uppercase text-white shadow-xl shadow-indigo-100 rounded-2xl transition-all hover:-translate-y-1 active:translate-y-0" 
-                          onClick={() => handleSaveInvoice('sent', true)}
-                          disabled={isProcessing}
-                      >
-                          {isProcessing ? <Loader2 className="h-5 w-5 animate-spin" /> : <><Eye className="mr-2 h-5 w-5" /> SIMPAN & PREVIEW</>}
-                      </Button>
+                        <div className="grid grid-cols-2 gap-6">
+                            <div className={cn("space-y-2 p-4 rounded-xl border-2 transition-all", isDpInvoice ? "bg-indigo-50 border-indigo-100 ring-2 ring-indigo-50/50" : "bg-slate-50/30 border-slate-100 opacity-60")}>
+                                <div className="flex justify-between items-center">
+                                    <Label className="text-[9px] font-black uppercase text-indigo-700">Down Payment (DP)</Label>
+                                    <Select value={dpMode} onValueChange={(v: any) => setDpMode(v)} disabled={!isDpInvoice}>
+                                        <SelectTrigger className="h-6 w-14 text-[8px] font-black uppercase px-2"><SelectValue /></SelectTrigger>
+                                        <SelectContent><SelectItem value="nominal">IDR</SelectItem><SelectItem value="percent">%</SelectItem></SelectContent>
+                                    </Select>
+                                </div>
+                                <Input value={dpValue} onChange={handleNumericChange(setDpValue)} disabled={!isDpInvoice} className="h-9 text-right font-black bg-white border-indigo-200" />
+                            </div>
 
-                      <Button 
-                          variant="ghost" 
-                          className="w-full h-12 text-[10px] font-black uppercase text-slate-400 hover:bg-slate-50 rounded-2xl tracking-widest" 
-                          onClick={() => handleSaveInvoice('sent')}
-                          disabled={isProcessing}
-                      >
-                        {isProcessing ? "Processing..." : "Hanya Simpan"}
-                      </Button>
-                    </div>
-                  )}
+                            <div className={cn("space-y-2 p-4 rounded-xl border-2 transition-all", !isDpInvoice ? "bg-emerald-50 border-emerald-100" : "bg-slate-50/30 border-slate-100 opacity-60")}>
+                                <div className="flex justify-between items-center">
+                                    <Label className="text-[9px] font-black uppercase text-emerald-700">DP Credit Use</Label>
+                                    <Select value={dpDeductionMode} onValueChange={(v: any) => setDpDeductionMode(v)} disabled={isDpInvoice}>
+                                        <SelectTrigger className="h-6 w-14 text-[8px] font-black uppercase px-2"><SelectValue /></SelectTrigger>
+                                        <SelectContent><SelectItem value="nominal">IDR</SelectItem><SelectItem value="percent">%</SelectItem></SelectContent>
+                                    </Select>
+                                </div>
+                                <Input value={dpDeductionValue} onChange={handleNumericChange(setDpDeductionValue)} disabled={isDpInvoice} className="h-9 text-right font-black bg-white border-emerald-200" />
+                            </div>
+                        </div>
+
+                        <div className="space-y-4 pt-4 border-t border-dashed">
+                             <div className="flex justify-between items-center">
+                                <Label className="text-[9px] font-black uppercase text-slate-400">Payment Matrix</Label>
+                                <div className="flex bg-slate-100 rounded-lg p-1 gap-1">
+                                    <Button variant={paymentMethod === 'bank' ? 'white' : 'ghost'} size="sm" onClick={() => setPaymentMethod('bank')} className="h-7 text-[8px] font-black uppercase rounded-md px-3">Manual Bank</Button>
+                                    <Button variant={paymentMethod === 'va' ? 'white' : 'ghost'} size="sm" onClick={() => setPaymentMethod('va')} className="h-7 text-[8px] font-black uppercase rounded-md px-3">Virtual Account</Button>
+                                </div>
+                             </div>
+                             {paymentMethod === 'va' && (
+                                 <div className="bg-indigo-900 p-4 rounded-xl space-y-2">
+                                     <Label className="text-[8px] font-black uppercase text-indigo-300">Target Virtual Account</Label>
+                                     <Input value={manualVaNumber} onChange={e => setManualVaNumber(e.target.value)} className="bg-indigo-800 border-indigo-700 text-white font-mono font-black text-center tracking-[0.2em] h-9 text-xs" />
+                                 </div>
+                             )}
+                        </div>
+                    </CardContent>
+                  </Card>
               </div>
-            </CardContent>
-          </Card>
-        </div>
+          </div>
+
+          {/* PREVIEW COLUMN */}
+          <div className="flex-1 bg-slate-200/50 overflow-y-auto scroll-smooth py-12 px-8">
+              <div className="max-w-[210mm] mx-auto scale-[0.85] origin-top shadow-2xl">
+                  <InvoiceTemplate 
+                    type="Original"
+                    invoiceData={previewInvoiceData}
+                    items={items}
+                    calculations={calcs}
+                  />
+              </div>
+              <div className="text-center mt-10">
+                  <p className="text-[10px] font-black uppercase text-slate-400 tracking-[0.4em]">Real-time Live Render Engine</p>
+              </div>
+          </div>
       </div>
-
-      <Dialog open={isQuickEditOpen} onOpenChange={setIsQuickEditOpen}>
-          <DialogContent className="sm:max-w-[425px]">
-              <DialogHeader>
-                  <DialogTitle className="uppercase font-black tracking-tight">Koreksi Data Master</DialogTitle>
-                  <DialogDescription className="text-xs font-bold uppercase text-slate-400">Pembaruan ini dapat disimpan ke database permanen.</DialogDescription>
-              </DialogHeader>
-              <div className="py-6 space-y-6">
-                  {editTarget === 'name' ? (
-                      <div className="space-y-2">
-                          <Label className="text-[10px] font-black uppercase">Nama PT Resmi</Label>
-                          <Input value={tempName} onChange={e => setTempName(e.target.value)} className="font-black uppercase h-12 bg-slate-50 border-slate-200" />
-                      </div>
-                  ) : (
-                      <div className="space-y-2">
-                          <Label className="text-[10px] font-black uppercase">Alamat Penagihan</Label>
-                          <textarea 
-                             className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-xs min-h-[100px] font-medium italic focus:ring-1 focus:ring-indigo-600 outline-none"
-                             value={tempAddress}
-                             onChange={e => setTempAddress(e.target.value)}
-                          />
-                      </div>
-                  )}
-
-                  <div className="flex items-center space-x-2 bg-indigo-50 p-4 rounded-xl border border-indigo-100">
-                      <Checkbox id="update-master" checked={updateMaster} onCheckedChange={(c) => setUpdateMaster(!!c)} />
-                      <div className="grid gap-1.5 leading-none">
-                        <Label htmlFor="update-master" className="text-[10px] font-black uppercase text-indigo-700 cursor-pointer">Simpan Perubahan ke Database Master</Label>
-                        <p className="text-[9px] text-indigo-400 font-medium">Memastikan data di profil pelanggan tetap akurat.</p>
-                      </div>
-                  </div>
-              </div>
-              <DialogFooter className="bg-slate-50 -mx-6 -mb-6 p-6 rounded-b-3xl">
-                  <Button variant="ghost" onClick={() => setIsQuickEditOpen(false)}>Batal</Button>
-                  <Button className="bg-indigo-600 hover:bg-indigo-700 font-black uppercase px-8" onClick={() => {
-                      if (editTarget === 'address') setBillingAddress(tempAddress);
-                      setIsQuickEditOpen(false);
-                      toast({ title: "Local Draft Updated" });
-                  }}>Gunakan Perubahan</Button>
-              </DialogFooter>
-          </DialogContent>
-      </Dialog>
     </main>
   );
 }
