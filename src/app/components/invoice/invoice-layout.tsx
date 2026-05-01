@@ -29,6 +29,7 @@ const formatCurrency = (value: number) => {
 export const InvoiceTemplate = ({ type, invoiceData, items, calculations }: InvoiceLayoutProps) => {
     const isCopy = type === 'Copy';
     
+    // Paging logic
     const itemChunks = Array.from({ length: Math.ceil(items.length / ITEMS_PER_PAGE) || 1 }, (_, i) =>
         items.slice(i * ITEMS_PER_PAGE, i * ITEMS_PER_PAGE + ITEMS_PER_PAGE)
     );
@@ -78,20 +79,20 @@ export const InvoiceTemplate = ({ type, invoiceData, items, calculations }: Invo
                         </div>
 
                         {/* TABLE AREA */}
-                        <main className="flex-grow">
+                        <main className="relative flex-grow">
                             <table className="w-full border-collapse text-[9pt]">
                                 <thead>
                                     <tr className="border border-black">
-                                        <th className="p-1 text-left w-[8%] border-r border-black font-normal">No.</th>
-                                        <th className="p-1 text-left w-[45%] border-r border-black font-normal">Item</th>
-                                        <th className="p-1 text-center w-[15%] border-r border-black font-normal">Quantity Unit</th>
+                                        <th className="p-1 text-left w-[5%] border-r border-black font-normal">No.</th>
+                                        <th className="p-1 text-left border-r border-black font-normal">Item</th>
+                                        <th className="p-1 text-center w-[18%] border-r border-black font-normal">Quantity Unit</th>
                                         <th className="p-1 text-right w-[15%] border-r border-black font-normal">Price</th>
-                                        <th className="p-1 text-right w-[17%] font-normal">Amount</th>
+                                        <th className="p-1 text-right w-[18%] font-normal">Amount</th>
                                     </tr>
                                 </thead>
                                 <tbody>
                                     {chunk.map((item, idx) => (
-                                        <tr key={item.id} className="align-top h-7">
+                                        <tr key={item.id} className="align-top border-x border-black h-7">
                                             <td className="p-1 text-center border-r border-black">{pageIndex * ITEMS_PER_PAGE + idx + 1}</td>
                                             <td className="p-1 border-r border-black uppercase text-[8.5pt] leading-tight">{item.name || item.productName}</td>
                                             <td className="p-1 text-center border-r border-black">{item.quantity.toLocaleString('id-ID')} {item.unit}</td>
@@ -101,7 +102,7 @@ export const InvoiceTemplate = ({ type, invoiceData, items, calculations }: Invo
                                     ))}
                                     {/* Empty rows to fill height */}
                                     {Array.from({ length: ITEMS_PER_PAGE - chunk.length }).map((_, i) => (
-                                        <tr key={`empty-${i}`} className="h-7">
+                                        <tr key={`empty-${i}`} className="border-x border-black h-7">
                                             <td className="border-r border-black"></td>
                                             <td className="border-r border-black"></td>
                                             <td className="border-r border-black"></td>
@@ -109,8 +110,18 @@ export const InvoiceTemplate = ({ type, invoiceData, items, calculations }: Invo
                                             <td></td>
                                         </tr>
                                     ))}
+                                    <tr className="border-t border-black"></tr>
                                 </tbody>
                             </table>
+
+                            {/* SUB TOTAL ITEM - Aligned exactly with Amount Column */}
+                            {isLastPage && (
+                                <div className="flex justify-end">
+                                    <div className="w-[18%] text-right pr-1 border-x border-b border-black py-1 bg-slate-50/30">
+                                        <p className="font-bold text-[9pt]">{formatCurrency(calculations.subTotalItems)}</p>
+                                    </div>
+                                </div>
+                            )}
                         </main>
 
                         {/* FOOTER AREA */}
@@ -119,14 +130,7 @@ export const InvoiceTemplate = ({ type, invoiceData, items, calculations }: Invo
                                 {/* CALCULATION MATRIX */}
                                 <div className="w-full flex flex-col items-end leading-tight mb-6">
                                     <div className="w-[50%]">
-                                        <div className="border-t border-black w-full mb-1"></div>
                                         <div className="space-y-1">
-                                            <div className="grid grid-cols-[1fr_80px_120px] items-center text-right">
-                                                <span className="pr-2">Subtotal</span>
-                                                <span></span>
-                                                <span>{formatCurrency(calculations.subTotalItems)}</span>
-                                            </div>
-
                                             {calculations.negotiation > 0 && (
                                                 <div className="grid grid-cols-[1fr_80px_120px] items-center text-right">
                                                     <span className="pr-2 text-rose-600">Discount</span>

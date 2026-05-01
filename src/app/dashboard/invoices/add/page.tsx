@@ -136,8 +136,21 @@ export default function AddInvoicePage() {
     }
   }, [currentCustomer, paymentMethod]);
 
+  const updateItemField = (id: string | number, field: keyof InvoiceItem, value: any) => {
+    setItems(prev => prev.map(item => {
+      if (item.id === id) {
+        const updatedItem = { ...item, [field]: value };
+        if (field === 'quantity' || field === 'price') {
+          updatedItem.total = (Number(updatedItem.quantity) || 0) * (Number(updatedItem.price) || 0);
+        }
+        return updatedItem;
+      }
+      return item;
+    }));
+  };
+
   const calcs = useMemo(() => {
-    const subTotalItems = items.reduce((acc, item) => acc + (item.quantity * item.price), 0);
+    const subTotalItems = items.reduce((acc, item) => acc + (item.total || 0), 0);
     
     const negInputVal = parseFormattedNumber(negotiationValue);
     const negotiation = negotiationMode === 'percent' ? (subTotalItems * (negInputVal / 100)) : negInputVal;
@@ -152,7 +165,6 @@ export default function AddInvoicePage() {
     const dpDedInputVal = parseFormattedNumber(dpDeductionValue);
     const dpDedNominal = dpDeductionMode === 'percent' ? (baseAfterNeg * (dpDedInputVal / 100)) : dpDedInputVal;
 
-    // MANDATORY CALCULATION SINKRON (11/12)
     const dppVat = baseAfterNeg * (11 / 12);
     const vat12 = dppVat * 0.12;
     
@@ -185,7 +197,7 @@ export default function AddInvoicePage() {
         soNumber: selectedSoNumber,
         poNumber: activeIdentity.poNumber || '',
         customer: activeIdentity.customer,
-        customerName: activeIdentity.customer, // ADDED FOR PREVIEW SYNC
+        customerName: activeIdentity.customer,
         customerCode: currentCustomer?.customerCode || '',
         billingAddress: billingAddress,
         date: format(issueDate, 'yyyy-MM-dd'),
@@ -378,40 +390,38 @@ export default function AddInvoicePage() {
                                         <TableHead className="py-3 px-6 text-[8pt]">Description</TableHead>
                                         <TableHead className="w-[80px] text-center text-[8pt]">Qty</TableHead>
                                         <TableHead className="w-[120px] text-right text-[8pt]">Price</TableHead>
+                                        <TableHead className="w-[120px] text-right text-[8pt]">Total</TableHead>
                                         <TableHead className="w-[40px]"></TableHead>
                                     </TableRow>
                                 </TableHeader>
                                 <TableBody>
                                     {items.length === 0 ? (
-                                        <TableRow><TableCell colSpan={4} className="text-center py-12 text-[10px] font-bold text-slate-300 uppercase tracking-widest italic">Add items or link SO...</TableCell></TableRow>
+                                        <TableRow><TableCell colSpan={5} className="text-center py-12 text-[10px] font-bold text-slate-300 uppercase tracking-widest italic">Add items or link SO...</TableCell></TableRow>
                                     ) : items.map(item => (
                                         <TableRow key={item.id} className="hover:bg-slate-50/50 group">
                                             <TableCell className="px-6 py-3">
                                                 <Input 
                                                     value={item.name} 
-                                                    onChange={e => setItems(items.map(it => it.id === item.id ? { ...it, name: e.target.value } : it))}
+                                                    onChange={e => updateItemField(item.id, 'name', e.target.value)}
                                                     className="h-8 text-[10px] font-bold border-none shadow-none bg-transparent p-0"
                                                 />
                                             </TableCell>
                                             <TableCell className="py-3">
                                                 <Input 
-                                                    value={item.quantity} 
-                                                    onChange={e => {
-                                                        const val = parseFormattedNumber(e.target.value);
-                                                        setItems(items.map(it => it.id === item.id ? { ...it, quantity: val, total: val * it.price } : it));
-                                                    }} 
+                                                    value={formatNumberWithCommas(item.quantity)} 
+                                                    onChange={e => updateItemField(item.id, 'quantity', parseFormattedNumber(e.target.value))} 
                                                     className="text-center h-8 text-[10px] font-black border-slate-200" 
                                                 />
                                             </TableCell>
                                             <TableCell className="py-3 text-right">
                                                 <Input 
                                                     value={formatNumberWithCommas(item.price)} 
-                                                    onChange={e => {
-                                                        const val = parseFormattedNumber(e.target.value);
-                                                        setItems(items.map(it => it.id === item.id ? { ...it, price: val, total: it.quantity * val } : it));
-                                                    }}
+                                                    onChange={e => updateItemField(item.id, 'price', parseFormattedNumber(e.target.value))}
                                                     className="h-8 text-right text-[10px] font-black border-none shadow-none bg-transparent pr-0"
                                                 />
+                                            </TableCell>
+                                            <TableCell className="py-3 text-right font-black text-[10px]">
+                                                Rp {formatNumberWithCommas(item.total)}
                                             </TableCell>
                                             <TableCell className="py-3">
                                                 <Button variant="ghost" size="icon" className="h-6 w-6 text-rose-300 hover:text-rose-600 opacity-0 group-hover:opacity-100 transition-opacity" onClick={() => setItems(items.filter(it => it.id !== item.id))}>
