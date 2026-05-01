@@ -37,13 +37,14 @@ const InvoicePreviewPage = () => {
     items.slice(i * ITEMS_PER_PAGE, i * ITEMS_PER_PAGE + ITEMS_PER_PAGE)
   );
 
-  // LOGIKA FINANSIAL (Billing Constructor Sync)
+  // LOGIKA FINANSIAL
   const totalAmount = invoiceData.amount || 0;
   const dppVat = totalAmount / 1.12;
   const vat12 = totalAmount - dppVat;
   const subTotalItems = items.reduce((acc, curr) => acc + (curr.total || 0), 0);
   const negotiation = invoiceData.negotiation || 0;
   const dpValue = invoiceData.dpValue || 0;
+  const retensi = invoiceData.retention || 0;
   const isVA = invoiceData.paymentMethod === 'va';
 
   const InvoiceTemplate = ({ type, chunk, pageIndex, totalPages }: { 
@@ -63,7 +64,7 @@ const InvoicePreviewPage = () => {
         )}
         style={{ width: '210mm', minHeight: '297mm', fontSize: '9pt' }}
       >
-        {/* HEADER */}
+        {/* HEADER PERUSAHAAN (Kiri Atas - Sesuai Contoh User) */}
         <header className="relative mb-6">
           <div className="flex justify-between items-start">
             <div className="space-y-1">
@@ -75,10 +76,11 @@ const InvoicePreviewPage = () => {
               </div>
             </div>
             <div className="text-right">
-              <h2 className="text-4xl font-black text-slate-100 tracking-tighter italic print:text-slate-100">{type}</h2>
+              <h2 className="text-4xl font-black text-slate-100 tracking-tighter italic print:text-slate-100/50">{type}</h2>
             </div>
           </div>
           
+          {/* JUDUL TENGAH (MANDAT) */}
           <div className="text-center mt-4 mb-2">
             <h1 className="font-bold text-[11pt] uppercase underline underline-offset-4">INVOICE/OFFICIAL RECEIPT</h1>
             <p className="text-[10pt] font-bold mt-1">No: {invoiceId.replace(/_/g, '/')}</p>
@@ -101,11 +103,11 @@ const InvoicePreviewPage = () => {
           </div>
         </div>
 
-        {/* TABLE SECTION */}
+        {/* TABLE SECTION - GARIS TIPIS (MANDAT) */}
         <div className="flex-grow">
-          <table className="w-full border-collapse border border-black text-[9pt]">
+          <table className="w-full border-collapse text-[9pt]">
             <thead>
-              <tr className="bg-slate-50 border-b border-black">
+              <tr className="bg-white border border-black">
                 <th className="py-2 px-2 text-left border-r border-black w-[5%] font-bold">No.</th>
                 <th className="py-2 px-3 text-left border-r border-black font-bold">Deskripsi Pekerjaan / Barang</th>
                 <th className="py-2 px-2 text-center border-r border-black w-[18%] font-bold">Qty Unit</th>
@@ -115,9 +117,9 @@ const InvoicePreviewPage = () => {
             </thead>
             <tbody>
               {chunk.map((item, idx) => (
-                <tr key={idx} className="align-top border-b border-slate-200">
+                <tr key={idx} className="align-top border-x border-black">
                   <td className="py-2 px-2 text-center border-r border-black">{pageIndex * ITEMS_PER_PAGE + idx + 1}</td>
-                  <td className="py-2 px-3 uppercase font-medium">{item.name}</td>
+                  <td className="py-2 px-3 uppercase font-medium border-r border-black">{item.name}</td>
                   <td className="py-2 px-2 text-center border-r border-black">{item.quantity.toLocaleString('id-ID')} {item.unit}</td>
                   <td className="py-2 px-3 text-right border-r border-black">{formatAccounting(item.price)}</td>
                   <td className="py-2 px-3 text-right font-bold">{formatAccounting(item.total)}</td>
@@ -125,7 +127,7 @@ const InvoicePreviewPage = () => {
               ))}
               {/* Fill empty rows for consistent layout */}
               {Array.from({ length: ITEMS_PER_PAGE - chunk.length }).map((_, i) => (
-                <tr key={`empty-${i}`} className="h-9">
+                <tr key={`empty-${i}`} className="h-9 border-x border-black">
                   <td className="border-r border-black"></td>
                   <td className="border-r border-black"></td>
                   <td className="border-r border-black"></td>
@@ -133,6 +135,8 @@ const InvoicePreviewPage = () => {
                   <td></td>
                 </tr>
               ))}
+              {/* Bottom Border Table */}
+              <tr className="border-t border-black"><td colSpan={5}></td></tr>
             </tbody>
           </table>
         </div>
@@ -140,10 +144,9 @@ const InvoicePreviewPage = () => {
         {/* FOOTER & CALCULATIONS (Only on last page) */}
         {isLastPage && (
           <div className="mt-4">
-            {/* FINANCIAL MATRIX */}
+            {/* FINANCIAL MATRIX (MANDAT: SEJAJAR KANAN SEBELUM PPN) */}
             <div className="flex flex-col items-end mb-6">
               <div className="w-[45%] space-y-1">
-                <div className="border-t border-black w-full mb-1"></div>
                 
                 <div className="grid grid-cols-[1fr_80px_120px] items-center text-right leading-tight">
                   <span className="pr-2 font-medium">Sub Total Item</span>
@@ -156,6 +159,14 @@ const InvoicePreviewPage = () => {
                     <span className="pr-2">Down Payment / DP</span>
                     <span className="text-center italic opacity-60"></span>
                     <span className="text-rose-600">({formatAccounting(dpValue)})</span>
+                  </div>
+                )}
+
+                {retensi > 0 && (
+                  <div className="grid grid-cols-[1fr_80px_120px] items-center text-right leading-tight">
+                    <span className="pr-2">Retention</span>
+                    <span></span>
+                    <span className="text-rose-600">({formatAccounting(retensi)})</span>
                   </div>
                 )}
 
@@ -231,7 +242,7 @@ const InvoicePreviewPage = () => {
 
   return (
     <main className="min-h-screen bg-slate-100 py-12 px-4 flex flex-col items-center print:p-0 print:bg-white animate-in fade-in duration-700">
-      {/* ACTION BAR */}
+      {/* ACTION BAR (MANDAT: KANAN ATAS BERJAJAR) */}
       <div className="fixed top-6 right-6 z-50 flex gap-3 print:hidden">
         <Button variant="outline" onClick={() => router.back()} className="rounded-xl shadow-md border-slate-200 bg-white">
           <ArrowLeft size={16} className="mr-2"/> Kembali
@@ -240,12 +251,12 @@ const InvoicePreviewPage = () => {
           <Download size={16} className="mr-2"/> Download PDF
         </Button>
         <Button onClick={() => window.print()} className="bg-indigo-600 hover:bg-indigo-700 text-white shadow-xl rounded-xl font-bold px-8">
-          <Printer size={16} className="mr-2"/> Cetak Invoice
+          <Printer size={16} className="mr-2"/> Cetak Sekarang
         </Button>
       </div>
 
       <div ref={invoiceContainerRef} className="print:w-full">
-        {/* ORIGINAL SET */}
+        {/* ORIGINAL SET (All Pages) */}
         {itemChunks.map((chunk, i) => (
           <InvoiceTemplate key={`orig-${i}`} type="ORIGINAL" chunk={chunk} pageIndex={i} totalPages={itemChunks.length} />
         ))}
@@ -257,7 +268,7 @@ const InvoicePreviewPage = () => {
           </span>
         </div>
 
-        {/* COPY SET */}
+        {/* COPY SET (All Pages) */}
         {itemChunks.map((chunk, i) => (
           <InvoiceTemplate key={`copy-${i}`} type="COPY" chunk={chunk} pageIndex={i} totalPages={itemChunks.length} />
         ))}
