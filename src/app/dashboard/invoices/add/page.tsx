@@ -164,7 +164,7 @@ export default function AddInvoicePage() {
     const dpVal = dpMode === 'percent' ? (subTotalItems * (dpInputVal / 100)) : dpInputVal;
     
     const retInputVal = parseFormattedNumber(retentionValue);
-    const retNominal = retentionMode === 'percent' ? (subTotalItems * (retInputVal / 100)) : retNominal;
+    const retNominal = retentionMode === 'percent' ? (subTotalItems * (retInputVal / 100)) : retInputVal;
     
     const dpDedInputVal = parseFormattedNumber(dpDeductionValue);
     const dpDedNominal = dpDeductionMode === 'percent' ? (subTotalItems * (dpDedInputVal / 100)) : dpDedInputVal;

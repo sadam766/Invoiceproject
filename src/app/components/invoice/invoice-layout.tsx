@@ -3,7 +3,7 @@
 import React from 'react';
 import { cn, formatCurrency } from '@/lib/utils';
 
-// Konfigurasi baris per halaman sesuai standar operasional
+// Konfigurasi baris per halaman sesuai standar operasional Dakota Hub
 const ITEMS_PER_PAGE = 8; 
 
 export type InvoiceTemplateProps = {
@@ -38,7 +38,7 @@ export const InvoiceTemplate = ({ type, invoiceData, items, calculations }: Invo
         className={cn(
           "relative bg-white mx-auto pt-12 pb-6 px-12 flex flex-col font-sans text-black shadow-lg mb-8 print:shadow-none print:mb-0",
           isCopy && "bg-slate-50 opacity-90 print:bg-white print:opacity-100",
-          pageIndex > 0 && "print:page-break-before-always"
+          pageIndex === 0 && isCopy && "print:page-break-before-always"
         )}
         style={{ width: '210mm', minHeight: '297mm', fontSize: '9pt' }}
       >
@@ -93,7 +93,7 @@ export const InvoiceTemplate = ({ type, invoiceData, items, calculations }: Invo
                   <td className="p-1 text-right">{formatCurrency(item.total)}</td>
                 </tr>
               ))}
-              {/* Baris Kosong untuk menjaga border vertikal */}
+              {/* Baris Kosong untuk menjaga border vertikal tetap lurus sampai bawah */}
               {Array.from({ length: ITEMS_PER_PAGE - chunk.length }).map((_, i) => (
                 <tr key={`empty-${i}`} className="border-x border-black h-8">
                   <td className="border-r border-black"></td>
@@ -133,7 +133,7 @@ export const InvoiceTemplate = ({ type, invoiceData, items, calculations }: Invo
                   {/* Garis pemisah sebelum Goods */}
                   <div className="col-span-2 border-t border-slate-200 my-0.5"></div>
 
-                  <span>Goods:</span><span className="text-right">{formatCurrency(calculations.subTotal || calculations.subTotalItems - calculations.dpValue - calculations.negotiation)}</span>
+                  <span>Goods:</span><span className="text-right">{formatCurrency(calculations.subTotal || (calculations.subTotalItems - calculations.dpValue - calculations.negotiation))}</span>
                   <span>DPP VAT (11/12):</span><span className="text-right">{formatCurrency(calculations.dppVat)}</span>
                   <span>VAT 12%:</span><span className="text-right">{formatCurrency(calculations.vat12)}</span>
                   <div className="col-span-2 border-t border-black mt-1 pt-1 flex justify-between font-bold">
@@ -145,10 +145,10 @@ export const InvoiceTemplate = ({ type, invoiceData, items, calculations }: Invo
 
             <div className="flex justify-between items-end">
               <div className="w-[60%] space-y-1 text-[8.5pt]">
-                <p>Payment Term: <strong>{invoiceData.paymentTerms || '90 Hari'}</strong></p>
                 <p>Please state with your payment: <strong>{displayInvoiceId}</strong></p>
+                <p>For payment, please transfer to our account:</p>
                 
-                <p className="font-bold underline uppercase pt-2">FOR PAYMENT, PLEASE TRANSFER TO:</p>
+                <p className="font-bold uppercase pt-2">PT. JEMBO CABLE COMPANY Tbk</p>
                 
                 {invoiceData.paymentMethod === 'va' ? (
                   <div className="p-2 border border-dashed border-slate-300 rounded-xl bg-slate-50/50 mt-1">
@@ -156,13 +156,11 @@ export const InvoiceTemplate = ({ type, invoiceData, items, calculations }: Invo
                     <p className="text-[14pt] font-black tracking-[0.2em] font-mono">{invoiceData.vaNumber || '-'}</p>
                   </div>
                 ) : (
-                  <>
-                    <p className="font-bold">PT. JEMBO CABLE COMPANY Tbk</p>
-                    <div className="text-[8.5pt] space-y-0.5">
-                      <div className="flex"><span className="w-[100px]">Bank Mandiri -</span><span>A/C No. : 102-0100206827 (IDR)</span></div>
-                      <div className="flex"><span className="w-[100px]">Bank BCA -</span><span>A/C No. : 684-0198977 (IDR)</span></div>
-                    </div>
-                  </>
+                  <div className="text-[8.5pt] space-y-0.5 mt-1">
+                    <div className="flex"><span className="w-[100px]">Bank Mandiri -</span><span>A/C No. : 102-0100206827 (Rp)</span></div>
+                    <div className="flex"><span className="w-[100px]">Jakarta Cabang</span><span>A/C No. : 102-0005000218 (Rp)</span></div>
+                    <div className="flex"><span className="w-[100px]">Bank BCA -</span><span>A/C No. : 684-0198977 (Rp)</span></div>
+                  </div>
                 )}
               </div>
               

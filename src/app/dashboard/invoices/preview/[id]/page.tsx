@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { useRef } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { doc } from 'firebase/firestore';
 import { useFirestore, useDoc, useMemoFirebase } from '@/firebase';
@@ -13,13 +13,14 @@ const InvoicePreviewPage = () => {
   const params = useParams();
   const router = useRouter();
   const firestore = useFirestore();
+  const invoiceContainerRef = useRef<HTMLDivElement>(null);
   const invoiceId = params.id as string;
   const safeId = invoiceId?.replace(/\//g, '_');
 
   const invoiceRef = useMemoFirebase(() => (firestore && safeId ? doc(firestore, 'invoices', safeId) : null), [firestore, safeId]);
   const { data: invoiceData, isLoading } = useDoc<Invoice>(invoiceRef);
 
-  if (isLoading) return <div className="p-20 text-center font-black uppercase text-slate-400 animate-pulse tracking-widest">Synchronizing Document...</div>;
+  if (isLoading) return <div className="p-20 text-center font-black uppercase text-slate-400 animate-pulse tracking-widest">Synchronizing...</div>;
   if (!invoiceData) return <div className="p-20 text-center text-rose-600 font-bold">Dokumen tidak ditemukan.</div>;
 
   const items = invoiceData.items || [];
@@ -48,7 +49,7 @@ const InvoicePreviewPage = () => {
   };
 
   return (
-    <main className="min-h-screen bg-slate-100 py-12 px-4 flex flex-col items-center">
+    <main className="min-h-screen bg-slate-100 py-12 px-4 print:p-0 print:bg-white flex flex-col items-center">
       
       {/* NAVIGATION & CONTROLS */}
       <div className="w-full max-w-[210mm] flex justify-center gap-4 mb-8 print:hidden">
@@ -63,7 +64,7 @@ const InvoicePreviewPage = () => {
         </Button>
       </div>
 
-      <div className="shadow-2xl">
+      <div ref={invoiceContainerRef} className="shadow-2xl">
         <InvoiceTemplate 
           type="Original" 
           invoiceData={invoiceData} 
@@ -72,7 +73,7 @@ const InvoicePreviewPage = () => {
         />
 
         {/* PAGE DIVIDER FOR PREVIEW */}
-        <div className="my-10 border-b-2 border-dashed border-slate-300 print:hidden text-center w-full">
+        <div className="my-10 border-b-2 border-dashed border-slate-300 print:hidden text-center w-[210mm]">
           <span className="bg-slate-100 px-4 py-1 text-slate-400 text-[10px] font-black uppercase tracking-[0.3em] rounded-full border border-slate-200 shadow-sm">
             Halaman Berikutnya (Copy)
           </span>
