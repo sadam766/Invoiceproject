@@ -1,7 +1,7 @@
 
 'use client';
 
-import React, { useRef } from 'react';
+import React from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { doc } from 'firebase/firestore';
 import { useFirestore, useDoc, useMemoFirebase } from '@/firebase';
@@ -26,15 +26,21 @@ const InvoicePreviewPage = () => {
   const items = invoiceData.items || [];
   
   // Directly use pre-calculated values from Billing Constructor
+  const subTotalItems = items.reduce((acc, curr) => acc + (curr.total || 0), 0);
+  
+  // Back-calculation fallback logic if fields are missing from database
+  const dppVat = invoiceData.dppVat || (subTotalItems - (invoiceData.negotiation || 0) - (invoiceData.dpValue || 0)) * (11/12);
+  const vat12 = invoiceData.vat12 || (dppVat * 0.12);
+
   const calcs = {
-      subTotalItems: items.reduce((acc, curr) => acc + (curr.total || 0), 0),
+      subTotalItems: subTotalItems,
       negotiation: invoiceData.negotiation || 0,
       dpValue: invoiceData.dpValue || 0,
       dpPercent: 0, // Visual only
       retensiValue: invoiceData.retention || 0,
-      dppVat: invoiceData.dppVat || 0,
-      vat12: invoiceData.vat12 || 0,
-      totalRp: invoiceData.amount || 0
+      dppVat: dppVat,
+      vat12: vat12,
+      totalRp: invoiceData.amount || (dppVat + vat12)
   };
 
   return (

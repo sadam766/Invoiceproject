@@ -165,7 +165,7 @@ export default function AddInvoicePage() {
     const dpVal = dpMode === 'percent' ? (subTotalItems * (dpInputVal / 100)) : dpInputVal;
     
     const retInputVal = parseFormattedNumber(retentionValue);
-    const retNominal = retentionMode === 'percent' ? (subTotalItems * (retInputVal / 100)) : retInputVal;
+    const retNominal = retentionMode === 'percent' ? (subTotalItems * (retInputVal / 100)) : retNominal;
     
     const dpDedInputVal = parseFormattedNumber(dpDeductionValue);
     const dpDedNominal = dpDeductionMode === 'percent' ? (subTotalItems * (dpDedInputVal / 100)) : dpDedInputVal;
@@ -249,25 +249,6 @@ export default function AddInvoicePage() {
         .finally(() => setIsSaving(false));
   };
 
-  const handleNumericChange = (setter: (v: string) => void) => (e: React.ChangeEvent<HTMLInputElement>) => {
-    const value = e.target.value;
-    if (value === '') { setter(''); return; }
-    const num = parseFormattedNumber(value);
-    if (!isNaN(num)) {
-        let formatted = formatNumberWithCommas(num);
-        if (value.endsWith(',') || value.endsWith('.')) {
-            if (!formatted.includes(',')) formatted += ',';
-        }
-        setter(formatted);
-    }
-  };
-
-  if (isIdentityLoading || isExistingLoading) {
-      return <div className="flex h-[80vh] items-center justify-center font-bold text-slate-400 animate-pulse uppercase tracking-widest text-xs">Synchronizing Modules...</div>;
-  }
-
-  const isLocked = (existingInvoiceData?.status === 'finalized' || existingInvoiceData?.status === 'paid' || existingInvoiceData?.status === 'received') && !isAdmin;
-
   const previewInvoiceData = {
       ...activeIdentity,
       customerName: activeIdentity?.customer,
@@ -307,7 +288,7 @@ export default function AddInvoicePage() {
           <div className="w-[45%] overflow-y-auto p-8 border-r bg-slate-50/30">
               <div className="space-y-8 max-w-2xl mx-auto pb-20">
                   
-                  <Card className={cn("shadow-sm border-none ring-1 ring-slate-200 overflow-hidden", isLocked && "opacity-60")}>
+                  <Card className="shadow-sm border-none ring-1 ring-slate-200 overflow-hidden">
                     <CardHeader className="bg-white border-b py-3 px-6">
                         <CardTitle className="text-[10px] font-black uppercase flex items-center gap-2 text-slate-500 tracking-widest">
                             <ReceiptText className="h-4 w-4 text-indigo-600" /> Header Info
@@ -388,7 +369,7 @@ export default function AddInvoicePage() {
                     </CardContent>
                   </Card>
 
-                  <Card className={cn("shadow-sm border-none ring-1 ring-slate-200 overflow-hidden", isLocked && "opacity-60")}>
+                  <Card className="shadow-sm border-none ring-1 ring-slate-200 overflow-hidden">
                     <CardHeader className="bg-white border-b py-3 px-6 flex flex-row items-center justify-between">
                         <CardTitle className="text-[10px] font-black uppercase text-slate-500 tracking-widest">Line Items</CardTitle>
                         <Switch checked={isDpInvoice} onCheckedChange={setIsDpInvoice} id="dp-mode" />
@@ -478,7 +459,7 @@ export default function AddInvoicePage() {
                     </CardContent>
                   </Card>
 
-                  <Card className={cn("shadow-sm border-none ring-1 ring-slate-200 overflow-hidden", isLocked && "opacity-60")}>
+                  <Card className="shadow-sm border-none ring-1 ring-slate-200 overflow-hidden">
                     <CardHeader className="bg-white border-b py-3 px-6">
                         <CardTitle className="text-[10px] font-black uppercase text-slate-500 tracking-widest flex items-center gap-2">
                             <History className="h-4 w-4 text-emerald-600" /> Financial Adjustments
@@ -494,7 +475,7 @@ export default function AddInvoicePage() {
                                         <SelectContent><SelectItem value="nominal">IDR</SelectItem><SelectItem value="percent">%</SelectItem></SelectContent>
                                     </Select>
                                 </div>
-                                <Input value={negotiationValue} onChange={handleNumericChange(setNegotiationValue)} className="h-9 text-right font-black" />
+                                <Input value={negotiationValue} onChange={(e) => setNegotiationValue(e.target.value)} className="h-9 text-right font-black" />
                             </div>
                             
                             <div className="space-y-2">
@@ -505,7 +486,7 @@ export default function AddInvoicePage() {
                                         <SelectContent><SelectItem value="nominal">IDR</SelectItem><SelectItem value="percent">%</SelectItem></SelectContent>
                                     </Select>
                                 </div>
-                                <Input value={retentionValue} onChange={handleNumericChange(setRetentionValue)} className="h-9 text-right font-black" />
+                                <Input value={retentionValue} onChange={(e) => setRetentionValue(e.target.value)} className="h-9 text-right font-black" />
                             </div>
                         </div>
 
@@ -518,7 +499,7 @@ export default function AddInvoicePage() {
                                         <SelectContent><SelectItem value="nominal">IDR</SelectItem><SelectItem value="percent">%</SelectItem></SelectContent>
                                     </Select>
                                 </div>
-                                <Input value={dpValue} onChange={handleNumericChange(setDpValue)} disabled={!isDpInvoice} className="h-9 text-right font-black bg-white border-indigo-200" />
+                                <Input value={dpValue} onChange={(e) => setDpValue(e.target.value)} disabled={!isDpInvoice} className="h-9 text-right font-black bg-white border-indigo-200" />
                             </div>
 
                             <div className={cn("space-y-2 p-4 rounded-xl border-2 transition-all", !isDpInvoice ? "bg-emerald-50 border-emerald-100" : "bg-slate-50/30 border-slate-100 opacity-60")}>
@@ -529,7 +510,7 @@ export default function AddInvoicePage() {
                                         <SelectContent><SelectItem value="nominal">IDR</SelectItem><SelectItem value="percent">%</SelectItem></SelectContent>
                                     </Select>
                                 </div>
-                                <Input value={dpDeductionValue} onChange={handleNumericChange(setDpDeductionValue)} disabled={isDpInvoice} className="h-9 text-right font-black bg-white border-emerald-200" />
+                                <Input value={dpDeductionValue} onChange={(e) => setDpDeductionValue(e.target.value)} disabled={isDpInvoice} className="h-9 text-right font-black bg-white border-emerald-200" />
                             </div>
                         </div>
 
@@ -553,7 +534,7 @@ export default function AddInvoicePage() {
               </div>
           </div>
 
-          {/* PREVIEW COLUMN: SYNCED TO SHARED LAYOUT */}
+          {/* PREVIEW COLUMN */}
           <div className="flex-1 bg-slate-200/50 overflow-y-auto scroll-smooth py-12 px-8">
               <div className="max-w-[210mm] mx-auto scale-[0.85] origin-top shadow-2xl">
                   <InvoiceTemplate 

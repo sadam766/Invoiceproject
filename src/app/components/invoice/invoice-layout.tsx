@@ -60,21 +60,21 @@ export const InvoiceTemplate = ({ type, invoiceData, items, calculations }: Invo
                             {type}
                         </div>
 
-                        {/* HEADER: TITLE & NO INVOICE (Left Aligned for ID) */}
+                        {/* HEADER: TITLE & NO INVOICE (Centered Title) */}
                         <header className="relative mb-8">
                              <div className="text-center w-full">
                                 <h1 className="font-bold text-[11pt] uppercase tracking-wider">INVOICE/OFFICIAL RECEIPT</h1>
                              </div>
-                             <div className="absolute left-0 top-0 text-[10pt] font-bold">
-                                No: {displayInvoiceId}
-                             </div>
                         </header>
 
-                        {/* INFO BAR: CUSTOMER & DATES */}
+                        {/* INFO BAR: CUSTOMER & DATES (Sync with instructions) */}
                         <div className="flex justify-between items-start mb-6 text-[9pt]">
                             <div className="w-[60%] space-y-1">
-                                <p className="font-bold uppercase text-[10pt]">{invoiceData.customerName || invoiceData.customer || '-'}</p>
-                                <p className="text-[8.5pt] leading-tight italic max-w-[350px]">
+                                <div className="flex flex-col">
+                                    <p className="font-bold uppercase text-[10pt]">{invoiceData.customerName || invoiceData.customer || 'N/A'}</p>
+                                    <p className="text-[9pt] font-medium">No: {displayInvoiceId}</p>
+                                </div>
+                                <p className="text-[8.5pt] leading-tight italic max-w-[350px] mt-1">
                                     {invoiceData.billingAddress || invoiceData.customerAddress || '-'}
                                 </p>
                                 <p className="text-[8pt] font-bold mt-2">Customer Code : {invoiceData.customerCode || '-'}</p>
@@ -136,44 +136,36 @@ export const InvoiceTemplate = ({ type, invoiceData, items, calculations }: Invo
                         {isLastPage && (
                             <footer className="pt-4 text-black text-[9pt]">
                                 {/* CALCULATION MATRIX: PRECISION ALIGNMENT */}
-                                <div className="w-full flex flex-col items-end leading-tight mb-6">
-                                    <div className="w-[45%] font-serif text-right space-y-1">
-                                        {/* BLOK 1: RINCIAN KOMERSIAL */}
-                                        <div className="grid grid-cols-2">
+                                <div className="w-full flex justify-end leading-tight mb-6">
+                                    <div className="w-1/3 text-[10px] space-y-1">
+                                        <div className="grid grid-cols-[1fr_auto] gap-x-4">
                                             <span>Subtotal Item:</span>
-                                            <span>{formatCurrency(calculations.subTotalItems)}</span>
-                                        </div>
-                                        {calculations.dpValue > 0 && (
-                                            <div className="grid grid-cols-2">
-                                                <span>DP/Retensi:</span>
-                                                <span>({formatCurrency(calculations.dpValue)})</span>
-                                            </div>
-                                        )}
-                                        {calculations.negotiation > 0 && (
-                                            <div className="grid grid-cols-2">
-                                                <span>Diskon:</span>
-                                                <span>({formatCurrency(calculations.negotiation)})</span>
-                                            </div>
-                                        )}
+                                            <span className="text-right">{formatCurrency(calculations.subTotalItems)}</span>
+                                            
+                                            {calculations.dpValue > 0 && (
+                                                <>
+                                                    <span>DP / Retensi:</span>
+                                                    <span className="text-right">({formatCurrency(calculations.dpValue)})</span>
+                                                </>
+                                            )}
+                                            {calculations.negotiation > 0 && (
+                                                <>
+                                                    <span>Diskon:</span>
+                                                    <span className="text-right">({formatCurrency(calculations.negotiation)})</span>
+                                                </>
+                                            )}
+                                            
+                                            {/* Divider before Goods */}
+                                            <div className="col-span-2 border-t border-slate-200 my-0.5"></div>
 
-                                        {/* BLOK 2: KALKULASI FISKAL (Sesuai Gambar) */}
-                                        <div className="border-t border-black mt-2 pt-2 space-y-1">
-                                            <div className="grid grid-cols-2">
-                                                <span>Goods:</span>
-                                                <span>{formatCurrency(goodsValue)}</span>
-                                            </div>
-                                            <div className="grid grid-cols-2">
-                                                <span>DPP VAT:</span>
-                                                <span>{formatCurrency(calculations.dppVat)}</span>
-                                            </div>
-                                            <div className="grid grid-cols-2">
-                                                <span>VAT 12%:</span>
-                                                <span>{formatCurrency(calculations.vat12)}</span>
-                                            </div>
-                                            <div className="grid grid-cols-2 font-bold border-t border-black mt-1 pt-1 text-[10pt]">
-                                                <span>Total Rp:</span>
-                                                <span>{formatCurrency(calculations.totalRp)}</span>
-                                            </div>
+                                            <span>Goods:</span>
+                                            <span className="text-right">{formatCurrency(goodsValue)}</span>
+                                            <span>DPP VAT (11/12):</span>
+                                            <span className="text-right">{formatCurrency(calculations.dppVat)}</span>
+                                            <span>VAT 12%:</span>
+                                            <span className="text-right">{formatCurrency(calculations.vat12)}</span>
+                                            <span className="font-bold border-t border-black mt-1 pt-1">Total Rp:</span>
+                                            <span className="text-right font-bold border-t border-black mt-1 pt-1">{formatCurrency(calculations.totalRp)}</span>
                                         </div>
                                     </div>
                                 </div>
@@ -192,9 +184,9 @@ export const InvoiceTemplate = ({ type, invoiceData, items, calculations }: Invo
                                         </p>
 
                                         {invoiceData.paymentMethod === 'va' ? (
-                                            <div className="border border-slate-300 bg-slate-50 p-3 rounded-lg w-[90%] mt-1">
-                                                <p className="text-[8pt] uppercase text-slate-500 font-bold">Mandiri Virtual Account (IDR)</p>
-                                                <p className="text-[13pt] font-black tracking-widest text-indigo-700">
+                                            <div className="border border-dashed border-slate-300 bg-slate-50 p-3 rounded-lg w-[90%] mt-1">
+                                                <p className="text-[8pt] uppercase text-slate-500 font-bold">Mandiri Virtual Account Number:</p>
+                                                <p className="text-[12pt] font-black tracking-widest text-indigo-700">
                                                     {invoiceData.vaNumber || invoiceData.virtualAccountNumber || '86625XXXXXXXXXXX'}
                                                 </p>
                                                 <p className="text-[7pt] italic text-slate-400 mt-1">*Pembayaran ini akan terverifikasi secara otomatis oleh sistem.</p>
@@ -202,15 +194,11 @@ export const InvoiceTemplate = ({ type, invoiceData, items, calculations }: Invo
                                         ) : (
                                             <div className="space-y-0.5">
                                                 <p className="font-bold text-[9pt]">PT. JEMBO CABLE COMPANY Tbk</p>
-                                                <div className="flex gap-4">
-                                                    <div className="grid grid-cols-[85px_auto] gap-x-1 text-[8.5pt]">
-                                                        <span className="italic">Bank Mandiri</span><span>: 102-0100206827 (IDR)</span>
-                                                        <span className="italic">Bank BCA</span><span>: 684-0198977 (IDR)</span>
-                                                    </div>
-                                                    <div className="grid grid-cols-[85px_auto] gap-x-1 text-[8.5pt]">
-                                                        <span className="italic">Bank Mandiri</span><span>: 102-0005000218 (IDR)</span>
-                                                        <span className="italic">Bank Mandiri</span><span>: 102-0005000226 (USD)</span>
-                                                    </div>
+                                                <div className="grid grid-cols-[100px_auto] gap-x-1">
+                                                    <span className="italic">Bank Mandiri -</span><span>A/C No. : 102-0100206827 (IDR)</span>
+                                                    <span className="italic">Bank BCA -</span><span>A/C No. : 684-0198977 (IDR)</span>
+                                                    <span className="italic">Bank Mandiri -</span><span>A/C No. : 102-0005000218 (IDR)</span>
+                                                    <span className="italic">Bank Mandiri -</span><span>A/C No. : 102-0005000226 (USD)</span>
                                                 </div>
                                             </div>
                                         )}
