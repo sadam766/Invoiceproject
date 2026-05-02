@@ -13,8 +13,7 @@ interface InvoiceLayoutProps {
         subTotalItems: number;
         negotiation: number;
         dpValue: number;
-        dpPercent: number;
-        retensiValue: number;
+        goodsValue: number;
         dppVat: number;
         vat12: number;
         totalRp: number;
@@ -37,9 +36,6 @@ export const InvoiceTemplate = ({ type, invoiceData, items, calculations }: Invo
 
     const totalPages = itemChunks.length;
     const displayInvoiceId = invoiceData.id?.replace(/_/g, '/') || 'DRAFT';
-
-    // Goods calculation: Subtotal Items - DP - Discount
-    const goodsValue = calculations.subTotalItems - (calculations.dpValue || 0) - (calculations.negotiation || 0);
 
     return (
         <div className={cn("flex flex-col", isCopy && "print:page-break-before-always")}>
@@ -67,7 +63,7 @@ export const InvoiceTemplate = ({ type, invoiceData, items, calculations }: Invo
                              </div>
                         </header>
 
-                        {/* INFO BAR: CUSTOMER & DATES (Sync with instructions) */}
+                        {/* INFO BAR: CUSTOMER & DATES */}
                         <div className="flex justify-between items-start mb-6 text-[9pt]">
                             <div className="w-[60%] space-y-1">
                                 <div className="flex flex-col">
@@ -100,7 +96,7 @@ export const InvoiceTemplate = ({ type, invoiceData, items, calculations }: Invo
                                 </thead>
                                 <tbody>
                                     {chunk.map((item, idx) => (
-                                        <tr key={item.id} className="align-top border-x border-black h-7">
+                                        <tr key={item.id} className="align-top border-x border-black h-8">
                                             <td className="p-1 text-center border-r border-black">{pageIndex * ITEMS_PER_PAGE + idx + 1}</td>
                                             <td className="p-1 border-r border-black uppercase text-[8.5pt] leading-tight">{item.name || item.productName}</td>
                                             <td className="p-1 text-center border-r border-black">{item.quantity.toLocaleString('id-ID')} {item.unit}</td>
@@ -110,7 +106,7 @@ export const InvoiceTemplate = ({ type, invoiceData, items, calculations }: Invo
                                     ))}
                                     {/* Empty rows to fill height */}
                                     {Array.from({ length: ITEMS_PER_PAGE - chunk.length }).map((_, i) => (
-                                        <tr key={`empty-${i}`} className="border-x border-black h-7">
+                                        <tr key={`empty-${i}`} className="border-x border-black h-8">
                                             <td className="border-r border-black"></td>
                                             <td className="border-r border-black"></td>
                                             <td className="border-r border-black"></td>
@@ -135,9 +131,9 @@ export const InvoiceTemplate = ({ type, invoiceData, items, calculations }: Invo
                         {/* FOOTER AREA */}
                         {isLastPage && (
                             <footer className="pt-4 text-black text-[9pt]">
-                                {/* CALCULATION MATRIX: PRECISION ALIGNMENT */}
+                                {/* CALCULATION MATRIX */}
                                 <div className="w-full flex justify-end leading-tight mb-6">
-                                    <div className="w-1/3 text-[10px] space-y-1">
+                                    <div className="w-1/3 text-[10px] space-y-1 font-serif">
                                         <div className="grid grid-cols-[1fr_auto] gap-x-4">
                                             <span>Subtotal Item:</span>
                                             <span className="text-right">{formatCurrency(calculations.subTotalItems)}</span>
@@ -155,11 +151,10 @@ export const InvoiceTemplate = ({ type, invoiceData, items, calculations }: Invo
                                                 </>
                                             )}
                                             
-                                            {/* Divider before Goods */}
                                             <div className="col-span-2 border-t border-slate-200 my-0.5"></div>
 
                                             <span>Goods:</span>
-                                            <span className="text-right">{formatCurrency(goodsValue)}</span>
+                                            <span className="text-right">{formatCurrency(calculations.goodsValue)}</span>
                                             <span>DPP VAT (11/12):</span>
                                             <span className="text-right">{formatCurrency(calculations.dppVat)}</span>
                                             <span>VAT 12%:</span>

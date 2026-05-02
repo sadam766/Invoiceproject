@@ -25,28 +25,33 @@ const InvoicePreviewPage = () => {
 
   const items = invoiceData.items || [];
   
-  // Directly use pre-calculated values from Billing Constructor
+  // LOGIC: Financial Matrix Real-time Calculation
   const subTotalItems = items.reduce((acc, curr) => acc + (curr.total || 0), 0);
+  const negotiation = invoiceData.negotiation || 0;
+  const dpValue = invoiceData.dpValue || 0;
   
-  // Back-calculation fallback logic if fields are missing from database
-  const dppVat = invoiceData.dppVat || (subTotalItems - (invoiceData.negotiation || 0) - (invoiceData.dpValue || 0)) * (11/12);
+  // Goods = Subtotal Bruto - DP - Diskon (As per Instruction #13)
+  const goodsValue = subTotalItems - dpValue - negotiation;
+  
+  // Back-calculation PPN 12% from Goods
+  const dppVat = invoiceData.dppVat || (goodsValue * (11 / 12));
   const vat12 = invoiceData.vat12 || (dppVat * 0.12);
+  const totalRp = invoiceData.amount || (goodsValue + vat12);
 
   const calcs = {
-      subTotalItems: subTotalItems,
-      negotiation: invoiceData.negotiation || 0,
-      dpValue: invoiceData.dpValue || 0,
-      dpPercent: 0, // Visual only
-      retensiValue: invoiceData.retention || 0,
-      dppVat: dppVat,
-      vat12: vat12,
-      totalRp: invoiceData.amount || (dppVat + vat12)
+      subTotalItems,
+      negotiation,
+      dpValue,
+      goodsValue,
+      dppVat,
+      vat12,
+      totalRp
   };
 
   return (
     <main className="min-h-screen bg-slate-100 py-12 px-4 flex flex-col items-center">
       
-      {/* NAVIGATION & CONTROLS: DYNAMIC TOPBAR */}
+      {/* NAVIGATION & CONTROLS */}
       <div className="w-full max-w-[210mm] flex justify-center gap-4 mb-8 print:hidden">
         <Button variant="outline" onClick={() => router.back()} className="rounded-xl font-bold border-slate-200 bg-white">
           <ArrowLeft size={16} className="mr-2"/> Kembali
