@@ -1,4 +1,3 @@
-
 'use client';
 
 import React from 'react';
@@ -42,7 +41,7 @@ const InvoicePreviewPage = () => {
       subTotalItems,
       negotiation,
       dpValue,
-      goodsValue,
+      subTotal: goodsValue,
       dppVat,
       vat12,
       totalRp
@@ -73,7 +72,7 @@ const InvoicePreviewPage = () => {
         />
 
         {/* PAGE DIVIDER FOR PREVIEW */}
-        <div className="my-10 border-b-2 border-dashed border-slate-300 print:hidden text-center">
+        <div className="my-10 border-b-2 border-dashed border-slate-300 print:hidden text-center w-full">
           <span className="bg-slate-100 px-4 py-1 text-slate-400 text-[10px] font-black uppercase tracking-[0.3em] rounded-full border border-slate-200 shadow-sm">
             Halaman Berikutnya (Copy)
           </span>

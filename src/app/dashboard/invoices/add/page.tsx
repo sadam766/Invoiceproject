@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useEffect, useState, useMemo } from 'react';
@@ -184,6 +183,7 @@ export default function AddInvoicePage() {
         subTotalItems,
         negotiation,
         dpValue: dpVal,
+        subTotal: goodsValue,
         dpPercent: subTotalItems > 0 ? Math.round((dpVal / subTotalItems) * 100) : 0,
         retensiValue: retNominal,
         dppVat,
@@ -510,7 +510,7 @@ export default function AddInvoicePage() {
                                         <SelectContent><SelectItem value="nominal">IDR</SelectItem><SelectItem value="percent">%</SelectItem></SelectContent>
                                     </Select>
                                 </div>
-                                <Input value={dpDeductionValue} onChange={(e) => setDpDeductionValue(e.target.value)} disabled={isDpInvoice} className="h-9 text-right font-black bg-white border-emerald-200" />
+                                <Input id="dpDeduction" value={dpDeductionValue} onChange={(e) => setDpDeductionValue(e.target.value)} disabled={isDpInvoice} className="h-9 text-right font-black bg-white border-emerald-200" />
                             </div>
                         </div>
 
@@ -518,8 +518,8 @@ export default function AddInvoicePage() {
                              <div className="flex justify-between items-center">
                                 <Label className="text-[9px] font-black uppercase text-slate-400">Payment Matrix</Label>
                                 <div className="flex bg-slate-100 rounded-lg p-1 gap-1">
-                                    <Button variant={paymentMethod === 'bank' ? 'white' : 'ghost'} size="sm" onClick={() => setPaymentMethod('bank')} className="h-7 text-[8px] font-black uppercase rounded-md px-3">Manual Bank</Button>
-                                    <Button variant={paymentMethod === 'va' ? 'white' : 'ghost'} size="sm" onClick={() => setPaymentMethod('va')} className="h-7 text-[8px] font-black uppercase rounded-md px-3">Virtual Account</Button>
+                                    <Button variant={paymentMethod === 'bank' ? 'default' : 'ghost'} size="sm" onClick={() => setPaymentMethod('bank')} className="h-7 text-[8px] font-black uppercase rounded-md px-3">Manual Bank</Button>
+                                    <Button variant={paymentMethod === 'va' ? 'default' : 'ghost'} size="sm" onClick={() => setPaymentMethod('va')} className="h-7 text-[8px] font-black uppercase rounded-md px-3">Virtual Account</Button>
                                 </div>
                              </div>
                              {paymentMethod === 'va' && (
