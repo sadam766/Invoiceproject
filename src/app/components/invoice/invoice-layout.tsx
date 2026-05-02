@@ -3,17 +3,12 @@
 import React from 'react';
 import { cn, formatCurrency } from '@/lib/utils';
 
-// Konfigurasi baris per halaman sesuai standar operasional Dakota Hub
-const ITEMS_PER_PAGE = 8; 
-
 export type InvoiceTemplateProps = {
   type: 'Original' | 'Copy';
   invoiceData: any;
   items: any[];
   calculations: {
     subTotalItems: number;
-    negotiation: number;
-    dpValue: number;
     dppVat: number;
     vat12: number;
     totalRp: number;
@@ -22,165 +17,138 @@ export type InvoiceTemplateProps = {
 };
 
 export const InvoiceTemplate = ({ type, invoiceData, items, calculations }: InvoiceTemplateProps) => {
-  // Logika Paging: Memecah item menjadi beberapa bagian halaman
-  const itemChunks = Array.from({ length: Math.ceil(items.length / ITEMS_PER_PAGE) || 1 }, (_, i) =>
-    items.slice(i * ITEMS_PER_PAGE, i * ITEMS_PER_PAGE + ITEMS_PER_PAGE)
-  );
-  const totalPages = itemChunks.length;
   const displayInvoiceId = invoiceData.id?.replace(/_/g, '/') || 'DRAFT';
 
-  const PageTemplate = ({ chunk, pageIndex }: { chunk: any[], pageIndex: number }) => {
-    const isLastPage = pageIndex === totalPages - 1;
-    const isCopy = type === 'Copy';
+  return (
+    <div 
+      className={cn(
+        "relative bg-white mx-auto pt-12 pb-6 px-12 flex flex-col font-sans text-black shadow-lg mb-8 print:shadow-none print:mb-0",
+        type === 'Copy' && "print:page-break-before-always"
+      )}
+      style={{ width: '210mm', minHeight: '297mm', fontSize: '9pt' }}
+    >
+      {/* LABEL ORIGINAL/COPY */}
+      <div className="absolute right-12 top-8 text-[10pt] text-slate-400 uppercase tracking-widest print:text-black">
+        {type}
+      </div>
 
-    return (
-      <div 
-        className={cn(
-          "relative bg-white mx-auto pt-12 pb-6 px-12 flex flex-col font-sans text-black shadow-lg mb-8 print:shadow-none print:mb-0",
-          isCopy && "bg-slate-50 opacity-90 print:bg-white print:opacity-100",
-          pageIndex === 0 && isCopy && "print:page-break-before-always"
-        )}
-        style={{ width: '210mm', minHeight: '297mm', fontSize: '9pt' }}
-      >
-        {/* LABEL: ORIGINAL / COPY */}
-        <div className="absolute right-12 top-8 text-[11pt] font-black text-slate-300 uppercase tracking-widest print:text-black">
-          {type}
+      {/* HEADER */}
+      <header className="relative mb-4">
+        <div className="text-center w-full mb-1">
+          <h1 className="font-bold text-[11pt] uppercase tracking-wider">INVOICE/OFFICIAL RECEIPT</h1>
         </div>
-
-        {/* HEADER: Judul & No Invoice di Tengah */}
-        <header className="relative mb-8 text-center w-full flex flex-col items-center">
-          <h1 className="font-bold text-[11pt] uppercase tracking-wider leading-tight">
-            INVOICE/OFFICIAL RECEIPT
-          </h1>
-          <p className="text-[10pt] font-bold">No: {displayInvoiceId}</p>
-        </header>
-
-        {/* INFO BAR: Customer & Date Info */}
-        <div className="flex justify-between items-start mb-6 text-[9pt]">
-          <div className="w-[60%] space-y-1">
-            <p className="font-bold uppercase text-[10pt]">{invoiceData.customerName || 'N/A'}</p>
-            <p className="text-[8.5pt] leading-tight italic max-w-[350px]">
-                {invoiceData.billingAddress || invoiceData.customerAddress || '-'}
-            </p>
-            <p className="text-[8pt] font-bold mt-2">Customer Code : {invoiceData.customerCode || '-'}</p>
-          </div>
-          <div className="text-[9pt] space-y-0.5" style={{ minWidth: '180px' }}>
+        <div className="flex justify-between items-start mt-4">
+          <p className="font-bold text-[10pt] uppercase">{invoiceData.customerName || 'N/A'}</p>
+          <div className="text-[9pt] space-y-0.5" style={{ minWidth: '160px' }}>
             <div className="grid grid-cols-[85px_5px_1fr]"><span>Sales Order</span><span>:</span><span>{invoiceData.soNumber || '-'}</span></div>
             <div className="grid grid-cols-[85px_5px_1fr]"><span>Order Date</span><span>:</span><span>{invoiceData.date || '-'}</span></div>
             <div className="grid grid-cols-[85px_5px_1fr]"><span>PO Number</span><span>:</span><span>{invoiceData.poNumber || '-'}</span></div>
           </div>
         </div>
+      </header>
 
-        {/* TABLE AREA */}
-        <main className="relative flex-grow">
-          <table className="w-full border-collapse text-[9pt]">
-            <thead>
-              <tr className="border border-black">
-                <th className="p-1 text-left w-[5%] border-r border-black font-normal">No.</th>
-                <th className="p-1 text-left border-r border-black font-normal">Item</th>
-                <th className="p-1 text-center w-[18%] border-r border-black font-normal">Quantity Unit</th>
-                <th className="p-1 text-right w-[15%] border-r border-black font-normal">Price</th>
-                <th className="p-1 text-right w-[18%] font-normal">Amount</th>
+      <div className="flex justify-between mb-1 px-0.5 text-[9pt] border-t border-slate-100 pt-1">
+        <span>Customer Code : {invoiceData.customerCode || '-'}</span>
+        <span>Date: {invoiceData.date || '-'}</span>
+      </div>
+
+      {/* TABLE */}
+      <main className="relative flex-grow">
+        <table className="w-full border-collapse">
+          <thead>
+            <tr className="border border-black text-[9pt]">
+              <th className="py-1 px-2 text-left border-r border-black w-[5%] font-normal">No.</th>
+              <th className="py-1 px-2 text-left border-r border-black font-normal">Item</th>
+              <th className="py-1 px-2 text-center border-r border-black w-[18%] font-normal">Quantity Unit</th>
+              <th className="py-1 px-2 text-right border-r border-black w-[15%] font-normal">Price</th>
+              <th className="py-1 px-2 text-right font-normal w-[18%]">Amount</th>
+            </tr>
+          </thead>
+          <tbody>
+            {items.map((item, idx) => (
+              <tr key={idx} className="align-top text-[9pt]">
+                <td className="py-1 px-2 text-left">{idx + 1}</td>
+                <td className="py-1 px-2 uppercase">{item.name}</td>
+                <td className="py-1 px-2 text-center">{item.quantity.toLocaleString('id-ID')} {item.unit}</td>
+                <td className="py-1 px-2 text-right">{formatCurrency(item.price)}</td>
+                <td className="py-1 px-2 text-right">{formatCurrency(item.total)}</td>
               </tr>
-            </thead>
-            <tbody>
-              {chunk.map((item, idx) => (
-                <tr key={idx} className="align-top border-x border-black h-8">
-                  <td className="p-1 text-center border-r border-black">{pageIndex * ITEMS_PER_PAGE + idx + 1}</td>
-                  <td className="p-1 border-r border-black uppercase text-[8.5pt] leading-tight">{item.name}</td>
-                  <td className="p-1 text-center border-r border-black">{item.quantity.toLocaleString('id-ID')} {item.unit}</td>
-                  <td className="p-1 text-right border-r border-black">{formatCurrency(item.price)}</td>
-                  <td className="p-1 text-right">{formatCurrency(item.total)}</td>
-                </tr>
-              ))}
-              {/* Baris Kosong untuk menjaga border vertikal tetap lurus sampai bawah */}
-              {Array.from({ length: ITEMS_PER_PAGE - chunk.length }).map((_, i) => (
-                <tr key={`empty-${i}`} className="border-x border-black h-8">
-                  <td className="border-r border-black"></td>
-                  <td className="border-r border-black"></td>
-                  <td className="border-r border-black"></td>
-                  <td className="border-r border-black"></td>
-                  <td></td>
-                </tr>
-              ))}
-              <tr className="border-t border-black"></tr>
-            </tbody>
-          </table>
+            ))}
+          </tbody>
+        </table>
 
-          {/* SUB TOTAL ITEM - Tetap menempel di kanan bawah kolom Amount */}
-          <div className="flex justify-end">
-            <div className="w-[18%] text-right pr-1 border-x border-b border-black py-1 bg-slate-50/10">
-              <p className="font-bold text-[9pt]">{formatCurrency(calculations.subTotalItems)}</p>
+        {/* SUB TOTAL ITEM - Menempel di bawah tabel sesuai tanda merah */}
+        <div className="flex justify-end mt-56">
+          <div className="w-[18%] text-right pr-2">
+            <div className="border-t border-black w-full mb-0.5"></div>
+            <p className="font-normal text-[9pt]">{formatCurrency(calculations.subTotalItems)}</p>
+          </div>
+        </div>
+      </main>
+
+      {/* FOOTER SECTION */}
+      <footer className="mt-[100px] transition-all"> 
+        <div className="w-full flex justify-start mb-0.5">
+          <p className="text-[10px] font-medium">No PO : {invoiceData.poNumber || '-'}</p>
+        </div>
+        <div className="border-t border-black w-full mb-0.5"></div>
+
+        <div className="flex justify-end mt-1">
+          <div className="w-1/4 text-[10px] leading-tight">
+            <div className="grid grid-cols-[1fr_auto] gap-x-4">
+              <span>Goods:</span><span className="text-right">{formatCurrency(calculations.subTotalItems)}</span>
+              <span>DPP VAT (11/12):</span><span className="text-right">{formatCurrency(calculations.dppVat)}</span>
+              <span>VAT 12%:</span><span className="text-right">{formatCurrency(calculations.vat12)}</span>
+              <span className="font-bold">Total Rp:</span><span className="text-right font-bold">{formatCurrency(calculations.totalRp)}</span>
             </div>
           </div>
-        </main>
+        </div>
 
-        {/* FOOTER: Signature & Payment Info */}
-        {isLastPage && (
-          <footer className="pt-4 text-black text-[9pt]">
-            <div className="w-full flex justify-end mb-4">
-              <div className="w-1/3 text-[10px] space-y-1">
-                <div className="grid grid-cols-[1fr_auto] gap-x-4">
-                  <span>Subtotal Item:</span><span className="text-right">{formatCurrency(calculations.subTotalItems)}</span>
-                  
-                  {calculations.dpValue > 0 && (
-                    <><span>DP / Retensi:</span><span className="text-right">({formatCurrency(calculations.dpValue)})</span></>
-                  )}
-                  {calculations.negotiation > 0 && (
-                    <><span>Diskon:</span><span className="text-right">({formatCurrency(calculations.negotiation)})</span></>
-                  )}
-                  
-                  {/* Garis pemisah sebelum Goods */}
-                  <div className="col-span-2 border-t border-slate-200 my-0.5"></div>
+        <div className="border-t border-black w-full my-1"></div>
 
-                  <span>Goods:</span><span className="text-right">{formatCurrency(calculations.subTotal || (calculations.subTotalItems - calculations.dpValue - calculations.negotiation))}</span>
-                  <span>DPP VAT (11/12):</span><span className="text-right">{formatCurrency(calculations.dppVat)}</span>
-                  <span>VAT 12%:</span><span className="text-right">{formatCurrency(calculations.vat12)}</span>
-                  <div className="col-span-2 border-t border-black mt-1 pt-1 flex justify-between font-bold">
-                    <span>Total Rp:</span><span>{formatCurrency(calculations.totalRp)}</span>
-                  </div>
-                </div>
+        <div className="flex justify-between items-start">
+          {/* INFORMASI PEMBAYARAN */}
+          <div className="w-[68%] text-[10px] leading-tight space-y-1">
+            <div className="flex">
+              <span className="w-[50px] font-bold">Payment:</span>
+              <span>{invoiceData.paymentTerms || '90 Hari'}</span>
+            </div>
+            
+            <div className="flex flex-col text-[10px]">
+              <p className="font-bold">Please state with your payment:</p>
+              <div className="w-max">
+                <p className="font-bold">For payment, please transfer to our account:</p>
               </div>
+              <p className="font-bold pt-1">PT. Jembo Cable Company Tbk</p>
             </div>
 
-            <div className="flex justify-between items-end">
-              <div className="w-[60%] space-y-1 text-[8.5pt]">
-                <p>Please state with your payment: <strong>{displayInvoiceId}</strong></p>
-                <p>For payment, please transfer to our account:</p>
-                
-                <p className="font-bold uppercase pt-2">PT. JEMBO CABLE COMPANY Tbk</p>
-                
-                {invoiceData.paymentMethod === 'va' ? (
-                  <div className="p-2 border border-dashed border-slate-300 rounded-xl bg-slate-50/50 mt-1">
-                    <p className="font-bold text-[8pt] text-indigo-600">MANDIRI VIRTUAL ACCOUNT:</p>
-                    <p className="text-[14pt] font-black tracking-[0.2em] font-mono">{invoiceData.vaNumber || '-'}</p>
-                  </div>
-                ) : (
-                  <div className="text-[8.5pt] space-y-0.5 mt-1">
-                    <div className="flex"><span className="w-[100px]">Bank Mandiri -</span><span>A/C No. : 102-0100206827 (Rp)</span></div>
-                    <div className="flex"><span className="w-[100px]">Jakarta Cabang</span><span>A/C No. : 102-0005000218 (Rp)</span></div>
-                    <div className="flex"><span className="w-[100px]">Bank BCA -</span><span>A/C No. : 684-0198977 (Rp)</span></div>
-                  </div>
-                )}
+            <div className="text-[10px]">
+              <div className="flex"><span className="w-[100px]">Bank Mandiri -</span><span>A/C No. : 102-0100206827 (Rp)</span></div>
+              <div className="flex"><span className="w-[100px]">Jakarta Cabang</span><span>A/C No. : 102-0005000218 (Rp)</span></div>
+              <div className="flex"><span className="w-[100px]">Jakarta Cabang</span><span>A/C No. : 102-0005000226 (USD)</span></div>
+            </div>
+
+            <div className="w-[280px] text-center font-bold text-slate-300 py-1">OR</div>
+
+            <div className="flex text-[10px] items-start">
+              <div className="w-[100px] leading-tight">
+                Bank BCA - Jakarta<br/>
+                Cabang KEM TOWER
               </div>
-              
-              <div className="w-[35%] text-center">
-                <p className="font-bold uppercase text-[9pt] mb-20">PT. JEMBO CABLE COMPANY Tbk</p>
-                <div className="border-t border-black w-44 mx-auto"></div>
-                <p className="font-bold uppercase pt-1 text-[9pt]">Finance Department</p>
+              <div>
+                A/C No. : 684-0198977 (Rp)
               </div>
             </div>
-          </footer>
-        )}
-      </div>
-    );
-  };
+          </div>
 
-  return (
-    <>
-      {itemChunks.map((chunk, i) => (
-        <PageTemplate key={`${type}-${i}`} chunk={chunk} pageIndex={i} />
-      ))}
-    </>
+          {/* TANDA TANGAN */}
+          <div className="w-[32%] flex flex-col items-center">
+            <p className="font-bold text-[10px]">PT. JEMBO CABLE COMPANY Tbk</p>
+            <div className="mt-28 border-t border-black w-full"></div>
+            <p className="font-bold uppercase pt-1 text-[10px]">Finance</p>
+          </div>
+        </div>
+      </footer>
+    </div>
   );
 };
