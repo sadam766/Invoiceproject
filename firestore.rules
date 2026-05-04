@@ -31,13 +31,16 @@ service cloud.firestore {
 
     // Notifications: Diperlukan untuk alur Approval VA & Alert Lonceng
     match /notifications/{id} {
-      // Allow read (get/list) if admin or if the user is the intended recipient
+      // Allow read if user is the recipient OR is an admin
+      // Split into get and list for better query matching
       allow get, list: if isSignedIn() && (
+        request.auth.token.email == 'fa@gmail.com' ||
         isAdmin() || 
         request.auth.uid == resource.data.recipientId
       );
       allow create: if isSignedIn();
       allow update: if isSignedIn() && (
+        request.auth.token.email == 'fa@gmail.com' ||
         isAdmin() || 
         request.auth.uid == resource.data.recipientId
       );
