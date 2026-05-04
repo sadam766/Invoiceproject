@@ -326,6 +326,13 @@ import {
                                                         <DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8 rounded-full"><MoreHorizontal className="h-4 w-4" /></Button></DropdownMenuTrigger>
                                                         <DropdownMenuContent align="end" className="w-48">
                                                             <DropdownMenuItem onClick={() => router.push(`/dashboard/invoices/preview/${encodeURIComponent(invoice.id)}`)}><Eye className="mr-2 h-4 w-4" /> Pratinjau Cetak</DropdownMenuItem>
+                                                            
+                                                            {isLeader && invoice.vaStatus === 'pending' && (
+                                                                <DropdownMenuItem onClick={() => handleApproveVA(invoice)} className="text-amber-600 font-black uppercase text-[10px]">
+                                                                    <CheckCircle2 className="mr-2 h-4 w-4" /> Approve VA
+                                                                </DropdownMenuItem>
+                                                            )}
+
                                                             {invoice.status !== 'finalized' && invoice.status !== 'cancelled' && invoice.status !== 'paid' && (
                                                                 <DropdownMenuItem onClick={() => router.push(`/dashboard/invoices/add?editInvoiceId=${invoice.id.replace(/\//g, '_')}`)}><Pencil className="mr-2 h-4 w-4" /> Ubah Data</DropdownMenuItem>
                                                             )}
