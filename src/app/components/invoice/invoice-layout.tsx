@@ -26,7 +26,8 @@ export const InvoiceTemplate = ({ type, invoiceData, items, calculations }: Invo
 
   // Mapping fallback logic to ensure customer name and address are never missed
   const customerName = invoiceData.customerName || invoiceData.customer || 'N/A';
-  const customerAddress = invoiceData.billingAddress || invoiceData.customerAddress || 'N/A';
+  // Enhanced address mapping: check multiple potential field names from Firestore
+  const customerAddress = invoiceData.billingAddress || invoiceData.customerAddress || invoiceData.address || 'N/A';
 
   return (
     <div 
@@ -45,13 +46,13 @@ export const InvoiceTemplate = ({ type, invoiceData, items, calculations }: Invo
       <header className="relative mb-6">
         <div className="text-center w-full space-y-1 text-black">
           <h1 className="font-bold text-[11pt] uppercase tracking-wider">INVOICE/OFFICIAL RECEIPT</h1>
-          {/* REVISI: Ukuran 18pt, Bold, Tanpa "No:", Center */}
-          <p className="font-bold text-[18pt] leading-tight">{displayInvoiceId}</p>
+          {/* REVISI: Ukuran 14pt, Bold, Tanpa "No:", Center */}
+          <p className="font-bold text-[14pt] leading-tight">{displayInvoiceId}</p>
         </div>
         
         <div className="flex justify-between items-start mt-6 text-black">
           <div className="w-[60%] space-y-1">
-            {/* REVISI: Mapping data pelanggan yang sinkron dengan Dashboard */}
+            {/* Nama pelanggan ditarik dari database */}
             <p className="font-bold uppercase text-[10pt]">{customerName}</p>
             <p className="text-[9pt] leading-tight italic max-w-[350px]">
                 {customerAddress}
