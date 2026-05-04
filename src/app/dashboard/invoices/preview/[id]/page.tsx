@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { useRef } from 'react';
@@ -5,7 +6,7 @@ import { useParams, useRouter } from 'next/navigation';
 import { doc } from 'firebase/firestore';
 import { useFirestore, useDoc, useMemoFirebase } from '@/firebase';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, Printer, AlertTriangle, Lock } from 'lucide-react';
+import { ArrowLeft, Printer, Lock } from 'lucide-react';
 import { type Invoice } from '@/app/lib/data';
 import { InvoiceTemplate } from '@/app/components/invoice/invoice-layout';
 import { Badge } from '@/components/ui/badge';
@@ -27,12 +28,27 @@ const InvoicePreviewPage = () => {
 
   const items = invoiceData.items || [];
   const subTotalItems = items.reduce((acc, curr) => acc + (curr.total || 0), 0);
-  const dppVat = invoiceData.dppVat || (subTotalItems * (11 / 12));
-  const vat12 = invoiceData.vat12 || (dppVat * 0.12);
-  const totalRp = invoiceData.amount || (dppVat + vat12);
+  
+  // LOGIC: Maintain proper calculation even in preview
+  const dpVal = invoiceData.dpValue || 0;
+  const discVal = invoiceData.discount || 0;
+  const dpMode = invoiceData.dpMode || 'kurangi';
+
+  let baseValue = subTotalItems;
+  if (dpMode === 'tagih') {
+      baseValue = dpVal;
+  } else {
+      baseValue = Math.max(0, subTotalItems - dpVal - discVal);
+  }
+
+  const dppVat = baseValue * (11 / 12);
+  const vat12 = dppVat * 0.12;
+  const totalRp = dppVat + vat12;
 
   const calcs = {
     subTotalItems,
+    dpValue: dpVal,
+    discountValue: discVal,
     dppVat,
     vat12,
     totalRp

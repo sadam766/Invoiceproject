@@ -41,12 +41,14 @@ export const InvoiceTemplate = ({ type, invoiceData, items, calculations }: Invo
       <header className="relative mb-6">
         <div className="text-center w-full space-y-1 text-black">
           <h1 className="font-bold text-[11pt] uppercase tracking-wider">INVOICE/OFFICIAL RECEIPT</h1>
-          <p className="text-[9pt]">No: {displayInvoiceId}</p>
+          {/* REVISI: Ukuran 25pt, Bold, Tanpa "No:" */}
+          <p className="font-bold text-[25pt] leading-tight">{displayInvoiceId}</p>
         </div>
         
         <div className="flex justify-between items-start mt-6 text-black">
           <div className="w-[60%] space-y-1">
-            <p className="font-bold uppercase text-[10pt]">{invoiceData.customerName || 'N/A'}</p>
+            {/* REVISI: Pastikan Nama & Alamat Muncul (Sync Dashboard) */}
+            <p className="font-bold uppercase text-[10pt]">{invoiceData.customerName || invoiceData.customer || 'N/A'}</p>
             <p className="text-[8.5pt] leading-tight italic max-w-[350px]">
                 {invoiceData.billingAddress || "N/A"}
             </p>
@@ -132,7 +134,7 @@ export const InvoiceTemplate = ({ type, invoiceData, items, calculations }: Invo
       {/* FOOTER SECTION */}
       <footer className="mt-8 text-black"> 
         <div className="w-full flex justify-start mb-0.5">
-          <p className="text-[10px] font-medium italic">Ref A : {invoiceData.poNumber || '-'}</p>
+          <p className="text-[10px] font-medium italic">Reference A : {invoiceData.poNumber || '-'}</p>
         </div>
         <div className="border-t border-black w-full mb-0.5"></div>
 
@@ -164,7 +166,7 @@ export const InvoiceTemplate = ({ type, invoiceData, items, calculations }: Invo
               {invoiceData.paymentMethod === 'va' ? (
                 <div className="mt-2 space-y-1">
                    <p className="font-bold italic">For payment, please transfer to our Virtual account:</p>
-                   <p className="font-black text-[10pt] uppercase">VIRTUAL ACCOUNT A/N {invoiceData.customerName || 'N/A'}</p>
+                   <p className="font-black text-[10pt] uppercase">VIRTUAL ACCOUNT A/N {invoiceData.customerName || invoiceData.customer || 'N/A'}</p>
                    <p className="font-mono text-xs tracking-widest border border-black/10 w-fit p-1 bg-black/5">{invoiceData.vaNumber || 'AWAITING APPROVAL'}</p>
                 </div>
               ) : (
