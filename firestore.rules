@@ -7,12 +7,10 @@ service cloud.firestore {
       return request.auth != null;
     }
 
-    // isSuperAdmin: Pengecekan langsung email leader utama
     function isSuperAdmin() {
       return isSignedIn() && request.auth.token.email == 'fa@gmail.com';
     }
 
-    // isAdmin: Verifikasi otoritas berdasarkan dokumen user atau email super admin
     function isAdmin() {
       return isSuperAdmin() || (
         isSignedIn() && 
@@ -25,8 +23,27 @@ service cloud.firestore {
       return isSignedIn() && request.auth.uid == userId;
     }
 
-    // --- Role-Based Access Control ---
+    // --- Notifications: Optimized for query scalability ---
+    match /notifications/{docId} {
+      // Izinkan baca jika pemilik (recipientId) atau Super Admin
+      allow read, list: if isSignedIn() && (
+        request.auth.uid == resource.data.recipientId || 
+        request.auth.token.email == "fa@gmail.com"
+      );
+      
+      // Izinkan create untuk alur approval antar user
+      allow create: if isSignedIn();
+      
+      // Izinkan update (mark as read) oleh penerima atau admin
+      allow update: if isSignedIn() && (
+        request.auth.uid == resource.data.recipientId || 
+        request.auth.token.email == "fa@gmail.com"
+      );
+      
+      allow delete: if isAdmin();
+    }
 
+    // --- Users Collection ---
     match /users/{userId} {
       allow read: if isSignedIn();
       allow create: if isSignedIn();
@@ -34,33 +51,9 @@ service cloud.firestore {
       allow delete: if isAdmin();
     }
 
-    // Notifications: Dioptimalkan untuk provability kueri list (Ikon Lonceng)
-    match /notifications/{id} {
-      // Pengecekan read dipisah untuk memastikan kueri berfilter recipientId diizinkan secara statis
-      allow read: if isSignedIn() && (
-        request.auth.token.email == 'fa@gmail.com' || 
-        request.auth.uid == resource.data.recipientId
-      );
-      
-      allow create: if isSignedIn();
-      
-      allow update: if isSignedIn() && (
-        request.auth.token.email == 'fa@gmail.com' || 
-        request.auth.uid == resource.data.recipientId
-      );
-      
-      allow delete: if isAdmin();
-    }
-
-    // Core Business Collections
-    match /invoiceNumbers/{id} {
-      allow read, write: if isSignedIn();
-    }
-
-    match /invoices/{id} {
-      allow read, write: if isSignedIn(); 
-    }
-
+    // --- Core Business Collections ---
+    match /invoiceNumbers/{id} { allow read, write: if isSignedIn(); }
+    match /invoices/{id} { allow read, write: if isSignedIn(); }
     match /customers/{id} { allow read, write: if isSignedIn(); }
     match /products/{id} { allow read, write: if isSignedIn(); }
     match /sales/{id} { allow read, write: if isSignedIn(); }
@@ -69,10 +62,10 @@ service cloud.firestore {
     match /taxInvoices/{id} { allow read, write: if isSignedIn(); }
     match /virtualAccounts/{id} { allow read, write: if isSignedIn(); }
     
-    // Support for collection group queries or nested paths
+    // Global fallback for deep nested paths or collection groups
     match /{path=**}/invoices/{id} { allow read, write: if isSignedIn(); }
     match /{path=**}/notifications/{id} { 
-      allow read: if isSignedIn() && (request.auth.token.email == 'fa@gmail.com' || request.auth.uid == resource.data.recipientId);
+       allow read: if isSignedIn() && (request.auth.token.email == "fa@gmail.com" || request.auth.uid == resource.data.recipientId);
     }
   }
 }

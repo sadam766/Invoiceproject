@@ -1,4 +1,3 @@
-
 'use client';
 import {
   SidebarProvider,
@@ -109,9 +108,10 @@ export default function DashboardLayout({
   const soQuery = useMemoFirebase(() => (!firestore ? null : query(collection(firestore, 'salesOrders'))), [firestore]);
   const { data: allSalesOrders, isLoading: soLoading } = useCollection<SalesOrder>(soQuery);
 
-  // NOTIFICATIONS LISTENER
+  // NOTIFICATIONS LISTENER (SYNCHRONIZED WITH RULES)
   const notifQuery = useMemoFirebase(() => {
     if (!firestore || !user) return null;
+    // CRITICAL: Query must match recipientId for security rules to approve the list operation
     return query(
       collection(firestore, 'notifications'),
       where('recipientId', '==', user.uid),
