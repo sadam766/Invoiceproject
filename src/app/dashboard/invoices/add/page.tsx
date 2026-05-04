@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useEffect, useState, useMemo } from 'react';
@@ -39,7 +40,8 @@ import {
   Eye,
   ChevronsUpDown,
   AlertTriangle,
-  Clock
+  Clock,
+  Percent
 } from 'lucide-react';
 import { type Invoice, type UserProfile, type InvoiceItem, type InvoiceNumber } from '@/app/lib/data';
 import { useToast } from '@/hooks/use-toast';
@@ -96,7 +98,6 @@ export default function AddInvoicePage() {
   const [billingAddress, setBillingAddress] = useState('');
   const [issueDate, setIssueDate] = useState<Date>(new Date());
   const [dueDate, setDueDate] = useState<Date>(addDays(new Date(), 30));
-  const [isDpInvoice, setIsDpInvoice] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState<'bank' | 'va'>('va');
   const [paymentTerms, setPaymentTerms] = useState('90 Hari');
   const [manualVaNumber, setManualVaNumber] = useState('');
@@ -104,15 +105,11 @@ export default function AddInvoicePage() {
   const [productPopoverOpen, setProductPopoverOpen] = useState(false);
   const [isProcessing, setIsSaving] = useState(false);
 
-  // Calculation States
-  const [negotiationValue, setNegotiationValue] = useState<string>('0');
-  const [negotiationMode, setNegotiationMode] = useState<'percent' | 'nominal'>('nominal');
+  // --- FINAL DP & DISCOUNT STATES ---
+  const [dpDescription, setDpDescription] = useState('DP 35%');
   const [dpValue, setDpValue] = useState<string>('0');
-  const [dpMode, setDpMode] = useState<'percent' | 'nominal'>('percent');
-  const [retentionValue, setRetentionValue] = useState<string>('0');
-  const [retentionMode, setRetentionMode] = useState<'percent' | 'nominal'>('nominal');
-  const [dpDeductionValue, setDpDeductionValue] = useState<string>('0');
-  const [dpDeductionMode, setDpDeductionMode] = useState<'percent' | 'nominal'>('nominal');
+  const [dpMode, setDpMode] = useState<'tagih' | 'kurangi'>('kurangi');
+  const [discountValue, setDiscountValue] = useState<string>('0');
 
   useEffect(() => {
       if (activeIdentity) {
@@ -124,12 +121,11 @@ export default function AddInvoicePage() {
           if ((activeIdentity as Invoice).paymentMethod) setPaymentMethod((activeIdentity as Invoice).paymentMethod as any);
           if ((activeIdentity as Invoice).paymentTerms) setPaymentTerms((activeIdentity as Invoice).paymentTerms!);
           if ((activeIdentity as Invoice).vaNumber) setManualVaNumber((activeIdentity as Invoice).vaNumber!);
-          setIsDpInvoice(!!(activeIdentity as Invoice).isDpInvoice);
           
-          if ((activeIdentity as Invoice).negotiation) setNegotiationValue(formatNumberWithCommas((activeIdentity as Invoice).negotiation!));
+          if ((activeIdentity as Invoice).dpDescription) setDpDescription((activeIdentity as Invoice).dpDescription!);
           if ((activeIdentity as Invoice).dpValue) setDpValue(formatNumberWithCommas((activeIdentity as Invoice).dpValue!));
-          if ((activeIdentity as Invoice).retention) setRetentionValue(formatNumberWithCommas((activeIdentity as Invoice).retention!));
-          if ((activeIdentity as Invoice).dpDeduction) setDpDeductionValue(formatNumberWithCommas((activeIdentity as Invoice).dpDeduction!));
+          if ((activeIdentity as Invoice).dpMode) setDpMode((activeIdentity as Invoice).dpMode!);
+          if ((activeIdentity as Invoice).discount) setDiscountValue(formatNumberWithCommas((activeIdentity as Invoice).discount!));
       }
   }, [activeIdentity]);
 
@@ -159,38 +155,29 @@ export default function AddInvoicePage() {
 
   const calcs = useMemo(() => {
     const subTotalItems = items.reduce((acc, item) => acc + (item.total || 0), 0);
-    
-    const negInputVal = parseFormattedNumber(negotiationValue);
-    const negotiation = negotiationMode === 'percent' ? (subTotalItems * (negInputVal / 100)) : negInputVal;
-    
-    const dpInputVal = parseFormattedNumber(dpValue);
-    const dpVal = dpMode === 'percent' ? (subTotalItems * (dpInputVal / 100)) : dpInputVal;
-    
-    const retInputVal = parseFormattedNumber(retentionValue);
-    const retNominal = retentionMode === 'percent' ? (subTotalItems * (negInputVal / 100)) : retInputVal;
-    
-    const dpDedInputVal = parseFormattedNumber(dpDeductionValue);
-    const dpDedNominal = dpDeductionMode === 'percent' ? (subTotalItems * (dpDedInputVal / 100)) : dpDedInputVal;
+    const dpVal = parseFormattedNumber(dpValue);
+    const discVal = parseFormattedNumber(discountValue);
 
-    const goodsValue = subTotalItems - dpVal - negotiation;
-    const dppVat = goodsValue * (11 / 12);
+    let baseValue = subTotalItems;
+    if (dpMode === 'tagih') {
+        baseValue = dpVal;
+    } else {
+        baseValue = Math.max(0, subTotalItems - dpVal - discVal);
+    }
+
+    const dppVat = baseValue * (11 / 12);
     const vat12 = dppVat * 0.12;
-    
-    let totalRp = isDpInvoice ? dpVal : (goodsValue + vat12 - dpDedNominal - retNominal);
-    totalRp = Math.max(0, totalRp);
+    const totalRp = dppVat + vat12;
 
     return {
         subTotalItems,
-        negotiation,
         dpValue: dpVal,
-        subTotal: goodsValue,
-        dpPercent: subTotalItems > 0 ? Math.round((dpVal / subTotalItems) * 100) : 0,
-        retensiValue: retNominal,
+        discountValue: discVal,
         dppVat,
         vat12,
         totalRp
     };
-  }, [items, negotiationValue, negotiationMode, dpValue, dpMode, retentionValue, retentionMode, dpDeductionValue, dpDeductionMode, isDpInvoice]);
+  }, [items, dpValue, dpMode, discountValue]);
 
   const handleSaveInvoice = async (invoiceStatus: any = 'sent', redirectToPreview = false) => {
     if (!firestore || !user || !activeIdentity) return;
@@ -201,7 +188,6 @@ export default function AddInvoicePage() {
     const timestamp = new Date().toISOString();
     const updater = userProfile?.displayName || user.email || 'System';
 
-    // LOGIKA PEMISAHAN JALUR PEMBAYARAN (Branching Logic)
     let finalStatus = invoiceStatus;
     let finalVaStatus = null;
     let requiresVaApproval = false;
@@ -209,7 +195,7 @@ export default function AddInvoicePage() {
     if (paymentMethod === 'va') {
         finalVaStatus = 'pending';
         if (invoiceStatus === 'sent') {
-            finalStatus = 'unpaid'; // Internally unpaid = "Waiting Approval" for VA
+            finalStatus = 'unpaid'; 
             requiresVaApproval = true;
         }
     } else {
@@ -232,14 +218,13 @@ export default function AddInvoicePage() {
         amount: calcs.totalRp,
         status: finalStatus,
         vaStatus: finalVaStatus,
-        isDpInvoice: isDpInvoice,
         paymentMethod: paymentMethod,
         paymentTerms: paymentTerms,
         vaNumber: paymentMethod === 'va' ? manualVaNumber : '',
-        negotiation: calcs.negotiation,
         dpValue: calcs.dpValue,
-        dpDeduction: parseFormattedNumber(dpDeductionValue),
-        retention: calcs.retensiValue,
+        dpDescription: dpDescription,
+        dpMode: dpMode,
+        discount: calcs.discountValue,
         dppVat: calcs.dppVat,
         vat12: calcs.vat12,
         items: items,
@@ -273,7 +258,6 @@ export default function AddInvoicePage() {
                 });
             });
             await Promise.all(notifPromises);
-            toast({ title: "Notifikasi Approval Terkirim ke Leader" });
         }
 
         if (redirectToPreview) {
@@ -297,12 +281,13 @@ export default function AddInvoicePage() {
       paymentMethod,
       paymentTerms,
       vaNumber: manualVaNumber,
+      dpDescription,
+      dpMode,
       date: format(issueDate, 'dd MMM yyyy'),
   };
 
   return (
     <main className="flex flex-1 flex-col h-full bg-background animate-in fade-in duration-500 overflow-hidden">
-      {/* TOPBAR */}
       <div className="flex items-center justify-between px-8 py-4 border-b bg-white z-10">
           <div className="flex items-center gap-4">
               <Button variant="ghost" size="icon" onClick={() => router.back()} className="rounded-full h-10 w-10">
@@ -310,7 +295,7 @@ export default function AddInvoicePage() {
               </Button>
               <div>
                   <h1 className="text-lg font-black tracking-tight uppercase text-slate-900 leading-tight">Billing Constructor</h1>
-                  <p className="text-slate-400 text-[10px] font-bold uppercase tracking-widest">Constructing Invoice ID: {activeIdentity?.id}</p>
+                  <p className="text-slate-400 text-[10px] font-bold uppercase tracking-widest">Standard Layout V2.0 — Final Mode</p>
               </div>
           </div>
           <div className="flex items-center gap-3">
@@ -339,11 +324,11 @@ export default function AddInvoicePage() {
                     <CardContent className="p-6 space-y-6">
                         <div className="grid grid-cols-2 gap-4">
                             <div className="space-y-1.5">
-                                <Label className="text-[9px] font-black uppercase text-slate-400 tracking-widest">Invoice Date</Label>
+                                <Label className="text-[9px] font-black uppercase text-slate-400">Invoice Date</Label>
                                 <Input type="date" value={format(issueDate, 'yyyy-MM-dd')} onChange={e => setIssueDate(new Date(e.target.value))} className="h-10 font-bold" />
                             </div>
                             <div className="space-y-1.5">
-                                <Label className="text-[9px] font-black uppercase text-slate-400 tracking-widest flex items-center gap-1">
+                                <Label className="text-[9px] font-black uppercase text-slate-400 flex items-center gap-1">
                                     <Clock className="h-3 w-3 text-indigo-500" /> Payment Terms
                                 </Label>
                                 <Input value={paymentTerms} onChange={e => setPaymentTerms(e.target.value)} placeholder="E.g. 90 Hari" className="h-10 font-black border-indigo-200" />
@@ -351,7 +336,7 @@ export default function AddInvoicePage() {
                         </div>
 
                         <div className="space-y-1.5">
-                            <Label className="text-[9px] font-black uppercase text-slate-400 tracking-widest">Sales Order (Mapping)</Label>
+                            <Label className="text-[9px] font-black uppercase text-slate-400">Sales Order (Mapping)</Label>
                             <Popover open={soPopoverOpen} onOpenChange={setSoPopoverOpen}>
                                 <PopoverTrigger asChild>
                                     <Button variant="outline" className="w-full justify-between h-10 font-bold border-slate-200">
@@ -386,22 +371,7 @@ export default function AddInvoicePage() {
 
                         <div className="space-y-3">
                             <div className="flex justify-between items-center">
-                                <Label className="text-[9px] font-black uppercase text-slate-400 tracking-widest">Billing Address</Label>
-                                <div className="flex gap-1.5">
-                                    {currentCustomer?.addresses?.map(addr => (
-                                        <Badge 
-                                            key={addr.id} 
-                                            variant="outline" 
-                                            className={cn(
-                                                "text-[8px] font-black uppercase cursor-pointer px-2 h-4", 
-                                                billingAddress === addr.address ? "bg-indigo-600 text-white border-indigo-600" : "bg-white text-slate-400"
-                                            )}
-                                            onClick={() => setBillingAddress(addr.address)}
-                                        >
-                                            {addr.label}
-                                        </Badge>
-                                    ))}
-                                </div>
+                                <Label className="text-[9px] font-black uppercase text-slate-400">Billing Address</Label>
                             </div>
                             <textarea 
                                 className="w-full rounded-xl border border-slate-200 bg-slate-50/50 p-4 text-[10px] leading-tight font-medium italic min-h-[80px]"
@@ -414,9 +384,8 @@ export default function AddInvoicePage() {
                   </Card>
 
                   <Card className="shadow-sm border-none ring-1 ring-slate-200 overflow-hidden">
-                    <CardHeader className="bg-white border-b py-3 px-6 flex flex-row items-center justify-between">
-                        <CardTitle className="text-[10px] font-black uppercase text-slate-500 tracking-widest">Line Items (Max 10 per page)</CardTitle>
-                        <Switch checked={isDpInvoice} onCheckedChange={setIsDpInvoice} id="dp-mode" />
+                    <CardHeader className="bg-white border-b py-3 px-6">
+                        <CardTitle className="text-[10px] font-black uppercase text-slate-500 tracking-widest">Line Items (Max 10)</CardTitle>
                     </CardHeader>
                     <CardContent className="p-0">
                         <div className="max-h-[300px] overflow-y-auto">
@@ -427,12 +396,11 @@ export default function AddInvoicePage() {
                                         <TableHead className="w-[80px] text-center text-[8pt]">Qty</TableHead>
                                         <TableHead className="w-[120px] text-right text-[8pt]">Price</TableHead>
                                         <TableHead className="w-[120px] text-right text-[8pt]">Total</TableHead>
-                                        <TableHead className="w-[40px]"></TableHead>
                                     </TableRow>
                                 </TableHeader>
                                 <TableBody>
                                     {items.length === 0 ? (
-                                        <TableRow><TableCell colSpan={5} className="text-center py-12 text-[10px] font-bold text-slate-300 uppercase tracking-widest italic">Add items or link SO...</TableCell></TableRow>
+                                        <TableRow><TableCell colSpan={4} className="text-center py-12 text-[10px] font-bold text-slate-300 uppercase italic">Add items to start...</TableCell></TableRow>
                                     ) : items.map(item => (
                                         <TableRow key={item.id} className="hover:bg-slate-50/50 group">
                                             <TableCell className="px-6 py-3">
@@ -458,11 +426,6 @@ export default function AddInvoicePage() {
                                             </TableCell>
                                             <TableCell className="py-3 text-right font-black text-[10px]">
                                                 Rp {formatNumberWithCommas(item.total)}
-                                            </TableCell>
-                                            <TableCell className="py-3">
-                                                <Button variant="ghost" size="icon" className="h-6 w-6 text-rose-300 hover:text-rose-600 opacity-0 group-hover:opacity-100 transition-opacity" onClick={() => setItems(items.filter(it => it.id !== item.id))}>
-                                                    <Trash2 className="h-3.5 w-3.5" />
-                                                </Button>
                                             </TableCell>
                                         </TableRow>
                                     ))}
@@ -504,57 +467,36 @@ export default function AddInvoicePage() {
                   </Card>
 
                   <Card className="shadow-sm border-none ring-1 ring-slate-200 overflow-hidden">
-                    <CardHeader className="bg-white border-b py-3 px-6">
+                    <CardHeader className="bg-white border-b py-3 px-6 flex flex-row items-center justify-between">
                         <CardTitle className="text-[10px] font-black uppercase text-slate-500 tracking-widest flex items-center gap-2">
-                            <History className="h-4 w-4 text-emerald-600" /> Financial Adjustments
+                            <Percent className="h-4 w-4 text-emerald-600" /> DP & Discount Logic
                         </CardTitle>
-                    </Header>
+                    </CardHeader>
                     <CardContent className="p-6 space-y-6">
-                        <div className="grid grid-cols-2 gap-6">
-                            <div className="space-y-2">
+                        <div className="grid gap-6">
+                            <div className="p-4 bg-indigo-50/50 rounded-2xl border-2 border-indigo-100 space-y-4">
                                 <div className="flex justify-between items-center">
-                                    <Label className="text-[9px] font-black uppercase text-slate-400">Negotiation</Label>
-                                    <Select value={negotiationMode} onValueChange={(v: any) => setNegotiationMode(v)}>
-                                        <SelectTrigger className="h-6 w-14 text-[8px] font-black uppercase px-2"><SelectValue /></SelectTrigger>
-                                        <SelectContent><SelectItem value="nominal">IDR</SelectItem><SelectItem value="percent">%</SelectItem></SelectContent>
-                                    </Select>
+                                    <Label className="text-[10px] font-black uppercase text-indigo-700">Uang Muka (DP)</Label>
+                                    <div className="flex bg-white rounded-lg p-1 border">
+                                        <Button variant={dpMode === 'tagih' ? 'default' : 'ghost'} size="sm" onClick={() => setDpMode('tagih')} className="h-7 text-[8px] font-black uppercase">Tagih DP</Button>
+                                        <Button variant={dpMode === 'kurangi' ? 'default' : 'ghost'} size="sm" onClick={() => setDpMode('kurangi')} className="h-7 text-[8px] font-black uppercase">Kurangi DP</Button>
+                                    </div>
                                 </div>
-                                <Input value={negotiationValue} onChange={(e) => setNegotiationValue(e.target.value)} className="h-9 text-right font-black" />
-                            </div>
-                            
-                            <div className="space-y-2">
-                                <div className="flex justify-between items-center">
-                                    <Label className="text-[9px] font-black uppercase text-slate-400">Retention</Label>
-                                    <Select value={retentionMode} onValueChange={(v: any) => setRetentionMode(v)}>
-                                        <SelectTrigger className="h-6 w-14 text-[8px] font-black uppercase px-2"><SelectValue /></SelectTrigger>
-                                        <SelectContent><SelectItem value="nominal">IDR</SelectItem><SelectItem value="percent">%</SelectItem></SelectContent>
-                                    </Select>
+                                <div className="grid grid-cols-2 gap-3">
+                                    <div className="space-y-1.5">
+                                        <Label className="text-[8px] font-bold uppercase text-slate-400">Deskripsi (e.g. DP 35%)</Label>
+                                        <Input value={dpDescription} onChange={e => setDpDescription(e.target.value)} className="h-9 font-bold text-xs" />
+                                    </div>
+                                    <div className="space-y-1.5">
+                                        <Label className="text-[8px] font-bold uppercase text-slate-400">Nominal DP</Label>
+                                        <Input value={dpValue} onChange={e => setDpValue(e.target.value)} className="h-9 font-black text-xs text-right" />
+                                    </div>
                                 </div>
-                                <Input value={retentionValue} onChange={(e) => setRetentionValue(e.target.value)} className="h-9 text-right font-black" />
-                            </div>
-                        </div>
-
-                        <div className="grid grid-cols-2 gap-6">
-                            <div className={cn("space-y-2 p-4 rounded-xl border-2 transition-all", isDpInvoice ? "bg-indigo-50 border-indigo-100 ring-2 ring-indigo-50/50" : "bg-slate-50/30 border-slate-100 opacity-60")}>
-                                <div className="flex justify-between items-center">
-                                    <Label className="text-[9px] font-black uppercase text-indigo-700">Down Payment (DP)</Label>
-                                    <Select value={dpMode} onValueChange={(v: any) => setDpMode(v)} disabled={!isDpInvoice}>
-                                        <SelectTrigger className="h-6 w-14 text-[8px] font-black uppercase px-2"><SelectValue /></SelectTrigger>
-                                        <SelectContent><SelectItem value="nominal">IDR</SelectItem><SelectItem value="percent">%</SelectItem></SelectContent>
-                                    </Select>
-                                </div>
-                                <Input value={dpValue} onChange={(e) => setDpValue(e.target.value)} disabled={!isDpInvoice} className="h-9 text-right font-black bg-white border-indigo-200" />
                             </div>
 
-                            <div className={cn("space-y-2 p-4 rounded-xl border-2 transition-all", !isDpInvoice ? "bg-emerald-50 border-emerald-100" : "bg-slate-50/30 border-slate-100 opacity-60")}>
-                                <div className="flex justify-between items-center">
-                                    <Label className="text-[9px] font-black uppercase text-emerald-700">DP Credit Use</Label>
-                                    <Select value={dpDeductionMode} onValueChange={(v: any) => setDpDeductionMode(v)} disabled={isDpInvoice}>
-                                        <SelectTrigger className="h-6 w-14 text-[8px] font-black uppercase px-2"><SelectValue /></SelectTrigger>
-                                        <SelectContent><SelectItem value="nominal">IDR</SelectItem><SelectItem value="percent">%</SelectItem></SelectContent>
-                                    </Select>
-                                </div>
-                                <Input id="dpDeduction" value={dpDeductionValue} onChange={(e) => setDpDeductionValue(e.target.value)} disabled={isDpInvoice} className="h-9 text-right font-black bg-white border-emerald-200" />
+                            <div className="space-y-2 px-1">
+                                <Label className="text-[10px] font-black uppercase text-slate-400">Potongan Diskon (Nominal)</Label>
+                                <Input value={discountValue} onChange={e => setDiscountValue(e.target.value)} className="h-10 font-black text-right border-emerald-100" />
                             </div>
                         </div>
 
@@ -587,18 +529,6 @@ export default function AddInvoicePage() {
                     items={items}
                     calculations={calcs}
                   />
-                  
-                  {paymentMethod === 'va' && (
-                      <div className="mt-8 max-w-[210mm] mx-auto bg-amber-50 border-2 border-amber-200 p-6 rounded-2xl flex items-start gap-4">
-                          <AlertTriangle className="h-6 w-6 text-amber-600 mt-1" />
-                          <div className="space-y-1">
-                              <p className="font-black text-sm text-amber-900 uppercase">Jalur Virtual Account Terdeteksi</p>
-                              <p className="text-xs text-amber-800 font-medium leading-relaxed">
-                                  Invoice ini akan berstatus <b>"Waiting Approval"</b> setelah disimpan. Leader akan menerima notifikasi lonceng untuk menyetujui VA di portal Mandiri sebelum dokumen siap dicetak.
-                              </p>
-                          </div>
-                      </div>
-                  )}
               </div>
           </div>
       </div>

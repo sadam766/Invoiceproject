@@ -71,8 +71,12 @@ export type Invoice = {
   negotiation?: number;
   negotiationMode?: 'percent' | 'nominal';
   dpValue?: number; 
+  dpDescription?: string;
+  dpMode?: 'tagih' | 'kurangi';
   dpDeduction?: number; 
+  discount?: number;
   retention?: number;
+  paymentTerms?: string;
   payments?: PaymentRecord[];
   items?: InvoiceItem[];
   isDpInvoice?: boolean;

@@ -1,3 +1,4 @@
+
 'use client';
 
 import React from 'react';
@@ -9,6 +10,8 @@ export type InvoiceTemplateProps = {
   items: any[];
   calculations: {
     subTotalItems: number;
+    dpValue: number;
+    discountValue: number;
     dppVat: number;
     vat12: number;
     totalRp: number;
@@ -27,28 +30,28 @@ export const InvoiceTemplate = ({ type, invoiceData, items, calculations }: Invo
         "relative bg-white mx-auto pt-12 pb-6 px-12 flex flex-col font-sans text-black shadow-lg mb-8 print:shadow-none print:mb-0",
         type === 'Copy' && "print:page-break-before-always"
       )}
-      style={{ width: '210mm', minHeight: '297mm', fontSize: '9pt' }}
+      style={{ width: '210mm', minHeight: '297mm', fontSize: '9pt', color: '#000000' }}
     >
       {/* LABEL ORIGINAL/COPY */}
-      <div className="absolute right-12 top-8 text-[10pt] text-slate-400 uppercase tracking-widest print:text-black">
+      <div className="absolute right-12 top-8 text-[10pt] text-black/40 uppercase tracking-widest print:text-black">
         {type}
       </div>
 
       {/* HEADER - CENTERED */}
       <header className="relative mb-6">
-        <div className="text-center w-full space-y-1">
+        <div className="text-center w-full space-y-1 text-black">
           <h1 className="font-bold text-[11pt] uppercase tracking-wider">INVOICE/OFFICIAL RECEIPT</h1>
           <p className="text-[9pt]">No: {displayInvoiceId}</p>
         </div>
         
-        <div className="flex justify-between items-start mt-6">
+        <div className="flex justify-between items-start mt-6 text-black">
           <div className="w-[60%] space-y-1">
             <p className="font-bold uppercase text-[10pt]">{invoiceData.customerName || 'N/A'}</p>
             <p className="text-[8.5pt] leading-tight italic max-w-[350px]">
                 {invoiceData.billingAddress || "N/A"}
             </p>
           </div>
-          <div className="text-[9pt] space-y-0.5" style={{ minWidth: '180px' }}>
+          <div className="text-[9pt] space-y-0.5 text-black" style={{ minWidth: '180px' }}>
             <div className="grid grid-cols-[85px_5px_1fr]"><span>Sales Order</span><span>:</span><span>{invoiceData.soNumber || '-'}</span></div>
             <div className="grid grid-cols-[85px_5px_1fr]"><span>Order Date</span><span>:</span><span>-</span></div>
             <div className="grid grid-cols-[85px_5px_1fr]"><span>Reference A</span><span>:</span><span>{invoiceData.poNumber || '-'}</span></div>
@@ -56,16 +59,16 @@ export const InvoiceTemplate = ({ type, invoiceData, items, calculations }: Invo
         </div>
       </header>
 
-      <div className="flex justify-between mb-1 px-0.5 text-[9pt] border-t border-slate-100 pt-1">
+      <div className="flex justify-between mb-1 px-0.5 text-[9pt] border-t border-black/10 pt-1 text-black">
         <span>Customer Code : {invoiceData.customerCode || '-'}</span>
         <span>Date: {invoiceData.date || '-'}</span>
       </div>
 
       {/* TABLE */}
       <main className="relative flex-grow">
-        <table className="w-full border-collapse">
+        <table className="w-full border-collapse border-black">
           <thead>
-            <tr className="border border-black text-[9pt]">
+            <tr className="border border-black text-[9pt] text-black">
               <th className="py-1 px-2 text-left border-r border-black w-[5%] font-normal">No.</th>
               <th className="py-1 px-2 text-left border-r border-black font-normal">Item</th>
               <th className="py-1 px-2 text-center border-r border-black w-[18%] font-normal">Quantity Unit</th>
@@ -73,7 +76,7 @@ export const InvoiceTemplate = ({ type, invoiceData, items, calculations }: Invo
               <th className="py-1 px-2 text-right font-normal w-[18%]">Amount</th>
             </tr>
           </thead>
-          <tbody>
+          <tbody className="text-black">
             {items.map((item, idx) => (
               <tr key={idx} className="align-top text-[9pt] border-x border-black h-8">
                 <td className="py-1 px-2 text-left border-r border-black">{idx + 1}</td>
@@ -83,7 +86,7 @@ export const InvoiceTemplate = ({ type, invoiceData, items, calculations }: Invo
                 <td className="py-1 px-2 text-right">{formatCurrency(item.total)}</td>
               </tr>
             ))}
-            {/* Filler rows to maintain border consistency */}
+            {/* Filler rows */}
             {Array.from({ length: emptyRows }).map((_, i) => (
                <tr key={`empty-${i}`} className="border-x border-black h-8">
                   <td className="border-r border-black"></td>
@@ -97,17 +100,37 @@ export const InvoiceTemplate = ({ type, invoiceData, items, calculations }: Invo
           </tbody>
         </table>
 
-        {/* SUB TOTAL ITEM - Dynamic Position */}
-        <div className="flex justify-end mt-2">
+        {/* FINANCIAL ADJUSTMENTS - UNDER TABLE */}
+        <div className="flex justify-end mt-2 text-black">
           <div className="w-[18%] text-right pr-2">
             <div className="border-t border-black w-full mb-0.5"></div>
             <p className="font-bold text-[9pt]">{formatCurrency(calculations.subTotalItems)}</p>
           </div>
         </div>
+
+        {/* DP & DISCOUNT ROWS */}
+        <div className="flex justify-end mt-1 text-black">
+            <div className="w-[40%] text-[9pt]">
+                {calculations.dpValue > 0 && (
+                    <div className="grid grid-cols-[1fr_auto] gap-x-4">
+                        <span className="font-medium italic">{invoiceData.dpDescription || 'DP'}</span>
+                        <span className="text-right">
+                            {invoiceData.dpMode === 'kurangi' ? `(${formatCurrency(calculations.dpValue)})` : formatCurrency(calculations.dpValue)}
+                        </span>
+                    </div>
+                )}
+                {calculations.discountValue > 0 && (
+                    <div className="grid grid-cols-[1fr_auto] gap-x-4">
+                        <span className="font-medium italic">Diskon</span>
+                        <span className="text-right">({formatCurrency(calculations.discountValue)})</span>
+                    </div>
+                )}
+            </div>
+        </div>
       </main>
 
       {/* FOOTER SECTION */}
-      <footer className="mt-8 transition-all"> 
+      <footer className="mt-8 text-black"> 
         <div className="w-full flex justify-start mb-0.5">
           <p className="text-[10px] font-medium italic">Ref A : {invoiceData.poNumber || '-'}</p>
         </div>
@@ -116,9 +139,10 @@ export const InvoiceTemplate = ({ type, invoiceData, items, calculations }: Invo
         <div className="flex justify-end mt-1">
           <div className="w-1/4 text-[10px] leading-tight">
             <div className="grid grid-cols-[1fr_auto] gap-x-4">
-              <span>Goods:</span><span className="text-right">{formatCurrency(calculations.subTotalItems)}</span>
+              <span>Goods:</span><span className="text-right">{formatCurrency(calculations.subTotalItems - (invoiceData.dpMode === 'kurangi' ? calculations.dpValue : 0) - calculations.discountValue)}</span>
               <span>DPP VAT (11/12):</span><span className="text-right">{formatCurrency(calculations.dppVat)}</span>
               <span>VAT 12%:</span><span className="text-right">{formatCurrency(calculations.vat12)}</span>
+              <div className="col-span-2 border-t border-black my-0.5 opacity-30"></div>
               <span className="font-bold">Total Rp:</span><span className="text-right font-bold">{formatCurrency(calculations.totalRp)}</span>
             </div>
           </div>
@@ -128,32 +152,32 @@ export const InvoiceTemplate = ({ type, invoiceData, items, calculations }: Invo
 
         <div className="flex justify-between items-start">
           {/* INFORMASI PEMBAYARAN HYBRID */}
-          <div className="w-[68%] text-[10px] leading-tight space-y-2">
+          <div className="w-[68%] text-[9pt] leading-tight space-y-2">
             <div className="flex">
               <span className="w-[60px] font-bold">Payment:</span>
               <span className="font-bold">{invoiceData.paymentTerms || '90 Hari'}</span>
             </div>
             
-            <div className="flex flex-col text-[10px]">
-              <p className="font-bold uppercase text-indigo-700">Please state with your payment: {displayInvoiceId}</p>
+            <div className="flex flex-col">
+              <p className="font-bold">Please state with your payment: {displayInvoiceId}</p>
               
               {invoiceData.paymentMethod === 'va' ? (
                 <div className="mt-2 space-y-1">
                    <p className="font-bold italic">For payment, please transfer to our Virtual account:</p>
-                   <p className="font-black text-[11px] uppercase">VIRTUAL ACCOUNT A/N {invoiceData.customerName || 'N/A'}</p>
-                   <p className="font-mono text-sm tracking-widest bg-slate-50 p-2 border border-slate-100 w-fit">{invoiceData.vaNumber || 'AWAITING APPROVAL'}</p>
+                   <p className="font-black text-[10pt] uppercase">VIRTUAL ACCOUNT A/N {invoiceData.customerName || 'N/A'}</p>
+                   <p className="font-mono text-xs tracking-widest border border-black/10 w-fit p-1 bg-black/5">{invoiceData.vaNumber || 'AWAITING APPROVAL'}</p>
                 </div>
               ) : (
                 <div className="mt-2 space-y-1">
                   <p className="font-bold italic">For payment, please transfer to our account:</p>
-                  <p className="font-bold text-slate-900">PT. Jembo Cable Company Tbk</p>
-                  <div className="text-[10px] mt-1 space-y-0.5">
+                  <p className="font-bold">PT. Jembo Cable Company Tbk</p>
+                  <div className="text-[9pt] mt-1 space-y-0.5">
                     <div className="flex"><span className="w-[100px]">Bank Mandiri -</span><span>A/C No. : 102-0100206827 (Rp)</span></div>
                     <div className="flex"><span className="w-[100px]">Jakarta Cabang</span><span>A/C No. : 102-0005000218 (Rp)</span></div>
                     <div className="flex"><span className="w-[100px]">Jakarta Cabang</span><span>A/C No. : 102-0005000226 (USD)</span></div>
                   </div>
-                  <div className="w-[280px] text-center font-bold text-slate-300 py-1">OR</div>
-                  <div className="flex text-[10px] items-start">
+                  <div className="w-[280px] text-center font-bold text-black/10 py-1">OR</div>
+                  <div className="flex items-start">
                     <div className="w-[100px] leading-tight">Bank BCA - Jakarta<br/>(Cabang KEM TOWER)</div>
                     <div>A/C No. : 684-0198977 (Rp)</div>
                   </div>
@@ -164,9 +188,9 @@ export const InvoiceTemplate = ({ type, invoiceData, items, calculations }: Invo
 
           {/* TANDA TANGAN */}
           <div className="w-[32%] flex flex-col items-center">
-            <p className="font-bold text-[10px]">PT. JEMBO CABLE COMPANY Tbk</p>
+            <p className="font-bold text-[9pt]">PT. JEMBO CABLE COMPANY Tbk</p>
             <div className="mt-24 border-t border-black w-full"></div>
-            <p className="font-bold uppercase pt-1 text-[10px]">Finance</p>
+            <p className="font-bold uppercase pt-1 text-[9pt]">Finance</p>
           </div>
         </div>
       </footer>
