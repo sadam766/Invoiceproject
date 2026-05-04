@@ -29,6 +29,14 @@ service cloud.firestore {
       allow delete: if isAdmin();
     }
 
+    // Notifications: Diperlukan untuk alur Approval VA & Alert Lonceng
+    match /notifications/{id} {
+      allow read: if isSignedIn() && (request.auth.uid == resource.data.recipientId || isAdmin());
+      allow create: if isSignedIn();
+      allow update: if isSignedIn() && request.auth.uid == resource.data.recipientId;
+      allow delete: if isAdmin();
+    }
+
     // Core Business Collections
     match /invoiceNumbers/{id} {
       allow read, write: if isSignedIn();
