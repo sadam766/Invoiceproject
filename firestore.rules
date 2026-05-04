@@ -1,3 +1,4 @@
+
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
@@ -23,21 +24,16 @@ service cloud.firestore {
       return isSignedIn() && request.auth.uid == userId;
     }
 
-    // --- Notifications: Unified Access Rule ---
+    // --- Notifications: Simplified for List Sync ---
     match /notifications/{docId} {
-      // Izinkan baca jika:
-      // 1. User adalah pemilik notifikasi (recipientId sesuai UID)
-      // 2. ATAU User adalah Super Admin (berdasarkan email)
-      allow read, list: if request.auth != null && (
+      allow read, list: if isSignedIn() && (
         request.auth.uid == resource.data.recipientId || 
         request.auth.token.email == "fa@gmail.com"
       );
       
-      // Izinkan create jika user sudah login
-      allow create: if request.auth != null;
+      allow create: if isSignedIn();
       
-      // Izinkan update (mark as read) oleh penerima atau admin
-      allow update: if request.auth != null && (
+      allow update: if isSignedIn() && (
         request.auth.uid == resource.data.recipientId || 
         request.auth.token.email == "fa@gmail.com"
       );
@@ -64,10 +60,7 @@ service cloud.firestore {
     match /taxInvoices/{id} { allow read, write: if isSignedIn(); }
     match /virtualAccounts/{id} { allow read, write: if isSignedIn(); }
     
-    // Global fallback for deep nested paths or collection groups
+    // Global fallback
     match /{path=**}/invoices/{id} { allow read, write: if isSignedIn(); }
-    match /{path=**}/notifications/{id} { 
-       allow read: if request.auth != null && (request.auth.token.email == "fa@gmail.com" || request.auth.uid == resource.data.recipientId);
-    }
   }
 }

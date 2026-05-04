@@ -123,7 +123,7 @@ import {
 
         try {
             await updateDoc(docRef, {
-                status: 'sent', // Change from "Waiting Approval" (unpaid) to "Ready to Send" (sent)
+                status: 'sent', // Ready to Send
                 vaStatus: 'approved',
                 vaApprovedBy: user.email,
                 vaApprovedAt: timestamp,
@@ -308,17 +308,17 @@ import {
                                                     className={cn(
                                                         "text-[9px] uppercase font-black px-2 py-0",
                                                         invoice.status === 'paid' ? "bg-emerald-50 text-emerald-700 border-emerald-100" : 
-                                                        isVaPending ? "bg-amber-50 text-amber-700 border-amber-100" :
-                                                        invoice.status === 'sent' || invoice.status === 'unpaid' ? "bg-indigo-50 text-indigo-700 border-indigo-100" : ""
+                                                        isVaPending ? "bg-amber-100 text-amber-900 border-amber-200" :
+                                                        invoice.status === 'sent' || invoice.status === 'unpaid' ? "bg-emerald-50 text-emerald-800 border-emerald-100" : ""
                                                     )}
                                                 >
-                                                    {isVaPending ? 'Waiting Approval' : (invoice.status === 'sent' ? 'Ready to Send' : invoice.status.replace('_', ' '))}
+                                                    {isVaPending ? 'Awaiting Lead Approval' : (invoice.status === 'sent' ? 'Ready to Send' : invoice.status.replace('_', ' '))}
                                                 </Badge>
                                             </TableCell>
                                             <TableCell className="text-right">
                                                 <div className="flex justify-end gap-1">
                                                     {isLeader && invoice.vaStatus === 'pending' && (
-                                                        <Button size="sm" className="h-8 bg-amber-600 hover:bg-amber-700 font-black text-[9px] uppercase" onClick={() => handleApproveVA(invoice)}>
+                                                        <Button size="sm" className="h-8 bg-amber-600 hover:bg-amber-700 font-black text-[9px] uppercase shadow-lg shadow-amber-100" onClick={() => handleApproveVA(invoice)}>
                                                             <CheckCircle2 className="mr-1 h-3 w-3" /> Approve VA
                                                         </Button>
                                                     )}

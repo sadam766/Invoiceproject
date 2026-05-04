@@ -105,7 +105,7 @@ export default function AddInvoicePage() {
   const [productPopoverOpen, setProductPopoverOpen] = useState(false);
   const [isProcessing, setIsSaving] = useState(false);
 
-  // --- FINAL DP & DISCOUNT STATES ---
+  // DP & Discount States
   const [dpDescription, setDpDescription] = useState('DP 35%');
   const [dpValue, setDpValue] = useState<string>('0');
   const [dpMode, setDpMode] = useState<'tagih' | 'kurangi'>('kurangi');
@@ -195,13 +195,13 @@ export default function AddInvoicePage() {
     if (paymentMethod === 'va') {
         finalVaStatus = 'pending';
         if (invoiceStatus === 'sent') {
-            finalStatus = 'unpaid'; 
+            finalStatus = 'unpaid'; // Maps to "Awaiting Lead Approval" in UI
             requiresVaApproval = true;
         }
     } else {
         finalVaStatus = 'approved';
         if (invoiceStatus === 'sent') {
-            finalStatus = 'sent'; 
+            finalStatus = 'sent'; // Ready to Send
         }
     }
 
@@ -243,6 +243,7 @@ export default function AddInvoicePage() {
         await setDoc(invoiceDocRef, dataToSave, { merge: true });
 
         if (requiresVaApproval) {
+            // Find all Leaders (admins)
             const leadersQuery = query(collection(firestore, 'users'), where('role', '==', 'admin'));
             const leadersSnap = await getDocs(leadersQuery);
             
@@ -257,6 +258,18 @@ export default function AddInvoicePage() {
                     createdAt: timestamp
                 });
             });
+            
+            // Also notify fa@gmail.com explicitly
+            const superAdminNotif = addDoc(collection(firestore, 'notifications'), {
+                recipientId: 'GEMGHpI6gvZQGUengfGWOt95CuJ2', // Example ID for fa@gmail.com if known, or handle in query
+                senderId: user.uid,
+                title: "VA Approval Required (Super Admin)",
+                message: `Invoice ${activeIdentity.id} menunggu approval VA.`,
+                invoiceId: activeIdentity.id,
+                status: 'unread',
+                createdAt: timestamp
+            });
+
             await Promise.all(notifPromises);
         }
 
