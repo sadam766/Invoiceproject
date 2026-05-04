@@ -24,6 +24,10 @@ export const InvoiceTemplate = ({ type, invoiceData, items, calculations }: Invo
   const maxItems = 10;
   const emptyRows = Math.max(0, maxItems - items.length);
 
+  // Mapping fallback logic to ensure customer name and address are never missed
+  const customerName = invoiceData.customerName || invoiceData.customer || 'N/A';
+  const customerAddress = invoiceData.billingAddress || invoiceData.customerAddress || 'N/A';
+
   return (
     <div 
       className={cn(
@@ -32,8 +36,8 @@ export const InvoiceTemplate = ({ type, invoiceData, items, calculations }: Invo
       )}
       style={{ width: '210mm', minHeight: '297mm', fontSize: '9pt', color: '#000000' }}
     >
-      {/* LABEL ORIGINAL/COPY */}
-      <div className="absolute right-12 top-8 text-[10pt] text-black/40 uppercase tracking-widest print:text-black">
+      {/* LABEL ORIGINAL/COPY - Solid Black for Print Professionalism */}
+      <div className="absolute right-12 top-8 text-[10pt] text-black uppercase tracking-widest">
         {type}
       </div>
 
@@ -41,16 +45,16 @@ export const InvoiceTemplate = ({ type, invoiceData, items, calculations }: Invo
       <header className="relative mb-6">
         <div className="text-center w-full space-y-1 text-black">
           <h1 className="font-bold text-[11pt] uppercase tracking-wider">INVOICE/OFFICIAL RECEIPT</h1>
-          {/* REVISI: Ukuran 25pt, Bold, Tanpa "No:" */}
-          <p className="font-bold text-[25pt] leading-tight">{displayInvoiceId}</p>
+          {/* REVISI: Ukuran 18pt, Bold, Tanpa "No:", Center */}
+          <p className="font-bold text-[18pt] leading-tight">{displayInvoiceId}</p>
         </div>
         
         <div className="flex justify-between items-start mt-6 text-black">
           <div className="w-[60%] space-y-1">
-            {/* REVISI: Pastikan Nama & Alamat Muncul (Sync Dashboard) */}
-            <p className="font-bold uppercase text-[10pt]">{invoiceData.customerName || invoiceData.customer || 'N/A'}</p>
-            <p className="text-[8.5pt] leading-tight italic max-w-[350px]">
-                {invoiceData.billingAddress || "N/A"}
+            {/* REVISI: Mapping data pelanggan yang sinkron dengan Dashboard */}
+            <p className="font-bold uppercase text-[10pt]">{customerName}</p>
+            <p className="text-[9pt] leading-tight italic max-w-[350px]">
+                {customerAddress}
             </p>
           </div>
           <div className="text-[9pt] space-y-0.5 text-black" style={{ minWidth: '180px' }}>
@@ -61,7 +65,7 @@ export const InvoiceTemplate = ({ type, invoiceData, items, calculations }: Invo
         </div>
       </header>
 
-      <div className="flex justify-between mb-1 px-0.5 text-[9pt] border-t border-black/10 pt-1 text-black">
+      <div className="flex justify-between mb-1 px-0.5 text-[9pt] border-t border-black pt-1 text-black">
         <span>Customer Code : {invoiceData.customerCode || '-'}</span>
         <span>Date: {invoiceData.date || '-'}</span>
       </div>
@@ -134,12 +138,12 @@ export const InvoiceTemplate = ({ type, invoiceData, items, calculations }: Invo
       {/* FOOTER SECTION */}
       <footer className="mt-8 text-black"> 
         <div className="w-full flex justify-start mb-0.5">
-          <p className="text-[10px] font-medium italic">Reference A : {invoiceData.poNumber || '-'}</p>
+          <p className="text-[9pt] font-medium italic">Reference A : {invoiceData.poNumber || '-'}</p>
         </div>
         <div className="border-t border-black w-full mb-0.5"></div>
 
         <div className="flex justify-end mt-1">
-          <div className="w-1/4 text-[10px] leading-tight">
+          <div className="w-1/4 text-[9pt] leading-tight">
             <div className="grid grid-cols-[1fr_auto] gap-x-4">
               <span>Goods:</span><span className="text-right">{formatCurrency(calculations.subTotalItems - (invoiceData.dpMode === 'kurangi' ? calculations.dpValue : 0) - calculations.discountValue)}</span>
               <span>DPP VAT (11/12):</span><span className="text-right">{formatCurrency(calculations.dppVat)}</span>
@@ -166,8 +170,8 @@ export const InvoiceTemplate = ({ type, invoiceData, items, calculations }: Invo
               {invoiceData.paymentMethod === 'va' ? (
                 <div className="mt-2 space-y-1">
                    <p className="font-bold italic">For payment, please transfer to our Virtual account:</p>
-                   <p className="font-black text-[10pt] uppercase">VIRTUAL ACCOUNT A/N {invoiceData.customerName || invoiceData.customer || 'N/A'}</p>
-                   <p className="font-mono text-xs tracking-widest border border-black/10 w-fit p-1 bg-black/5">{invoiceData.vaNumber || 'AWAITING APPROVAL'}</p>
+                   <p className="font-black text-[10pt] uppercase">VIRTUAL ACCOUNT A/N {customerName}</p>
+                   <p className="font-mono text-xs tracking-widest border border-black w-fit p-1 bg-black/5">{invoiceData.vaNumber || 'AWAITING APPROVAL'}</p>
                 </div>
               ) : (
                 <div className="mt-2 space-y-1">
@@ -178,7 +182,7 @@ export const InvoiceTemplate = ({ type, invoiceData, items, calculations }: Invo
                     <div className="flex"><span className="w-[100px]">Jakarta Cabang</span><span>A/C No. : 102-0005000218 (Rp)</span></div>
                     <div className="flex"><span className="w-[100px]">Jakarta Cabang</span><span>A/C No. : 102-0005000226 (USD)</span></div>
                   </div>
-                  <div className="w-[280px] text-center font-bold text-black/10 py-1">OR</div>
+                  <div className="w-[280px] text-center font-bold text-black opacity-10 py-1">OR</div>
                   <div className="flex items-start">
                     <div className="w-[100px] leading-tight">Bank BCA - Jakarta<br/>(Cabang KEM TOWER)</div>
                     <div>A/C No. : 684-0198977 (Rp)</div>
