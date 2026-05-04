@@ -12,7 +12,7 @@ service cloud.firestore {
       return isSignedIn() && (
         request.auth.token.email == 'fa@gmail.com' ||
         (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
-         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin')
+         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('role', 'staff') == 'admin')
       );
     }
 
@@ -31,11 +31,16 @@ service cloud.firestore {
 
     // Notifications: Diperlukan untuk alur Approval VA & Alert Lonceng
     match /notifications/{id} {
-      // Split read into get and list for better query validation
-      allow get: if isSignedIn() && (isAdmin() || request.auth.uid == resource.data.recipientId);
-      allow list: if isSignedIn() && (isAdmin() || resource.data.recipientId == request.auth.uid);
+      // Allow read (get/list) if admin or if the user is the intended recipient
+      allow get, list: if isSignedIn() && (
+        isAdmin() || 
+        request.auth.uid == resource.data.recipientId
+      );
       allow create: if isSignedIn();
-      allow update: if isSignedIn() && (isAdmin() || request.auth.uid == resource.data.recipientId);
+      allow update: if isSignedIn() && (
+        isAdmin() || 
+        request.auth.uid == resource.data.recipientId
+      );
       allow delete: if isAdmin();
     }
 
