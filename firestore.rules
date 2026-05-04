@@ -7,12 +7,17 @@ service cloud.firestore {
       return request.auth != null;
     }
 
-    // isAdmin: Memverifikasi otoritas leader atau administrator
+    // isSuperAdmin: Pengecekan langsung email leader utama
+    function isSuperAdmin() {
+      return isSignedIn() && request.auth.token.email == 'fa@gmail.com';
+    }
+
+    // isAdmin: Verifikasi otoritas berdasarkan dokumen user atau email super admin
     function isAdmin() {
-      return isSignedIn() && (
-        request.auth.token.email == 'fa@gmail.com' ||
-        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
-         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin')
+      return isSuperAdmin() || (
+        isSignedIn() && 
+        exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin'
       );
     }
 
@@ -29,22 +34,19 @@ service cloud.firestore {
       allow delete: if isAdmin();
     }
 
-    // Notifications: Diperlukan untuk alur Approval VA & Alert Lonceng
+    // Notifications: Dioptimalkan untuk provability kueri list (Ikon Lonceng)
     match /notifications/{id} {
-      // Allow read if user is the recipient OR is the Super Admin
-      // Simplified for better query proving in list operations
+      // Pengecekan read dipisah untuk memastikan kueri berfilter recipientId diizinkan secara statis
       allow read: if isSignedIn() && (
         request.auth.token.email == 'fa@gmail.com' || 
-        request.auth.uid == resource.data.recipientId ||
-        isAdmin()
+        request.auth.uid == resource.data.recipientId
       );
       
       allow create: if isSignedIn();
       
       allow update: if isSignedIn() && (
         request.auth.token.email == 'fa@gmail.com' || 
-        request.auth.uid == resource.data.recipientId ||
-        isAdmin()
+        request.auth.uid == resource.data.recipientId
       );
       
       allow delete: if isAdmin();
@@ -67,7 +69,7 @@ service cloud.firestore {
     match /taxInvoices/{id} { allow read, write: if isSignedIn(); }
     match /virtualAccounts/{id} { allow read, write: if isSignedIn(); }
     
-    // Support for collection group queries or nested paths if used
+    // Support for collection group queries or nested paths
     match /{path=**}/invoices/{id} { allow read, write: if isSignedIn(); }
     match /{path=**}/notifications/{id} { 
       allow read: if isSignedIn() && (request.auth.token.email == 'fa@gmail.com' || request.auth.uid == resource.data.recipientId);
