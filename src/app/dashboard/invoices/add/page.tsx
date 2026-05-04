@@ -259,16 +259,24 @@ export default function AddInvoicePage() {
                 });
             });
             
-            // Also notify fa@gmail.com explicitly
-            const superAdminNotif = addDoc(collection(firestore, 'notifications'), {
-                recipientId: 'GEMGHpI6gvZQGUengfGWOt95CuJ2', // Example ID for fa@gmail.com if known, or handle in query
-                senderId: user.uid,
-                title: "VA Approval Required (Super Admin)",
-                message: `Invoice ${activeIdentity.id} menunggu approval VA.`,
-                invoiceId: activeIdentity.id,
-                status: 'unread',
-                createdAt: timestamp
-            });
+            // Explicitly ensure fa@gmail.com is included if not in the snap
+            const isSuperAdminInSnap = leadersSnap.docs.some(d => d.data().email === 'fa@gmail.com');
+            if (!isSuperAdminInSnap) {
+                // Find Super Admin ID manually or by query
+                const saQuery = query(collection(firestore, 'users'), where('email', '==', 'fa@gmail.com'));
+                const saSnap = await getDocs(saQuery);
+                if (!saSnap.empty) {
+                    notifPromises.push(addDoc(collection(firestore, 'notifications'), {
+                        recipientId: saSnap.docs[0].id,
+                        senderId: user.uid,
+                        title: "VA Approval Required",
+                        message: `Virtual Account untuk Invoice ${activeIdentity.id} memerlukan persetujuan Leader Utama.`,
+                        invoiceId: activeIdentity.id,
+                        status: 'unread',
+                        createdAt: timestamp
+                    }));
+                }
+            }
 
             await Promise.all(notifPromises);
         }

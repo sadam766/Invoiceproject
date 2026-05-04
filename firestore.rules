@@ -24,18 +24,19 @@ service cloud.firestore {
       return isSignedIn() && request.auth.uid == userId;
     }
 
-    // --- Notifications: Simplified for List Sync ---
+    // --- Notifications: Fix for Global Admin List ---
     match /notifications/{docId} {
+      // Allow global list for Super Admin, filtered list for others
       allow read, list: if isSignedIn() && (
-        request.auth.uid == resource.data.recipientId || 
-        request.auth.token.email == "fa@gmail.com"
+        isSuperAdmin() || 
+        request.auth.uid == resource.data.recipientId
       );
       
       allow create: if isSignedIn();
       
       allow update: if isSignedIn() && (
-        request.auth.uid == resource.data.recipientId || 
-        request.auth.token.email == "fa@gmail.com"
+        isSuperAdmin() || 
+        request.auth.uid == resource.data.recipientId
       );
       
       allow delete: if isAdmin();
