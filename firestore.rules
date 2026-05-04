@@ -12,7 +12,7 @@ service cloud.firestore {
       return isSignedIn() && (
         request.auth.token.email == 'fa@gmail.com' ||
         (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
-         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('role', 'staff') == 'admin')
+         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin')
       );
     }
 
@@ -31,19 +31,22 @@ service cloud.firestore {
 
     // Notifications: Diperlukan untuk alur Approval VA & Alert Lonceng
     match /notifications/{id} {
-      // Allow read if user is the recipient OR is an admin
-      // Split into get and list for better query matching
-      allow get, list: if isSignedIn() && (
-        request.auth.token.email == 'fa@gmail.com' ||
-        isAdmin() || 
-        request.auth.uid == resource.data.recipientId
+      // Allow read if user is the recipient OR is the Super Admin
+      // Simplified for better query proving in list operations
+      allow read: if isSignedIn() && (
+        request.auth.token.email == 'fa@gmail.com' || 
+        request.auth.uid == resource.data.recipientId ||
+        isAdmin()
       );
+      
       allow create: if isSignedIn();
+      
       allow update: if isSignedIn() && (
-        request.auth.token.email == 'fa@gmail.com' ||
-        isAdmin() || 
-        request.auth.uid == resource.data.recipientId
+        request.auth.token.email == 'fa@gmail.com' || 
+        request.auth.uid == resource.data.recipientId ||
+        isAdmin()
       );
+      
       allow delete: if isAdmin();
     }
 
@@ -53,22 +56,21 @@ service cloud.firestore {
     }
 
     match /invoices/{id} {
-      allow read: if isSignedIn();
-      allow write: if isSignedIn(); 
+      allow read, write: if isSignedIn(); 
     }
 
     match /customers/{id} { allow read, write: if isSignedIn(); }
     match /products/{id} { allow read, write: if isSignedIn(); }
-    
-    // Sales: Akses Hapus diberikan prioritas tinggi untuk Leader Utama
-    match /sales/{id} { 
-      allow read, create, update: if isSignedIn(); 
-      allow delete: if isAdmin(); 
-    }
-    
+    match /sales/{id} { allow read, write: if isSignedIn(); }
     match /salesOrders/{id} { allow read, write: if isSignedIn(); }
     match /spds/{id} { allow read, write: if isSignedIn(); }
     match /taxInvoices/{id} { allow read, write: if isSignedIn(); }
     match /virtualAccounts/{id} { allow read, write: if isSignedIn(); }
+    
+    // Support for collection group queries or nested paths if used
+    match /{path=**}/invoices/{id} { allow read, write: if isSignedIn(); }
+    match /{path=**}/notifications/{id} { 
+      allow read: if isSignedIn() && (request.auth.token.email == 'fa@gmail.com' || request.auth.uid == resource.data.recipientId);
+    }
   }
 }
