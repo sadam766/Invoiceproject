@@ -79,17 +79,29 @@ export function AddSpdDialog({ isOpen, onOpenChange, onSave, spdData, onAddClick
       });
   }, [allSentInvoices, searchInvoice, spdData]);
 
-  // LOGIC: Generate PS/0588-J/KEU/2026/DK format
+  // LOGIC: Generate PS/0588-J/KEU/2026/DK format with Smart Sequencing
   useEffect(() => {
     if (!isOpen || spdData) return;
 
     const now = new Date();
     const currentYear = format(now, 'yyyy');
     
-    // Count existing SPDs in this year to get the next number
-    const yearSpds = allSpds?.filter(s => s.date.startsWith(currentYear)) || [];
-    const nextNum = (yearSpds.length + 1).toString().padStart(4, '0');
+    // SMART SEQUENCING: Find the highest existing number in database to suggest the next one
+    let maxSequence = 0;
+    if (allSpds) {
+        allSpds.forEach(s => {
+            // Regex to extract digits between PS/ and -J/
+            const match = s.id.match(/PS\/(\d+)-J/);
+            if (match && match[1]) {
+                const num = parseInt(match[1], 10);
+                if (!isNaN(num) && num > maxSequence) {
+                    maxSequence = num;
+                }
+            }
+        });
+    }
     
+    const nextNum = (maxSequence + 1).toString().padStart(4, '0');
     setSpdId(`PS/${nextNum}-J/KEU/${currentYear}/DK`);
   }, [isOpen, spdData, allSpds]);
 
@@ -124,10 +136,11 @@ export function AddSpdDialog({ isOpen, onOpenChange, onSave, spdData, onAddClick
     if (exists) {
         setSelectedInvoices(selectedInvoices.filter(si => si.invoiceId !== inv.id));
     } else {
+        // PERBAIKAN: Pastikan billingAddress diambil dengan benar
         setSelectedInvoices([...selectedInvoices, {
             invoiceId: inv.id,
             customer: inv.customer,
-            address: inv.billingAddress,
+            address: inv.billingAddress || inv.customerAddress || 'Alamat tidak disetel',
             status: 'pending',
             sjNumbers: inv.sjNumbers || [] 
         }]);
@@ -142,7 +155,7 @@ export function AddSpdDialog({ isOpen, onOpenChange, onSave, spdData, onAddClick
   };
 
   const handleSave = async () => {
-    if (!courier || selectedInvoices.length === 0 || !firestore) return;
+    if (!courier || selectedInvoices.length === 0 || !firestore || !spdId) return;
     
     const processedInvoices = selectedInvoices.map(inv => {
         const rawSj = localSjAdditions[inv.invoiceId] || '';
@@ -161,7 +174,7 @@ export function AddSpdDialog({ isOpen, onOpenChange, onSave, spdData, onAddClick
     });
 
     onSave({
-      id: spdId,
+      id: spdId.trim().toUpperCase(),
       date,
       courier,
       invoices: processedInvoices,
@@ -197,8 +210,14 @@ export function AddSpdDialog({ isOpen, onOpenChange, onSave, spdData, onAddClick
           <div className="bg-slate-50 p-8 space-y-8 border-r md:col-span-2">
              <div className="space-y-6">
                 <div className="space-y-2">
-                    <Label className="text-[9px] font-black uppercase text-slate-400 tracking-widest">Nomor SPD Digital (Auto)</Label>
-                    <div className="bg-white p-3 rounded-xl border border-indigo-100 font-mono text-xs font-black text-indigo-700 shadow-sm">{spdId}</div>
+                    <Label className="text-[9px] font-black uppercase text-slate-400 tracking-widest">Nomor SPD Digital (Editable)</Label>
+                    <Input 
+                        value={spdId} 
+                        onChange={e => setSpdId(e.target.value)} 
+                        className="h-11 bg-white border-indigo-100 font-mono text-xs font-black text-indigo-700 shadow-sm focus-visible:ring-indigo-500 uppercase"
+                        placeholder="PS/0001-J/KEU/2026/DK"
+                    />
+                    <p className="text-[8px] text-slate-400 font-bold uppercase italic">Anda dapat menyesuaikan nomor urut jika diperlukan.</p>
                 </div>
                 <div className="space-y-2">
                     <Label className="text-[9px] font-black uppercase text-slate-400 tracking-widest">Tanggal Pengiriman</Label>
@@ -323,7 +342,7 @@ export function AddSpdDialog({ isOpen, onOpenChange, onSave, spdData, onAddClick
                                             <p className="text-sm font-black uppercase text-slate-800 truncate leading-none">{inv.customer}</p>
                                             <div className="flex items-start gap-1.5 text-[10px] text-slate-400">
                                                 <MapPin className="h-3 w-3 shrink-0 mt-0.5 text-rose-400" />
-                                                <span className="line-clamp-1 italic font-medium">{inv.billingAddress}</span>
+                                                <span className="line-clamp-1 italic font-medium">{inv.billingAddress || inv.customerAddress || 'Alamat tidak tersedia'}</span>
                                             </div>
                                         </div>
                                     </div>
@@ -344,7 +363,7 @@ export function AddSpdDialog({ isOpen, onOpenChange, onSave, spdData, onAddClick
                     <Button 
                         type="button" 
                         onClick={handleSave} 
-                        disabled={!courier || selectedInvoices.length === 0}
+                        disabled={!courier || selectedInvoices.length === 0 || !spdId}
                         className="h-14 flex-1 bg-indigo-600 hover:bg-indigo-700 shadow-2xl shadow-indigo-200 rounded-2xl font-black uppercase text-xs tracking-[0.2em] transition-all hover:-translate-y-1 active:translate-y-0"
                     >
                         <CheckCircle2 className="mr-2 h-5 w-5" /> TERBITKAN SPD (SIAP JALAN)

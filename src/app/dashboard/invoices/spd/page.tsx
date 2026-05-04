@@ -1,4 +1,3 @@
-
 'use client';
 import { useState, useMemo, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
@@ -99,7 +98,7 @@ import {
                 const entries: SpdInvoiceEntry[] = invoices.map(inv => ({
                     invoiceId: inv.id,
                     customer: inv.customer,
-                    address: inv.billingAddress,
+                    address: inv.billingAddress || inv.customerAddress || 'Alamat tidak disetel',
                     status: 'pending',
                     sjNumbers: inv.sjNumbers || []
                 }));
@@ -171,12 +170,13 @@ import {
     const handleSave = async (newItem: SpdData) => {
         if (!firestore || !user) return;
 
-        const existing = spds?.find(s => s.id.toLowerCase() === newItem.id.toLowerCase());
-        if (existing && !editingSpd) {
+        // VALIDASI DUPLIKASI: Cek apakah nomor SPD sudah ada, kecuali jika sedang mengedit SPD yang sama
+        const existing = spds?.find(s => s.id.trim().toUpperCase() === newItem.id.trim().toUpperCase());
+        if (existing && (!editingSpd || editingSpd.id !== newItem.id)) {
             toast({ 
                 variant: "destructive", 
                 title: "Nomor SPD Duplikat", 
-                description: `Nomor ini sudah digunakan oleh ${existing.createdBy || 'User lain'}.` 
+                description: `Nomor SPD ${newItem.id} sudah digunakan oleh ${existing.createdBy || 'User lain'}. Gunakan nomor urut lain.` 
             });
             return;
         }
