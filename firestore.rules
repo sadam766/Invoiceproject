@@ -31,9 +31,11 @@ service cloud.firestore {
 
     // Notifications: Diperlukan untuk alur Approval VA & Alert Lonceng
     match /notifications/{id} {
-      allow read: if isSignedIn() && (request.auth.uid == resource.data.recipientId || isAdmin());
+      // Split read into get and list for better query validation
+      allow get: if isSignedIn() && (isAdmin() || request.auth.uid == resource.data.recipientId);
+      allow list: if isSignedIn() && (isAdmin() || resource.data.recipientId == request.auth.uid);
       allow create: if isSignedIn();
-      allow update: if isSignedIn() && request.auth.uid == resource.data.recipientId;
+      allow update: if isSignedIn() && (isAdmin() || request.auth.uid == resource.data.recipientId);
       allow delete: if isAdmin();
     }
 
@@ -53,7 +55,7 @@ service cloud.firestore {
     // Sales: Akses Hapus diberikan prioritas tinggi untuk Leader Utama
     match /sales/{id} { 
       allow read, create, update: if isSignedIn(); 
-      allow delete: if request.auth.token.email == 'fa@gmail.com' || isAdmin(); 
+      allow delete: if isAdmin(); 
     }
     
     match /salesOrders/{id} { allow read, write: if isSignedIn(); }
