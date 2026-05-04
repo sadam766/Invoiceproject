@@ -1,6 +1,5 @@
 
 import type { LucideIcon } from 'lucide-react';
-import { PlaceHolderImages, type ImagePlaceholder } from '@/lib/placeholder-images';
 
 export type UserProfile = {
   uid: string;
@@ -48,6 +47,7 @@ export type Invoice = {
   poNumber: string;
   customer: string;
   customerCode?: string;
+  customerName?: string;
   billingAddress: string;
   billingNpwp?: string;
   date: string; 
@@ -58,8 +58,12 @@ export type Invoice = {
   spdNumber?: string;
   paymentMethod?: string;
   vaNumber?: string;
+  vaStatus?: 'pending' | 'approved' | 'rejected';
+  vaApprovedBy?: string;
+  vaApprovedAt?: string;
   ownerId?: string;
   createdBy?: string;
+  creatorId?: string;
   lastUpdatedBy?: string;
   lastUpdatedAt?: string;
   revisionLogs?: RevisionLog[];
@@ -68,13 +72,21 @@ export type Invoice = {
   negotiationMode?: 'percent' | 'nominal';
   dpValue?: number; 
   dpDeduction?: number; 
-  unusedDpCredit?: number; 
-  isOverBillingAllowed?: boolean; 
   retention?: number;
   payments?: PaymentRecord[];
   items?: InvoiceItem[];
   isDpInvoice?: boolean;
-  isOriginalPrinted?: boolean;
+};
+
+export type AppNotification = {
+  id: string;
+  recipientId: string;
+  senderId: string;
+  title: string;
+  message: string;
+  invoiceId: string;
+  status: 'unread' | 'read';
+  createdAt: string;
 };
 
 export type InvoiceNumber = {

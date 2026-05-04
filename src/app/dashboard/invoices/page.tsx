@@ -1,3 +1,4 @@
+
 'use client';
 import { useState, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
@@ -29,7 +30,7 @@ import {
   import { Label } from '@/components/ui/label';
   import { Textarea } from '@/components/ui/textarea';
   import { type Invoice, type UserProfile } from '@/app/lib/data';
-  import { Search, MoreHorizontal, Eye, Pencil, Download, Truck, FileSpreadsheet, XCircle, ShieldCheck, Layers, Database, Hash, History, Trash2, AlertTriangle } from 'lucide-react';
+  import { Search, MoreHorizontal, Eye, Pencil, Download, Truck, FileSpreadsheet, XCircle, ShieldCheck, Layers, Database, Hash, History, Trash2, AlertTriangle, CheckCircle2 } from 'lucide-react';
   import { Skeleton } from '@/components/ui/skeleton';
   import {
     DropdownMenu,
@@ -39,7 +40,7 @@ import {
   } from '@/components/ui/dropdown-menu';
   import { useToast } from '@/hooks/use-toast';
   import { useFirestore, useUser, useMemoFirebase, errorEmitter, FirestorePermissionError, useDoc } from '@/firebase';
-  import { collection, query, doc, updateDoc, arrayUnion, deleteDoc, writeBatch } from 'firebase/firestore';
+  import { collection, query, doc, updateDoc, arrayUnion, deleteDoc, writeBatch, addDoc } from 'firebase/firestore';
   import { exportToExcel, cn } from '@/lib/utils';
   import { DateRangePicker } from '@/app/components/date-range-picker';
   import { isWithinInterval, parseISO, startOfToday, format, subDays, startOfMonth, endOfMonth } from 'date-fns';
@@ -52,7 +53,6 @@ import {
     const [searchQuery, setSearchQuery] = useState('');
     const [selectedInvoices, setSelectedInvoices] = useState<Set<string>>(new Set());
     
-    // Set default range to current month to avoid empty list on fresh load
     const [dateRange, setDateRange] = useState<{ from: Date; to: Date }>({
         from: startOfMonth(new Date()),
         to: endOfMonth(new Date()),
@@ -80,12 +80,12 @@ import {
     const { data: userProfile } = useDoc<UserProfile>(userProfileRef);
 
     const isSuperAdmin = user?.email?.toLowerCase() === 'fa@gmail.com' || userProfile?.email?.toLowerCase() === 'fa@gmail.com';
+    const isLeader = userProfile?.role === 'admin' || isSuperAdmin;
 
     const filteredInvoices = useMemo(() => {
         if (!invoices) return [];
         let filtered = invoices;
 
-        // Smart Filtering: If there is a search query, search across all dates
         if (!searchQuery) {
             filtered = filtered.filter(inv => {
                 const invDate = parseISO(inv.date);
@@ -114,6 +114,43 @@ import {
 
         return filtered.sort((a,b) => b.date.localeCompare(a.date));
     }, [invoices, activeTab, searchQuery, dateRange]);
+
+    const handleApproveVA = async (invoice: Invoice) => {
+        if (!firestore || !user || !isLeader) return;
+        const safeId = invoice.id.replace(/\//g, '_');
+        const docRef = doc(firestore, 'invoices', safeId);
+        const timestamp = new Date().toISOString();
+
+        try {
+            await updateDoc(docRef, {
+                vaStatus: 'approved',
+                vaApprovedBy: user.email,
+                vaApprovedAt: timestamp,
+                revisionLogs: arrayUnion({
+                    updatedBy: userProfile?.displayName || user.email || 'Leader',
+                    updatedAt: timestamp,
+                    action: "Virtual Account APPROVED by Leader"
+                })
+            });
+
+            // NOTIFY BACK TO ADMIN (Creator)
+            if (invoice.creatorId) {
+                await addDoc(collection(firestore, 'notifications'), {
+                    recipientId: invoice.creatorId,
+                    senderId: user.uid,
+                    title: "VA Approved",
+                    message: `Virtual Account untuk Invoice ${invoice.id} telah disetujui. Dokumen siap dikirim.`,
+                    invoiceId: invoice.id,
+                    status: 'unread',
+                    createdAt: timestamp
+                });
+            }
+
+            toast({ title: "VA Approved", description: "Status pembayaran VA kini aktif dan Admin telah dinotifikasi." });
+        } catch (error) {
+            toast({ variant: "destructive", title: "Approval Gagal" });
+        }
+    };
 
     const handleVoidInvoice = () => {
         if (!firestore || !targetInvoiceId || !voidReason || !user) return;
@@ -157,13 +194,13 @@ import {
 
         const batch = writeBatch(firestore);
         batch.delete(invoiceRef);
-        batch.delete(identityRef); // Cascade cleanup of identity registry
+        batch.delete(identityRef);
 
         batch.commit()
             .then(() => {
                 toast({ 
                     title: "Data Dihapus Permanen", 
-                    description: `Nomor ${deleteTargetId} telah dihapus total dari repository dan identitas.` 
+                    description: `Nomor ${deleteTargetId} telah dihapus total dari repository.` 
                 });
                 setDeleteDialogOpen(false);
                 setDeleteTargetId(null);
@@ -172,30 +209,6 @@ import {
                 errorEmitter.emit('permission-error', new FirestorePermissionError({
                     path: invoiceRef.path,
                     operation: 'delete',
-                }));
-            });
-    };
-
-    const handleFinalize = (invoiceId: string) => {
-        if (!firestore || !isSuperAdmin || !user) return;
-        const safeId = invoiceId.replace(/\//g, '_');
-        const docRef = doc(firestore, 'invoices', safeId);
-        const timestamp = new Date().toISOString();
-        const updateData = { 
-            status: 'finalized',
-            lastUpdatedAt: timestamp,
-            lastUpdatedBy: userProfile?.displayName || user.email || 'Leader'
-        };
-
-        updateDoc(docRef, updateData)
-            .then(() => {
-                toast({ title: "Invoice Finalized", description: "Data sekarang terkunci untuk audit." });
-            })
-            .catch(async (serverError) => {
-                errorEmitter.emit('permission-error', new FirestorePermissionError({
-                    path: docRef.path,
-                    operation: 'update',
-                    requestResourceData: updateData
                 }));
             });
     };
@@ -247,7 +260,7 @@ import {
                                     <TableHead className="text-[10px] font-black uppercase tracking-widest">Identitas Penagihan</TableHead>
                                     <TableHead className="text-[10px] font-black uppercase tracking-widest">Legal Customer & PO</TableHead>
                                     <TableHead className="text-[10px] font-black uppercase tracking-widest text-right">Total Tagihan</TableHead>
-                                    <TableHead className="text-[10px] font-black uppercase tracking-widest text-right">Outstanding</TableHead>
+                                    <TableHead className="text-[10px] font-black uppercase tracking-widest text-center">VA Status</TableHead>
                                     <TableHead className="text-[10px] font-black uppercase tracking-widest">Status</TableHead>
                                     <TableHead className="text-right text-[10px] font-black uppercase tracking-widest">Aksi</TableHead>
                                 </TableRow>
@@ -277,8 +290,15 @@ import {
                                                 <div className="text-[9px] text-muted-foreground truncate max-w-[200px] italic">PO: {invoice.poNumber}</div>
                                             </TableCell>
                                             <TableCell className="text-xs font-black text-right">Rp {invoice.amount.toLocaleString('id-ID')}</TableCell>
-                                            <TableCell className="text-xs font-black text-right text-red-600">
-                                                {outstandingDoc > 0 ? `Rp ${outstandingDoc.toLocaleString('id-ID')}` : '-'}
+                                            <TableCell className="text-center">
+                                                {invoice.paymentMethod === 'va' ? (
+                                                    <Badge className={cn(
+                                                        "text-[8px] font-black uppercase",
+                                                        invoice.vaStatus === 'approved' ? "bg-emerald-50 text-emerald-700 border-emerald-100" : "bg-amber-50 text-amber-700 border-amber-100"
+                                                    )}>
+                                                        {invoice.vaStatus === 'approved' ? 'Approved/Ready' : 'Awaiting Lead Approval'}
+                                                    </Badge>
+                                                ) : <span className="text-[8px] text-slate-300">-</span>}
                                             </TableCell>
                                             <TableCell>
                                                 <Badge 
@@ -293,28 +313,35 @@ import {
                                                 </Badge>
                                             </TableCell>
                                             <TableCell className="text-right">
-                                                <DropdownMenu>
-                                                    <DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8 rounded-full"><MoreHorizontal className="h-4 w-4" /></Button></DropdownMenuTrigger>
-                                                    <DropdownMenuContent align="end" className="w-48">
-                                                        <DropdownMenuItem onClick={() => router.push(`/dashboard/invoices/preview/${encodeURIComponent(invoice.id)}`)}><Eye className="mr-2 h-4 w-4" /> Pratinjau Cetak</DropdownMenuItem>
-                                                        {invoice.status !== 'finalized' && invoice.status !== 'cancelled' && invoice.status !== 'paid' && (
-                                                            <DropdownMenuItem onClick={() => router.push(`/dashboard/invoices/add?editInvoiceId=${invoice.id.replace(/\//g, '_')}`)}><Pencil className="mr-2 h-4 w-4" /> Ubah Data</DropdownMenuItem>
-                                                        )}
-                                                        {isSuperAdmin && (
-                                                            <DropdownMenuItem 
-                                                                className="text-red-600 font-bold" 
-                                                                onClick={() => { setDeleteTargetId(invoice.id); setDeleteDialogOpen(true); }}
-                                                            >
-                                                                <Trash2 className="mr-2 h-4 w-4" /> {isEmpty ? 'Hapus Kosong' : 'Hapus Permanen'}
-                                                            </DropdownMenuItem>
-                                                        )}
-                                                        {invoice.status !== 'cancelled' && (
-                                                            <DropdownMenuItem className="text-destructive font-bold" onClick={() => { setTargetInvoiceId(invoice.id); setVoidDialogOpen(true); }}>
-                                                                <XCircle className="mr-2 h-4 w-4" /> Tandai VOID
-                                                            </DropdownMenuItem>
-                                                        )}
-                                                    </DropdownMenuContent>
-                                                </DropdownMenu>
+                                                <div className="flex justify-end gap-1">
+                                                    {isLeader && invoice.vaStatus === 'pending' && (
+                                                        <Button size="sm" className="h-8 bg-amber-600 hover:bg-amber-700 font-black text-[9px] uppercase" onClick={() => handleApproveVA(invoice)}>
+                                                            <CheckCircle2 className="mr-1 h-3 w-3" /> Approve VA
+                                                        </Button>
+                                                    )}
+                                                    <DropdownMenu>
+                                                        <DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8 rounded-full"><MoreHorizontal className="h-4 w-4" /></Button></DropdownMenuTrigger>
+                                                        <DropdownMenuContent align="end" className="w-48">
+                                                            <DropdownMenuItem onClick={() => router.push(`/dashboard/invoices/preview/${encodeURIComponent(invoice.id)}`)}><Eye className="mr-2 h-4 w-4" /> Pratinjau Cetak</DropdownMenuItem>
+                                                            {invoice.status !== 'finalized' && invoice.status !== 'cancelled' && invoice.status !== 'paid' && (
+                                                                <DropdownMenuItem onClick={() => router.push(`/dashboard/invoices/add?editInvoiceId=${invoice.id.replace(/\//g, '_')}`)}><Pencil className="mr-2 h-4 w-4" /> Ubah Data</DropdownMenuItem>
+                                                            )}
+                                                            {isSuperAdmin && (
+                                                                <DropdownMenuItem 
+                                                                    className="text-red-600 font-bold" 
+                                                                    onClick={() => { setDeleteTargetId(invoice.id); setDeleteDialogOpen(true); }}
+                                                                >
+                                                                    <Trash2 className="mr-2 h-4 w-4" /> {isEmpty ? 'Hapus Kosong' : 'Hapus Permanen'}
+                                                                </DropdownMenuItem>
+                                                            )}
+                                                            {invoice.status !== 'cancelled' && (
+                                                                <DropdownMenuItem className="text-destructive font-bold" onClick={() => { setTargetInvoiceId(invoice.id); setVoidDialogOpen(true); }}>
+                                                                    <XCircle className="mr-2 h-4 w-4" /> Tandai VOID
+                                                                </DropdownMenuItem>
+                                                            )}
+                                                        </DropdownMenuContent>
+                                                    </DropdownMenu>
+                                                </div>
                                             </TableCell>
                                         </TableRow>
                                     );
@@ -356,7 +383,7 @@ import {
                         <AlertTriangle className="h-5 w-5" /> Hapus Total
                     </DialogTitle>
                     <DialogDescription>
-                        Data invoice <b>{deleteTargetId}</b> akan dihapus permanen dari seluruh sistem, termasuk registrasi identitasnya.
+                        Data invoice <b>{deleteTargetId}</b> akan dihapus permanen dari seluruh sistem.
                     </DialogDescription>
                 </DialogHeader>
                 <DialogFooter className="mt-4">

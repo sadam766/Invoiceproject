@@ -37,6 +37,7 @@ import {
   CreditCard,
   Layers,
   History,
+  Clock,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -54,8 +55,8 @@ import { ThemeToggle } from '../components/theme-toggle';
 import { cn } from '@/lib/utils';
 import { useAuth, useUser, useFirestore, useDoc, useMemoFirebase, useCollection } from '@/firebase';
 import { signOut } from 'firebase/auth';
-import { doc, query, collection } from 'firebase/firestore';
-import type { UserProfile, Invoice, Customer, ProductListItem, SalesListItem, SalesOrder } from '@/app/lib/data';
+import { doc, query, collection, where, orderBy, limit, updateDoc } from 'firebase/firestore';
+import type { UserProfile, Invoice, Customer, ProductListItem, SalesListItem, SalesOrder, AppNotification } from '@/app/lib/data';
 import { startOfToday, isBefore, parseISO } from 'date-fns';
 import { TOOLTIP_CONTENT } from '../lib/tooltip-content';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
@@ -107,6 +108,30 @@ export default function DashboardLayout({
 
   const soQuery = useMemoFirebase(() => (!firestore ? null : query(collection(firestore, 'salesOrders'))), [firestore]);
   const { data: allSalesOrders, isLoading: soLoading } = useCollection<SalesOrder>(soQuery);
+
+  // NOTIFICATIONS LISTENER
+  const notifQuery = useMemoFirebase(() => {
+    if (!firestore || !user) return null;
+    return query(
+      collection(firestore, 'notifications'),
+      where('recipientId', '==', user.uid),
+      orderBy('createdAt', 'desc'),
+      limit(10)
+    );
+  }, [firestore, user]);
+  const { data: notifications } = useCollection<AppNotification>(notifQuery);
+
+  const unreadNotifCount = useMemo(() => {
+    return notifications?.filter(n => n.status === 'unread').length || 0;
+  }, [notifications]);
+
+  const handleNotificationClick = async (notif: AppNotification) => {
+    if (!firestore) return;
+    // Mark as read
+    await updateDoc(doc(firestore, 'notifications', notif.id), { status: 'read' });
+    // Navigate to invoice
+    router.push(`/dashboard/invoices`);
+  };
 
   const userProfileRef = useMemoFirebase(() => {
     if (!firestore || !user) return null;
@@ -181,10 +206,6 @@ export default function DashboardLayout({
                       placeholder="Quick Search..." 
                       className="h-9 w-full bg-slate-800/50 border-none text-xs rounded-full pl-9 pr-12 focus-visible:ring-1 focus-visible:ring-primary/50 text-slate-200"
                   />
-                  <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-0.5 opacity-40">
-                      <kbd className="text-[8px] font-mono border px-1 rounded bg-slate-900 border-slate-700 text-slate-400">CTRL</kbd>
-                      <kbd className="text-[8px] font-mono border px-1 rounded bg-slate-900 border-slate-700 text-slate-400">K</kbd>
-                  </div>
                </div>
             </div>
           </SidebarHeader>
@@ -299,38 +320,54 @@ export default function DashboardLayout({
               <div className="flex items-center gap-4 ml-auto">
                   <ThemeToggle />
                   
-                  <TooltipProvider>
-                      <Tooltip>
-                          <TooltipTrigger asChild>
-                              <DropdownMenu>
-                                  <DropdownMenuTrigger asChild>
-                                      <Button className="bg-primary hover:bg-primary/90 shadow-lg shadow-primary/20 h-10 px-6 rounded-2xl gap-2 font-black uppercase text-[10px] tracking-widest text-white transition-smooth active:scale-95">
-                                          <Plus className="h-4 w-4" /> Quick Add
-                                      </Button>
-                                  </DropdownMenuTrigger>
-                                  <DropdownMenuContent align="end" className="w-56 p-2 rounded-2xl shadow-premium border-none ring-1 ring-slate-100">
-                                      <DropdownMenuLabel className="text-[10px] uppercase tracking-widest font-black text-slate-400 p-2">Transaction Shortcut</DropdownMenuLabel>
-                                      <DropdownMenuItem onClick={() => router.push('/dashboard/sales-orders')} className="rounded-xl py-3 cursor-pointer"><ShoppingCart className="mr-3 h-4 w-4 text-blue-500" /> New SO</DropdownMenuItem>
-                                      <DropdownMenuItem onClick={() => router.push('/dashboard/sales')} className="rounded-xl py-3 cursor-pointer"><Layers className="mr-3 h-4 w-4 text-indigo-500" /> Register PO</DropdownMenuItem>
-                                      <DropdownMenuItem onClick={() => router.push('/dashboard/customers')} className="rounded-xl py-3 cursor-pointer"><Users className="mr-3 h-4 w-4 text-emerald-500" /> New Customer</DropdownMenuItem>
-                                  </DropdownMenuContent>
-                              </DropdownMenu>
-                          </TooltipTrigger>
-                          <TooltipContent className="bg-slate-900 text-white text-[11px] font-medium px-3 py-1.5 rounded-lg border-none shadow-xl">
-                              {TOOLTIP_CONTENT.quick_add}
-                          </TooltipContent>
-                      </Tooltip>
-                  </TooltipProvider>
-
-                  <Button variant="ghost" size="icon" className="relative h-10 w-10 rounded-2xl bg-slate-50 text-slate-400 hover:bg-slate-100 transition-smooth">
-                      <Bell className="h-5 w-5" />
-                      {overdueCount > 0 && (
-                          <span className="absolute top-2 right-2 flex h-2 w-2">
-                              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-75"></span>
-                              <span className="relative inline-flex rounded-full h-2 w-2 bg-rose-500"></span>
-                          </span>
-                      )}
-                  </Button>
+                  {/* NOTIFICATION BELL */}
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="ghost" size="icon" className="relative h-10 w-10 rounded-2xl bg-slate-50 text-slate-400 hover:bg-slate-100 transition-smooth">
+                          <Bell className="h-5 w-5" />
+                          {unreadNotifCount > 0 && (
+                              <span className="absolute top-2 right-2 flex h-4 w-4">
+                                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-75"></span>
+                                  <span className="relative inline-flex rounded-full h-4 w-4 bg-rose-500 text-[8px] font-black text-white items-center justify-center">
+                                    {unreadNotifCount}
+                                  </span>
+                              </span>
+                          )}
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent className="w-80 p-2 rounded-2xl shadow-premium border-none ring-1 ring-slate-100" align="end">
+                        <DropdownMenuLabel className="text-[10px] uppercase tracking-widest font-black text-slate-400 p-2 flex justify-between">
+                          System Notifications
+                          {unreadNotifCount > 0 && <Badge variant="secondary" className="bg-rose-50 text-rose-600 border-none text-[8px] h-4">New Action</Badge>}
+                        </DropdownMenuLabel>
+                        <DropdownMenuSeparator className="my-1" />
+                        {notifications?.length === 0 ? (
+                          <div className="p-8 text-center opacity-30">
+                            <Clock className="h-8 w-8 mx-auto mb-2" />
+                            <p className="text-[10px] font-black uppercase tracking-widest">Inbox is Empty</p>
+                          </div>
+                        ) : (
+                          <div className="max-h-96 overflow-y-auto space-y-1">
+                            {notifications?.map((n) => (
+                              <DropdownMenuItem 
+                                key={n.id} 
+                                onClick={() => handleNotificationClick(n)}
+                                className={cn(
+                                  "p-3 rounded-xl cursor-pointer flex flex-col items-start gap-1 transition-colors",
+                                  n.status === 'unread' ? "bg-indigo-50/50" : "hover:bg-slate-50"
+                                )}
+                              >
+                                <div className="flex justify-between w-full">
+                                  <span className="text-[10px] font-black text-indigo-700 uppercase">{n.title}</span>
+                                  <span className="text-[8px] font-bold text-slate-400">{n.createdAt?.split('T')[0]}</span>
+                                </div>
+                                <p className="text-xs font-bold text-slate-700 leading-tight">{n.message}</p>
+                              </DropdownMenuItem>
+                            ))}
+                          </div>
+                        )}
+                    </DropdownMenuContent>
+                  </DropdownMenu>
 
                   <div className="h-8 w-px bg-slate-100 mx-2" />
 

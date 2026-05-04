@@ -41,41 +41,24 @@
         "date": { "type": "string" },
         "items": { "type": "array" },
         "vaNumber": { "type": "string" },
+        "vaStatus": { "type": "string", "enum": ["pending", "approved", "rejected"] },
+        "vaApprovedBy": { "type": "string" },
+        "vaApprovedAt": { "type": "string" },
+        "createdBy": { "type": "string", "description": "User ID of the creator" },
         "revisionLogs": { "type": "array" }
       }
     },
-    "InvoiceNumber": {
-      "title": "Invoice Identity",
+    "Notification": {
+      "title": "In-App Notification",
       "type": "object",
       "properties": {
-        "id": { "type": "string" },
-        "customer": { "type": "string" },
-        "customerCode": { "type": "string" },
-        "salesOrder": { "type": "string" },
-        "poNumber": { "type": "string" },
-        "date": { "type": "string" }
-      }
-    },
-    "SalesOrder": {
-      "title": "Sales Order Item",
-      "type": "object",
-      "properties": {
-        "soNumber": { "type": "string" },
-        "productName": { "type": "string" },
-        "quantity": { "type": "number" },
-        "price": { "type": "number" },
-        "customer": { "type": "string" }
-      }
-    },
-    "SalesListItem": {
-      "title": "Purchase Order Registry",
-      "type": "object",
-      "properties": {
-        "poNumber": { "type": "string" },
-        "customer": { "type": "string" },
-        "amount": { "type": "number" },
-        "paidOffline": { "type": "number" },
-        "status": { "type": "string" }
+        "recipientId": { "type": "string" },
+        "senderId": { "type": "string" },
+        "title": { "type": "string" },
+        "message": { "type": "string" },
+        "invoiceId": { "type": "string" },
+        "status": { "type": "string", "enum": ["unread", "read"] },
+        "createdAt": { "type": "string" }
       }
     }
   },
@@ -95,21 +78,9 @@
       "schema": "#/entities/Invoice",
       "description": "Billing documents with item progress"
     },
-    "/invoiceNumbers/{id}": {
-      "schema": "#/entities/InvoiceNumber",
-      "description": "Identity registry for SAR/ERP numbers"
-    },
-    "/salesOrders/{id}": {
-      "schema": "#/entities/SalesOrder",
-      "description": "Sales Order contract items"
-    },
-    "/sales/{id}": {
-      "schema": "#/entities/SalesListItem",
-      "description": "Global PO registry"
-    },
-    "/products/{id}": { "schema": "object", "description": "Master product inventory" },
-    "/spds/{id}": { "schema": "object", "description": "Document dispatch tracking" },
-    "/taxInvoices/{id}": { "schema": "object", "description": "Tax invoice synchronization" },
-    "/virtualAccounts/{id}": { "schema": "object", "description": "Customer payment accounts" }
+    "/notifications/{id}": {
+      "schema": "#/entities/Notification",
+      "description": "System and approval notifications"
+    }
   }
 }

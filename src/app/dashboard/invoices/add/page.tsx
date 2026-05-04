@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useEffect, useState, useMemo } from 'react';
@@ -41,8 +42,8 @@ import {
 } from 'lucide-react';
 import { type Invoice, type UserProfile, type InvoiceItem, type InvoiceNumber } from '@/app/lib/data';
 import { useToast } from '@/hooks/use-toast';
-import { useFirestore, useMemoFirebase, useUser, useDoc, errorEmitter, FirestorePermissionError } from '@/firebase';
-import { collection, query, doc, setDoc, arrayUnion } from 'firebase/firestore';
+import { useFirestore, useMemoFirebase, useUser, useDoc, errorEmitter, FirestorePermissionError, useCollection } from '@/firebase';
+import { collection, query, doc, setDoc, arrayUnion, addDoc, getDocs, where } from 'firebase/firestore';
 import { Badge } from '@/components/ui/badge';
 import {
     Command,
@@ -88,7 +89,6 @@ export default function AddInvoicePage() {
 
   const userProfileRef = useMemoFirebase(() => (!firestore || !user) ? null : doc(firestore, 'users', user.uid), [firestore, user]);
   const { data: userProfile } = useDoc<UserProfile>(userProfileRef);
-  const isAdmin = user?.email?.toLowerCase() === 'fa@gmail.com' || userProfile?.role === 'admin';
 
   const [items, setItems] = useState<InvoiceItem[]>([]);
   const [selectedSoNumber, setSelectedSoNumber] = useState('');
@@ -169,10 +169,7 @@ export default function AddInvoicePage() {
     const dpDedInputVal = parseFormattedNumber(dpDeductionValue);
     const dpDedNominal = dpDeductionMode === 'percent' ? (subTotalItems * (dpDedInputVal / 100)) : dpDedInputVal;
 
-    // Goods = Total Barang - DP - Diskon (As per Instruction #13)
     const goodsValue = subTotalItems - dpVal - negotiation;
-    
-    // Back-calculation PPN 12% from Goods
     const dppVat = goodsValue * (11 / 12);
     const vat12 = dppVat * 0.12;
     
@@ -201,6 +198,9 @@ export default function AddInvoicePage() {
     const timestamp = new Date().toISOString();
     const updater = userProfile?.displayName || user.email || 'System';
 
+    // VA Approval Trigger
+    const requiresVaApproval = paymentMethod === 'va' && invoiceStatus === 'sent';
+
     const dataToSave: any = {
         id: activeIdentity.id,
         soNumber: selectedSoNumber,
@@ -213,6 +213,7 @@ export default function AddInvoicePage() {
         dueDate: format(dueDate, 'yyyy-MM-dd'),
         amount: calcs.totalRp,
         status: invoiceStatus,
+        vaStatus: requiresVaApproval ? 'pending' : (paymentMethod === 'va' ? 'approved' : null),
         isDpInvoice: isDpInvoice,
         paymentMethod: paymentMethod,
         vaNumber: paymentMethod === 'va' ? manualVaNumber : '',
@@ -223,6 +224,8 @@ export default function AddInvoicePage() {
         dppVat: calcs.dppVat,
         vat12: calcs.vat12,
         items: items,
+        creatorId: user.uid,
+        createdBy: updater,
         lastUpdatedAt: timestamp,
         lastUpdatedBy: updater,
         revisionLogs: arrayUnion({
@@ -232,21 +235,42 @@ export default function AddInvoicePage() {
         })
     };
 
-    setDoc(invoiceDocRef, dataToSave, { merge: true })
-        .then(() => {
-            toast({ title: "Invoice Berhasil Disimpan" });
-            if (redirectToPreview) {
-                router.push(`/dashboard/invoices/preview/${encodeURIComponent(activeIdentity.id)}`);
-            } else {
-                router.push('/dashboard/invoices');
-            }
-        })
-        .catch(err => {
-            errorEmitter.emit('permission-error', new FirestorePermissionError({
-                path: invoiceDocRef.path, operation: 'write', requestResourceData: dataToSave
-            }));
-        })
-        .finally(() => setIsSaving(false));
+    try {
+        await setDoc(invoiceDocRef, dataToSave, { merge: true });
+
+        // CREATE NOTIFICATIONS FOR LEADERS
+        if (requiresVaApproval) {
+            const leadersQuery = query(collection(firestore, 'users'), where('role', '==', 'admin'));
+            const leadersSnap = await getDocs(leadersQuery);
+            
+            const notifPromises = leadersSnap.docs.map(lDoc => {
+                return addDoc(collection(firestore, 'notifications'), {
+                    recipientId: lDoc.id,
+                    senderId: user.uid,
+                    title: "VA Approval Required",
+                    message: `Invoice ${activeIdentity.id} memerlukan persetujuan Virtual Account Mandiri.`,
+                    invoiceId: activeIdentity.id,
+                    status: 'unread',
+                    createdAt: timestamp
+                });
+            });
+            await Promise.all(notifPromises);
+            toast({ title: "Notifikasi Approval Terkirim ke Leader" });
+        }
+
+        toast({ title: "Invoice Berhasil Disimpan" });
+        if (redirectToPreview) {
+            router.push(`/dashboard/invoices/preview/${encodeURIComponent(activeIdentity.id)}`);
+        } else {
+            router.push('/dashboard/invoices');
+        }
+    } catch (err) {
+        errorEmitter.emit('permission-error', new FirestorePermissionError({
+            path: invoiceDocRef.path, operation: 'write', requestResourceData: dataToSave
+        }));
+    } finally {
+        setIsSaving(false);
+    }
   };
 
   const previewInvoiceData = {
