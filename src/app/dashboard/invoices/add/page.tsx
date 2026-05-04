@@ -38,7 +38,8 @@ import {
   Trash2,
   History,
   Eye,
-  ChevronsUpDown
+  ChevronsUpDown,
+  AlertTriangle
 } from 'lucide-react';
 import { type Invoice, type UserProfile, type InvoiceItem, type InvoiceNumber } from '@/app/lib/data';
 import { useToast } from '@/hooks/use-toast';
@@ -164,7 +165,7 @@ export default function AddInvoicePage() {
     const dpVal = dpMode === 'percent' ? (subTotalItems * (dpInputVal / 100)) : dpInputVal;
     
     const retInputVal = parseFormattedNumber(retentionValue);
-    const retNominal = retentionMode === 'percent' ? (subTotalItems * (retInputVal / 100)) : retInputVal;
+    const retNominal = retentionMode === 'percent' ? (subTotalItems * (negInputVal / 100)) : retInputVal;
     
     const dpDedInputVal = parseFormattedNumber(dpDeductionValue);
     const dpDedNominal = dpDeductionMode === 'percent' ? (subTotalItems * (dpDedInputVal / 100)) : dpDedInputVal;
@@ -198,8 +199,24 @@ export default function AddInvoicePage() {
     const timestamp = new Date().toISOString();
     const updater = userProfile?.displayName || user.email || 'System';
 
-    // VA Approval Trigger
-    const requiresVaApproval = paymentMethod === 'va' && invoiceStatus === 'sent';
+    // LOGIKA PEMISAHAN JALUR PEMBAYARAN (Branching Logic)
+    let finalStatus = invoiceStatus;
+    let finalVaStatus = null;
+    let requiresVaApproval = false;
+
+    if (paymentMethod === 'va') {
+        finalVaStatus = 'pending';
+        if (invoiceStatus === 'sent') {
+            finalStatus = 'unpaid'; // Internally unpaid = "Waiting Approval" for VA
+            requiresVaApproval = true;
+        }
+    } else {
+        // Manual Transfer
+        finalVaStatus = 'approved'; // Manual transfer is pre-approved in terms of Dakota Hub workflow
+        if (invoiceStatus === 'sent') {
+            finalStatus = 'sent'; // "Ready to Send"
+        }
+    }
 
     const dataToSave: any = {
         id: activeIdentity.id,
@@ -212,8 +229,8 @@ export default function AddInvoicePage() {
         date: format(issueDate, 'yyyy-MM-dd'),
         dueDate: format(dueDate, 'yyyy-MM-dd'),
         amount: calcs.totalRp,
-        status: invoiceStatus,
-        vaStatus: requiresVaApproval ? 'pending' : (paymentMethod === 'va' ? 'approved' : null),
+        status: finalStatus,
+        vaStatus: finalVaStatus,
         isDpInvoice: isDpInvoice,
         paymentMethod: paymentMethod,
         vaNumber: paymentMethod === 'va' ? manualVaNumber : '',
@@ -238,7 +255,7 @@ export default function AddInvoicePage() {
     try {
         await setDoc(invoiceDocRef, dataToSave, { merge: true });
 
-        // CREATE NOTIFICATIONS FOR LEADERS
+        // CREATE NOTIFICATIONS FOR LEADERS ONLY FOR VA ROUTE
         if (requiresVaApproval) {
             const leadersQuery = query(collection(firestore, 'users'), where('role', '==', 'admin'));
             const leadersSnap = await getDocs(leadersQuery);
@@ -248,7 +265,7 @@ export default function AddInvoicePage() {
                     recipientId: lDoc.id,
                     senderId: user.uid,
                     title: "VA Approval Required",
-                    message: `Invoice ${activeIdentity.id} memerlukan persetujuan Virtual Account Mandiri.`,
+                    message: `Virtual Account untuk Invoice ${activeIdentity.id} memerlukan persetujuan Leader.`,
                     invoiceId: activeIdentity.id,
                     status: 'unread',
                     createdAt: timestamp
@@ -256,9 +273,10 @@ export default function AddInvoicePage() {
             });
             await Promise.all(notifPromises);
             toast({ title: "Notifikasi Approval Terkirim ke Leader" });
+        } else if (isSent) {
+            toast({ title: "Invoice Siap Dikirim", description: "Jalur Manual Transfer aktif. Dokumen bisa langsung dicetak." });
         }
 
-        toast({ title: "Invoice Berhasil Disimpan" });
         if (redirectToPreview) {
             router.push(`/dashboard/invoices/preview/${encodeURIComponent(activeIdentity.id)}`);
         } else {
@@ -567,6 +585,18 @@ export default function AddInvoicePage() {
                     items={items}
                     calculations={calcs}
                   />
+                  
+                  {paymentMethod === 'va' && (
+                      <div className="mt-8 max-w-[210mm] mx-auto bg-amber-50 border-2 border-amber-200 p-6 rounded-2xl flex items-start gap-4">
+                          <AlertTriangle className="h-6 w-6 text-amber-600 mt-1" />
+                          <div className="space-y-1">
+                              <p className="font-black text-sm text-amber-900 uppercase">Jalur Virtual Account Terdeteksi</p>
+                              <p className="text-xs text-amber-800 font-medium leading-relaxed">
+                                  Invoice ini akan berstatus <b>"Waiting Approval"</b> setelah disimpan. Leader akan menerima notifikasi lonceng untuk menyetujui VA di portal Mandiri sebelum dokumen siap dicetak.
+                              </p>
+                          </div>
+                      </div>
+                  )}
               </div>
           </div>
       </div>

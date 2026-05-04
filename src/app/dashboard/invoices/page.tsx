@@ -39,7 +39,7 @@ import {
     DropdownMenuTrigger,
   } from '@/components/ui/dropdown-menu';
   import { useToast } from '@/hooks/use-toast';
-  import { useFirestore, useUser, useMemoFirebase, errorEmitter, FirestorePermissionError, useDoc } from '@/firebase';
+  import { useFirestore, useUser, useCollection, useMemoFirebase, errorEmitter, FirestorePermissionError, useDoc } from '@/firebase';
   import { collection, query, doc, updateDoc, arrayUnion, deleteDoc, writeBatch, addDoc } from 'firebase/firestore';
   import { exportToExcel, cn } from '@/lib/utils';
   import { DateRangePicker } from '@/app/components/date-range-picker';
@@ -123,6 +123,7 @@ import {
 
         try {
             await updateDoc(docRef, {
+                status: 'sent', // Change from "Waiting Approval" (unpaid) to "Ready to Send" (sent)
                 vaStatus: 'approved',
                 vaApprovedBy: user.email,
                 vaApprovedAt: timestamp,
@@ -272,6 +273,7 @@ import {
                                     const totalPaid = invoice.payments?.reduce((s, p) => s + p.amount, 0) || (invoice.status === 'paid' ? invoice.amount : 0);
                                     const outstandingDoc = Math.max(0, invoice.amount - totalPaid);
                                     const isEmpty = invoice.amount === 0 || !invoice.items || invoice.items.length === 0;
+                                    const isVaPending = invoice.paymentMethod === 'va' && invoice.vaStatus === 'pending';
                                     
                                     return (
                                         <TableRow key={invoice.id} className={cn("hover:bg-muted/5 transition-colors", invoice.status === 'cancelled' && "opacity-40 grayscale")}>
@@ -306,10 +308,11 @@ import {
                                                     className={cn(
                                                         "text-[9px] uppercase font-black px-2 py-0",
                                                         invoice.status === 'paid' ? "bg-emerald-50 text-emerald-700 border-emerald-100" : 
-                                                        invoice.status === 'sent' || invoice.status === 'unpaid' ? "bg-rose-50 text-rose-600 border-rose-100" : ""
+                                                        isVaPending ? "bg-amber-50 text-amber-700 border-amber-100" :
+                                                        invoice.status === 'sent' || invoice.status === 'unpaid' ? "bg-indigo-50 text-indigo-700 border-indigo-100" : ""
                                                     )}
                                                 >
-                                                    {invoice.status.replace('_', ' ')}
+                                                    {isVaPending ? 'Waiting Approval' : (invoice.status === 'sent' ? 'Ready to Send' : invoice.status.replace('_', ' '))}
                                                 </Badge>
                                             </TableCell>
                                             <TableCell className="text-right">
