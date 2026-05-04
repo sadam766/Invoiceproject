@@ -27,10 +27,17 @@ import {
     DialogFooter,
     DialogDescription
   } from '@/components/ui/dialog';
+  import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+  } from '@/components/ui/select';
   import { Label } from '@/components/ui/label';
   import { Textarea } from '@/components/ui/textarea';
   import { type Invoice, type UserProfile } from '@/app/lib/data';
-  import { Search, MoreHorizontal, Eye, Pencil, Download, Truck, FileSpreadsheet, XCircle, ShieldCheck, Layers, Database, Hash, History, Trash2, AlertTriangle, CheckCircle2 } from 'lucide-react';
+  import { Search, MoreHorizontal, Eye, Pencil, Download, Truck, FileSpreadsheet, XCircle, ShieldCheck, Layers, Database, Hash, History, Trash2, AlertTriangle, CheckCircle2, FileJson } from 'lucide-react';
   import { Skeleton } from '@/components/ui/skeleton';
   import {
     DropdownMenu,
@@ -41,7 +48,7 @@ import {
   import { useToast } from '@/hooks/use-toast';
   import { useFirestore, useUser, useCollection, useMemoFirebase, errorEmitter, FirestorePermissionError, useDoc } from '@/firebase';
   import { collection, query, doc, updateDoc, arrayUnion, deleteDoc, writeBatch, addDoc } from 'firebase/firestore';
-  import { exportToExcel, cn } from '@/lib/utils';
+  import { exportToExcel, exportTaxInvoicesToExcel, cn } from '@/lib/utils';
   import { DateRangePicker } from '@/app/components/date-range-picker';
   import { isWithinInterval, parseISO, startOfToday, format, subDays, startOfMonth, endOfMonth } from 'date-fns';
   import { DeleteConfirmationDialog } from '@/app/components/delete-confirmation-dialog';
@@ -62,7 +69,7 @@ import {
     const { user } = useUser();
 
     // Consume Cached Data
-    const { invoices, isLoading: isGlobalLoading } = useDashboardData();
+    const { invoices, customers, isLoading: isGlobalLoading } = useDashboardData();
 
     // Void State
     const [voidDialogOpen, setVoidDialogOpen] = useState(false);
@@ -72,6 +79,10 @@ import {
     // Hard Delete State
     const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
     const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null);
+
+    // e-Faktur Export State
+    const [taxExportOpen, setTaxExportOpen] = useState(false);
+    const [taxCode, setTaxCode] = useState('04');
     
     const userProfileRef = useMemoFirebase(() => {
         if (!firestore || !user) return null;
@@ -214,6 +225,18 @@ import {
             });
     };
 
+    const triggerTaxExport = () => {
+        const toExport = invoices?.filter(inv => selectedInvoices.has(inv.id)) || [];
+        if (toExport.length === 0) {
+            toast({ variant: "destructive", title: "Pilih Invoice", description: "Pilih minimal satu invoice untuk diexport ke e-Faktur." });
+            return;
+        }
+        if (!customers) return;
+        exportTaxInvoicesToExcel(toExport, customers, taxCode);
+        setTaxExportOpen(false);
+        setSelectedInvoices(new Set());
+    };
+
     return (
       <main className="flex flex-1 flex-col gap-4 p-4 md:gap-8 md:p-8">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -229,7 +252,7 @@ import {
             <div className="flex items-center gap-2">
                 <DateRangePicker onRangeChange={setDateRange} />
                 <Button variant="outline" size="sm" onClick={() => exportToExcel(filteredInvoices, `Invoice-Log-${format(new Date(), 'yyyyMMdd')}`)} className="font-bold h-9">
-                    <FileSpreadsheet className="mr-2 h-4 w-4 text-green-600" /> Export
+                    <FileSpreadsheet className="mr-2 h-4 w-4 text-green-600" /> Export CSV
                 </Button>
                 <Button size="sm" className="font-black uppercase h-9 shadow-md bg-indigo-600 hover:bg-indigo-700" onClick={() => router.push('/dashboard/sales')}>
                     <Layers className="mr-2 h-4 w-4" /> Mulai Penagihan
@@ -241,12 +264,19 @@ import {
             <CardContent className="pt-6">
                 <Tabs defaultValue="all" value={activeTab} onValueChange={setActiveTab}>
                     <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
-                        <TabsList className="bg-muted/50 p-1">
-                            <TabsTrigger value="all" className="text-xs font-bold uppercase">Semua</TabsTrigger>
-                            <TabsTrigger value="paid" className="text-xs font-bold uppercase px-4 text-emerald-600">Lunas</TabsTrigger>
-                            <TabsTrigger value="unpaid" className="text-xs font-bold uppercase px-4 text-red-600">Terutang</TabsTrigger>
-                            <TabsTrigger value="cancelled" className="text-xs font-bold uppercase px-4 opacity-50">Void</TabsTrigger>
-                        </TabsList>
+                        <div className="flex items-center gap-4">
+                            <TabsList className="bg-muted/50 p-1">
+                                <TabsTrigger value="all" className="text-xs font-bold uppercase">Semua</TabsTrigger>
+                                <TabsTrigger value="paid" className="text-xs font-bold uppercase px-4 text-emerald-600">Lunas</TabsTrigger>
+                                <TabsTrigger value="unpaid" className="text-xs font-bold uppercase px-4 text-red-600">Terutang</TabsTrigger>
+                                <TabsTrigger value="cancelled" className="text-xs font-bold uppercase px-4 opacity-50">Void</TabsTrigger>
+                            </TabsList>
+                            {selectedInvoices.size > 0 && (
+                                <Button size="sm" onClick={() => setTaxExportOpen(true)} className="bg-emerald-600 hover:bg-emerald-700 font-black uppercase text-[10px] tracking-widest h-8 px-4 rounded-xl shadow-lg shadow-emerald-100">
+                                    <FileJson className="mr-2 h-3.5 w-3.5" /> Export e-Faktur ({selectedInvoices.size})
+                                </Button>
+                            )}
+                        </div>
                         <div className="relative w-full sm:w-64">
                             <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
                             <Input placeholder="Cari No. Invoice, Customer, PO..." className="pl-8 h-9 bg-muted/20 border-none font-medium" value={searchQuery} onChange={e => setSearchQuery(e.target.value)} />
@@ -362,6 +392,51 @@ import {
                 </Tabs>
             </CardContent>
         </Card>
+
+        {/* Export e-Faktur Configuration */}
+        <Dialog open={taxExportOpen} onOpenChange={setTaxExportOpen}>
+            <DialogContent className="sm:max-w-[400px] rounded-3xl overflow-hidden border-none shadow-2xl">
+                <DialogHeader className="p-4 bg-slate-50">
+                    <DialogTitle className="flex items-center gap-2 text-emerald-700 uppercase font-black text-sm">
+                        <FileJson className="h-5 w-5" /> Config Export e-Faktur
+                    </DialogTitle>
+                </DialogHeader>
+                <div className="p-6 space-y-6">
+                    <div className="space-y-3">
+                        <Label className="text-[10px] font-black uppercase text-slate-400 tracking-widest px-1">Pilih Kode Transaksi</Label>
+                        <Select value={taxCode} onValueChange={setTaxCode}>
+                            <SelectTrigger className="h-12 rounded-xl font-bold border-emerald-100 bg-emerald-50/20">
+                                <SelectValue placeholder="Pilih Kode" />
+                            </SelectTrigger>
+                            <SelectContent className="rounded-xl border-none shadow-xl">
+                                <SelectItem value="01">01 - DPP Murni (Standard)</SelectItem>
+                                <SelectItem value="02">02 - Pemungut Bendaharawan</SelectItem>
+                                <SelectItem value="03">03 - Pemungut Selain Bendaharawan</SelectItem>
+                                <SelectItem value="04">04 - DPP Nilai Lain (11/12 Rumus)</SelectItem>
+                                <SelectItem value="07">07 - Tidak Dipungut</SelectItem>
+                                <SelectItem value="08">08 - Dibebaskan</SelectItem>
+                            </SelectContent>
+                        </Select>
+                    </div>
+                    {taxCode === '04' && (
+                        <div className="p-4 bg-blue-50 rounded-2xl border border-blue-100 border-dashed">
+                            <p className="text-[10px] font-bold text-blue-700 leading-relaxed italic">
+                                Info: Kode 04 akan otomatis menerapkan pembulatan 11/12 pada DPP per baris item.
+                            </p>
+                        </div>
+                    )}
+                    <div className="flex items-center gap-2 text-[10px] font-black uppercase text-slate-400 bg-slate-50 p-3 rounded-xl">
+                        <CheckCircle2 className="h-4 w-4 text-emerald-600" /> {selectedInvoices.size} Dokumen Terpilih
+                    </div>
+                </div>
+                <DialogFooter className="p-6 border-t bg-slate-50/30">
+                    <Button variant="ghost" onClick={() => setTaxExportOpen(false)} className="h-12 font-bold px-6">Batal</Button>
+                    <Button onClick={triggerTaxExport} className="h-12 flex-1 bg-emerald-600 hover:bg-emerald-700 font-black uppercase tracking-widest text-xs rounded-xl shadow-lg shadow-emerald-100">
+                        UNDUH TEMPLATE EXCEL
+                    </Button>
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
 
         {/* Void Dialog */}
         <Dialog open={voidDialogOpen} onOpenChange={setVoidDialogOpen}>

@@ -2,6 +2,7 @@
 import { clsx, type ClassValue } from "clsx"
 import { twMerge } from "tailwind-merge"
 import * as XLSX from 'xlsx';
+import { type Invoice, type Customer } from "@/app/lib/data";
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
@@ -116,6 +117,90 @@ export const exportToExcel = (data: any[], fileName: string) => {
   const workbook = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(workbook, worksheet, 'Data');
   XLSX.writeFile(workbook, `${fileName}.xlsx`);
+};
+
+/**
+ * Export Invoices to e-Faktur Template (Multi-Sheet)
+ */
+export const exportTaxInvoicesToExcel = (invoices: Invoice[], allCustomers: Customer[], taxCode: string) => {
+    const workbook = XLSX.utils.book_new();
+
+    // 1. SHEET FAKTUR
+    const fakturData = invoices.map(inv => {
+        const customer = allCustomers.find(c => c.name === inv.customer);
+        const ref = `${inv.id} ${inv.soNumber || ''} ${inv.poNumber}`.trim();
+        const defaultAddr = customer?.addresses?.find(a => a.isDefault) || customer?.addresses?.[0];
+        
+        return [
+            ref,                        // Referensi
+            taxCode,                    // Kode Transaksi
+            inv.date,                   // Tanggal Faktur
+            "Normal",                   // Jenis Faktur
+            defaultAddr?.npwp || "-",   // NPWP/NIK Pembeli
+            inv.customer,               // Nama Pembeli
+            customer?.customerCode || "-", // ID TKU Pembeli
+            "NORMAL"                    // Action
+        ];
+    });
+
+    const fakturHeader = [
+        ["Referensi", "Kode_Transaksi", "Tanggal_Faktur", "Jenis_Faktur", "NPWP_NIK_Pembeli", "Nama_Pembeli", "ID_TKU_Pembeli", "Action"]
+    ];
+    
+    const fakturSheet = XLSX.utils.aoa_to_sheet([...fakturHeader, ...fakturData, ["END"]]);
+    XLSX.utils.book_append_sheet(workbook, fakturSheet, "Faktur");
+
+    // 2. SHEET DETAIL FAKTUR
+    const detailData: any[] = [];
+    invoices.forEach(inv => {
+        const items = inv.items || [];
+        const discountTotal = inv.discount || 0;
+        const discountPerItem = items.length > 0 ? (discountTotal / items.length) : 0;
+
+        items.forEach(item => {
+            // Kode UM Mapping
+            let unitCode = "UM.0033";
+            const lowerUnit = item.unit?.toLowerCase();
+            if (lowerUnit === "meter" || lowerUnit === "m") unitCode = "UM.0013";
+            else if (lowerUnit === "unit" || lowerUnit === "pcs") unitCode = "UM.0018";
+
+            // Type A: Goods, B: Service
+            const type = item.category?.toLowerCase().includes("kabel") ? "A" : "B";
+
+            // Calculations with High Precision Rounding
+            const hargaTotal = item.quantity * item.price;
+            const dppItem = Math.round(hargaTotal - discountPerItem);
+            
+            // Logic Kode 04: DPP Nilai Lain
+            const finalDpp = taxCode === "04" ? Math.round((11 / 12) * dppItem) : dppItem;
+            const ppn = Math.round(finalDpp * 0.12);
+
+            detailData.push([
+                type,           // Tipe (A/B)
+                item.name,      // Nama
+                item.price,     // Harga Satuan
+                item.quantity,  // Jumlah Barang
+                hargaTotal,     // Harga Total
+                Math.round(discountPerItem), // Diskon
+                finalDpp,       // DPP
+                ppn,            // PPN
+                0,              // Tarif PPnBM
+                0,              // PPnBM
+                unitCode        // Satuan Ukur
+            ]);
+        });
+    });
+
+    const detailHeader = [
+        ["Tipe", "Nama", "Harga_Satuan", "Jumlah_Barang", "Harga_Total", "Diskon", "DPP", "PPN", "Tarif_PPnBM", "PPnBM", "Action"]
+    ];
+
+    const detailSheet = XLSX.utils.aoa_to_sheet([...detailHeader, ...detailData, ["END"]]);
+    XLSX.utils.book_append_sheet(workbook, detailSheet, "DetailFaktur");
+
+    // Write File
+    const timestamp = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 16);
+    XLSX.writeFile(workbook, `eFaktur_Dakota_${timestamp}.xlsx`);
 };
 
 export const importFromExcel = (file: File): Promise<any[]> => {
