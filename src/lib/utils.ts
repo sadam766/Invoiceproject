@@ -121,17 +121,19 @@ export const exportToExcel = (data: any[], fileName: string) => {
 
 /**
  * Export Invoices to e-Faktur Template (Multi-Sheet)
+ * Logic updated to sync "Baris" column and use Integer Rounding
  */
 export const exportTaxInvoicesToExcel = (invoices: Invoice[], allCustomers: Customer[], taxCode: string) => {
     const workbook = XLSX.utils.book_new();
 
     // 1. SHEET FAKTUR
-    const fakturData = invoices.map(inv => {
+    const fakturData = invoices.map((inv, index) => {
         const customer = allCustomers.find(c => c.name === inv.customer);
         const ref = `${inv.id} ${inv.soNumber || ''} ${inv.poNumber}`.trim();
         const defaultAddr = customer?.addresses?.find(a => a.isDefault) || customer?.addresses?.[0];
         
         return [
+            index + 1,                  // Baris (ID Unik untuk sinkronisasi)
             ref,                        // Referensi
             taxCode,                    // Kode Transaksi
             inv.date,                   // Tanggal Faktur
@@ -144,15 +146,16 @@ export const exportTaxInvoicesToExcel = (invoices: Invoice[], allCustomers: Cust
     });
 
     const fakturHeader = [
-        ["Referensi", "Kode_Transaksi", "Tanggal_Faktur", "Jenis_Faktur", "NPWP_NIK_Pembeli", "Nama_Pembeli", "ID_TKU_Pembeli", "Action"]
+        ["Baris", "Referensi", "Kode_Transaksi", "Tanggal_Faktur", "Jenis_Faktur", "NPWP_NIK_Pembeli", "Nama_Pembeli", "ID_TKU_Pembeli", "Action"]
     ];
     
-    const fakturSheet = XLSX.utils.aoa_to_sheet([...fakturHeader, ...fakturData, ["END"]]);
+    const finalFakturRows = [...fakturHeader, ...fakturData, ["END"]];
+    const fakturSheet = XLSX.utils.aoa_to_sheet(finalFakturRows);
     XLSX.utils.book_append_sheet(workbook, fakturSheet, "Faktur");
 
     // 2. SHEET DETAIL FAKTUR
     const detailData: any[] = [];
-    invoices.forEach(inv => {
+    invoices.forEach((inv, index) => {
         const items = inv.items || [];
         const discountTotal = inv.discount || 0;
         const discountPerItem = items.length > 0 ? (discountTotal / items.length) : 0;
@@ -167,38 +170,41 @@ export const exportTaxInvoicesToExcel = (invoices: Invoice[], allCustomers: Cust
             // Type A: Goods, B: Service
             const type = item.category?.toLowerCase().includes("kabel") ? "A" : "B";
 
-            // Calculations with High Precision Rounding
+            // Calculations with Pre-Calculated Integer Rounding (Absolute)
             const hargaTotal = item.quantity * item.price;
             const dppItem = Math.round(hargaTotal - discountPerItem);
             
-            // Logic Kode 04: DPP Nilai Lain
+            // Logic Kode 04: DPP Nilai Lain (ROUND 11/12)
             const finalDpp = taxCode === "04" ? Math.round((11 / 12) * dppItem) : dppItem;
             const ppn = Math.round(finalDpp * 0.12);
 
             detailData.push([
+                index + 1,      // Baris (WAJIB SAMA dengan Sheet Faktur untuk referensi induk)
                 type,           // Tipe (A/B)
                 item.name,      // Nama
-                item.price,     // Harga Satuan
+                Math.round(item.price),     // Harga Satuan (Rounded)
                 item.quantity,  // Jumlah Barang
-                hargaTotal,     // Harga Total
-                Math.round(discountPerItem), // Diskon
-                finalDpp,       // DPP
-                ppn,            // PPN
+                Math.round(hargaTotal),     // Harga Total (Rounded)
+                Math.round(discountPerItem), // Diskon (Rounded)
+                finalDpp,       // DPP (Rounded)
+                ppn,            // PPN (Rounded)
                 0,              // Tarif PPnBM
                 0,              // PPnBM
-                unitCode        // Satuan Ukur
+                unitCode,       // Satuan Ukur
+                "NORMAL"        // Action
             ]);
         });
     });
 
     const detailHeader = [
-        ["Tipe", "Nama", "Harga_Satuan", "Jumlah_Barang", "Harga_Total", "Diskon", "DPP", "PPN", "Tarif_PPnBM", "PPnBM", "Action"]
+        ["Baris", "Tipe", "Nama", "Harga_Satuan", "Jumlah_Barang", "Harga_Total", "Diskon", "DPP", "PPN", "Tarif_PPnBM", "PPnBM", "Satuan_Ukur", "Action"]
     ];
 
-    const detailSheet = XLSX.utils.aoa_to_sheet([...detailHeader, ...detailData, ["END"]]);
+    const finalDetailRows = [...detailHeader, ...detailData, ["END"]];
+    const detailSheet = XLSX.utils.aoa_to_sheet(finalDetailRows);
     XLSX.utils.book_append_sheet(workbook, detailSheet, "DetailFaktur");
 
-    // Write File
+    // Write File with Timestamp
     const timestamp = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 16);
     XLSX.writeFile(workbook, `eFaktur_Dakota_${timestamp}.xlsx`);
 };
