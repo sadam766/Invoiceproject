@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useEffect, useState, useMemo } from 'react';
@@ -39,11 +38,12 @@ import {
   History,
   Eye,
   ChevronsUpDown,
-  AlertTriangle
+  AlertTriangle,
+  Clock
 } from 'lucide-react';
 import { type Invoice, type UserProfile, type InvoiceItem, type InvoiceNumber } from '@/app/lib/data';
 import { useToast } from '@/hooks/use-toast';
-import { useFirestore, useMemoFirebase, useUser, useDoc, errorEmitter, FirestorePermissionError, useCollection } from '@/firebase';
+import { useFirestore, useMemoFirebase, useUser, useDoc, errorEmitter, FirestorePermissionError } from '@/firebase';
 import { collection, query, doc, setDoc, arrayUnion, addDoc, getDocs, where } from 'firebase/firestore';
 import { Badge } from '@/components/ui/badge';
 import {
@@ -98,6 +98,7 @@ export default function AddInvoicePage() {
   const [dueDate, setDueDate] = useState<Date>(addDays(new Date(), 30));
   const [isDpInvoice, setIsDpInvoice] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState<'bank' | 'va'>('va');
+  const [paymentTerms, setPaymentTerms] = useState('90 Hari');
   const [manualVaNumber, setManualVaNumber] = useState('');
   const [soPopoverOpen, setSoPopoverOpen] = useState(false);
   const [productPopoverOpen, setProductPopoverOpen] = useState(false);
@@ -121,6 +122,7 @@ export default function AddInvoicePage() {
           }
           if (activeIdentity.billingAddress) setBillingAddress(activeIdentity.billingAddress);
           if ((activeIdentity as Invoice).paymentMethod) setPaymentMethod((activeIdentity as Invoice).paymentMethod as any);
+          if ((activeIdentity as Invoice).paymentTerms) setPaymentTerms((activeIdentity as Invoice).paymentTerms!);
           if ((activeIdentity as Invoice).vaNumber) setManualVaNumber((activeIdentity as Invoice).vaNumber!);
           setIsDpInvoice(!!(activeIdentity as Invoice).isDpInvoice);
           
@@ -211,10 +213,9 @@ export default function AddInvoicePage() {
             requiresVaApproval = true;
         }
     } else {
-        // Manual Transfer
-        finalVaStatus = 'approved'; // Manual transfer is pre-approved in terms of Dakota Hub workflow
+        finalVaStatus = 'approved';
         if (invoiceStatus === 'sent') {
-            finalStatus = 'sent'; // "Ready to Send"
+            finalStatus = 'sent'; 
         }
     }
 
@@ -233,6 +234,7 @@ export default function AddInvoicePage() {
         vaStatus: finalVaStatus,
         isDpInvoice: isDpInvoice,
         paymentMethod: paymentMethod,
+        paymentTerms: paymentTerms,
         vaNumber: paymentMethod === 'va' ? manualVaNumber : '',
         negotiation: calcs.negotiation,
         dpValue: calcs.dpValue,
@@ -255,7 +257,6 @@ export default function AddInvoicePage() {
     try {
         await setDoc(invoiceDocRef, dataToSave, { merge: true });
 
-        // CREATE NOTIFICATIONS FOR LEADERS ONLY FOR VA ROUTE
         if (requiresVaApproval) {
             const leadersQuery = query(collection(firestore, 'users'), where('role', '==', 'admin'));
             const leadersSnap = await getDocs(leadersQuery);
@@ -273,8 +274,6 @@ export default function AddInvoicePage() {
             });
             await Promise.all(notifPromises);
             toast({ title: "Notifikasi Approval Terkirim ke Leader" });
-        } else if (isSent) {
-            toast({ title: "Invoice Siap Dikirim", description: "Jalur Manual Transfer aktif. Dokumen bisa langsung dicetak." });
         }
 
         if (redirectToPreview) {
@@ -296,6 +295,7 @@ export default function AddInvoicePage() {
       customerName: activeIdentity?.customer,
       billingAddress,
       paymentMethod,
+      paymentTerms,
       vaNumber: manualVaNumber,
       date: format(issueDate, 'dd MMM yyyy'),
   };
@@ -343,8 +343,10 @@ export default function AddInvoicePage() {
                                 <Input type="date" value={format(issueDate, 'yyyy-MM-dd')} onChange={e => setIssueDate(new Date(e.target.value))} className="h-10 font-bold" />
                             </div>
                             <div className="space-y-1.5">
-                                <Label className="text-[9px] font-black uppercase text-slate-400 tracking-widest">Due Date</Label>
-                                <Input type="date" value={format(dueDate, 'yyyy-MM-dd')} onChange={e => setDueDate(new Date(e.target.value))} className="h-10 font-bold border-rose-100 bg-rose-50/10" />
+                                <Label className="text-[9px] font-black uppercase text-slate-400 tracking-widest flex items-center gap-1">
+                                    <Clock className="h-3 w-3 text-indigo-500" /> Payment Terms
+                                </Label>
+                                <Input value={paymentTerms} onChange={e => setPaymentTerms(e.target.value)} placeholder="E.g. 90 Hari" className="h-10 font-black border-indigo-200" />
                             </div>
                         </div>
 
@@ -413,7 +415,7 @@ export default function AddInvoicePage() {
 
                   <Card className="shadow-sm border-none ring-1 ring-slate-200 overflow-hidden">
                     <CardHeader className="bg-white border-b py-3 px-6 flex flex-row items-center justify-between">
-                        <CardTitle className="text-[10px] font-black uppercase text-slate-500 tracking-widest">Line Items</CardTitle>
+                        <CardTitle className="text-[10px] font-black uppercase text-slate-500 tracking-widest">Line Items (Max 10 per page)</CardTitle>
                         <Switch checked={isDpInvoice} onCheckedChange={setIsDpInvoice} id="dp-mode" />
                     </CardHeader>
                     <CardContent className="p-0">
@@ -506,7 +508,7 @@ export default function AddInvoicePage() {
                         <CardTitle className="text-[10px] font-black uppercase text-slate-500 tracking-widest flex items-center gap-2">
                             <History className="h-4 w-4 text-emerald-600" /> Financial Adjustments
                         </CardTitle>
-                    </CardHeader>
+                    </Header>
                     <CardContent className="p-6 space-y-6">
                         <div className="grid grid-cols-2 gap-6">
                             <div className="space-y-2">
