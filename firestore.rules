@@ -23,19 +23,21 @@ service cloud.firestore {
       return isSignedIn() && request.auth.uid == userId;
     }
 
-    // --- Notifications: Optimized for query scalability ---
+    // --- Notifications: Unified Access Rule ---
     match /notifications/{docId} {
-      // Izinkan baca jika pemilik (recipientId) atau Super Admin
-      allow read, list: if isSignedIn() && (
+      // Izinkan baca jika:
+      // 1. User adalah pemilik notifikasi (recipientId sesuai UID)
+      // 2. ATAU User adalah Super Admin (berdasarkan email)
+      allow read, list: if request.auth != null && (
         request.auth.uid == resource.data.recipientId || 
         request.auth.token.email == "fa@gmail.com"
       );
       
-      // Izinkan create untuk alur approval antar user
-      allow create: if isSignedIn();
+      // Izinkan create jika user sudah login
+      allow create: if request.auth != null;
       
       // Izinkan update (mark as read) oleh penerima atau admin
-      allow update: if isSignedIn() && (
+      allow update: if request.auth != null && (
         request.auth.uid == resource.data.recipientId || 
         request.auth.token.email == "fa@gmail.com"
       );
@@ -65,7 +67,7 @@ service cloud.firestore {
     // Global fallback for deep nested paths or collection groups
     match /{path=**}/invoices/{id} { allow read, write: if isSignedIn(); }
     match /{path=**}/notifications/{id} { 
-       allow read: if isSignedIn() && (request.auth.token.email == "fa@gmail.com" || request.auth.uid == resource.data.recipientId);
+       allow read: if request.auth != null && (request.auth.token.email == "fa@gmail.com" || request.auth.uid == resource.data.recipientId);
     }
   }
 }

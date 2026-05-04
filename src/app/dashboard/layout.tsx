@@ -111,13 +111,23 @@ export default function DashboardLayout({
   // NOTIFICATIONS LISTENER (SYNCHRONIZED WITH RULES)
   const notifQuery = useMemoFirebase(() => {
     if (!firestore || !user) return null;
-    // CRITICAL: Query must match recipientId for security rules to approve the list operation
-    return query(
-      collection(firestore, 'notifications'),
-      where('recipientId', '==', user.uid),
-      orderBy('createdAt', 'desc'),
-      limit(10)
-    );
+    
+    // Penanganan Khusus Super Admin (fa@gmail.com)
+    // Jika Super Admin, tampilkan seluruh notifikasi global. Jika user biasa, filter wajib berdasarkan recipientId.
+    if (user.email === 'fa@gmail.com') {
+      return query(
+        collection(firestore, 'notifications'),
+        orderBy('createdAt', 'desc'),
+        limit(10)
+      );
+    } else {
+      return query(
+        collection(firestore, 'notifications'),
+        where('recipientId', '==', user.uid),
+        orderBy('createdAt', 'desc'),
+        limit(10)
+      );
+    }
   }, [firestore, user]);
   const { data: notifications } = useCollection<AppNotification>(notifQuery);
 
