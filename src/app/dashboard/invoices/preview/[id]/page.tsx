@@ -1,4 +1,3 @@
-
 'use client';
 
 import React, { useRef } from 'react';
@@ -10,6 +9,7 @@ import { ArrowLeft, Printer, AlertTriangle, Lock } from 'lucide-react';
 import { type Invoice } from '@/app/lib/data';
 import { InvoiceTemplate } from '@/app/components/invoice/invoice-layout';
 import { Badge } from '@/components/ui/badge';
+import { cn } from '@/lib/utils';
 
 const InvoicePreviewPage = () => {
   const params = useParams();
