@@ -29,7 +29,6 @@ const InvoicePreviewPage = () => {
   const items = invoiceData.items || [];
   const subTotalItems = items.reduce((acc, curr) => acc + (curr.total || 0), 0);
   
-  // LOGIC: Maintain proper calculation even in preview
   const dpVal = invoiceData.dpValue || 0;
   const discVal = invoiceData.discount || 0;
   const dpMode = invoiceData.dpMode || 'kurangi';
@@ -41,7 +40,6 @@ const InvoicePreviewPage = () => {
       baseValue = Math.max(0, subTotalItems - dpVal - discVal);
   }
 
-  // Pre-calculated Rounding 11/12 logic for code 04 compatibility
   const dppVat = Math.round(baseValue * (11 / 12));
   const vat12 = Math.round(dppVat * 0.12);
   const totalRp = dppVat + vat12;
@@ -65,7 +63,7 @@ const InvoicePreviewPage = () => {
                   <div className="bg-amber-600 p-2 rounded-xl"><Lock className="h-4 w-4 text-white" /></div>
                   <div className="space-y-0.5">
                       <p className="text-xs font-black uppercase text-amber-900">Pencetakan Dikunci</p>
-                      <p className="text-[10px] font-medium text-amber-800">Menunggu persetujuan Virtual Account dari Leader di Portal Mandiri.</p>
+                      <p className="text-[10px] font-medium text-amber-800">Menunggu persetujuan Virtual Account dari Leader.</p>
                   </div>
               </div>
               <Badge variant="outline" className="bg-white border-amber-300 text-amber-700 font-black text-[10px] uppercase">Awaiting Approval</Badge>
