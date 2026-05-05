@@ -1,4 +1,3 @@
-
 'use client';
 import { Button } from '@/components/ui/button';
 import {
@@ -32,6 +31,7 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
+import { Badge } from '@/components/ui/badge';
 import { Plus, Check, ChevronsUpDown, Info, Layers, Percent } from 'lucide-react';
 import type { SalesListItem, Customer, UserProfile, PaymentStage } from '@/app/lib/data';
 import { useState, useEffect, useMemo } from 'react';
