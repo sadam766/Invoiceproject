@@ -76,7 +76,7 @@
 
 /* Glassmorphism V2.0 */
 .glass-sidebar {
-  @apply bg-slate-900/95 backdrop-blur-xl border-r border-slate-800/50;
+  @apply bg-sidebar/95 backdrop-blur-xl border-r border-sidebar-border;
 }
 
 .shadow-soft {
@@ -94,4 +94,18 @@
 /* Custom Transitions */
 .transition-smooth {
   @apply transition-all duration-300 ease-in-out;
+}
+
+@media print {
+  .print-break-inside-avoid {
+    page-break-inside: avoid;
+  }
+  
+  body {
+    background: white !important;
+  }
+  
+  .print-no-shadow {
+    box-shadow: none !important;
+  }
 }
