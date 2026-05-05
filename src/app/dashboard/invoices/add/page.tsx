@@ -48,7 +48,8 @@ import {
   Check,
   Target,
   Wallet,
-  ShieldAlert
+  ShieldAlert,
+  Layers
 } from 'lucide-react';
 import { type Invoice, type UserProfile, type InvoiceItem, type InvoiceNumber, type SalesListItem } from '@/app/lib/data';
 import { useToast } from '@/hooks/use-toast';
@@ -437,7 +438,7 @@ export default function AddInvoicePage() {
                                     className={cn("h-1.5", poUtilization.isOverLimit ? "bg-rose-100" : "bg-slate-100")} 
                                 />
                                 <div className="flex gap-4 pt-2">
-                                    <div className="flex items-center gap-1.5 text-[8px] font-bold text-slate-400">
+                                    <div className="flex items-center gap-1.5 text-[8px] font-bold text-slate-300">
                                         <div className="w-1.5 h-1.5 rounded-full bg-slate-300" /> Prev: Rp {formatNumberWithCommas(poUtilization.used)}
                                     </div>
                                     <div className="flex items-center gap-1.5 text-[8px] font-bold text-indigo-500">
@@ -680,8 +681,8 @@ export default function AddInvoicePage() {
                              <div className="flex justify-between items-center">
                                 <Label className="text-[9px] font-black uppercase text-slate-400">Payment Matrix</Label>
                                 <div className="flex bg-slate-100 rounded-lg p-1 gap-1">
-                                    <Button variant={paymentMethod === 'bank' ? 'default' : 'ghost'} size="sm" onClick={() => setPaymentMethod('bank')} className="h-7 text-[8px] font-black uppercase rounded-md px-3">Manual Bank</Button>
-                                    <Button variant={paymentMethod === 'va' ? 'default' : 'ghost'} size="sm" onClick={() => setPaymentMethod('va')} className="h-7 text-[8px] font-black uppercase rounded-md px-3">Virtual Account</Button>
+                                    <Button variant={paymentMethod === 'bank' ? 'default' : 'ghost'} size="sm" onClick={() => setMethod('bank')} className="h-7 text-[8px] font-black uppercase rounded-md px-3">Manual Bank</Button>
+                                    <Button variant={paymentMethod === 'va' ? 'default' : 'ghost'} size="sm" onClick={() => setMethod('va')} className="h-7 text-[8px] font-black uppercase rounded-md px-3">Virtual Account</Button>
                                 </div>
                              </div>
                              {paymentMethod === 'va' && (
