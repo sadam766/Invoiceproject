@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useEffect, useState, useMemo } from 'react';
@@ -48,7 +49,8 @@ import {
   Target,
   Wallet,
   ShieldAlert,
-  Layers
+  Layers,
+  Zap
 } from 'lucide-react';
 import { type Invoice, type UserProfile, type InvoiceItem, type InvoiceNumber, type SalesListItem } from '@/app/lib/data';
 import { useToast } from '@/hooks/use-toast';
@@ -143,16 +145,52 @@ export default function AddInvoicePage() {
     return Object.values(customerItems);
   }, [activeIdentity?.customer, allInvoices]);
 
+  // PO Monitoring Logic
+  const poRecord = useMemo(() => {
+    if (!activeIdentity?.poNumber || !allSalesRecords) return null;
+    return allSalesRecords.find(s => s.poNumber === activeIdentity.poNumber);
+  }, [activeIdentity?.poNumber, allSalesRecords]);
+
+  // SMART LOGIC: Auto-apply Payment Scheme from PO Blueprint
+  useEffect(() => {
+    if (poRecord && poRecord.paymentScheme && items.length > 0 && !editInvoiceId) {
+        // Find existing invoices for this PO
+        const poInvoices = allInvoices?.filter(inv => inv.poNumber === poRecord.poNumber && inv.status !== 'cancelled') || [];
+        
+        // Count how many stages are already invoiced
+        const invoicedStagesCount = poInvoices.length;
+        const currentStageIndex = invoicedStagesCount;
+        
+        if (currentStageIndex < poRecord.paymentScheme.length) {
+            const nextStage = poRecord.paymentScheme[currentStageIndex];
+            
+            // Auto-configure DP section based on blueprint
+            setDpDescription(nextStage.label + " " + nextStage.percent + "%");
+            
+            // Logic: First stage is usually "Tagih DP", subsequent are "Kurangi DP" (Pelunasan)
+            if (currentStageIndex === 0) {
+                setDpMode('tagih');
+            } else {
+                setDpMode('kurangi');
+            }
+            
+            toast({ 
+                title: "Blueprint Applied", 
+                description: `Mengikuti skema penagihan PO: Tahap ${currentStageIndex + 1} (${nextStage.label}).`,
+                duration: 5000
+            });
+        }
+    }
+  }, [poRecord, items.length, editInvoiceId, allInvoices, toast]);
+
   // Load Initial Data
   useEffect(() => {
       if (activeIdentity) {
           if (!selectedSoNumber) setSelectedSoNumber(activeIdentity.salesOrder || '');
           
-          // PHASE 1: Load items from active identity (SO to Invoice transition)
           if (activeIdentity.items && activeIdentity.items.length > 0 && items.length === 0) {
               setItems(activeIdentity.items);
           } 
-          // PHASE 2: Fallback - Auto-pull from LAST INVOICE for same PO (Historical Mapping)
           else if ((!activeIdentity.items || activeIdentity.items.length === 0) && items.length === 0 && activeIdentity.poNumber && allInvoices) {
               const prevInvoices = allInvoices
                 .filter(inv => inv.poNumber === activeIdentity.poNumber && inv.status !== 'cancelled')
@@ -180,12 +218,6 @@ export default function AddInvoicePage() {
     if (!activeIdentity?.customer || !allCustomers) return null;
     return allCustomers.find(c => c.name.toLowerCase() === activeIdentity.customer.toLowerCase());
   }, [activeIdentity?.customer, allCustomers]);
-
-  // PO Monitoring Logic
-  const poRecord = useMemo(() => {
-    if (!activeIdentity?.poNumber || !allSalesRecords) return null;
-    return allSalesRecords.find(s => s.poNumber === activeIdentity.poNumber);
-  }, [activeIdentity?.poNumber, allSalesRecords]);
 
   const previouslyInvoiced = useMemo(() => {
     if (!activeIdentity?.poNumber || !allInvoices) return 0;
@@ -266,7 +298,7 @@ export default function AddInvoicePage() {
         total,
         percent: total > 0 ? (combined / total) * 100 : 0,
         remaining: Math.max(0, total - combined),
-        isOverLimit: combined > total + 100 // Tolerance buffer for rounding
+        isOverLimit: combined > total + 100 
     };
   }, [poRecord, previouslyInvoiced, calcs.totalRp]);
 
@@ -459,6 +491,17 @@ export default function AddInvoicePage() {
                                     </div>
                                 </div>
                             </div>
+
+                            {/* SMART BLUEPRINT STATUS */}
+                            {poRecord.paymentScheme && (
+                                <div className="mt-6 pt-4 border-t border-dashed flex items-center gap-3">
+                                    <Zap className="h-4 w-4 text-amber-500" />
+                                    <div className="flex flex-col">
+                                        <span className="text-[8px] font-black uppercase text-slate-400">Blueprint Active</span>
+                                        <span className="text-[10px] font-bold text-slate-700">Scheme: {poRecord.paymentScheme.map(s => `${s.percent}%`).join(' - ')}</span>
+                                    </div>
+                                </div>
+                            )}
                         </CardContent>
                     </Card>
                   )}

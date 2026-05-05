@@ -181,6 +181,12 @@ export type Customer = {
   createdBy?: string;
 };
 
+export type PaymentStage = {
+  label: string;
+  percent: number;
+  trigger: 'PO' | 'Delivery' | 'Retention';
+};
+
 export type SalesListItem = {
   id?: string;
   soNumber: string;
@@ -195,6 +201,7 @@ export type SalesListItem = {
   paidDate?: string;
   ownerId?: string;
   createdBy?: string;
+  paymentScheme?: PaymentStage[];
 };
 
 export type SpdInvoiceEntry = {

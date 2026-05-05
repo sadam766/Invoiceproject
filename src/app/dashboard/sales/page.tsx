@@ -1,3 +1,4 @@
+
 'use client';
 import { useState, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
@@ -28,7 +29,7 @@ import {
   } from '@/components/ui/dialog';
   import { Textarea } from '@/components/ui/textarea';
   import { type SalesListItem, type UserProfile, type Invoice } from '@/app/lib/data';
-  import { Search, MoreHorizontal, Download, Eye, Edit, FileSpreadsheet, RefreshCw, XCircle, FilePlus, Trash2, Wallet } from 'lucide-react';
+  import { Search, MoreHorizontal, Download, Eye, Edit, FileSpreadsheet, RefreshCw, XCircle, FilePlus, Trash2, Wallet, Layers } from 'lucide-react';
   import { AddSaleDialog } from './_components/add-sale-dialog';
   import { useToast } from '@/hooks/use-toast';
   import { cn, exportToExcel } from '@/lib/utils';
@@ -101,7 +102,7 @@ import {
             if (totalPaid >= sale.amount && sale.amount > 0) status = 'Paid';
             else if (totalPaid > 0 || totalInvoiced > 0) status = 'Partial';
 
-            return { ...sale, status, totalPaid, totalInvoiced };
+            return { ...sale, status, totalPaid, totalInvoiced, relatedInvoicesCount: relatedInvoices.length };
         });
     }, [sales, invoices, searchQuery]);
 
@@ -135,21 +136,13 @@ import {
 
     const handleHardDeletePo = async () => {
         if (!firestore || !hardDeleteState.docId || !isSuperAdmin) return;
-        
         const docRef = doc(firestore, 'sales', hardDeleteState.docId);
-        
         try {
             await deleteDoc(docRef);
-            toast({ 
-                title: "PO Dihapus Permanen", 
-                description: `Data PO ${hardDeleteState.poNumber} telah dihapus sepenuhnya dari database.` 
-            });
+            toast({ title: "PO Dihapus Permanen" });
             setHardDeleteState({ isOpen: false });
         } catch (error: any) {
-            errorEmitter.emit('permission-error', new FirestorePermissionError({
-                path: docRef.path,
-                operation: 'delete',
-            }));
+            errorEmitter.emit('permission-error', new FirestorePermissionError({ path: docRef.path, operation: 'delete' }));
         }
     };
 
@@ -157,53 +150,29 @@ import {
         if (!firestore || !soUpdateState.poNumber) return;
         const safeId = soUpdateState.poNumber.replace(/\//g, '_');
         const docRef = doc(firestore, 'sales', safeId);
-        
         const batch = writeBatch(firestore);
         batch.update(docRef, { soNumber: tempSo });
-
         const relatedInvoices = invoices?.filter(inv => inv.poNumber === soUpdateState.poNumber) || [];
         relatedInvoices.forEach(inv => {
             const invRef = doc(firestore, 'invoices', inv.id.replace(/\//g, '_'));
             batch.update(invRef, { soNumber: tempSo });
         });
-
         batch.commit()
-            .then(() => {
-                toast({ title: "SO Number Updated" });
-                setSoUpdateState({ isOpen: false });
-            })
+            .then(() => { toast({ title: "SO Number Updated" }); setSoUpdateState({ isOpen: false }); })
             .catch(async (serverError) => {
-                errorEmitter.emit('permission-error', new FirestorePermissionError({
-                    path: docRef.path,
-                    operation: 'update',
-                    requestResourceData: { soNumber: tempSo }
-                }));
+                errorEmitter.emit('permission-error', new FirestorePermissionError({ path: docRef.path, operation: 'update', requestResourceData: { soNumber: tempSo } }));
             });
     };
 
     const handleSaveSale = (saleData: Omit<SalesListItem, 'ownerId'>) => {
         if (!firestore || !user) return;
-        
         const safeId = saleData.poNumber.replace(/\//g, '_');
         const docRef = doc(firestore, 'sales', safeId);
-        
-        const dataToSave = { 
-            ...saleData, 
-            ownerId: user.uid, 
-            createdBy: userProfile?.displayName || user.email || 'System' 
-        };
-
+        const dataToSave = { ...saleData, ownerId: user.uid, createdBy: userProfile?.displayName || user.email || 'System' };
         setDoc(docRef, dataToSave, { merge: true })
-            .then(() => {
-                toast({ title: "PO Berhasil Disimpan" });
-                setIsDialogOpen(false);
-            })
+            .then(() => { toast({ title: "PO Berhasil Disimpan" }); setIsDialogOpen(false); })
             .catch(async (serverError) => {
-                errorEmitter.emit('permission-error', new FirestorePermissionError({
-                    path: docRef.path, 
-                    operation: editingSale ? 'update' : 'create', 
-                    requestResourceData: dataToSave
-                }));
+                errorEmitter.emit('permission-error', new FirestorePermissionError({ path: docRef.path, operation: editingSale ? 'update' : 'create', requestResourceData: dataToSave }));
             });
     };
 
@@ -242,110 +211,94 @@ import {
                                 <TableHead className="w-[40px] px-4"><Checkbox onCheckedChange={(checked) => setSelectedIds(checked ? new Set(filteredSales.map(s => s.poNumber)) : new Set())} /></TableHead>
                                 <TableHead className="text-[10px] font-black uppercase tracking-widest py-5">Identity / PO Number</TableHead>
                                 <TableHead className="text-[10px] font-black uppercase tracking-widest">Legal Customer</TableHead>
-                                <TableHead className="text-[10px] font-black uppercase tracking-widest">SO Reference</TableHead>
+                                <TableHead className="text-[10px] font-black uppercase tracking-widest text-center">AR Status Blueprint</TableHead>
                                 <TableHead className="text-[10px] font-black uppercase tracking-widest text-right">Nilai Kontrak</TableHead>
-                                <TableHead className="text-[10px] font-black uppercase tracking-widest text-center">AR Status</TableHead>
                                 <TableHead className="text-right py-4 px-6"></TableHead>
                             </TableRow>
                         </TableHeader>
                         <TableBody>
                             {isLoading ? (
-                                <TableRow><TableCell colSpan={7} className="text-center py-20 font-black uppercase text-[10px] tracking-widest animate-pulse text-slate-400">Syncing Master Sales Database...</TableCell></TableRow>
+                                <TableRow><TableCell colSpan={6} className="text-center py-20 font-black uppercase text-[10px] tracking-widest animate-pulse text-slate-400">Syncing Master Sales Database...</TableCell></TableRow>
                             ) : filteredSales.length === 0 ? (
-                                <TableRow><TableCell colSpan={7} className="text-center py-20 text-slate-400 font-bold italic">Belum ada PO terdaftar.</TableCell></TableRow>
-                            ) : filteredSales.map((sale: any) => (
-                                <TableRow key={sale.id || sale.poNumber} className={cn("hover:bg-indigo-50/10 border-b-slate-100 last:border-0 transition-colors", selectedIds.has(sale.poNumber) ? "bg-indigo-50/30" : "", sale.status === 'Cancelled' && "opacity-40 grayscale")}>
-                                    <TableCell className="px-4"><Checkbox checked={selectedIds.has(sale.poNumber)} onCheckedChange={() => setSelectedIds(prev => { const n = new Set(prev); n.has(sale.poNumber) ? n.delete(sale.poNumber) : n.add(sale.poNumber); return n; })} /></TableCell>
-                                    <TableCell className="font-black text-indigo-700">{sale.poNumber}</TableCell>
-                                    <TableCell className="text-xs font-black uppercase text-slate-700">{sale.customer}</TableCell>
-                                    <TableCell>
-                                        <div className="flex items-center gap-2">
-                                            {sale.soNumber ? (
-                                                <Badge variant="outline" className="font-mono bg-blue-50 text-blue-700 font-black text-[9px] border-blue-100 h-5">{sale.soNumber}</Badge>
-                                            ) : (
-                                                <span className="text-[9px] font-black italic text-slate-300 uppercase">Awaiting SO</span>
-                                            )}
-                                            {sale.status !== 'Cancelled' && (
-                                                <Button variant="ghost" size="icon" className="h-7 w-7 rounded-full hover:bg-blue-100" onClick={() => { setTempSo(sale.soNumber || ''); setSoUpdateState({ isOpen: true, poNumber: sale.poNumber }); }}>
-                                                    <RefreshCw className="h-3 w-3 text-blue-600" />
-                                                </Button>
-                                            )}
-                                        </div>
-                                    </TableCell>
-                                    <TableCell className="font-black text-slate-900 text-right">Rp {sale.amount.toLocaleString('id-ID')}</TableCell>
-                                    <TableCell className="text-center">
-                                        <Badge className={cn(
-                                            "text-[9px] font-black uppercase px-2.5 py-0.5 border-none h-5",
-                                            sale.status === 'Paid' ? 'bg-emerald-100 text-emerald-700' : 
-                                            sale.status === 'Cancelled' ? 'bg-rose-100 text-rose-700' : 
-                                            sale.status === 'Partial' ? 'bg-amber-100 text-amber-700' : 'bg-slate-100 text-slate-500'
-                                        )}>
-                                            {sale.status}
-                                        </Badge>
-                                    </TableCell>
-                                    <TableCell className="text-right px-6">
-                                        <div className="flex justify-end gap-2">
-                                            {sale.status !== 'Cancelled' && (
-                                                <>
-                                                    <TooltipProvider>
-                                                        <Tooltip>
-                                                            <TooltipTrigger asChild>
-                                                                <Button 
-                                                                    size="sm" 
-                                                                    className="h-8 bg-indigo-600 hover:bg-indigo-700 font-black uppercase text-[9px] tracking-widest shadow-md px-4 rounded-xl"
-                                                                    onClick={() => router.push(`/dashboard/invoices/number?poNumber=${encodeURIComponent(sale.poNumber)}`)}
-                                                                >
-                                                                    <FilePlus className="mr-1.5 h-3.5 w-3.5" /> Billing
-                                                                </Button>
-                                                            </TooltipTrigger>
-                                                            <TooltipContent className="bg-slate-900 text-white border-none text-[10px]">Tarik data PO ke bagian Penagihan.</TooltipContent>
-                                                        </Tooltip>
-                                                    </TooltipProvider>
-
-                                                    <TooltipProvider>
-                                                        <Tooltip>
-                                                            <TooltipTrigger asChild>
-                                                                <Button 
-                                                                    size="sm" 
-                                                                    variant="outline"
-                                                                    className="h-8 border-emerald-200 text-emerald-700 hover:bg-emerald-50 font-black uppercase text-[9px] tracking-widest px-4 rounded-xl"
-                                                                    onClick={() => router.push(`/dashboard/sales-management?search=${encodeURIComponent(sale.poNumber)}`)}
-                                                                >
-                                                                    <Wallet className="mr-1.5 h-3.5 w-3.5" /> AR Book
-                                                                </Button>
-                                                            </TooltipTrigger>
-                                                            <TooltipContent className="bg-slate-900 text-white border-none text-[10px]">Monitoring Piutang & Ceklist Bayar.</TooltipContent>
-                                                        </Tooltip>
-                                                    </TooltipProvider>
-                                                </>
-                                            )}
-                                            <DropdownMenu>
-                                                <DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8 rounded-full"><MoreHorizontal className="h-4 w-4 text-slate-400" /></Button></DropdownMenuTrigger>
-                                                <DropdownMenuContent align="end" className="w-48">
-                                                    {isAdmin && sale.status !== 'Cancelled' && (
-                                                        <>
-                                                            <DropdownMenuItem onClick={() => { setEditingSale(sale); setIsDialogOpen(true); }} className="text-[10px] font-black uppercase tracking-widest">
-                                                              <Edit className="mr-2 h-4 w-4" /> Edit Kontrak PO
-                                                            </DropdownMenuItem>
-                                                            <DropdownMenuItem className="text-rose-600 font-black uppercase text-[10px] tracking-widest focus:text-rose-600" onClick={() => { setTargetPoId(sale.poNumber); setVoidDialogOpen(true); }}>
-                                                              <XCircle className="mr-2 h-4 w-4" /> Batal / Void PO
-                                                            </DropdownMenuItem>
-                                                        </>
+                                <TableRow><TableCell colSpan={6} className="text-center py-20 text-slate-400 font-bold italic">Belum ada PO terdaftar.</TableCell></TableRow>
+                            ) : filteredSales.map((sale: any) => {
+                                const hasScheme = sale.paymentScheme && sale.paymentScheme.length > 0;
+                                return (
+                                    <TableRow key={sale.poNumber} className={cn("hover:bg-indigo-50/10 border-b-slate-100 last:border-0 transition-colors", selectedIds.has(sale.poNumber) ? "bg-indigo-50/30" : "", sale.status === 'Cancelled' && "opacity-40 grayscale")}>
+                                        <TableCell className="px-4"><Checkbox checked={selectedIds.has(sale.poNumber)} onCheckedChange={() => setSelectedIds(prev => { const n = new Set(prev); n.has(sale.poNumber) ? n.delete(sale.poNumber) : n.add(sale.poNumber); return n; })} /></TableCell>
+                                        <TableCell>
+                                            <div className="flex flex-col">
+                                                <span className="font-black text-indigo-700">{sale.poNumber}</span>
+                                                <span className="text-[8px] font-black uppercase text-slate-400">SO: {sale.soNumber || 'Pending'}</span>
+                                            </div>
+                                        </TableCell>
+                                        <TableCell className="text-xs font-black uppercase text-slate-700">{sale.customer}</TableCell>
+                                        <TableCell>
+                                            <div className="flex flex-col items-center gap-1.5">
+                                                <div className="flex gap-1">
+                                                    {hasScheme ? sale.paymentScheme.map((stage: any, sIdx: number) => {
+                                                        const isDone = sIdx < sale.relatedInvoicesCount;
+                                                        return (
+                                                            <TooltipProvider key={sIdx}>
+                                                                <Tooltip>
+                                                                    <TooltipTrigger asChild>
+                                                                        <div className={cn(
+                                                                            "h-2 w-8 rounded-full border transition-all",
+                                                                            isDone ? "bg-emerald-500 border-emerald-600 shadow-sm" : "bg-slate-100 border-slate-200"
+                                                                        )} />
+                                                                    </TooltipTrigger>
+                                                                    <TooltipContent className="bg-slate-900 text-white text-[9px] uppercase font-black">
+                                                                        {stage.label}: {isDone ? 'INVOICED' : 'PENDING'}
+                                                                    </TooltipContent>
+                                                                </Tooltip>
+                                                            </TooltipProvider>
+                                                        );
+                                                    }) : (
+                                                        <Badge variant="outline" className="text-[8px] font-black opacity-30 uppercase">No Scheme</Badge>
                                                     )}
-                                                    {isSuperAdmin && (
-                                                        <DropdownMenuItem 
-                                                            className="text-red-700 font-black uppercase text-[10px] tracking-widest focus:bg-red-50 focus:text-red-700" 
-                                                            onSelect={(e) => { e.preventDefault(); setHardDeleteState({ isOpen: true, docId: sale.id, poNumber: sale.poNumber }); }}
-                                                        >
-                                                            <Trash2 className="mr-2 h-4 w-4" /> Hapus Database
-                                                        </DropdownMenuItem>
-                                                    )}
-                                                </DropdownMenuContent>
-                                            </DropdownMenu>
-                                        </div>
-                                    </TableCell>
-                                </TableRow>
-                            ))}
+                                                </div>
+                                                <Badge className={cn(
+                                                    "text-[8px] font-black uppercase px-2 py-0 border-none",
+                                                    sale.status === 'Paid' ? 'bg-emerald-100 text-emerald-700' : 
+                                                    sale.status === 'Cancelled' ? 'bg-rose-100 text-rose-700' : 
+                                                    sale.status === 'Partial' ? 'bg-amber-100 text-amber-700' : 'bg-slate-100 text-slate-500'
+                                                )}>
+                                                    {sale.status}
+                                                </Badge>
+                                            </div>
+                                        </TableCell>
+                                        <TableCell className="font-black text-slate-900 text-right">Rp {sale.amount.toLocaleString('id-ID')}</TableCell>
+                                        <TableCell className="text-right px-6">
+                                            <div className="flex justify-end gap-2">
+                                                {sale.status !== 'Cancelled' && (
+                                                    <Button 
+                                                        size="sm" 
+                                                        className="h-8 bg-indigo-600 hover:bg-indigo-700 font-black uppercase text-[9px] tracking-widest shadow-md px-4 rounded-xl"
+                                                        onClick={() => router.push(`/dashboard/invoices/number?poNumber=${encodeURIComponent(sale.poNumber)}`)}
+                                                    >
+                                                        <FilePlus className="mr-1.5 h-3.5 w-3.5" /> Billing
+                                                    </Button>
+                                                )}
+                                                <DropdownMenu>
+                                                    <DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8 rounded-full"><MoreHorizontal className="h-4 w-4 text-slate-400" /></Button></DropdownMenuTrigger>
+                                                    <DropdownMenuContent align="end" className="w-48">
+                                                        {isAdmin && sale.status !== 'Cancelled' && (
+                                                            <>
+                                                                <DropdownMenuItem onClick={() => { setEditingSale(sale); setIsDialogOpen(true); }} className="text-[10px] font-black uppercase tracking-widest">
+                                                                  <Edit className="mr-2 h-4 w-4" /> Edit Kontrak & Scheme
+                                                                </DropdownMenuItem>
+                                                                <DropdownMenuItem className="text-rose-600 font-black uppercase text-[10px] tracking-widest" onClick={() => { setTargetPoId(sale.poNumber); setVoidDialogOpen(true); }}>
+                                                                  <XCircle className="mr-2 h-4 w-4" /> Batal / Void PO
+                                                                </DropdownMenuItem>
+                                                            </>
+                                                        )}
+                                                    </DropdownMenuContent>
+                                                </DropdownMenu>
+                                            </div>
+                                        </TableCell>
+                                    </TableRow>
+                                );
+                            })}
                         </TableBody>
                     </Table>
                 </div>
@@ -378,20 +331,6 @@ import {
         >
             <div className="hidden" />
         </DeleteConfirmationDialog>
-
-        {/* SO Update Modal */}
-        <Dialog open={soUpdateState.isOpen} onOpenChange={(o) => setSoUpdateState(prev => ({...prev, isOpen: o}))}>
-            <DialogContent className="sm:max-w-[400px]">
-                <DialogHeader><DialogTitle className="uppercase font-black tracking-tight">Sinkronisasi SO Produksi</DialogTitle></DialogHeader>
-                <div className="py-6 space-y-2">
-                    <Label className="text-[10px] font-black uppercase text-slate-400">Nomor SO Resmi</Label>
-                    <Input value={tempSo} onChange={e => setTempSo(e.target.value)} placeholder="SO-2024-XXXX" className="font-mono font-black text-lg text-indigo-700 h-12 bg-indigo-50 border-indigo-100 rounded-xl text-center" />
-                </div>
-                <DialogFooter className="bg-slate-50 -mx-6 -mb-6 p-6 rounded-b-3xl">
-                    <Button onClick={handleUpdateSo} className="w-full bg-indigo-600 hover:bg-indigo-700 h-12 font-black uppercase tracking-widest rounded-xl shadow-lg shadow-indigo-100">Simpan & Sinkronkan</Button>
-                </DialogFooter>
-            </DialogContent>
-        </Dialog>
       </main>
     );
   }
