@@ -82,7 +82,7 @@ export const InvoiceTemplate = ({ type, invoiceData, items, calculations }: Invo
       </div>
 
       {/* TABLE SECTION */}
-      <main className="relative flex-grow">
+      <main className="relative flex-grow flex flex-col">
         <table className="w-full border-collapse">
           <thead>
             <tr className="border border-black text-[9pt]">
@@ -138,8 +138,11 @@ export const InvoiceTemplate = ({ type, invoiceData, items, calculations }: Invo
           </div>
         </div>
 
+        {/* PENDORONG (SPACER) - Mendorong Footer ke bawah halaman */}
+        <div className="flex-grow"></div>
+
         {/* FOOTER SECTION */}
-        <div className="mt-20">
+        <div className="mt-auto">
           <div className="w-full flex justify-start mb-0.5">
             <p className="text-[10px] font-medium">No PO : {invoiceData.poNumber || '-'}</p>
           </div>
