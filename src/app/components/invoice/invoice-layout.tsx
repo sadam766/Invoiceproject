@@ -104,16 +104,25 @@ export const InvoiceTemplate = ({ type, invoiceData, items, calculations }: Invo
           </tbody>
         </table>
 
-        {/* Mid-page border line */}
-        <div className="border-t border-black w-[15%] ml-auto mt-4 mb-10"></div>
+        {/* Short line under Amount column only */}
+        <div className="flex justify-end">
+            <div className="w-[18%] border-t border-black mt-2"></div>
+        </div>
+        
+        {/* Sub-total Items display right under the short line */}
+        <div className="flex justify-end mb-4">
+            <div className="w-[18%] text-right font-bold text-[9pt]">
+                {formatCurrency(calculations.subTotalItems)}
+            </div>
+        </div>
 
-        {/* PO Reference Line */}
-        <div className="border-y-2 border-black py-2 mb-4 font-bold">
+        {/* PO Reference Line - Top border removed as requested */}
+        <div className="border-b-2 border-black py-2 mb-8 font-bold">
             No PO : {invoiceData.poNumber || ''}
         </div>
 
         {/* FINANCIAL SUMMARY */}
-        <div className="flex justify-end">
+        <div className="flex justify-end border-t border-black pt-4">
            <div className="w-[40%] space-y-1 text-[9pt]">
               <div className="grid grid-cols-[1fr_auto] gap-x-4">
                  <span>Goods:</span>
@@ -158,7 +167,10 @@ export const InvoiceTemplate = ({ type, invoiceData, items, calculations }: Invo
              </div>
           </div>
 
-          <div className="text-center font-bold italic py-1 w-[80%]">OR</div>
+          {/* Centered OR text between Mandiri and BCA blocks */}
+          <div className="text-center font-bold italic py-2 w-[80%] uppercase tracking-widest text-[8pt] text-slate-400">
+             - OR -
+          </div>
 
           <div className="grid grid-cols-2 gap-x-4">
              <div className="space-y-0.5">
