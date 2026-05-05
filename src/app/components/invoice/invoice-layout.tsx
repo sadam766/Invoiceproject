@@ -23,6 +23,23 @@ export const InvoiceTemplate = ({ type, invoiceData, items, calculations }: Invo
   const displayInvoiceId = invoiceData.id?.replace(/_/g, '/') || 'DRAFT';
   const customerName = invoiceData.customerName || invoiceData.customer || 'N/A';
   const customerAddress = invoiceData.billingAddress || invoiceData.customerAddress || invoiceData.address || '';
+  
+  // Logic: isDeduction check (Jika statusnya adalah deduksi/pelunasan)
+  const isDeduction = invoiceData.dpMode === 'kurangi';
+  
+  // Extract percentage from description (e.g. "DP 35%")
+  const dpPercentMatch = invoiceData.dpDescription?.match(/(\d+)%/);
+  const dpPercent = dpPercentMatch ? dpPercentMatch[1] : '';
+
+  // Calculate Net Goods for the financial summary block
+  // Jika tagih DP -> Goods adalah nominal DP
+  // Jika kurangi DP -> Goods adalah Subtotal - DP - Discount
+  let netGoods = calculations.subTotalItems;
+  if (invoiceData.dpMode === 'tagih') {
+      netGoods = calculations.dpValue;
+  } else {
+      netGoods = Math.max(0, calculations.subTotalItems - calculations.dpValue - calculations.discountValue);
+  }
 
   return (
     <div 
@@ -91,16 +108,38 @@ export const InvoiceTemplate = ({ type, invoiceData, items, calculations }: Invo
           </tbody>
         </table>
 
-        {/* SUB TOTAL ITEM - Sesuai tanda merah di snippet */}
-        <div className="flex justify-end mt-56">
-          <div className="w-[18%] text-right pr-2">
-            <div className="border-t border-black w-full mb-0.5"></div>
-            <p className="font-normal text-[9pt]">{formatCurrency(calculations.subTotalItems)}</p>
+        {/* SECTION SUBTOTAL, DISCOUNT, DP - Revised Layout */}
+        <div className="flex justify-end mt-4">
+          <div className="w-[45%] pr-1">
+            
+            {/* Baris Sub-Total Item */}
+            <div className="flex justify-end border-t border-black pt-1 mb-1">
+              <span className="font-normal text-[9pt]">{formatCurrency(calculations.subTotalItems)}</span>
+            </div>
+
+            {/* Baris Discount */}
+            {calculations.discountValue > 0 && (
+                <div className="grid grid-cols-[1fr_auto] gap-x-10 text-[9pt] mb-1">
+                    <span className="text-right">Discount</span>
+                    <span className="w-[120px] text-right">({formatCurrency(calculations.discountValue)})</span>
+                </div>
+            )}
+
+            {/* Baris DP dengan Kondisional Kurung */}
+            {calculations.dpValue > 0 && (
+                <div className="grid grid-cols-[1fr_1fr_auto] gap-x-4 text-[9pt]">
+                    <span className="text-right">DP</span>
+                    <span className="text-center">{dpPercent}{dpPercent ? '%' : ''}</span>
+                    <span className="w-[120px] text-right">
+                        {isDeduction ? `(${formatCurrency(calculations.dpValue)})` : formatCurrency(calculations.dpValue)}
+                    </span>
+                </div>
+            )}
           </div>
         </div>
 
-        {/* FOOTER SECTION - Sesuai tanda orange di snippet */}
-        <div className="mt-[100px]">
+        {/* FOOTER SECTION */}
+        <div className="mt-20">
           <div className="w-full flex justify-start mb-0.5">
             <p className="text-[10px] font-medium">No PO : {invoiceData.poNumber || '-'}</p>
           </div>
@@ -111,7 +150,7 @@ export const InvoiceTemplate = ({ type, invoiceData, items, calculations }: Invo
             <div className="w-1/4 text-[10px] leading-tight space-y-0.5">
               <div className="grid grid-cols-[1fr_auto] gap-x-4">
                 <span>Goods:</span>
-                <span className="text-right">{formatCurrency(calculations.subTotalItems)}</span>
+                <span className="text-right">{formatCurrency(netGoods)}</span>
               </div>
               <div className="grid grid-cols-[1fr_auto] gap-x-4">
                 <span>DPP VAT (11/12):</span>
