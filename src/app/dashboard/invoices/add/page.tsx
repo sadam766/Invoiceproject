@@ -272,8 +272,9 @@ export default function AddInvoicePage() {
         baseValue = Math.max(0, subTotalItems - dpVal - discVal);
     }
 
-    const dppVat = baseValue * (11 / 12);
-    const vat12 = dppVat * 0.12;
+    // Logic e-Faktur: 11/12 integer rounding for DPP Nilai Lain
+    const dppVat = Math.round(baseValue * (11 / 12));
+    const vat12 = Math.round(dppVat * 0.12);
     const totalRp = dppVat + vat12;
 
     return {
@@ -360,6 +361,7 @@ export default function AddInvoicePage() {
         createdBy: updater,
         lastUpdatedAt: timestamp,
         lastUpdatedBy: updater,
+        isProforma: activeIdentity.id.startsWith('KW'),
         revisionLogs: arrayUnion({
             updatedBy: updater,
             updatedAt: timestamp,
@@ -412,6 +414,7 @@ export default function AddInvoicePage() {
       dpDescription,
       dpMode,
       date: format(issueDate, 'dd MMM yyyy'),
+      isProforma: activeIdentity?.id.startsWith('KW')
   };
 
   return (

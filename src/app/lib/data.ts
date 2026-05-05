@@ -79,6 +79,7 @@ export type Invoice = {
   paymentTerms?: string;
   payments?: PaymentRecord[];
   items?: InvoiceItem[];
+  isProforma?: boolean;
   isDpInvoice?: boolean;
 };
 

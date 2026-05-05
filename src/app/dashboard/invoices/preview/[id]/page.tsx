@@ -41,8 +41,9 @@ const InvoicePreviewPage = () => {
       baseValue = Math.max(0, subTotalItems - dpVal - discVal);
   }
 
-  const dppVat = baseValue * (11 / 12);
-  const vat12 = dppVat * 0.12;
+  // Pre-calculated Rounding 11/12 logic for code 04 compatibility
+  const dppVat = Math.round(baseValue * (11 / 12));
+  const vat12 = Math.round(dppVat * 0.12);
   const totalRp = dppVat + vat12;
 
   const calcs = {

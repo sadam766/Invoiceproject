@@ -3,6 +3,7 @@
 
 import React from 'react';
 import { cn, formatCurrency } from '@/lib/utils';
+import Image from 'next/image';
 
 export type InvoiceTemplateProps = {
   type: 'Original' | 'Copy';
@@ -21,73 +22,86 @@ export type InvoiceTemplateProps = {
 
 export const InvoiceTemplate = ({ type, invoiceData, items, calculations }: InvoiceTemplateProps) => {
   const displayInvoiceId = invoiceData.id?.replace(/_/g, '/') || 'DRAFT';
+  const isProforma = displayInvoiceId.startsWith('KW') || invoiceData.isProforma;
   const maxItems = 10;
   const emptyRows = Math.max(0, maxItems - items.length);
 
   // Mapping fallback logic to ensure customer name and address are never missed
   const customerName = invoiceData.customerName || invoiceData.customer || 'N/A';
-  // Enhanced address mapping: check multiple potential field names from Firestore
   const customerAddress = invoiceData.billingAddress || invoiceData.customerAddress || invoiceData.address || 'N/A';
 
   return (
     <div 
       className={cn(
-        "relative bg-white mx-auto pt-12 pb-6 px-12 flex flex-col font-sans text-black shadow-lg mb-8 print:shadow-none print:mb-0",
+        "relative bg-white mx-auto pt-10 pb-6 px-12 flex flex-col font-sans text-black shadow-lg mb-8 print:shadow-none print:mb-0",
         type === 'Copy' && "print:page-break-before-always"
       )}
       style={{ width: '210mm', minHeight: '297mm', fontSize: '9pt', color: '#000000' }}
     >
-      {/* LABEL ORIGINAL/COPY - Solid Black for Print Professionalism */}
-      <div className="absolute right-12 top-8 text-[10pt] text-black uppercase tracking-widest">
+      {/* LABEL ORIGINAL/COPY */}
+      <div className="absolute right-12 top-8 text-[8pt] text-black uppercase tracking-widest font-bold">
         {type}
       </div>
 
-      {/* HEADER - CENTERED */}
-      <header className="relative mb-6">
-        <div className="text-center w-full space-y-1 text-black">
-          <h1 className="font-bold text-[11pt] uppercase tracking-wider">INVOICE/OFFICIAL RECEIPT</h1>
-          {/* REVISI: Ukuran 14pt, Bold, Tanpa "No:", Center */}
-          <p className="font-bold text-[14pt] leading-tight">{displayInvoiceId}</p>
+      {/* HEADER SECTION - Branding */}
+      <header className="relative mb-4">
+        <div className="flex justify-between items-start mb-6">
+          <div className="flex flex-col">
+             <div className="flex items-center gap-3">
+                <div className="w-12 h-12 bg-black flex items-center justify-center text-white font-black text-xl italic rounded-lg">J</div>
+                <div>
+                   <h2 className="font-black text-lg leading-none uppercase tracking-tighter">JEMBO CABLE</h2>
+                   <p className="text-[8pt] font-medium italic opacity-60">Together We Grow</p>
+                </div>
+             </div>
+             <div className="mt-4 space-y-0.5 text-[7pt] leading-tight max-w-[400px]">
+                <p className="font-bold">PT JEMBO CABLE COMPANY Tbk.</p>
+                <p><span className="font-bold">Head Office:</span> Jl. Industri Raya Blok A No. 1, Jatiuwung, Tangerang 15135, Indonesia.</p>
+                <p><span className="font-bold">Marketing Office:</span> Mega Glodok Kemayoran Tower B 6th Floor, Jakarta Pusat.</p>
+             </div>
+          </div>
+          <div className="text-right">
+             <h1 className="font-black text-[11pt] uppercase tracking-wider mb-1">
+                {isProforma ? 'PROFORMA INVOICE' : 'INVOICE/OFFICIAL RECEIPT'}
+             </h1>
+             <p className="font-bold text-[14pt] leading-tight">{displayInvoiceId}</p>
+          </div>
         </div>
         
-        <div className="flex justify-between items-start mt-6 text-black">
+        <div className="flex justify-between items-start mt-6 text-black border-t border-black pt-4">
           <div className="w-[60%] space-y-1">
-            {/* Nama pelanggan ditarik dari database */}
-            <p className="font-bold uppercase text-[10pt]">{customerName}</p>
+            <p className="text-[8pt] uppercase font-bold text-slate-400">Customer Identity:</p>
+            <p className="font-black uppercase text-[10pt]">{customerName}</p>
             <p className="text-[9pt] leading-tight italic max-w-[350px]">
                 {customerAddress}
             </p>
           </div>
           <div className="text-[9pt] space-y-0.5 text-black" style={{ minWidth: '180px' }}>
             <div className="grid grid-cols-[85px_5px_1fr]"><span>Sales Order</span><span>:</span><span>{invoiceData.soNumber || '-'}</span></div>
-            <div className="grid grid-cols-[85px_5px_1fr]"><span>Order Date</span><span>:</span><span>-</span></div>
+            <div className="grid grid-cols-[85px_5px_1fr]"><span>Order Date</span><span>:</span><span>{invoiceData.orderDate || '-'}</span></div>
             <div className="grid grid-cols-[85px_5px_1fr]"><span>Reference A</span><span>:</span><span>{invoiceData.poNumber || '-'}</span></div>
+            <div className="grid grid-cols-[85px_5px_1fr]"><span>Date</span><span>:</span><span>{invoiceData.date || '-'}</span></div>
           </div>
         </div>
       </header>
 
-      <div className="flex justify-between mb-1 px-0.5 text-[9pt] border-t border-black pt-1 text-black">
-        <span>Customer Code : {invoiceData.customerCode || '-'}</span>
-        <span>Date: {invoiceData.date || '-'}</span>
-      </div>
-
       {/* TABLE */}
-      <main className="relative flex-grow">
+      <main className="relative flex-grow mt-2">
         <table className="w-full border-collapse border-black">
           <thead>
-            <tr className="border border-black text-[9pt] text-black">
-              <th className="py-1 px-2 text-left border-r border-black w-[5%] font-normal">No.</th>
-              <th className="py-1 px-2 text-left border-r border-black font-normal">Item</th>
-              <th className="py-1 px-2 text-center border-r border-black w-[18%] font-normal">Quantity Unit</th>
-              <th className="py-1 px-2 text-right border-r border-black w-[15%] font-normal">Price</th>
-              <th className="py-1 px-2 text-right font-normal w-[18%]">Amount</th>
+            <tr className="border-y border-black text-[9pt] text-black bg-slate-50">
+              <th className="py-2 px-2 text-left border-r border-black w-[5%] font-bold">No.</th>
+              <th className="py-2 px-2 text-left border-r border-black font-bold">Item</th>
+              <th className="py-2 px-2 text-center border-r border-black w-[18%] font-bold">Quantity Unit</th>
+              <th className="py-2 px-2 text-right border-r border-black w-[15%] font-bold">Price</th>
+              <th className="py-2 px-2 text-right font-bold w-[18%]">Amount</th>
             </tr>
           </thead>
           <tbody className="text-black">
             {items.map((item, idx) => (
               <tr key={idx} className="align-top text-[9pt] border-x border-black h-8">
                 <td className="py-1 px-2 text-left border-r border-black">{idx + 1}</td>
-                <td className="py-1 px-2 uppercase border-r border-black">{item.name}</td>
+                <td className="py-1 px-2 uppercase border-r border-black font-medium">{item.name}</td>
                 <td className="py-1 px-2 text-center border-r border-black">{item.quantity.toLocaleString('id-ID')} {item.unit}</td>
                 <td className="py-1 px-2 text-right border-r border-black">{formatCurrency(item.price)}</td>
                 <td className="py-1 px-2 text-right">{formatCurrency(item.total)}</td>
@@ -107,100 +121,110 @@ export const InvoiceTemplate = ({ type, invoiceData, items, calculations }: Invo
           </tbody>
         </table>
 
-        {/* FINANCIAL ADJUSTMENTS - UNDER TABLE */}
-        <div className="flex justify-end mt-2 text-black">
-          <div className="w-[18%] text-right pr-2">
-            <div className="border-t border-black w-full mb-0.5"></div>
-            <p className="font-bold text-[9pt]">{formatCurrency(calculations.subTotalItems)}</p>
-          </div>
-        </div>
+        {/* FINANCIAL CALCULATIONS */}
+        <div className="flex justify-end mt-4 text-black">
+          <div className="w-[45%] text-[9pt] space-y-1">
+             <div className="grid grid-cols-[1fr_auto] gap-x-4">
+                <span className="font-bold">Goods:</span>
+                <span className="text-right">{formatCurrency(calculations.subTotalItems)}</span>
+             </div>
+             
+             {/* DP Logic Visualization */}
+             {invoiceData.dpValue > 0 && (
+                 <div className="grid grid-cols-[1fr_auto] gap-x-4 italic">
+                    <span>{invoiceData.dpDescription || 'Down Payment'}</span>
+                    <span className="text-right">
+                        {invoiceData.dpMode === 'kurangi' ? `(${formatCurrency(invoiceData.dpValue)})` : formatCurrency(invoiceData.dpValue)}
+                    </span>
+                 </div>
+             )}
 
-        {/* DP & DISCOUNT ROWS */}
-        <div className="flex justify-end mt-1 text-black">
-            <div className="w-[40%] text-[9pt]">
-                {calculations.dpValue > 0 && (
-                    <div className="grid grid-cols-[1fr_auto] gap-x-4">
-                        <span className="font-medium italic">{invoiceData.dpDescription || 'DP'}</span>
-                        <span className="text-right">
-                            {invoiceData.dpMode === 'kurangi' ? `(${formatCurrency(calculations.dpValue)})` : formatCurrency(calculations.dpValue)}
-                        </span>
-                    </div>
-                )}
-                {calculations.discountValue > 0 && (
-                    <div className="grid grid-cols-[1fr_auto] gap-x-4">
-                        <span className="font-medium italic">Diskon</span>
-                        <span className="text-right">({formatCurrency(calculations.discountValue)})</span>
-                    </div>
-                )}
-            </div>
+             {invoiceData.discount > 0 && (
+                 <div className="grid grid-cols-[1fr_auto] gap-x-4 italic">
+                    <span>Discount</span>
+                    <span className="text-right">({formatCurrency(invoiceData.discount)})</span>
+                 </div>
+             )}
+
+             <div className="border-t border-black my-1"></div>
+
+             <div className="grid grid-cols-[1fr_auto] gap-x-4">
+                <span>DPP VAT (11/12):</span>
+                <span className="text-right">{formatCurrency(calculations.dppVat)}</span>
+             </div>
+             <div className="grid grid-cols-[1fr_auto] gap-x-4">
+                <span>VAT 12%:</span>
+                <span className="text-right">{formatCurrency(calculations.vat12)}</span>
+             </div>
+             
+             <div className="border-t-2 border-black my-1"></div>
+             
+             <div className="grid grid-cols-[1fr_auto] gap-x-4 text-[11pt] font-black uppercase">
+                <span>Total Rp:</span>
+                <span className="text-right">{formatCurrency(calculations.totalRp)}</span>
+             </div>
+          </div>
         </div>
       </main>
 
       {/* FOOTER SECTION */}
       <footer className="mt-8 text-black"> 
-        <div className="w-full flex justify-start mb-0.5">
-          <p className="text-[9pt] font-medium italic">Reference A : {invoiceData.poNumber || '-'}</p>
-        </div>
-        <div className="border-t border-black w-full mb-0.5"></div>
-
-        <div className="flex justify-end mt-1">
-          <div className="w-1/4 text-[9pt] leading-tight">
-            <div className="grid grid-cols-[1fr_auto] gap-x-4">
-              <span>Goods:</span><span className="text-right">{formatCurrency(calculations.subTotalItems - (invoiceData.dpMode === 'kurangi' ? calculations.dpValue : 0) - calculations.discountValue)}</span>
-              <span>DPP VAT (11/12):</span><span className="text-right">{formatCurrency(calculations.dppVat)}</span>
-              <span>VAT 12%:</span><span className="text-right">{formatCurrency(calculations.vat12)}</span>
-              <div className="col-span-2 border-t border-black my-0.5 opacity-30"></div>
-              <span className="font-bold">Total Rp:</span><span className="text-right font-bold">{formatCurrency(calculations.totalRp)}</span>
-            </div>
-          </div>
-        </div>
-
-        <div className="border-t border-black w-full my-1"></div>
-
         <div className="flex justify-between items-start">
-          {/* INFORMASI PEMBAYARAN HYBRID */}
-          <div className="w-[68%] text-[9pt] leading-tight space-y-2">
+          {/* INFORMASI PEMBAYARAN */}
+          <div className="w-[65%] text-[8.5pt] leading-tight space-y-4">
             <div className="flex">
-              <span className="w-[60px] font-bold">Payment:</span>
-              <span className="font-bold">{invoiceData.paymentTerms || '90 Hari'}</span>
+              <span className="w-[100px] font-bold">Payment Terms:</span>
+              <span className="font-bold border-b border-black px-2">{invoiceData.paymentTerms || '90 Hari'}</span>
             </div>
             
-            <div className="flex flex-col">
-              <p className="font-bold">Please state with your payment: {displayInvoiceId}</p>
+            <div className="space-y-2">
+              <p className="font-bold italic underline">Instructions for payment:</p>
               
               {invoiceData.paymentMethod === 'va' ? (
-                <div className="mt-2 space-y-1">
-                   <p className="font-bold italic">For payment, please transfer to our Virtual account:</p>
-                   <p className="font-black text-[10pt] uppercase">VIRTUAL ACCOUNT A/N {customerName}</p>
-                   <p className="font-mono text-xs tracking-widest border border-black w-fit p-1 bg-black/5">{invoiceData.vaNumber || 'AWAITING APPROVAL'}</p>
+                <div className="bg-slate-50 p-4 border border-black rounded-lg space-y-2">
+                   <p className="font-bold uppercase tracking-tight">VIRTUAL ACCOUNT TRANSFER (MANDIRI)</p>
+                   <p className="text-[10pt] font-black">A/N {customerName}</p>
+                   <p className="font-mono text-[12pt] font-black tracking-widest bg-white w-fit px-3 py-1 border border-black shadow-sm">
+                      {invoiceData.vaNumber || 'AWAITING APPROVAL'}
+                   </p>
+                   <p className="text-[7pt] italic opacity-70 mt-1">Please include invoice number {displayInvoiceId} in transaction description.</p>
                 </div>
               ) : (
-                <div className="mt-2 space-y-1">
-                  <p className="font-bold italic">For payment, please transfer to our account:</p>
-                  <p className="font-bold">PT. Jembo Cable Company Tbk</p>
-                  <div className="text-[9pt] mt-1 space-y-0.5">
-                    <div className="flex"><span className="w-[100px]">Bank Mandiri -</span><span>A/C No. : 102-0100206827 (Rp)</span></div>
-                    <div className="flex"><span className="w-[100px]">Jakarta Cabang</span><span>A/C No. : 102-0005000218 (Rp)</span></div>
-                    <div className="flex"><span className="w-[100px]">Jakarta Cabang</span><span>A/C No. : 102-0005000226 (USD)</span></div>
+                <div className="grid grid-cols-2 gap-4 bg-slate-50 p-4 border border-black rounded-lg">
+                  <div className="space-y-1">
+                    <p className="font-bold text-[7.5pt] border-b border-black pb-1 mb-1">BANK MANDIRI (RP)</p>
+                    <p className="font-bold">A/C: 102-0100206827</p>
+                    <p className="text-[7pt]">PT. JEMBO CABLE COMPANY Tbk</p>
                   </div>
-                  <div className="w-[280px] text-center font-bold text-black opacity-10 py-1">OR</div>
-                  <div className="flex items-start">
-                    <div className="w-[100px] leading-tight">Bank BCA - Jakarta<br/>(Cabang KEM TOWER)</div>
-                    <div>A/C No. : 684-0198977 (Rp)</div>
+                  <div className="space-y-1 border-l border-black pl-4">
+                    <p className="font-bold text-[7.5pt] border-b border-black pb-1 mb-1">BANK BCA (RP)</p>
+                    <p className="font-bold">A/C: 684-0198977</p>
+                    <p className="text-[7pt]">Cabang KEM TOWER Jakarta</p>
                   </div>
                 </div>
               )}
             </div>
+
+            {/* ISO Certification Text */}
+            <div className="pt-6 grid grid-cols-3 gap-2 opacity-40 grayscale">
+               <div className="border border-black p-1 text-center font-bold text-[6pt]">ISO 9001:2015</div>
+               <div className="border border-black p-1 text-center font-bold text-[6pt]">ISO 14001:2015</div>
+               <div className="border border-black p-1 text-center font-bold text-[6pt]">ISO 45001:2018</div>
+            </div>
           </div>
 
           {/* TANDA TANGAN */}
-          <div className="w-[32%] flex flex-col items-center">
-            <p className="font-bold text-[9pt]">PT. JEMBO CABLE COMPANY Tbk</p>
-            <div className="mt-24 border-t border-black w-full"></div>
-            <p className="font-bold uppercase pt-1 text-[9pt]">Finance</p>
+          <div className="w-[30%] flex flex-col items-center">
+            <p className="font-bold text-[9pt] text-center mb-20 uppercase">PT. JEMBO CABLE COMPANY Tbk</p>
+            <div className="w-full h-px bg-black"></div>
+            <p className="font-bold uppercase pt-1 text-[9pt]">Finance Department</p>
+            <p className="text-[7pt] italic opacity-60">Verified Document V2.0</p>
           </div>
         </div>
       </footer>
+
+      {/* Decorative Ornament (Watermark Effect) */}
+      <div className="absolute bottom-4 right-4 w-32 h-32 opacity-[0.03] pointer-events-none rotate-45 border-4 border-black rounded-full"></div>
     </div>
   );
 };
