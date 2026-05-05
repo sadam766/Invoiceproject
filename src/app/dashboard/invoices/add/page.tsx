@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useEffect, useState, useMemo } from 'react';
@@ -681,8 +680,8 @@ export default function AddInvoicePage() {
                              <div className="flex justify-between items-center">
                                 <Label className="text-[9px] font-black uppercase text-slate-400">Payment Matrix</Label>
                                 <div className="flex bg-slate-100 rounded-lg p-1 gap-1">
-                                    <Button variant={paymentMethod === 'bank' ? 'default' : 'ghost'} size="sm" onClick={() => setMethod('bank')} className="h-7 text-[8px] font-black uppercase rounded-md px-3">Manual Bank</Button>
-                                    <Button variant={paymentMethod === 'va' ? 'default' : 'ghost'} size="sm" onClick={() => setMethod('va')} className="h-7 text-[8px] font-black uppercase rounded-md px-3">Virtual Account</Button>
+                                    <Button variant={paymentMethod === 'bank' ? 'default' : 'ghost'} size="sm" onClick={() => setPaymentMethod('bank')} className="h-7 text-[8px] font-black uppercase rounded-md px-3">Manual Bank</Button>
+                                    <Button variant={paymentMethod === 'va' ? 'default' : 'ghost'} size="sm" onClick={() => setPaymentMethod('va')} className="h-7 text-[8px] font-black uppercase rounded-md px-3">Virtual Account</Button>
                                 </div>
                              </div>
                              {paymentMethod === 'va' && (
