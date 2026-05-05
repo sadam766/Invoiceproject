@@ -108,34 +108,32 @@ export const InvoiceTemplate = ({ type, invoiceData, items, calculations }: Invo
           </tbody>
         </table>
 
-        {/* SECTION SUBTOTAL, DISCOUNT, DP - Layout Adjusted to Center the Sub-total */}
+        {/* SECTION SUBTOTAL, DISCOUNT, DP */}
         <div className="flex justify-end mt-4">
-          <div className="w-[45%] pr-1">
+          <div className="w-[35%] pr-1"> 
             
-            {/* Baris Sub-Total Item: Menggunakan grid 3 kolom agar nominalnya di tengah (sejajar kolom persentase DP) */}
-            <div className="grid grid-cols-[1fr_1fr_auto] gap-x-4 border-t border-black pt-1 mb-1 text-[9pt]">
-              <span className="text-right"></span> {/* Kosongkan kiri */}
-              <span className="text-center font-normal">{formatCurrency(calculations.subTotalItems)}</span>
-              <span className="w-[120px] text-right"></span> {/* Kosongkan kanan agar nominal di tengah */}
+            {/* Baris Sub-Total Item */}
+            <div className="flex justify-end border-t border-black pt-1 mb-1">
+              <span className="font-normal text-[9pt]">{formatCurrency(calculations.subTotalItems)}</span>
             </div>
 
             {/* Baris Discount */}
             {calculations.discountValue > 0 && (
-                <div className="grid grid-cols-[1fr_auto] gap-x-10 text-[9pt] mb-1">
-                    <span className="text-right">Discount</span>
-                    <span className="w-[120px] text-right">({formatCurrency(calculations.discountValue)})</span>
-                </div>
+              <div className="grid grid-cols-[1fr_auto] gap-x-10 text-[9pt] mb-1">
+                <span className="text-right">Discount</span>
+                <span className="w-[120px] text-right">({formatCurrency(calculations.discountValue)})</span>
+              </div>
             )}
 
-            {/* Baris DP: Nominal tetap di paling kanan */}
+            {/* Baris DP */}
             {calculations.dpValue > 0 && (
-                <div className="grid grid-cols-[1fr_1fr_auto] gap-x-4 text-[9pt]">
-                    <span className="text-right">DP</span>
-                    <span className="text-center">{dpPercent}{dpPercent ? '%' : ''}</span>
-                    <span className="w-[120px] text-right">
-                        {isDeduction ? `(${formatCurrency(calculations.dpValue)})` : formatCurrency(calculations.dpValue)}
-                    </span>
-                </div>
+              <div className="grid grid-cols-[1fr_1.5fr_auto] gap-x-4 text-[9pt]">
+                <span className="text-right">DP</span>
+                <span className="text-center">{dpPercent}{dpPercent ? '%' : ''}</span>
+                <span className="w-[120px] text-right">
+                  {isDeduction ? `(${formatCurrency(calculations.dpValue)})` : formatCurrency(calculations.dpValue)}
+                </span>
+              </div>
             )}
           </div>
         </div>
