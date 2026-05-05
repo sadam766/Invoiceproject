@@ -413,6 +413,8 @@ export default function AddInvoicePage() {
       vaNumber: manualVaNumber,
       dpDescription,
       dpMode,
+      dpValue: calcs.dpValue,
+      discount: calcs.discountValue,
       date: format(issueDate, 'dd MMM yyyy'),
       isProforma: activeIdentity?.id.startsWith('KW')
   };
@@ -460,7 +462,7 @@ export default function AddInvoicePage() {
                                 <CardTitle className="text-[10px] font-black uppercase flex items-center gap-2 text-slate-500 tracking-widest">
                                     <Target className="h-4 w-4 text-indigo-600" /> Plafon PO Control
                                 </CardTitle>
-                                {poUtilization.isOverLimit && <Badge className="bg-rose-600 text-[8px] uppercase font-black animate-pulse"><ShieldAlert className="h-2 w-2 mr-1"/> LIMIT REACHED</Badge>}
+                                {poUtilization.isOverLimit && <Badge className="bg-rose-600 text-[8px] uppercase font-black animate-pulse"><ShieldAlert className="h-2 w-2 mr-1" /> LIMIT REACHED</Badge>}
                             </div>
                         </CardHeader>
                         <CardContent className="p-6">

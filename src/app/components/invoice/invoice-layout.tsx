@@ -3,7 +3,6 @@
 
 import React from 'react';
 import { cn, formatCurrency } from '@/lib/utils';
-import Image from 'next/image';
 
 export type InvoiceTemplateProps = {
   type: 'Original' | 'Copy';
@@ -50,37 +49,45 @@ export const InvoiceTemplate = ({ type, invoiceData, items, calculations }: Invo
              <div className="flex items-center gap-3">
                 <div className="w-12 h-12 bg-black flex items-center justify-center text-white font-black text-xl italic rounded-lg">J</div>
                 <div>
-                   <h2 className="font-black text-lg leading-none uppercase tracking-tighter">JEMBO CABLE</h2>
-                   <p className="text-[8pt] font-medium italic opacity-60">Together We Grow</p>
+                   <h2 className="font-black text-lg leading-none uppercase tracking-tighter text-black">JEMBO CABLE</h2>
+                   <p className="text-[8pt] font-medium italic opacity-60 text-black">Together We Grow</p>
                 </div>
              </div>
-             <div className="mt-4 space-y-0.5 text-[7pt] leading-tight max-w-[400px]">
+             <div className="mt-4 space-y-0.5 text-[7pt] leading-tight max-w-[400px] text-black">
                 <p className="font-bold">PT JEMBO CABLE COMPANY Tbk.</p>
                 <p><span className="font-bold">Head Office:</span> Jl. Industri Raya Blok A No. 1, Jatiuwung, Tangerang 15135, Indonesia.</p>
                 <p><span className="font-bold">Marketing Office:</span> Mega Glodok Kemayoran Tower B 6th Floor, Jakarta Pusat.</p>
              </div>
           </div>
-          <div className="text-right">
-             <h1 className="font-black text-[11pt] uppercase tracking-wider mb-1">
-                {isProforma ? 'PROFORMA INVOICE' : 'INVOICE/OFFICIAL RECEIPT'}
-             </h1>
-             <p className="font-bold text-[14pt] leading-tight">{displayInvoiceId}</p>
+          
+          <div className="flex flex-col items-end opacity-40 grayscale text-black">
+            <div className="border border-black p-1 text-center font-bold text-[6pt] w-20">ISO 9001</div>
+            <div className="border border-black p-1 text-center font-bold text-[6pt] w-20 mt-1">ISO 14001</div>
+            <div className="border border-black p-1 text-center font-bold text-[6pt] w-20 mt-1">ISO 45001</div>
           </div>
         </div>
+
+        {/* CENTER TITLE & INVOICE ID - Standard V2.0 */}
+        <div className="text-center mb-8 border-y border-black py-4">
+            <h1 className="font-black text-[11pt] uppercase tracking-wider mb-1 text-black">
+                {isProforma ? 'PROFORMA INVOICE' : 'INVOICE/OFFICIAL RECEIPT'}
+            </h1>
+            <p className="font-bold text-[14pt] leading-tight text-black">{displayInvoiceId}</p>
+        </div>
         
-        <div className="flex justify-between items-start mt-6 text-black border-t border-black pt-4">
+        <div className="flex justify-between items-start text-black">
           <div className="w-[60%] space-y-1">
             <p className="text-[8pt] uppercase font-bold text-slate-400">Customer Identity:</p>
-            <p className="font-black uppercase text-[10pt]">{customerName}</p>
-            <p className="text-[9pt] leading-tight italic max-w-[350px]">
+            <p className="font-black uppercase text-[10pt] text-black">{customerName}</p>
+            <p className="text-[9pt] leading-tight italic max-w-[350px] text-black">
                 {customerAddress}
             </p>
           </div>
-          <div className="text-[9pt] space-y-0.5 text-black" style={{ minWidth: '180px' }}>
-            <div className="grid grid-cols-[85px_5px_1fr]"><span>Sales Order</span><span>:</span><span>{invoiceData.soNumber || '-'}</span></div>
-            <div className="grid grid-cols-[85px_5px_1fr]"><span>Order Date</span><span>:</span><span>{invoiceData.orderDate || '-'}</span></div>
-            <div className="grid grid-cols-[85px_5px_1fr]"><span>Reference A</span><span>:</span><span>{invoiceData.poNumber || '-'}</span></div>
-            <div className="grid grid-cols-[85px_5px_1fr]"><span>Date</span><span>:</span><span>{invoiceData.date || '-'}</span></div>
+          <div className="text-[9pt] space-y-0.5 text-black font-bold" style={{ minWidth: '200px' }}>
+            <div className="grid grid-cols-[100px_5px_1fr]"><span>Sales Order</span><span>:</span><span>{invoiceData.soNumber || '-'}</span></div>
+            <div className="grid grid-cols-[100px_5px_1fr]"><span>Order Date</span><span>:</span><span>{invoiceData.orderDate || '-'}</span></div>
+            <div className="grid grid-cols-[100px_5px_1fr]"><span>Reference A</span><span>:</span><span>{invoiceData.poNumber || '-'}</span></div>
+            <div className="grid grid-cols-[100px_5px_1fr]"><span>Date</span><span>:</span><span>{invoiceData.date || '-'}</span></div>
           </div>
         </div>
       </header>
@@ -126,7 +133,7 @@ export const InvoiceTemplate = ({ type, invoiceData, items, calculations }: Invo
           <div className="w-[45%] text-[9pt] space-y-1">
              <div className="grid grid-cols-[1fr_auto] gap-x-4">
                 <span className="font-bold">Goods:</span>
-                <span className="text-right">{formatCurrency(calculations.subTotalItems)}</span>
+                <span className="text-right font-bold">{formatCurrency(calculations.subTotalItems)}</span>
              </div>
              
              {/* DP Logic Visualization */}
@@ -205,8 +212,8 @@ export const InvoiceTemplate = ({ type, invoiceData, items, calculations }: Invo
               )}
             </div>
 
-            {/* ISO Certification Text */}
-            <div className="pt-6 grid grid-cols-3 gap-2 opacity-40 grayscale">
+            {/* Certification Footer Text */}
+            <div className="pt-6 grid grid-cols-3 gap-2 opacity-40 grayscale text-black">
                <div className="border border-black p-1 text-center font-bold text-[6pt]">ISO 9001:2015</div>
                <div className="border border-black p-1 text-center font-bold text-[6pt]">ISO 14001:2015</div>
                <div className="border border-black p-1 text-center font-bold text-[6pt]">ISO 45001:2018</div>
