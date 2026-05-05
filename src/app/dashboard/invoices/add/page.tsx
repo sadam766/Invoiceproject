@@ -125,13 +125,45 @@ export default function AddInvoicePage() {
   const [dpMode, setDpMode] = useState<'tagih' | 'kurangi'>('kurangi');
   const [discountValue, setDiscountValue] = useState<string>('0');
 
+  // SMART HISTORY: Build a list of unique previously used items for this customer
+  const itemHistorySuggestions = useMemo(() => {
+    if (!activeIdentity?.customer || !allInvoices) return [];
+    const customerItems: Record<string, { name: string, price: number, unit: string }> = {};
+    
+    allInvoices
+        .filter(inv => inv.customer === activeIdentity.customer)
+        .forEach(inv => {
+            inv.items?.forEach(item => {
+                const key = item.name.toLowerCase();
+                if (!customerItems[key]) {
+                    customerItems[key] = { name: item.name, price: item.price, unit: item.unit };
+                }
+            });
+        });
+    return Object.values(customerItems);
+  }, [activeIdentity?.customer, allInvoices]);
+
   // Load Initial Data
   useEffect(() => {
       if (activeIdentity) {
           if (!selectedSoNumber) setSelectedSoNumber(activeIdentity.salesOrder || '');
+          
+          // PHASE 1: Load items from active identity (SO to Invoice transition)
           if (activeIdentity.items && activeIdentity.items.length > 0 && items.length === 0) {
               setItems(activeIdentity.items);
+          } 
+          // PHASE 2: Fallback - Auto-pull from LAST INVOICE for same PO (Historical Mapping)
+          else if ((!activeIdentity.items || activeIdentity.items.length === 0) && items.length === 0 && activeIdentity.poNumber && allInvoices) {
+              const prevInvoices = allInvoices
+                .filter(inv => inv.poNumber === activeIdentity.poNumber && inv.status !== 'cancelled')
+                .sort((a, b) => b.date.localeCompare(a.date));
+              
+              if (prevInvoices.length > 0 && prevInvoices[0].items) {
+                  setItems(prevInvoices[0].items);
+                  toast({ title: "Items Auto-Pulled", description: "Mengambil data rincian barang dari invoice terakhir untuk PO yang sama." });
+              }
           }
+
           if (activeIdentity.billingAddress) setBillingAddress(activeIdentity.billingAddress);
           if ((activeIdentity as Invoice).paymentMethod) setPaymentMethod((activeIdentity as Invoice).paymentMethod as any);
           if ((activeIdentity as Invoice).paymentTerms) setPaymentTerms((activeIdentity as Invoice).paymentTerms!);
@@ -142,7 +174,7 @@ export default function AddInvoicePage() {
           if ((activeIdentity as Invoice).dpMode) setDpMode((activeIdentity as Invoice).dpMode!);
           if ((activeIdentity as Invoice).discount) setDiscountValue(formatNumberWithCommas((activeIdentity as Invoice).discount!));
       }
-  }, [activeIdentity]);
+  }, [activeIdentity, allInvoices, items.length, selectedSoNumber, toast]);
 
   const currentCustomer = useMemo(() => {
     if (!activeIdentity?.customer || !allCustomers) return null;
@@ -162,24 +194,6 @@ export default function AddInvoicePage() {
       .reduce((sum, inv) => sum + inv.amount, 0);
   }, [activeIdentity?.poNumber, allInvoices, activeIdentity?.id]);
 
-  // SMART HISTORY: Build a list of unique previously used items for this customer
-  const itemHistorySuggestions = useMemo(() => {
-    if (!activeIdentity?.customer || !allInvoices) return [];
-    const customerItems: Record<string, { name: string, price: number, unit: string }> = {};
-    
-    allInvoices
-        .filter(inv => inv.customer === activeIdentity.customer)
-        .forEach(inv => {
-            inv.items?.forEach(item => {
-                const key = item.name.toLowerCase();
-                if (!customerItems[key]) {
-                    customerItems[key] = { name: item.name, price: item.price, unit: item.unit };
-                }
-            });
-        });
-    return Object.values(customerItems);
-  }, [activeIdentity?.customer, allInvoices]);
-
   // Auto-calculate DP from percentage
   useEffect(() => {
     const match = dpDescription.match(/(\d+)%/);
@@ -195,7 +209,7 @@ export default function AddInvoicePage() {
     if (currentCustomer && paymentMethod === 'va' && !manualVaNumber) {
         setManualVaNumber(currentCustomer.virtualAccountNumber || '');
     }
-  }, [currentCustomer, paymentMethod]);
+  }, [currentCustomer, paymentMethod, manualVaNumber]);
 
   const updateItemField = (id: string | number, field: keyof InvoiceItem, value: any) => {
     setItems(prev => prev.map(item => {

@@ -28,7 +28,7 @@ import {
 import { Calendar } from '@/components/ui/calendar';
 import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
-import type { InvoiceNumber, Customer, SalesOrder, Invoice, SalesListItem } from '@/app/lib/data';
+import type { InvoiceNumber, Customer, SalesOrder, Invoice, SalesListItem, InvoiceItem } from '@/app/lib/data';
 import { useToast } from '@/hooks/use-toast';
 import { useFirestore, useCollection, useMemoFirebase } from '@/firebase';
 import { collection, query } from 'firebase/firestore';
@@ -39,7 +39,7 @@ import { Badge } from '@/components/ui/badge';
 type AddInvoiceNumberDialogProps = {
   isOpen: boolean;
   onOpenChange: (isOpen: boolean) => void;
-  onSave: (invoice: Omit<InvoiceNumber, 'id'> & {id: string}, action: 'save' | 'create') => Promise<void>;
+  onSave: (invoice: Omit<InvoiceNumber, 'id'> & {id: string, items?: InvoiceItem[]}, action: 'save' | 'create') => Promise<void>;
   invoiceData?: InvoiceNumber;
   onAddClick: () => void;
   allInvoiceNumbers: InvoiceNumber[] | null;
@@ -65,6 +65,7 @@ export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceDa
   const [salesOrder, setSalesOrder] = useState('');
   const [poNumber, setPoNumber] = useState('');
   const [customer, setCustomer] = useState('');
+  const [preselectedItems, setPreselectedItems] = useState<InvoiceItem[]>([]);
 
   const [customerPopoverOpen, setCustomerPopoverOpen] = useState(false);
   const [soPopoverOpen, setSoPopoverOpen] = useState(false);
@@ -105,7 +106,7 @@ export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceDa
         toast({ title: "PO Auto-Linked", description: `Data PO ${matchedPo.poNumber} berhasil ditarik melalui SO Produksi.` });
       }
     }
-  }, [salesOrder, masterSalesList, invoiceData]);
+  }, [salesOrder, masterSalesList, invoiceData, poNumber, toast]);
 
   // TRIGGER: PO to SO Automatic Link
   useEffect(() => {
@@ -116,7 +117,7 @@ export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceDa
         if (matchedPo.soNumber) setSalesOrder(matchedPo.soNumber);
       }
     }
-  }, [poNumber, masterSalesList, invoiceData]);
+  }, [poNumber, masterSalesList, invoiceData, salesOrder]);
 
   const generateNextNumber = (type: 'sar' | 'kw') => {
     let currentMax = 0;
@@ -222,6 +223,7 @@ export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceDa
           setPoNumber(initialPoNumber || '');
           setDate(new Date());
           setErpNumberInput('');
+          setPreselectedItems([]);
       }
   }, [isOpen, invoiceData, initialPoNumber]);
 
@@ -229,7 +231,7 @@ export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceDa
       if (isAutoNumber && !invoiceData && isOpen && numberSource === 'manual') {
           setupForAddMode(invoiceType);
       }
-  }, [invoiceType, isAutoNumber, isOpen, numberSource, existingInvoices, allInvoiceNumbers]);
+  }, [invoiceType, isAutoNumber, isOpen, numberSource, existingInvoices, allInvoiceNumbers, invoiceData]);
 
   useEffect(() => {
     if (numberSource === 'manual') {
@@ -249,6 +251,16 @@ export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceDa
       if (soDetails) {
         setCustomer(soDetails.customer);
         setPoNumber(soDetails.poNumber || '');
+        if (soDetails.items) {
+            setPreselectedItems(soDetails.items.map(i => ({
+                id: i.id,
+                name: i.productName,
+                quantity: i.quantity,
+                unit: i.unit,
+                price: i.price,
+                total: i.total
+            })));
+        }
       }
     }
     setSoPopoverOpen(false);
@@ -275,7 +287,8 @@ export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceDa
             salesOrder,
             poNumber,
             date: formattedDate,
-            amount: 0 
+            amount: 0,
+            items: preselectedItems
         }, action);
         onOpenChange(false);
     } catch (err) {
@@ -402,7 +415,7 @@ export function AddInvoiceNumberDialog({ isOpen, onOpenChange, onSave, invoiceDa
                     <CommandList>
                       <CommandEmpty />
                       <CommandGroup>
-                          {salesOrderListData?.map((so, idx) => (
+                          {salesOrderListData?.filter(so => so.status !== 'cancelled').map((so, idx) => (
                           <CommandItem
                               key={`${so.soNumber}-${idx}`}
                               value={`${so.soNumber}|${so.customer}`}
