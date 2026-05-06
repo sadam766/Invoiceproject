@@ -99,75 +99,79 @@ export const InvoiceTemplate = ({ type, invoiceData, items, calculations }: Invo
           </table>
         </div>
 
-        {/* SECTION SUBTOTAL, DISCOUNT, DP - Layout di Tengah/Kanan dengan Garis Pendek */}
-        <div className="mt-4 mb-4 flex justify-end">
-          <div className="w-[300px] flex flex-col items-end"> 
-            
-            {/* Garis Pendek di Atas Subtotal */}
-            <div className="border-t border-black w-[150px] mb-1"></div>
-            
-            {/* Sub-Total Item */}
-            <div className="flex justify-between w-full text-[9pt] font-normal">
-              <span>Sub-Total</span>
-              <span>{formatCurrency(calculations.subTotalItems)}</span>
-            </div>
-
-            {/* Baris Discount */}
-            {calculations.discountValue > 0 && (
-              <div className="flex justify-between w-full text-[9pt]">
-                <span>Discount</span>
-                <span>({formatCurrency(calculations.discountValue)})</span>
+        {/* SECTION SUBTOTAL, DISCOUNT, DP - Layout Rapat Kanan */}
+          <div className="mt-4 mb-4 flex justify-end">
+            {/* Kita gunakan w-[300px] agar lebarnya cukup untuk menampung nominal besar */}
+            <div className="w-[300px] flex flex-col items-end"> 
+              
+              {/* Garis Pendek di Atas Subtotal - Lebarnya disesuaikan agar pas di atas angka */}
+              <div className="border-t border-black w-[180px] mb-1"></div>
+              
+              {/* Baris Sub-Total Item: Menggunakan flex justify-end agar angka langsung ke kanan */}
+              <div className="flex justify-end w-full text-[9pt] font-normal">
+                <span>{formatCurrency(calculations.subTotalItems)}</span>
               </div>
-            )}
 
-            {/* Baris DP */}
-            {calculations.dpValue > 0 && (
-              <div className="flex justify-between w-full text-[9pt]">
-                <div className="flex gap-4">
-                  <span>DP</span>
-                  <span className="text-slate-500">{dpPercent}{dpPercent ? '%' : ''}</span>
+              {/* Baris Discount */}
+              {calculations.discountValue > 0 && (
+                <div className="flex justify-between w-full text-[9pt] mt-1">
+                  <span className="pl-4">Discount</span>
+                  <span>({formatCurrency(calculations.discountValue)})</span>
                 </div>
-                <span>
-                  {isDeduction ? `(${formatCurrency(calculations.dpValue)})` : formatCurrency(calculations.dpValue)}
-                </span>
-              </div>
-            )}
+              )}
+
+              {/* Baris DP */}
+              {calculations.dpValue > 0 && (
+                <div className="flex justify-between w-full text-[9pt] mt-1">
+                  <div className="flex gap-4 pl-4">
+                    <span>DP</span>
+                    <span className="text-slate-500">{dpPercent}{dpPercent ? '%' : ''}</span>
+                  </div>
+                  <span>
+                    {isDeduction ? `(${formatCurrency(calculations.dpValue)})` : formatCurrency(calculations.dpValue)}
+                  </span>
+                </div>
+              )}
+            </div>
           </div>
-        </div>
 
         {/* SPACER - Menjamin Footer Terkunci di Bawah */}
         <div className="flex-grow"></div>
 
         {/* FOOTER SECTION - Terkunci di Dasar Halaman */}
         <footer className="mt-auto print:break-inside-avoid">
-          <div className="w-full flex justify-start mb-0.5 border-t border-black pt-1">
-            <p className="text-[10px] font-medium">No PO : {invoiceData.poNumber || '-'}</p>
-          </div>
+        <div className="w-full flex justify-start mb-1">
+          <p className="text-[10px] font-medium">No PO : {invoiceData.poNumber || '-'}</p>
+        </div>
 
-          {/* FINANCIAL SUMMARY */}
-          <div className="flex justify-end mt-1 mb-2">
-            <div className="w-1/4 text-[10px] leading-tight space-y-0.5">
-              <div className="grid grid-cols-[1fr_auto] gap-x-4">
+        {/* Garis panjang yang mendekati bagian Goods */}
+        <div className="border-t border-black w-full mb-1"></div>
+
+          {/* FINANCIAL SUMMARY - Tanpa Garis di Total Rp */}
+          <div className="flex justify-end mt-1">
+            <div className="w-1/3 text-[10px] space-y-0.5 pt-1">
+              <div className="flex justify-between">
                 <span>Goods:</span>
-                <span className="text-right">{formatCurrency(netGoods)}</span>
+                <span>{formatCurrency(netGoods)}</span>
               </div>
-              <div className="grid grid-cols-[1fr_auto] gap-x-4">
+              <div className="flex justify-between">
                 <span>DPP VAT (11/12):</span>
-                <span className="text-right">{formatCurrency(calculations.dppVat)}</span>
+                <span>{formatCurrency(calculations.dppVat)}</span>
               </div>
-              <div className="grid grid-cols-[1fr_auto] gap-x-4">
+              <div className="flex justify-between">
                 <span>VAT 12%:</span>
-                <span className="text-right">{formatCurrency(calculations.vat12)}</span>
+                <span>{formatCurrency(calculations.vat12)}</span>
               </div>
-              <div className="grid grid-cols-[1fr_auto] gap-x-4 font-bold border-t border-black pt-1 mt-0.5">
+              <div className="flex justify-between font-bold mt-0.5">
                 <span>Total Rp:</span>
-                <span className="text-right">{formatCurrency(calculations.totalRp)}</span>
+                <span>{formatCurrency(calculations.totalRp)}</span>
               </div>
             </div>
           </div>
 
           <div className="border-t border-black w-full my-2"></div>
 
+          {/* PAYMENT SECTION */}
           <div className="flex justify-between items-start">
             <div className="w-[68%] text-[10px] leading-tight space-y-2">
               <div className="flex">
@@ -181,25 +185,52 @@ export const InvoiceTemplate = ({ type, invoiceData, items, calculations }: Invo
                 <p className="font-bold pt-1 uppercase">PT. Jembo Cable Company Tbk</p>
               </div>
 
-              <div className="space-y-1">
-                <div className="flex"><span className="w-[100px]">Bank Mandiri -</span><span>A/C No. : 102-0100206827 (Rp)</span></div>
-                <div className="flex"><span className="w-[100px]">Jakarta Cabang</span><span>A/C No. : 102-0005000218 (Rp)</span></div>
-                <div className="flex"><span className="w-[100px]">Sudirman</span><span>A/C No. : 102-0005000226 (USD)</span></div>
-              </div>
+              {/* CONTAINER HYBRID: MANUAL & VIRTUAL ACCOUNT */}
+              <div className="flex gap-4 items-start">
+                
+                {/* Kolom Kiri: Manual Accounts (Data Asli Tidak Dirubah) */}
+                <div className="flex-1 space-y-1">
+                  <div className="space-y-1">
+                    <div className="flex"><span className="w-[100px]">Bank Mandiri -</span><span>A/C No. : 102-0100206827 (Rp)</span></div>
+                    <div className="flex"><span className="w-[100px]">Jakarta Cabang</span><span>A/C No. : 102-0005000218 (Rp)</span></div>
+                    <div className="flex"><span className="w-[100px]">Sudirman</span><span>A/C No. : 102-0005000226 (USD)</span></div>
+                  </div>
 
-              <div className="w-[280px] text-center font-bold text-slate-300 italic tracking-widest py-1">OR</div>
+                  <div className="w-full text-center font-bold text-slate-300 italic tracking-widest py-0.5 text-[8px]">OR</div>
 
-              <div className="flex items-start">
-                <div className="w-[100px] leading-tight">
-                  Bank BCA - Jakarta<br/>
-                  Cabang KEM TOWER
+                  <div className="flex items-start">
+                    <div className="w-[100px] leading-tight">
+                      Bank BCA - Jakarta<br/>
+                      Cabang KEM TOWER
+                    </div>
+                    <div>
+                      A/C No. : 684-0198977 (Rp)
+                    </div>
+                  </div>
                 </div>
-                <div>
-                  A/C No. : 684-0198977 (Rp)
+
+                {/* Garis Pemisah Vertikal */}
+                <div className="border-l border-slate-200 h-24 self-center hidden md:block"></div>
+
+                {/* Kolom Kanan: Virtual Account */}
+                <div className="flex-1 bg-slate-50 p-2 rounded border border-slate-100">
+                  <p className="font-bold text-[9px] mb-1 underline">VIRTUAL ACCOUNT</p>
+                  <div className="space-y-0.5 text-[9px]">
+                    <div className="grid grid-cols-[80px_5px_1fr]">
+                      <span>Bank</span><span>:</span><span className="font-bold">Mandiri</span>
+                    </div>
+                    <div className="grid grid-cols-[80px_5px_1fr]">
+                      <span>VA Number</span><span>:</span><span className="font-black">{invoiceData.vaNumber || '-'}</span>
+                    </div>
+                    <div className="grid grid-cols-[80px_5px_1fr]">
+                      <span>Name</span><span>:</span><span className="uppercase">{customerName}</span>
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
 
+            {/* SIGNATURE SECTION */}
             <div className="w-[32%] flex flex-col items-center">
               <p className="font-bold text-[10px] uppercase">PT. JEMBO CABLE COMPANY Tbk</p>
               <div className="mt-28 border-t border-black w-full"></div>
