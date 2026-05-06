@@ -303,7 +303,7 @@ import {
                                     const totalPaid = invoice.payments?.reduce((s, p) => s + p.amount, 0) || (invoice.status === 'paid' ? invoice.amount : 0);
                                     const outstandingDoc = Math.max(0, invoice.amount - totalPaid);
                                     const isEmpty = invoice.amount === 0 || !invoice.items || invoice.items.length === 0;
-                                    const isVaPending = invoice.paymentMethod === 'va' && invoice.vaStatus === 'pending';
+                                    const isVaPending = invoice.paymentMode === 'virtual_account' && invoice.vaStatus === 'pending';
                                     
                                     return (
                                         <TableRow key={invoice.id} className={cn("hover:bg-muted/5 transition-colors", invoice.status === 'cancelled' && "opacity-40 grayscale")}>
@@ -323,7 +323,7 @@ import {
                                             </TableCell>
                                             <TableCell className="text-xs font-black text-right">Rp {invoice.amount.toLocaleString('id-ID')}</TableCell>
                                             <TableCell className="text-center">
-                                                {invoice.paymentMethod === 'va' ? (
+                                                {invoice.paymentMode === 'virtual_account' ? (
                                                     <Badge className={cn(
                                                         "text-[8px] font-black uppercase",
                                                         invoice.vaStatus === 'approved' ? "bg-emerald-50 text-emerald-700 border-emerald-100" : "bg-amber-50 text-amber-700 border-amber-100"

@@ -1,3 +1,4 @@
+
 'use client';
 
 import React from 'react';
@@ -185,48 +186,46 @@ export const InvoiceTemplate = ({ type, invoiceData, items, calculations }: Invo
                 <p className="font-bold pt-1 uppercase">PT. Jembo Cable Company Tbk</p>
               </div>
 
-              {/* CONTAINER HYBRID: MANUAL & VIRTUAL ACCOUNT */}
-              <div className="flex gap-4 items-start">
-                
-                {/* Kolom Kiri: Manual Accounts (Data Asli Tidak Dirubah) */}
-                <div className="flex-1 space-y-1">
-                  <div className="space-y-1">
-                    <div className="flex"><span className="w-[100px]">Bank Mandiri -</span><span>A/C No. : 102-0100206827 (Rp)</span></div>
-                    <div className="flex"><span className="w-[100px]">Jakarta Cabang</span><span>A/C No. : 102-0005000218 (Rp)</span></div>
-                    <div className="flex"><span className="w-[100px]">Sudirman</span><span>A/C No. : 102-0005000226 (USD)</span></div>
-                  </div>
-
-                  <div className="w-full text-center font-bold text-slate-300 italic tracking-widest py-0.5 text-[8px]">OR</div>
-
-                  <div className="flex items-start">
-                    <div className="w-[100px] leading-tight">
-                      Bank BCA - Jakarta<br/>
-                      Cabang KEM TOWER
-                    </div>
-                    <div>
-                      A/C No. : 684-0198977 (Rp)
+              {/* AREA PEMBAYARAN DINAMIS */}
+              <div className="mt-2">
+                {invoiceData.paymentMode === 'virtual_account' ? (
+                  /* TAMPILAN VIRTUAL ACCOUNT */
+                  <div className="w-[280px] bg-slate-50 p-2 rounded border border-slate-200">
+                    <p className="font-bold text-[9px] mb-1 underline">VIRTUAL ACCOUNT</p>
+                    <div className="space-y-0.5 text-[9px]">
+                      <div className="grid grid-cols-[80px_5px_1fr]">
+                        <span>Bank</span><span>:</span><span className="font-bold">Mandiri</span>
+                      </div>
+                      <div className="grid grid-cols-[80px_5px_1fr]">
+                        <span>VA Number</span><span>:</span><span className="font-black">{invoiceData.vaNumber || '-'}</span>
+                      </div>
+                      <div className="grid grid-cols-[80px_5px_1fr]">
+                        <span>Name</span><span>:</span><span className="uppercase">{customerName}</span>
+                      </div>
                     </div>
                   </div>
-                </div>
-
-                {/* Garis Pemisah Vertikal */}
-                <div className="border-l border-slate-200 h-24 self-center hidden md:block"></div>
-
-                {/* Kolom Kanan: Virtual Account */}
-                <div className="flex-1 bg-slate-50 p-2 rounded border border-slate-100">
-                  <p className="font-bold text-[9px] mb-1 underline">VIRTUAL ACCOUNT</p>
-                  <div className="space-y-0.5 text-[9px]">
-                    <div className="grid grid-cols-[80px_5px_1fr]">
-                      <span>Bank</span><span>:</span><span className="font-bold">Mandiri</span>
+                ) : (
+                  /* TAMPILAN MANUAL BANK (DEFAULT) */
+                  <div className="space-y-2">
+                    <div className="space-y-1">
+                      <div className="flex"><span className="w-[100px]">Bank Mandiri -</span><span>A/C No. : 102-0100206827 (Rp)</span></div>
+                      <div className="flex"><span className="w-[100px]">Jakarta Cabang</span><span>A/C No. : 102-0005000218 (Rp)</span></div>
+                      <div className="flex"><span className="w-[100px]">Sudirman</span><span>A/C No. : 102-0005000226 (USD)</span></div>
                     </div>
-                    <div className="grid grid-cols-[80px_5px_1fr]">
-                      <span>VA Number</span><span>:</span><span className="font-black">{invoiceData.vaNumber || '-'}</span>
-                    </div>
-                    <div className="grid grid-cols-[80px_5px_1fr]">
-                      <span>Name</span><span>:</span><span className="uppercase">{customerName}</span>
+
+                    <div className="w-[280px] text-center font-bold text-slate-300 italic tracking-widest py-1 text-[8px]">OR</div>
+
+                    <div className="flex items-start">
+                      <div className="w-[100px] leading-tight">
+                        Bank BCA - Jakarta<br/>
+                        Cabang KEM TOWER
+                      </div>
+                      <div>
+                        A/C No. : 684-0198977 (Rp)
+                      </div>
                     </div>
                   </div>
-                </div>
+                )}
               </div>
             </div>
 

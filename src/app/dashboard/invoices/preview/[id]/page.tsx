@@ -53,7 +53,7 @@ const InvoicePreviewPage = () => {
     totalRp
   };
 
-  const isVaPending = invoiceData.paymentMethod === 'va' && invoiceData.vaStatus === 'pending';
+  const isVaPending = invoiceData.paymentMode === 'virtual_account' && invoiceData.vaStatus === 'pending';
 
   return (
     <main className="min-h-screen bg-slate-100 py-12 px-4 flex flex-col items-center print:p-0 print:bg-white">

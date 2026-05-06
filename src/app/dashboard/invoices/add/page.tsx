@@ -114,7 +114,7 @@ export default function AddInvoicePage() {
   const [billingAddress, setBillingAddress] = useState('');
   const [issueDate, setIssueDate] = useState<Date>(new Date());
   const [dueDate, setDueDate] = useState<Date>(addDays(new Date(), 30));
-  const [paymentMethod, setPaymentMethod] = useState<'bank' | 'va'>('va');
+  const [paymentMode, setPaymentMode] = useState<'manual' | 'virtual_account'>('virtual_account');
   const [paymentTerms, setPaymentTerms] = useState('90 Hari');
   const [manualVaNumber, setManualVaNumber] = useState('');
   const [soPopoverOpen, setSoPopoverOpen] = useState(false);
@@ -203,7 +203,7 @@ export default function AddInvoicePage() {
           }
 
           if (activeIdentity.billingAddress) setBillingAddress(activeIdentity.billingAddress);
-          if ((activeIdentity as Invoice).paymentMethod) setPaymentMethod((activeIdentity as Invoice).paymentMethod as any);
+          if ((activeIdentity as Invoice).paymentMode) setPaymentMode((activeIdentity as Invoice).paymentMode as any);
           if ((activeIdentity as Invoice).paymentTerms) setPaymentTerms((activeIdentity as Invoice).paymentTerms!);
           if ((activeIdentity as Invoice).vaNumber) setManualVaNumber((activeIdentity as Invoice).vaNumber!);
           
@@ -238,10 +238,10 @@ export default function AddInvoicePage() {
   }, [dpDescription, items]);
 
   useEffect(() => {
-    if (currentCustomer && paymentMethod === 'va' && !manualVaNumber) {
+    if (currentCustomer && paymentMode === 'virtual_account' && !manualVaNumber) {
         setManualVaNumber(currentCustomer.virtualAccountNumber || '');
     }
-  }, [currentCustomer, paymentMethod, manualVaNumber]);
+  }, [currentCustomer, paymentMode, manualVaNumber]);
 
   const updateItemField = (id: string | number, field: keyof InvoiceItem, value: any) => {
     setItems(prev => prev.map(item => {
@@ -321,7 +321,7 @@ export default function AddInvoicePage() {
     let finalVaStatus = null;
     let requiresVaApproval = false;
 
-    if (paymentMethod === 'va') {
+    if (paymentMode === 'virtual_account') {
         finalVaStatus = 'pending';
         if (invoiceStatus === 'sent') {
             finalStatus = 'unpaid'; 
@@ -347,9 +347,9 @@ export default function AddInvoicePage() {
         amount: calcs.totalRp,
         status: finalStatus,
         vaStatus: finalVaStatus,
-        paymentMethod: paymentMethod,
+        paymentMode: paymentMode,
         paymentTerms: paymentTerms,
-        vaNumber: paymentMethod === 'va' ? manualVaNumber : '',
+        vaNumber: paymentMode === 'virtual_account' ? manualVaNumber : '',
         dpValue: calcs.dpValue,
         dpDescription: dpDescription,
         dpMode: dpMode,
@@ -408,7 +408,7 @@ export default function AddInvoicePage() {
       ...activeIdentity,
       customerName: activeIdentity?.customer,
       billingAddress,
-      paymentMethod,
+      paymentMode,
       paymentTerms,
       vaNumber: manualVaNumber,
       dpDescription,
@@ -742,11 +742,11 @@ export default function AddInvoicePage() {
                              <div className="flex justify-between items-center">
                                 <Label className="text-[9px] font-black uppercase text-slate-400">Payment Matrix</Label>
                                 <div className="flex bg-slate-100 rounded-lg p-1 gap-1">
-                                    <Button variant={paymentMethod === 'bank' ? 'default' : 'ghost'} size="sm" onClick={() => setPaymentMethod('bank')} className="h-7 text-[8px] font-black uppercase rounded-md px-3">Manual Bank</Button>
-                                    <Button variant={paymentMethod === 'va' ? 'default' : 'ghost'} size="sm" onClick={() => setPaymentMethod('va')} className="h-7 text-[8px] font-black uppercase rounded-md px-3">Virtual Account</Button>
+                                    <Button variant={paymentMode === 'manual' ? 'default' : 'ghost'} size="sm" onClick={() => setPaymentMode('manual')} className="h-7 text-[8px] font-black uppercase rounded-md px-3">Manual Bank</Button>
+                                    <Button variant={paymentMode === 'virtual_account' ? 'default' : 'ghost'} size="sm" onClick={() => setPaymentMode('virtual_account')} className="h-7 text-[8px] font-black uppercase rounded-md px-3">Virtual Account</Button>
                                 </div>
                              </div>
-                             {paymentMethod === 'va' && (
+                             {paymentMode === 'virtual_account' && (
                                  <div className="bg-indigo-900 p-4 rounded-xl space-y-2">
                                      <Label className="text-[8px] font-black uppercase text-indigo-300">Target Virtual Account</Label>
                                      <Input value={manualVaNumber} onChange={e => setManualVaNumber(e.target.value)} className="bg-indigo-800 border-indigo-700 text-white font-mono font-black text-center tracking-[0.2em] h-9 text-xs" />

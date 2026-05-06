@@ -56,7 +56,7 @@ export type Invoice = {
   status: 'paid' | 'unpaid' | 'sent' | 'draft' | 'received' | 'cancelled' | 'finalized' | 'partial';
   voidReason?: string;
   spdNumber?: string;
-  paymentMethod?: string;
+  paymentMode?: 'manual' | 'virtual_account';
   vaNumber?: string;
   vaStatus?: 'pending' | 'approved' | 'rejected';
   vaApprovedBy?: string;
