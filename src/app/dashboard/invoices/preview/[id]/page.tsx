@@ -29,14 +29,15 @@ const InvoicePreviewPage = () => {
     if (!element || !invoiceData) return;
 
     const opt = {
-      margin: [0, 0, 0, 0],
+      margin: 0,
       filename: `Invoice_${invoiceData.id.replace(/\//g, '_')}.pdf`,
       image: { type: 'jpeg', quality: 0.98 },
       html2canvas: { 
         scale: 2, 
         useCORS: true, 
         letterRendering: true,
-        logging: false 
+        logging: false,
+        scrollY: 0
       },
       jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
       pagebreak: { mode: ['avoid-all', 'css', 'legacy'] }
@@ -118,7 +119,7 @@ const InvoicePreviewPage = () => {
         </div>
       </div>
 
-      <div ref={invoiceContainerRef}>
+      <div ref={invoiceContainerRef} className="print:m-0 print:p-0">
         <InvoiceTemplate 
           type="Original" 
           invoiceData={invoiceData} 
