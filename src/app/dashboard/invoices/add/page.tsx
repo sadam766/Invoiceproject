@@ -594,13 +594,13 @@ export default function AddInvoicePage() {
                     </CardHeader>
                     <CardContent className="p-0">
                         <div className="max-h-[400px] overflow-y-auto">
-                            <Table>
+                            <Table className="table-auto w-full">
                                 <TableHeader className="bg-slate-50/50 sticky top-0 z-10 shadow-sm">
                                     <TableRow>
                                         <TableHead className="py-3 px-6 text-[8pt]">Description</TableHead>
-                                        <TableHead className="w-[120px] text-center text-[8pt]">Qty</TableHead>
-                                        <TableHead className="w-[110px] text-center text-[8pt]">Unit</TableHead>
-                                        <TableHead className="w-[170px] text-right text-[8pt]">Price</TableHead>
+                                        <TableHead className="w-[130px] text-center text-[8pt]">Qty</TableHead>
+                                        <TableHead className="w-[120px] text-center text-[8pt]">Unit</TableHead>
+                                        <TableHead className="w-[190px] text-right text-[8pt]">Price</TableHead>
                                         <TableHead className="w-[60px]"></TableHead>
                                     </TableRow>
                                 </TableHeader>
@@ -649,14 +649,14 @@ export default function AddInvoicePage() {
                                                 <Input 
                                                     value={formatNumberWithCommas(item.quantity)} 
                                                     onChange={e => updateItemField(item.id, 'quantity', parseFormattedNumber(e.target.value))} 
-                                                    className="text-center h-10 text-[11px] font-black border-slate-200 px-3 w-full rounded-md focus-visible:ring-2 focus-visible:ring-indigo-500" 
+                                                    className="text-center h-10 text-[11px] font-black border-slate-200 px-4 w-full rounded-md focus-visible:ring-2 focus-visible:ring-indigo-500 shadow-sm transition-all" 
                                                 />
                                             </TableCell>
                                             <TableCell className="py-4">
                                                 <Input 
                                                     value={item.unit} 
                                                     onChange={e => updateItemField(item.id, 'unit', e.target.value)} 
-                                                    className="text-center h-10 text-[10px] font-bold bg-slate-50/50 border-slate-200 px-2 rounded-md" 
+                                                    className="text-center h-10 text-[10px] font-bold bg-slate-50/50 border-slate-200 px-4 rounded-md shadow-sm transition-all" 
                                                     placeholder="Meter"
                                                 />
                                             </TableCell>
@@ -664,11 +664,11 @@ export default function AddInvoicePage() {
                                                 <Input 
                                                     value={formatNumberWithCommas(item.price)} 
                                                     onChange={e => updateItemField(item.id, 'price', parseFormattedNumber(e.target.value))}
-                                                    className="h-10 text-right text-[11px] font-black border-slate-200 px-3 w-full rounded-md focus-visible:ring-2 focus-visible:ring-indigo-500"
+                                                    className="h-10 text-right text-[11px] font-black border-slate-200 px-4 w-full rounded-md focus-visible:ring-2 focus-visible:ring-indigo-500 shadow-sm transition-all"
                                                 />
                                             </TableCell>
                                             <TableCell className="py-4 text-center">
-                                                <Button variant="ghost" size="icon" className="h-8 w-8 text-rose-300 hover:text-rose-600 hover:bg-rose-50 transition-colors ml-2" onClick={() => removeItem(item.id)}>
+                                                <Button variant="ghost" size="icon" className="h-8 w-8 text-rose-300 hover:text-rose-600 hover:bg-rose-50 transition-colors ml-4" onClick={() => removeItem(item.id)}>
                                                     <Trash2 className="h-4 w-4" />
                                                 </Button>
                                             </TableCell>
