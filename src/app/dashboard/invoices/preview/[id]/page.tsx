@@ -6,11 +6,12 @@ import { useParams, useRouter } from 'next/navigation';
 import { doc } from 'firebase/firestore';
 import { useFirestore, useDoc, useMemoFirebase } from '@/firebase';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, Printer, Lock } from 'lucide-react';
+import { ArrowLeft, Printer, Lock, Download } from 'lucide-react';
 import { type Invoice } from '@/app/lib/data';
 import { InvoiceTemplate } from '@/app/components/invoice/invoice-layout';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
+import html2pdf from 'html2pdf.js';
 
 const InvoicePreviewPage = () => {
   const params = useParams();
@@ -22,6 +23,27 @@ const InvoicePreviewPage = () => {
 
   const invoiceRef = useMemoFirebase(() => (firestore && safeId ? doc(firestore, 'invoices', safeId) : null), [firestore, safeId]);
   const { data: invoiceData, isLoading } = useDoc<Invoice>(invoiceRef);
+
+  const handleDownloadPdf = () => {
+    const element = invoiceContainerRef.current;
+    if (!element || !invoiceData) return;
+
+    const opt = {
+      margin: [0, 0, 0, 0],
+      filename: `Invoice_${invoiceData.id.replace(/\//g, '_')}.pdf`,
+      image: { type: 'jpeg', quality: 0.98 },
+      html2canvas: { 
+        scale: 2, 
+        useCORS: true, 
+        letterRendering: true,
+        logging: false 
+      },
+      jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
+      pagebreak: { mode: ['avoid-all', 'css', 'legacy'] }
+    };
+
+    html2pdf().from(element).set(opt).save();
+  };
 
   if (isLoading) return <div className="p-20 text-center font-black uppercase text-slate-400 animate-pulse tracking-widest">Memuat...</div>;
   if (!invoiceData) return <div className="p-20 text-center text-rose-600 font-bold">Dokumen tidak ditemukan.</div>;
@@ -74,16 +96,26 @@ const InvoicePreviewPage = () => {
         <Button variant="outline" onClick={() => router.back()} className="rounded-xl font-bold bg-white">
           <ArrowLeft size={16} className="mr-2"/> Kembali
         </Button>
-        <Button 
-            onClick={() => window.print()} 
+        <div className="flex gap-2">
+          <Button 
+            variant="secondary"
+            onClick={handleDownloadPdf}
             disabled={isVaPending}
-            className={cn(
-                "shadow-xl rounded-xl px-8 font-black uppercase text-[10px] tracking-widest",
-                isVaPending ? "bg-slate-300 text-slate-500 cursor-not-allowed" : "bg-indigo-600 hover:bg-indigo-700 text-white"
-            )}
-        >
-          <Printer size={16} className="mr-2"/> {isVaPending ? 'Cetak Terkunci' : 'Cetak Sekarang'}
-        </Button>
+            className="shadow-md rounded-xl px-6 font-black uppercase text-[10px] tracking-widest bg-white border-slate-200 hover:bg-slate-50"
+          >
+            <Download size={16} className="mr-2"/> Simpan PDF
+          </Button>
+          <Button 
+              onClick={() => window.print()} 
+              disabled={isVaPending}
+              className={cn(
+                  "shadow-xl rounded-xl px-8 font-black uppercase text-[10px] tracking-widest",
+                  isVaPending ? "bg-slate-300 text-slate-500 cursor-not-allowed" : "bg-indigo-600 hover:bg-indigo-700 text-white"
+              )}
+          >
+            <Printer size={16} className="mr-2"/> {isVaPending ? 'Cetak Terkunci' : 'Cetak Sekarang'}
+          </Button>
+        </div>
       </div>
 
       <div ref={invoiceContainerRef}>
