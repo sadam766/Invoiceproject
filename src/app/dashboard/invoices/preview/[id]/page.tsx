@@ -127,8 +127,15 @@ const InvoicePreviewPage = () => {
           calculations={calcs} 
         />
 
-        {/* Space between pages in UI - hidden in print */}
-        <div className="h-8 w-full print:hidden"></div>
+        {/* Visual Separator - Matching Screenshot UI */}
+        <div className="w-[210mm] py-4 print:hidden">
+          <div className="relative flex items-center justify-center">
+            <div className="absolute inset-0 flex items-center"><span className="w-full border-t-2 border-dashed border-slate-300"></span></div>
+            <span className="relative bg-slate-100 px-4 text-[9px] font-black uppercase text-slate-400 tracking-[0.3em]">
+              HALAMAN BERIKUTNYA (COPY)
+            </span>
+          </div>
+        </div>
 
         <InvoiceTemplate 
           type="Copy" 
