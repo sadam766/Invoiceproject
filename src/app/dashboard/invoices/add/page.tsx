@@ -597,10 +597,10 @@ export default function AddInvoicePage() {
                             <Table className="table-auto w-full">
                                 <TableHeader className="bg-slate-50/50 sticky top-0 z-10 shadow-sm">
                                     <TableRow>
-                                        <TableHead className="py-3 px-6 text-[8pt]">Description</TableHead>
-                                        <TableHead className="w-[130px] text-center text-[8pt]">Qty</TableHead>
-                                        <TableHead className="w-[120px] text-center text-[8pt]">Unit</TableHead>
-                                        <TableHead className="w-[190px] text-right text-[8pt]">Price</TableHead>
+                                        <TableHead className="py-3 px-6 text-[10px] font-black uppercase">Description</TableHead>
+                                        <TableHead className="w-[130px] text-center text-[10px] font-black uppercase">Qty</TableHead>
+                                        <TableHead className="w-[120px] text-center text-[10px] font-black uppercase">Unit</TableHead>
+                                        <TableHead className="w-[190px] text-right text-[10px] font-black uppercase">Price</TableHead>
                                         <TableHead className="w-[60px]"></TableHead>
                                     </TableRow>
                                 </TableHeader>
@@ -615,7 +615,7 @@ export default function AddInvoicePage() {
                                                         <Input 
                                                             value={item.name} 
                                                             onChange={e => updateItemField(item.id, 'name', e.target.value)}
-                                                            className="h-9 text-[10px] font-bold border-none shadow-none bg-transparent p-0 w-full focus-visible:ring-0"
+                                                            className="h-11 text-sm font-bold border-none shadow-none bg-transparent p-0 w-full focus-visible:ring-0"
                                                         />
                                                     </PopoverTrigger>
                                                     <PopoverContent className="w-[450px] p-0 shadow-2xl" align="start">
@@ -649,14 +649,14 @@ export default function AddInvoicePage() {
                                                 <Input 
                                                     value={formatNumberWithCommas(item.quantity)} 
                                                     onChange={e => updateItemField(item.id, 'quantity', parseFormattedNumber(e.target.value))} 
-                                                    className="text-center h-10 text-[11px] font-black border-slate-200 px-4 w-full rounded-md focus-visible:ring-2 focus-visible:ring-indigo-500 shadow-sm transition-all" 
+                                                    className="text-center h-11 text-sm font-bold border-slate-200 px-3 min-w-[80px] w-full rounded-md focus-visible:ring-2 focus-visible:ring-indigo-500 shadow-sm transition-all" 
                                                 />
                                             </TableCell>
                                             <TableCell className="py-4">
                                                 <Input 
                                                     value={item.unit} 
                                                     onChange={e => updateItemField(item.id, 'unit', e.target.value)} 
-                                                    className="text-center h-10 text-[10px] font-bold bg-slate-50/50 border-slate-200 px-4 rounded-md shadow-sm transition-all" 
+                                                    className="text-center h-11 text-sm font-bold bg-slate-50/50 border-slate-200 px-3 min-w-[80px] w-full rounded-md shadow-sm transition-all" 
                                                     placeholder="Meter"
                                                 />
                                             </TableCell>
@@ -664,7 +664,7 @@ export default function AddInvoicePage() {
                                                 <Input 
                                                     value={formatNumberWithCommas(item.price)} 
                                                     onChange={e => updateItemField(item.id, 'price', parseFormattedNumber(e.target.value))}
-                                                    className="h-10 text-right text-[11px] font-black border-slate-200 px-4 w-full rounded-md focus-visible:ring-2 focus-visible:ring-indigo-500 shadow-sm transition-all"
+                                                    className="h-11 text-right text-sm font-bold border-slate-200 px-3 min-w-[140px] w-full rounded-md focus-visible:ring-2 focus-visible:ring-indigo-500 shadow-sm transition-all"
                                                 />
                                             </TableCell>
                                             <TableCell className="py-4 text-center">
