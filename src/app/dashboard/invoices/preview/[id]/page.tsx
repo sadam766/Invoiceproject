@@ -127,8 +127,8 @@ const InvoicePreviewPage = () => {
           calculations={calcs} 
         />
 
-        {/* Removed text label to keep Copy page clean as per instructions */}
-        <div className="my-10 border-b border-dashed border-slate-200 print:hidden w-[210mm]"></div>
+        {/* This divider is purely visual in UI and hidden during print/PDF generation */}
+        <div className="my-1 border-b border-transparent print:hidden w-[210mm]"></div>
 
         <InvoiceTemplate 
           type="Copy" 

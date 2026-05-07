@@ -38,18 +38,19 @@ export const InvoiceTemplate = ({ type, invoiceData, items, calculations }: Invo
   return (
     <div 
       className={cn(
-        "relative bg-white mx-auto pt-12 pb-20 px-12 flex flex-col font-sans text-black shadow-lg print:shadow-none print:m-0 print:border-none overflow-hidden print:page-break-inside-avoid",
+        "relative bg-white mx-auto pt-12 pb-24 px-12 flex flex-col font-sans text-black shadow-lg print:shadow-none print:m-0 print:border-none overflow-hidden print:page-break-inside-avoid",
         type === 'Copy' && "print:page-break-before-always"
       )}
       style={{ 
         width: '210mm', 
-        minHeight: '295mm', 
+        minHeight: '290mm', 
         fontSize: '9pt', 
         color: '#000000', 
         boxSizing: 'border-box' 
       }}
     >
-      <div className="absolute right-12 top-12 text-[10pt] text-slate-400 uppercase font-medium print:hidden">
+      {/* Visual Indicator for UI only */}
+      <div className="absolute right-12 top-6 text-[10pt] text-slate-300 uppercase font-black tracking-[0.2em] print:hidden">
         {type}
       </div>
 
@@ -78,8 +79,8 @@ export const InvoiceTemplate = ({ type, invoiceData, items, calculations }: Invo
       </div>
 
       <main className="relative flex-grow flex flex-col overflow-hidden">
-        {/* Reduced min-h to pull footer up and give more room for Bank Info */}
-        <div className="min-h-[360px]">
+        {/* Further reduced min-h to pull footer up significantly */}
+        <div className="min-h-[300px]">
           <table className="w-full border-collapse">
             <thead>
               <tr className="border border-black text-[9pt]">
@@ -162,15 +163,15 @@ export const InvoiceTemplate = ({ type, invoiceData, items, calculations }: Invo
           </div>
           <div className="border-t border-black w-full my-2"></div>
           <div className="flex justify-between items-start print:page-break-inside-avoid">
-            <div className="w-[68%] text-[10px] leading-tight space-y-2">
-              <div className="flex">
+            <div className="w-[68%] text-[10px] leading-tight space-y-1">
+              <div className="flex mb-1">
                 <span className="w-[60px] font-bold">Payment:</span>
                 <span>{invoiceData.paymentTerms || '90 Hari setelah invoice diterima'}</span>
               </div>
-              <div className="flex flex-col space-y-0.5">
+              <div className="flex flex-col space-y-0.5 mb-1">
                 <p className="font-bold">Please state with your payment: <span className="font-black">{displayInvoiceId}</span></p>
                 <p className="font-bold">For payment, please transfer to our account:</p>
-                <p className="font-bold pt-1 uppercase">PT. Jembo Cable Company Tbk</p>
+                <p className="font-bold pt-0.5 uppercase">PT. Jembo Cable Company Tbk</p>
               </div>
               <div className="mt-1">
                 {invoiceData.paymentMode === 'virtual_account' ? (
@@ -195,7 +196,7 @@ export const InvoiceTemplate = ({ type, invoiceData, items, calculations }: Invo
                       <div className="flex"><span className="w-[100px]">Jakarta Cabang</span><span>A/C No. : 102-0005000218 (Rp)</span></div>
                       <div className="flex"><span className="w-[100px]">Sudirman</span><span>A/C No. : 102-0005000226 (USD)</span></div>
                     </div>
-                    <div className="w-[280px] text-center font-bold text-slate-300 italic tracking-widest py-0.5 text-[8px]">OR</div>
+                    <div className="w-[280px] text-center font-bold text-slate-300 italic tracking-widest py-0 text-[8px]">OR</div>
                     <div className="flex items-start">
                       <div className="w-[100px] leading-tight">
                         Bank BCA - Jakarta<br/>
@@ -211,7 +212,7 @@ export const InvoiceTemplate = ({ type, invoiceData, items, calculations }: Invo
             </div>
             <div className="w-[32%] flex flex-col items-center">
               <p className="font-bold text-[10px] uppercase">PT. JEMBO CABLE COMPANY Tbk</p>
-              <div className="mt-24 border-t border-black w-full"></div>
+              <div className="mt-20 border-t border-black w-full"></div>
               <p className="font-bold uppercase pt-1 text-[10px]">Finance</p>
             </div>
           </div>
