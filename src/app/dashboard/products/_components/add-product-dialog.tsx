@@ -102,14 +102,14 @@ export function AddProductDialog({ isOpen, onOpenChange, onSave, productData, on
         <div className="grid gap-6 py-6">
           <div className="space-y-2">
             <Label htmlFor="product-name" className="text-[10px] font-black uppercase text-slate-400">Official Product Name</Label>
-            <Input id="product-name" value={name} onChange={(e) => setName(e.target.value)} className="font-bold h-11 bg-slate-50 border-slate-200" />
+            <Input id="product-name" value={name} onChange={(e) => setName(e.target.value)} className="font-bold h-11 bg-slate-50 border-slate-200 rounded-md px-4" />
           </div>
           
           <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="category" className="text-[10px] font-black uppercase text-slate-400">Category</Label>
                 <Select value={category} onValueChange={setCategory}>
-                  <SelectTrigger className="h-11 font-bold bg-slate-50 border-slate-200"><SelectValue placeholder="Select" /></SelectTrigger>
+                  <SelectTrigger className="h-11 font-bold bg-slate-50 border-slate-200 rounded-md"><SelectValue placeholder="Select" /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="kabel">Kabel</SelectItem>
                     <SelectItem value="aksesoris">Aksesoris</SelectItem>
@@ -118,18 +118,18 @@ export function AddProductDialog({ isOpen, onOpenChange, onSave, productData, on
               </div>
               <div className="space-y-2">
                 <Label htmlFor="unit" className="text-[10px] font-black uppercase text-slate-400">Unit (UOM)</Label>
-                <Input id="unit" value={unit} onChange={(e) => setUnit(e.target.value)} className="h-11 font-black text-indigo-600 bg-indigo-50/50 border-indigo-100" />
+                <Input id="unit" value={unit} onChange={(e) => setUnit(e.target.value)} className="h-11 font-black text-indigo-600 bg-indigo-50/50 border-indigo-100 rounded-md px-4" />
               </div>
           </div>
 
           <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="quantity" className="text-[10px] font-black uppercase text-slate-400">Initial Stock</Label>
-                <Input type="text" step="any" id="quantity" value={quantity} onChange={handleNumericChange(setQuantity)} className="h-11 font-bold" />
+                <Input type="text" step="any" id="quantity" value={quantity} onChange={handleNumericChange(setQuantity)} className="h-11 font-bold rounded-md px-4" />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="price" className="text-[10px] font-black uppercase text-slate-400">Standard Price (IDR)</Label>
-                <Input type="text" step="any" id="price" value={price} onChange={handleNumericChange(setPrice)} className="h-11 font-black text-slate-900" />
+                <Input type="text" step="any" id="price" value={price} onChange={handleNumericChange(setPrice)} className="h-11 font-black text-slate-900 rounded-md px-4" />
               </div>
           </div>
         </div>

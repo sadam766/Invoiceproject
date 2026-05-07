@@ -227,8 +227,8 @@ export function SalesOrderConstructor({ isOpen, onOpenChange, orderData, onSave 
                                     <TableHeader className="bg-slate-50">
                                         <TableRow>
                                             <TableHead className="text-[9px] font-black uppercase py-4 px-6">Description</TableHead>
-                                            <TableHead className="w-[100px] text-center text-[9px] font-black uppercase">Qty</TableHead>
-                                            <TableHead className="w-[140px] text-right text-[9px] font-black uppercase">Price (IDR)</TableHead>
+                                            <TableHead className="w-[120px] text-center text-[9px] font-black uppercase">Qty</TableHead>
+                                            <TableHead className="w-[190px] text-right text-[9px] font-black uppercase">Price (IDR)</TableHead>
                                             <TableHead className="w-[140px] text-right text-[9px] font-black uppercase">Total</TableHead>
                                             <TableHead className="w-[60px]"></TableHead>
                                         </TableRow>
@@ -239,24 +239,24 @@ export function SalesOrderConstructor({ isOpen, onOpenChange, orderData, onSave 
                                                 <TableCell className="px-6">
                                                     <Input value={item.productName} onChange={e => updateItem(item.id, 'productName', e.target.value)} className="h-9 text-[11px] font-black uppercase border-dashed" />
                                                 </TableCell>
-                                                <TableCell>
+                                                <TableCell className="min-w-[120px]">
                                                     <Input 
                                                         type="text"
                                                         step="any"
                                                         value={inputBuffers[`${item.id}-quantity`] !== undefined ? inputBuffers[`${item.id}-quantity`] : formatNumberWithCommas(item.quantity)} 
                                                         onChange={e => handleNumericChange(item.id, 'quantity', e.target.value)}
                                                         onBlur={() => handleNumericBlur(item.id, 'quantity')}
-                                                        className="text-center text-xs h-9 font-black rounded-lg w-20" 
+                                                        className="text-center text-xs h-9 font-black rounded-md w-full px-4" 
                                                     />
                                                 </TableCell>
-                                                <TableCell>
+                                                <TableCell className="min-w-[190px]">
                                                     <Input 
                                                         type="text"
                                                         step="any"
                                                         value={inputBuffers[`${item.id}-price`] !== undefined ? inputBuffers[`${item.id}-price`] : formatNumberWithCommas(item.price)} 
                                                         onChange={e => handleNumericChange(item.id, 'price', e.target.value)}
                                                         onBlur={() => handleNumericBlur(item.id, 'price')}
-                                                        className="h-9 text-right text-xs font-black border-dashed"
+                                                        className="h-9 text-right text-xs font-black border-dashed rounded-md px-4 w-full"
                                                     />
                                                 </TableCell>
                                                 <TableCell className="text-right font-black text-xs px-2">Rp {formatNumberWithCommas(item.total)}</TableCell>

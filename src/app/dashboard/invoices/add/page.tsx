@@ -235,7 +235,6 @@ export default function AddInvoicePage() {
     }));
   };
 
-  // Helper for numeric inputs that preserves typing state (including dot/comma)
   const handleNumericInputChange = (id: string | number, field: 'quantity' | 'price', rawValue: string) => {
     const key = `${id}-${field}`;
     setInputBuffer(prev => ({ ...prev, [key]: rawValue }));
@@ -502,9 +501,9 @@ export default function AddInvoicePage() {
                                 <TableHeader className="bg-slate-50/50 sticky top-0 z-10 shadow-sm">
                                     <TableRow>
                                         <TableHead className="py-3 px-6 text-[10px] font-black uppercase">Description</TableHead>
-                                        <TableHead className="w-[110px] text-center text-[10px] font-black uppercase">Qty</TableHead>
+                                        <TableHead className="w-[120px] text-center text-[10px] font-black uppercase">Qty</TableHead>
                                         <TableHead className="w-[100px] text-center text-[10px] font-black uppercase">Unit</TableHead>
-                                        <TableHead className="w-[160px] text-right text-[10px] font-black uppercase">Price</TableHead>
+                                        <TableHead className="w-[190px] text-right text-[10px] font-black uppercase">Price</TableHead>
                                         <TableHead className="w-[60px]"></TableHead>
                                     </TableRow>
                                 </TableHeader>
@@ -545,27 +544,27 @@ export default function AddInvoicePage() {
                                                     </PopoverContent>
                                                 </Popover>
                                             </TableCell>
-                                            <TableCell className="py-4">
+                                            <TableCell className="py-4 min-w-[120px]">
                                                 <Input 
                                                     type="text"
                                                     step="any"
                                                     value={inputBuffer[`${item.id}-quantity`] !== undefined ? inputBuffer[`${item.id}-quantity`] : formatNumberWithCommas(item.quantity)} 
                                                     onChange={e => handleNumericInputChange(item.id, 'quantity', e.target.value)}
                                                     onBlur={() => handleNumericInputBlur(item.id, 'quantity')}
-                                                    className="text-center h-11 text-sm font-bold border-slate-200 px-3 w-full rounded-md focus-visible:ring-2 focus-visible:ring-indigo-500 shadow-sm" 
+                                                    className="text-center h-11 text-sm font-bold border-slate-200 px-4 w-full rounded-md focus-visible:ring-2 focus-visible:ring-indigo-500 shadow-sm" 
                                                 />
                                             </TableCell>
                                             <TableCell className="py-4">
                                                 <Input value={item.unit} onChange={e => updateItemField(item.id, 'unit', e.target.value)} className="text-center h-11 text-sm font-bold bg-slate-50/50 border-slate-200 px-3 w-full rounded-md shadow-sm" />
                                             </TableCell>
-                                            <TableCell className="py-4 text-right">
+                                            <TableCell className="py-4 text-right min-w-[190px]">
                                                 <Input 
                                                     type="text"
                                                     step="any"
                                                     value={inputBuffer[`${item.id}-price`] !== undefined ? inputBuffer[`${item.id}-price`] : formatNumberWithCommas(item.price)} 
                                                     onChange={e => handleNumericInputChange(item.id, 'price', e.target.value)}
                                                     onBlur={() => handleNumericInputBlur(item.id, 'price')}
-                                                    className="h-11 text-right text-sm font-bold border-slate-200 px-3 w-full rounded-md focus-visible:ring-2 focus-visible:ring-indigo-500 shadow-sm"
+                                                    className="h-11 text-right text-sm font-bold border-slate-200 px-4 w-full rounded-md focus-visible:ring-2 focus-visible:ring-indigo-500 shadow-sm"
                                                 />
                                             </TableCell>
                                             <TableCell className="py-4 text-center">
