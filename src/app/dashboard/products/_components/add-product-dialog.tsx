@@ -118,18 +118,18 @@ export function AddProductDialog({ isOpen, onOpenChange, onSave, productData, on
               </div>
               <div className="space-y-2">
                 <Label htmlFor="unit" className="text-[10px] font-black uppercase text-slate-400">Unit (UOM)</Label>
-                <Input id="unit" value={unit} onChange={(e) => setUnit(e.target.value)} className="h-11 font-black text-indigo-600 bg-indigo-50/50 border-indigo-100 rounded-md px-4" />
+                <Input id="unit" value={unit} onChange={(e) => setUnit(e.target.value)} className="h-11 font-black text-indigo-600 bg-indigo-50/50 border-indigo-100 rounded-[6px] px-[15px] min-w-[100px]" />
               </div>
           </div>
 
           <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="quantity" className="text-[10px] font-black uppercase text-slate-400">Initial Stock</Label>
-                <Input type="text" step="any" id="quantity" value={quantity} onChange={handleNumericChange(setQuantity)} className="h-11 font-bold rounded-md px-4" />
+                <Input type="text" step="any" id="quantity" value={quantity} onChange={handleNumericChange(setQuantity)} className="h-11 font-bold rounded-[6px] px-[15px] min-w-[100px]" />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="price" className="text-[10px] font-black uppercase text-slate-400">Standard Price (IDR)</Label>
-                <Input type="text" step="any" id="price" value={price} onChange={handleNumericChange(setPrice)} className="h-11 font-black text-slate-900 rounded-md px-4" />
+                <Input type="text" step="any" id="price" value={price} onChange={handleNumericChange(setPrice)} className="h-11 font-black text-slate-900 rounded-[6px] px-[15px] min-w-[160px]" />
               </div>
           </div>
         </div>
