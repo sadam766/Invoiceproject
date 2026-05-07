@@ -38,21 +38,27 @@ export const InvoiceTemplate = ({ type, invoiceData, items, calculations }: Invo
   return (
     <div 
       className={cn(
-        "relative bg-white mx-auto pt-12 pb-6 px-12 flex flex-col font-sans text-black shadow-lg mb-8 print:shadow-none print:mb-0 print:m-0 print:border-none",
+        "relative bg-white mx-auto pt-12 pb-6 px-12 flex flex-col font-sans text-black shadow-lg print:shadow-none print:m-0 print:border-none overflow-hidden",
         type === 'Copy' && "print:page-break-before-always"
       )}
-      style={{ width: '210mm', minHeight: '296mm', fontSize: '9pt', color: '#000000', boxSizing: 'border-box' }}
+      style={{ 
+        width: '210mm', 
+        minHeight: '296mm', 
+        fontSize: '9pt', 
+        color: '#000000', 
+        boxSizing: 'border-box' 
+      }}
     >
       <div className="absolute right-12 top-12 text-[10pt] text-slate-400 uppercase font-medium print:hidden">
         {type}
       </div>
 
-      <header className="text-center mb-4 print:break-inside-avoid">
+      <header className="text-center mb-4">
         <h1 className="font-bold text-[11pt] uppercase">INVOICE/OFFICIAL RECEIPT</h1>
         <p className="font-bold text-[14pt] leading-tight mt-1">{displayInvoiceId}</p>
       </header>
 
-      <div className="flex justify-between items-start mt-4 mb-2 print:break-inside-avoid">
+      <div className="flex justify-between items-start mt-4 mb-2">
         <div className="w-[50%] space-y-0.5">
           <p className="font-bold uppercase text-[10pt]">{customerName}</p>
           <p className="text-[9pt] leading-tight italic whitespace-pre-line">
@@ -66,15 +72,14 @@ export const InvoiceTemplate = ({ type, invoiceData, items, calculations }: Invo
         </div>
       </div>
 
-      <div className="flex justify-between py-1 mb-1 font-medium text-[9pt] border-t border-slate-100 pt-1 print:break-inside-avoid">
+      <div className="flex justify-between py-1 mb-1 font-medium text-[9pt] border-t border-slate-100 pt-1">
           <span>Customer Code : {invoiceData.customerCode || '-'}</span>
           <span>Date: {invoiceData.date || '-'}</span>
       </div>
 
       <main className="relative flex-grow flex flex-col overflow-hidden">
-        {/* Container Tabel dengan Min-Height agar Subtotal tidak langsung nempel ke atas saat item sedikit */}
-        <div className="min-h-[400px] print:min-h-0">
-          <table className="w-full border-collapse print:page-break-inside-avoid">
+        <div className="min-h-[400px]">
+          <table className="w-full border-collapse">
             <thead>
               <tr className="border border-black text-[9pt]">
                 <th className="py-1 px-2 text-left border-r border-black w-[5%] font-normal">No.</th>
@@ -100,49 +105,40 @@ export const InvoiceTemplate = ({ type, invoiceData, items, calculations }: Invo
           </table>
         </div>
 
-        {/* SECTION SUBTOTAL, DISCOUNT, DP - Layout Rapat Kanan */}
-          <div className="mt-4 mb-4 flex justify-end print:page-break-inside-avoid">
-            <div className="w-[300px] flex flex-col items-end"> 
-              
-              <div className="border-t border-black w-[180px] mb-1"></div>
-              
-              <div className="flex justify-between w-full text-[9pt] font-normal">
-                <span>Sub-Total</span>
-                <span>{formatCurrency(calculations.subTotalItems)}</span>
-              </div>
-
-              {calculations.discountValue > 0 && (
-                <div className="flex justify-between w-full text-[9pt] mt-1">
-                  <span className="pl-4">Discount</span>
-                  <span>({formatCurrency(calculations.discountValue)})</span>
-                </div>
-              )}
-
-              {calculations.dpValue > 0 && (
-                <div className="flex justify-between w-full text-[9pt] mt-1">
-                  <div className="flex gap-4 pl-4">
-                    <span>DP</span>
-                    <span className="text-slate-500">{dpPercent}{dpPercent ? '%' : ''}</span>
-                  </div>
-                  <span>
-                    {isDeduction ? `(${formatCurrency(calculations.dpValue)})` : formatCurrency(calculations.dpValue)}
-                  </span>
-                </div>
-              )}
+        <div className="mt-4 mb-4 flex justify-end">
+          <div className="w-[300px] flex flex-col items-end"> 
+            <div className="border-t border-black w-[180px] mb-1"></div>
+            <div className="flex justify-between w-full text-[9pt] font-normal">
+              <span>Sub-Total</span>
+              <span>{formatCurrency(calculations.subTotalItems)}</span>
             </div>
+            {calculations.discountValue > 0 && (
+              <div className="flex justify-between w-full text-[9pt] mt-1">
+                <span className="pl-4">Discount</span>
+                <span>({formatCurrency(calculations.discountValue)})</span>
+              </div>
+            )}
+            {calculations.dpValue > 0 && (
+              <div className="flex justify-between w-full text-[9pt] mt-1">
+                <div className="flex gap-4 pl-4">
+                  <span>DP</span>
+                  <span className="text-slate-500">{dpPercent}%</span>
+                </div>
+                <span>
+                  {isDeduction ? `(${formatCurrency(calculations.dpValue)})` : formatCurrency(calculations.dpValue)}
+                </span>
+              </div>
+            )}
           </div>
-
-        {/* SPACER - Menjamin Footer Terkunci di Bawah */}
-        <div className="flex-grow"></div>
-
-        {/* FOOTER SECTION - Terkunci di Dasar Halaman */}
-        <footer className="mt-auto print:page-break-inside-avoid print:mt-4">
-        <div className="w-full flex justify-start mb-1">
-          <p className="text-[10px] font-medium">No PO : {invoiceData.poNumber || '-'}</p>
         </div>
 
-        <div className="border-t border-black w-full mb-1"></div>
+        <div className="flex-grow"></div>
 
+        <footer className="mt-auto">
+          <div className="w-full flex justify-start mb-1">
+            <p className="text-[10px] font-medium">No PO : {invoiceData.poNumber || '-'}</p>
+          </div>
+          <div className="border-t border-black w-full mb-1"></div>
           <div className="flex justify-end mt-1">
             <div className="w-1/3 text-[10px] space-y-0.5 pt-1">
               <div className="flex justify-between">
@@ -163,22 +159,18 @@ export const InvoiceTemplate = ({ type, invoiceData, items, calculations }: Invo
               </div>
             </div>
           </div>
-
           <div className="border-t border-black w-full my-2"></div>
-
           <div className="flex justify-between items-start">
             <div className="w-[68%] text-[10px] leading-tight space-y-2">
               <div className="flex">
                 <span className="w-[60px] font-bold">Payment:</span>
                 <span>{invoiceData.paymentTerms || '90 Hari setelah invoice diterima'}</span>
               </div>
-              
               <div className="flex flex-col space-y-0.5">
                 <p className="font-bold">Please state with your payment: <span className="font-black">{displayInvoiceId}</span></p>
                 <p className="font-bold">For payment, please transfer to our account:</p>
                 <p className="font-bold pt-1 uppercase">PT. Jembo Cable Company Tbk</p>
               </div>
-
               <div className="mt-2">
                 {invoiceData.paymentMode === 'virtual_account' ? (
                   <div className="w-[280px] bg-slate-50 p-2 rounded border border-slate-200">
@@ -202,9 +194,7 @@ export const InvoiceTemplate = ({ type, invoiceData, items, calculations }: Invo
                       <div className="flex"><span className="w-[100px]">Jakarta Cabang</span><span>A/C No. : 102-0005000218 (Rp)</span></div>
                       <div className="flex"><span className="w-[100px]">Sudirman</span><span>A/C No. : 102-0005000226 (USD)</span></div>
                     </div>
-
                     <div className="w-[280px] text-center font-bold text-slate-300 italic tracking-widest py-1 text-[8px]">OR</div>
-
                     <div className="flex items-start">
                       <div className="w-[100px] leading-tight">
                         Bank BCA - Jakarta<br/>
@@ -218,7 +208,6 @@ export const InvoiceTemplate = ({ type, invoiceData, items, calculations }: Invo
                 )}
               </div>
             </div>
-
             <div className="w-[32%] flex flex-col items-center">
               <p className="font-bold text-[10px] uppercase">PT. JEMBO CABLE COMPANY Tbk</p>
               <div className="mt-28 border-t border-black w-full"></div>

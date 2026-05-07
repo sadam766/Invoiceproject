@@ -40,7 +40,7 @@ const InvoicePreviewPage = () => {
         scrollY: 0
       },
       jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
-      pagebreak: { mode: ['avoid-all', 'css', 'legacy'] }
+      pagebreak: { mode: 'css' } // Rely on our explicit page-break CSS
     };
 
     html2pdf().from(element).set(opt).save();
@@ -81,7 +81,7 @@ const InvoicePreviewPage = () => {
   return (
     <main className="min-h-screen bg-slate-100 py-12 px-4 flex flex-col items-center print:p-0 print:bg-white">
       {isVaPending && (
-          <div className="w-full max-w-[210mm] mb-6 bg-amber-100 border-2 border-amber-200 p-4 rounded-2xl flex items-center justify-between print:hidden">
+          <div className="w-full max-w-[210mm] mb-6 bg-amber-100 border-2 border-amber-200 p-4 rounded-2xl flex items-center justify-between print:hidden text-black">
               <div className="flex items-center gap-3">
                   <div className="bg-amber-600 p-2 rounded-xl"><Lock className="h-4 w-4 text-white" /></div>
                   <div className="space-y-0.5">
@@ -94,7 +94,7 @@ const InvoicePreviewPage = () => {
       )}
 
       <div className="w-full max-w-[210mm] flex justify-center gap-4 mb-8 print:hidden">
-        <Button variant="outline" onClick={() => router.back()} className="rounded-xl font-bold bg-white">
+        <Button variant="outline" onClick={() => router.back()} className="rounded-xl font-bold bg-white text-black">
           <ArrowLeft size={16} className="mr-2"/> Kembali
         </Button>
         <div className="flex gap-2">
@@ -102,7 +102,7 @@ const InvoicePreviewPage = () => {
             variant="secondary"
             onClick={handleDownloadPdf}
             disabled={isVaPending}
-            className="shadow-md rounded-xl px-6 font-black uppercase text-[10px] tracking-widest bg-white border-slate-200 hover:bg-slate-50"
+            className="shadow-md rounded-xl px-6 font-black uppercase text-[10px] tracking-widest bg-white border-slate-200 hover:bg-slate-50 text-black"
           >
             <Download size={16} className="mr-2"/> Simpan PDF
           </Button>
@@ -119,7 +119,7 @@ const InvoicePreviewPage = () => {
         </div>
       </div>
 
-      <div ref={invoiceContainerRef} className="print:m-0 print:p-0">
+      <div ref={invoiceContainerRef} className="print:m-0 print:p-0 flex flex-col">
         <InvoiceTemplate 
           type="Original" 
           invoiceData={invoiceData} 
