@@ -31,7 +31,7 @@ const InvoicePreviewPage = () => {
     const opt = {
       margin: 0,
       filename: `Invoice_${invoiceData.id.replace(/\//g, '_')}.pdf`,
-      image: { type: 'jpeg', quality: 0.98 },
+      image: { type: 'jpeg', quality: 1 },
       html2canvas: { 
         scale: 2, 
         useCORS: true, 
@@ -94,7 +94,7 @@ const InvoicePreviewPage = () => {
       )}
 
       <div className="w-full max-w-[210mm] flex justify-center gap-4 mb-8 print:hidden">
-        <Button variant="outline" onClick={() => router.back()} className="rounded-xl font-bold bg-white text-black">
+        <Button variant="outline" onClick={() => router.back()} className="rounded-xl font-bold bg-white text-black border-slate-200">
           <ArrowLeft size={16} className="mr-2"/> Kembali
         </Button>
         <div className="flex gap-2">
@@ -119,7 +119,7 @@ const InvoicePreviewPage = () => {
         </div>
       </div>
 
-      <div ref={invoiceContainerRef} className="print:m-0 print:p-0 flex flex-col">
+      <div ref={invoiceContainerRef} className="print:m-0 print:p-0 flex flex-col items-center">
         <InvoiceTemplate 
           type="Original" 
           invoiceData={invoiceData} 
@@ -127,8 +127,8 @@ const InvoicePreviewPage = () => {
           calculations={calcs} 
         />
 
-        {/* This divider is purely visual in UI and hidden during print/PDF generation */}
-        <div className="my-1 border-b border-transparent print:hidden w-[210mm]"></div>
+        {/* Space between pages in UI - hidden in print */}
+        <div className="h-8 w-full print:hidden"></div>
 
         <InvoiceTemplate 
           type="Copy" 
