@@ -38,12 +38,12 @@ export const InvoiceTemplate = ({ type, invoiceData, items, calculations }: Invo
   return (
     <div 
       className={cn(
-        "relative bg-white mx-auto pt-12 pb-10 px-12 flex flex-col font-sans text-black shadow-lg print:shadow-none print:m-0 print:border-none overflow-hidden",
+        "relative bg-white mx-auto pt-12 pb-16 px-12 flex flex-col font-sans text-black shadow-lg print:shadow-none print:m-0 print:border-none overflow-hidden print:page-break-inside-avoid",
         type === 'Copy' && "print:page-break-before-always"
       )}
       style={{ 
         width: '210mm', 
-        minHeight: '296mm', 
+        minHeight: '295mm', 
         fontSize: '9pt', 
         color: '#000000', 
         boxSizing: 'border-box' 
