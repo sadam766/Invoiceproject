@@ -30,7 +30,8 @@ const InvoicePreviewPage = () => {
       filename: `Invoice_${invoiceData.id.replace(/\//g, '_')}.pdf`,
       image: { type: 'jpeg', quality: 0.98 },
       html2canvas: { scale: 2, useCORS: true },
-      jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+      jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
+      pagebreak: { mode: 'css' }
     };
 
     html2pdf().from(element).set(opt).save();
@@ -90,13 +91,11 @@ const InvoicePreviewPage = () => {
           calculations={calcs} 
         />
 
-        {/* Pemisah visual hanya di layar */}
+        {/* Pemisah visual hanya di layar - Bersih tanpa teks sesuai instruksi */}
         <div className="w-[210mm] py-10 print:hidden text-center">
            <div className="relative flex items-center justify-center">
               <div className="absolute inset-0 flex items-center"><span className="w-full border-t-2 border-dashed border-slate-300"></span></div>
-              <span className="relative bg-slate-100 px-4 text-xs font-black uppercase text-slate-400 tracking-widest">
-                HALAMAN BERIKUTNYA (COPY)
-              </span>
+              <span className="relative bg-slate-100 px-4"></span>
            </div>
         </div>
 
