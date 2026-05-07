@@ -40,7 +40,7 @@ const InvoicePreviewPage = () => {
         scrollY: 0
       },
       jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
-      pagebreak: { mode: 'css' } // Rely on our explicit page-break CSS
+      pagebreak: { mode: 'css' } 
     };
 
     html2pdf().from(element).set(opt).save();
@@ -127,9 +127,8 @@ const InvoicePreviewPage = () => {
           calculations={calcs} 
         />
 
-        <div className="my-10 border-b-2 border-dashed border-slate-300 print:hidden text-center w-[210mm]">
-          <span className="bg-slate-100 px-2 text-slate-400 text-xs uppercase tracking-widest">Halaman Berikutnya (Copy)</span>
-        </div>
+        {/* Removed text label to keep Copy page clean as per instructions */}
+        <div className="my-10 border-b border-dashed border-slate-200 print:hidden w-[210mm]"></div>
 
         <InvoiceTemplate 
           type="Copy" 
