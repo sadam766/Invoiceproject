@@ -598,10 +598,10 @@ export default function AddInvoicePage() {
                                 <TableHeader className="bg-slate-50/50 sticky top-0 z-10 shadow-sm">
                                     <TableRow>
                                         <TableHead className="py-3 px-6 text-[8pt]">Description</TableHead>
-                                        <TableHead className="w-[110px] text-center text-[8pt]">Qty</TableHead>
-                                        <TableHead className="w-[100px] text-center text-[8pt]">Unit</TableHead>
-                                        <TableHead className="w-[160px] text-right text-[8pt]">Price</TableHead>
-                                        <TableHead className="w-[50px]"></TableHead>
+                                        <TableHead className="w-[120px] text-center text-[8pt]">Qty</TableHead>
+                                        <TableHead className="w-[110px] text-center text-[8pt]">Unit</TableHead>
+                                        <TableHead className="w-[170px] text-right text-[8pt]">Price</TableHead>
+                                        <TableHead className="w-[60px]"></TableHead>
                                     </TableRow>
                                 </TableHeader>
                                 <TableBody>
@@ -609,13 +609,13 @@ export default function AddInvoicePage() {
                                         <TableRow><TableCell colSpan={5} className="text-center py-12 text-[10px] font-bold text-slate-300 uppercase italic">Add items to start...</TableCell></TableRow>
                                     ) : items.map(item => (
                                         <TableRow key={item.id} className="hover:bg-slate-50/50 group">
-                                            <TableCell className="px-6 py-3">
+                                            <TableCell className="px-6 py-4">
                                                 <Popover>
                                                     <PopoverTrigger asChild>
                                                         <Input 
                                                             value={item.name} 
                                                             onChange={e => updateItemField(item.id, 'name', e.target.value)}
-                                                            className="h-8 text-[10px] font-bold border-none shadow-none bg-transparent p-0 w-full"
+                                                            className="h-9 text-[10px] font-bold border-none shadow-none bg-transparent p-0 w-full focus-visible:ring-0"
                                                         />
                                                     </PopoverTrigger>
                                                     <PopoverContent className="w-[450px] p-0 shadow-2xl" align="start">
@@ -645,31 +645,31 @@ export default function AddInvoicePage() {
                                                     </PopoverContent>
                                                 </Popover>
                                             </TableCell>
-                                            <TableCell className="py-3">
+                                            <TableCell className="py-4">
                                                 <Input 
                                                     value={formatNumberWithCommas(item.quantity)} 
                                                     onChange={e => updateItemField(item.id, 'quantity', parseFormattedNumber(e.target.value))} 
-                                                    className="text-center h-8 text-[10px] font-black border-slate-200 px-3 w-full" 
+                                                    className="text-center h-10 text-[11px] font-black border-slate-200 px-3 w-full rounded-md focus-visible:ring-2 focus-visible:ring-indigo-500" 
                                                 />
                                             </TableCell>
-                                            <TableCell className="py-3">
+                                            <TableCell className="py-4">
                                                 <Input 
                                                     value={item.unit} 
                                                     onChange={e => updateItemField(item.id, 'unit', e.target.value)} 
-                                                    className="text-center h-8 text-[10px] font-bold bg-slate-50 border-none px-1" 
+                                                    className="text-center h-10 text-[10px] font-bold bg-slate-50/50 border-slate-200 px-2 rounded-md" 
                                                     placeholder="Meter"
                                                 />
                                             </TableCell>
-                                            <TableCell className="py-3 text-right">
+                                            <TableCell className="py-4 text-right">
                                                 <Input 
                                                     value={formatNumberWithCommas(item.price)} 
                                                     onChange={e => updateItemField(item.id, 'price', parseFormattedNumber(e.target.value))}
-                                                    className="h-8 text-right text-[10px] font-black border-none shadow-none bg-transparent pr-0 w-full"
+                                                    className="h-10 text-right text-[11px] font-black border-slate-200 px-3 w-full rounded-md focus-visible:ring-2 focus-visible:ring-indigo-500"
                                                 />
                                             </TableCell>
-                                            <TableCell className="text-center">
-                                                <Button variant="ghost" size="icon" className="h-7 w-7 text-rose-300 hover:text-rose-600" onClick={() => removeItem(item.id)}>
-                                                    <Trash2 className="h-3 w-3" />
+                                            <TableCell className="py-4 text-center">
+                                                <Button variant="ghost" size="icon" className="h-8 w-8 text-rose-300 hover:text-rose-600 hover:bg-rose-50 transition-colors ml-2" onClick={() => removeItem(item.id)}>
+                                                    <Trash2 className="h-4 w-4" />
                                                 </Button>
                                             </TableCell>
                                         </TableRow>
