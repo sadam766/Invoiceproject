@@ -127,6 +127,18 @@ export default function AddInvoicePage() {
   const [dpMode, setDpMode] = useState<'tagih' | 'kurangi'>('kurangi');
   const [discountValue, setDiscountValue] = useState<string>('0');
 
+  // DEDUPLICATED CATALOG: Remove duplicate item names from master products
+  const uniqueMasterProducts = useMemo(() => {
+    if (!masterProducts) return [];
+    const seen = new Set();
+    return masterProducts.filter(p => {
+      const nameLower = p.name.toLowerCase().trim();
+      const duplicate = seen.has(nameLower);
+      seen.add(nameLower);
+      return !duplicate;
+    });
+  }, [masterProducts]);
+
   // SMART HISTORY: Build a list of unique previously used items for this customer
   const itemHistorySuggestions = useMemo(() => {
     if (!activeIdentity?.customer || !allInvoices) return [];
@@ -136,7 +148,7 @@ export default function AddInvoicePage() {
         .filter(inv => inv.customer === activeIdentity.customer)
         .forEach(inv => {
             inv.items?.forEach(item => {
-                const key = item.name.toLowerCase();
+                const key = item.name.toLowerCase().trim();
                 if (!customerItems[key]) {
                     customerItems[key] = { name: item.name, price: item.price, unit: item.unit };
                 }
@@ -586,9 +598,9 @@ export default function AddInvoicePage() {
                                 <TableHeader className="bg-slate-50/50 sticky top-0 z-10 shadow-sm">
                                     <TableRow>
                                         <TableHead className="py-3 px-6 text-[8pt]">Description</TableHead>
-                                        <TableHead className="w-[70px] text-center text-[8pt]">Qty</TableHead>
+                                        <TableHead className="w-[110px] text-center text-[8pt]">Qty</TableHead>
                                         <TableHead className="w-[100px] text-center text-[8pt]">Unit</TableHead>
-                                        <TableHead className="w-[120px] text-right text-[8pt]">Price</TableHead>
+                                        <TableHead className="w-[160px] text-right text-[8pt]">Price</TableHead>
                                         <TableHead className="w-[50px]"></TableHead>
                                     </TableRow>
                                 </TableHeader>
@@ -606,7 +618,7 @@ export default function AddInvoicePage() {
                                                             className="h-8 text-[10px] font-bold border-none shadow-none bg-transparent p-0 w-full"
                                                         />
                                                     </PopoverTrigger>
-                                                    <PopoverContent className="w-[300px] p-0" align="start">
+                                                    <PopoverContent className="w-[450px] p-0 shadow-2xl" align="start">
                                                         <Command>
                                                             <CommandInput placeholder="Search History..." />
                                                             <CommandList>
@@ -637,7 +649,7 @@ export default function AddInvoicePage() {
                                                 <Input 
                                                     value={formatNumberWithCommas(item.quantity)} 
                                                     onChange={e => updateItemField(item.id, 'quantity', parseFormattedNumber(e.target.value))} 
-                                                    className="text-center h-8 text-[10px] font-black border-slate-200 px-1" 
+                                                    className="text-center h-8 text-[10px] font-black border-slate-200 px-3 w-full" 
                                                 />
                                             </TableCell>
                                             <TableCell className="py-3">
@@ -652,7 +664,7 @@ export default function AddInvoicePage() {
                                                 <Input 
                                                     value={formatNumberWithCommas(item.price)} 
                                                     onChange={e => updateItemField(item.id, 'price', parseFormattedNumber(e.target.value))}
-                                                    className="h-8 text-right text-[10px] font-black border-none shadow-none bg-transparent pr-0"
+                                                    className="h-8 text-right text-[10px] font-black border-none shadow-none bg-transparent pr-0 w-full"
                                                 />
                                             </TableCell>
                                             <TableCell className="text-center">
@@ -672,13 +684,13 @@ export default function AddInvoicePage() {
                                         <Plus className="mr-1.5 h-3.5 w-3.5" /> Insert Manual Row
                                     </Button>
                                 </PopoverTrigger>
-                                <PopoverContent className="w-[300px] p-0" align="center">
+                                <PopoverContent className="w-[450px] p-0 shadow-2xl" align="center">
                                     <Command>
                                         <CommandInput placeholder="Search catalog..." />
-                                        <CommandList>
+                                        <CommandList className="max-h-[350px] overflow-y-auto">
                                             <CommandEmpty>Not found.</CommandEmpty>
                                             <CommandGroup>
-                                                {masterProducts?.map((p) => (
+                                                {uniqueMasterProducts?.map((p) => (
                                                     <CommandItem
                                                         key={p.id}
                                                         onSelect={() => {
@@ -686,8 +698,12 @@ export default function AddInvoicePage() {
                                                             setItems([...items, newItem]);
                                                             setProductPopoverOpen(false);
                                                         }}
+                                                        className="py-3 px-4"
                                                     >
-                                                        <span className="text-[10px] font-bold">{p.name}</span>
+                                                        <div className="flex flex-col">
+                                                          <span className="text-[11px] font-black uppercase text-slate-800">{p.name}</span>
+                                                          <span className="text-[9px] text-slate-400 font-bold uppercase tracking-widest">{p.category} • {p.unit} • Rp {formatNumberWithCommas(p.price)}</span>
+                                                        </div>
                                                     </CommandItem>
                                                 ))}
                                             </CommandGroup>
