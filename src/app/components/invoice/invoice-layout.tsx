@@ -38,7 +38,7 @@ export const InvoiceTemplate = ({ type, invoiceData, items, calculations }: Invo
   return (
     <div 
       className={cn(
-        "relative bg-white mx-auto pt-12 pb-6 px-12 flex flex-col font-sans text-black shadow-lg print:shadow-none print:m-0 print:border-none overflow-hidden",
+        "relative bg-white mx-auto pt-12 pb-10 px-12 flex flex-col font-sans text-black shadow-lg print:shadow-none print:m-0 print:border-none overflow-hidden",
         type === 'Copy' && "print:page-break-before-always"
       )}
       style={{ 
@@ -105,7 +105,7 @@ export const InvoiceTemplate = ({ type, invoiceData, items, calculations }: Invo
           </table>
         </div>
 
-        <div className="mt-4 mb-4 flex justify-end">
+        <div className="mt-4 mb-4 flex justify-end print:page-break-inside-avoid">
           <div className="w-[300px] flex flex-col items-end"> 
             <div className="border-t border-black w-[180px] mb-1"></div>
             <div className="flex justify-between w-full text-[9pt] font-normal">
@@ -134,7 +134,7 @@ export const InvoiceTemplate = ({ type, invoiceData, items, calculations }: Invo
 
         <div className="flex-grow"></div>
 
-        <footer className="mt-auto">
+        <footer className="mt-auto print:page-break-inside-avoid">
           <div className="w-full flex justify-start mb-1">
             <p className="text-[10px] font-medium">No PO : {invoiceData.poNumber || '-'}</p>
           </div>
@@ -188,19 +188,19 @@ export const InvoiceTemplate = ({ type, invoiceData, items, calculations }: Invo
                     </div>
                   </div>
                 ) : (
-                  <div className="space-y-2">
-                    <div className="space-y-1">
+                  <div className="space-y-1">
+                    <div className="space-y-0.5">
                       <div className="flex"><span className="w-[100px]">Bank Mandiri -</span><span>A/C No. : 102-0100206827 (Rp)</span></div>
                       <div className="flex"><span className="w-[100px]">Jakarta Cabang</span><span>A/C No. : 102-0005000218 (Rp)</span></div>
                       <div className="flex"><span className="w-[100px]">Sudirman</span><span>A/C No. : 102-0005000226 (USD)</span></div>
                     </div>
-                    <div className="w-[280px] text-center font-bold text-slate-300 italic tracking-widest py-1 text-[8px]">OR</div>
+                    <div className="w-[280px] text-center font-bold text-slate-300 italic tracking-widest py-0.5 text-[8px]">OR</div>
                     <div className="flex items-start">
                       <div className="w-[100px] leading-tight">
                         Bank BCA - Jakarta<br/>
                         Cabang KEM TOWER
                       </div>
-                      <div>
+                      <div className="font-bold">
                         A/C No. : 684-0198977 (Rp)
                       </div>
                     </div>
@@ -210,7 +210,7 @@ export const InvoiceTemplate = ({ type, invoiceData, items, calculations }: Invo
             </div>
             <div className="w-[32%] flex flex-col items-center">
               <p className="font-bold text-[10px] uppercase">PT. JEMBO CABLE COMPANY Tbk</p>
-              <div className="mt-28 border-t border-black w-full"></div>
+              <div className="mt-24 border-t border-black w-full"></div>
               <p className="font-bold uppercase pt-1 text-[10px]">Finance</p>
             </div>
           </div>
