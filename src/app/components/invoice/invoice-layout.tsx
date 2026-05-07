@@ -38,7 +38,7 @@ export const InvoiceTemplate = ({ type, invoiceData, items, calculations }: Invo
   return (
     <div 
       className={cn(
-        "relative bg-white mx-auto pt-12 pb-32 px-12 flex flex-col font-sans text-black shadow-lg print:shadow-none print:m-0 print:border-none overflow-hidden print:page-break-inside-avoid",
+        "relative bg-white mx-auto pt-12 pb-40 px-12 flex flex-col font-sans text-black shadow-lg print:shadow-none print:m-0 print:border-none overflow-hidden print:page-break-inside-avoid",
         type === 'Copy' && "print:page-break-before-always"
       )}
       style={{ 
@@ -80,7 +80,7 @@ export const InvoiceTemplate = ({ type, invoiceData, items, calculations }: Invo
 
       <main className="relative flex-grow flex flex-col overflow-hidden">
         {/* Adjusted min-h to allow footer to rise when items are few */}
-        <div className="min-h-[280px]">
+        <div className="min-h-[260px]">
           <table className="w-full border-collapse">
             <thead>
               <tr className="border border-black text-[9pt]">
@@ -212,7 +212,7 @@ export const InvoiceTemplate = ({ type, invoiceData, items, calculations }: Invo
             </div>
             <div className="w-[32%] flex flex-col items-center">
               <p className="font-bold text-[10px] uppercase">PT. JEMBO CABLE COMPANY Tbk</p>
-              <div className="mt-20 border-t border-black w-full"></div>
+              <div className="mt-28 border-t border-black w-full"></div>
               <p className="font-bold uppercase pt-1 text-[10px]">Finance</p>
             </div>
           </div>
