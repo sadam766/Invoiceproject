@@ -38,18 +38,18 @@ export const InvoiceTemplate = ({ type, invoiceData, items, calculations }: Invo
   return (
     <div 
       className={cn(
-        "relative bg-white mx-auto pt-12 pb-24 px-12 flex flex-col font-sans text-black shadow-lg print:shadow-none print:m-0 print:border-none overflow-hidden print:page-break-inside-avoid",
+        "relative bg-white mx-auto pt-12 pb-32 px-12 flex flex-col font-sans text-black shadow-lg print:shadow-none print:m-0 print:border-none overflow-hidden print:page-break-inside-avoid",
         type === 'Copy' && "print:page-break-before-always"
       )}
       style={{ 
         width: '210mm', 
-        minHeight: '290mm', 
+        minHeight: '285mm', 
         fontSize: '9pt', 
         color: '#000000', 
         boxSizing: 'border-box' 
       }}
     >
-      {/* Visual Indicator for UI only */}
+      {/* Visual Indicator for UI only - Hidden in Print */}
       <div className="absolute right-12 top-6 text-[10pt] text-slate-300 uppercase font-black tracking-[0.2em] print:hidden">
         {type}
       </div>
@@ -79,8 +79,8 @@ export const InvoiceTemplate = ({ type, invoiceData, items, calculations }: Invo
       </div>
 
       <main className="relative flex-grow flex flex-col overflow-hidden">
-        {/* Further reduced min-h to pull footer up significantly */}
-        <div className="min-h-[300px]">
+        {/* Adjusted min-h to allow footer to rise when items are few */}
+        <div className="min-h-[280px]">
           <table className="w-full border-collapse">
             <thead>
               <tr className="border border-black text-[9pt]">
@@ -202,7 +202,7 @@ export const InvoiceTemplate = ({ type, invoiceData, items, calculations }: Invo
                         Bank BCA - Jakarta<br/>
                         Cabang KEM TOWER
                       </div>
-                      <div className="font-bold">
+                      <div className="font-bold ml-2">
                         A/C No. : 684-0198977 (Rp)
                       </div>
                     </div>
