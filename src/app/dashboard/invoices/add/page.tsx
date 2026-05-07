@@ -551,11 +551,11 @@ export default function AddInvoicePage() {
                                                     value={inputBuffer[`${item.id}-quantity`] !== undefined ? inputBuffer[`${item.id}-quantity`] : formatNumberWithCommas(item.quantity)} 
                                                     onChange={e => handleNumericInputChange(item.id, 'quantity', e.target.value)}
                                                     onBlur={() => handleNumericInputBlur(item.id, 'quantity')}
-                                                    className="text-center h-11 text-sm font-bold border-slate-200 px-[15px] min-w-[100px] w-full rounded-[6px] focus-visible:ring-2 focus-visible:ring-indigo-500 shadow-sm" 
+                                                    className="text-center h-11 text-sm font-bold border-slate-200 px-[15px] min-w-[120px] w-full rounded-[6px] focus-visible:ring-2 focus-visible:ring-indigo-500 shadow-sm" 
                                                 />
                                             </TableCell>
                                             <TableCell className="py-4">
-                                                <Input value={item.unit} onChange={e => updateItemField(item.id, 'unit', e.target.value)} className="text-center h-11 text-sm font-bold bg-slate-50/50 border-slate-200 px-[15px] min-w-[100px] w-full rounded-[6px] shadow-sm" />
+                                                <Input value={item.unit} onChange={e => updateItemField(item.id, 'unit', e.target.value)} className="text-center h-11 text-sm font-bold bg-slate-50/50 border-slate-200 px-[15px] min-w-[120px] w-full rounded-[6px] shadow-sm" />
                                             </TableCell>
                                             <TableCell className="py-4 text-right">
                                                 <Input 
@@ -564,7 +564,7 @@ export default function AddInvoicePage() {
                                                     value={inputBuffer[`${item.id}-price`] !== undefined ? inputBuffer[`${item.id}-price`] : formatNumberWithCommas(item.price)} 
                                                     onChange={e => handleNumericInputChange(item.id, 'price', e.target.value)}
                                                     onBlur={() => handleNumericInputBlur(item.id, 'price')}
-                                                    className="h-11 text-right text-sm font-bold border-slate-200 px-[15px] min-w-[160px] w-full rounded-[6px] focus-visible:ring-2 focus-visible:ring-indigo-500 shadow-sm"
+                                                    className="h-11 text-right text-sm font-bold border-slate-200 px-[15px] min-w-[190px] w-full rounded-[6px] focus-visible:ring-2 focus-visible:ring-indigo-500 shadow-sm"
                                                 />
                                             </TableCell>
                                             <TableCell className="py-4 text-center">
