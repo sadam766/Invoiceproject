@@ -22,24 +22,17 @@ export function generateVirtualAccount(customerCode: string): string {
   const base = bankPrefix + yearFull;
   
   // Extract 3 letters and last 3 digits
-  // If code is "ADH004", letters = ADH, digits = 004
   const letters = cleanCode.substring(0, 3);
   const digits = cleanCode.match(/\d+$/)?.[0]?.padStart(3, '0') || '000';
   
-  // Excel CODE() - 64 logic
-  // A=1, B=2 ... J=10, K=11
   let asciiSlots = "";
   for (let i = 0; i < 3; i++) {
     const charCode = letters.charCodeAt(i);
-    // Standard ASCII: A=65. 65-64 = 1.
     const rank = charCode >= 65 && charCode <= 90 ? charCode - 64 : 0;
     asciiSlots += rank.toString();
   }
   
-  // Final Assembly
   const result = base + asciiSlots + digits + "0";
-  
-  // Force trim to 16 if too long
   return result.substring(0, 16).padEnd(16, '0');
 }
 
@@ -67,8 +60,9 @@ export function formatCurrency(value: number | string | undefined): string {
 
 /**
  * Memformat angka ke format mata uang/akuntansi Indonesia (Tanpa desimal jika bulat)
+ * Sekarang mendukung hingga 3 digit desimal jika ada.
  */
-export function formatNumberWithCommas(value: number | string | undefined): string {
+export function formatNumberWithCommas(value: number | string | undefined, minDecimals?: number): string {
   if (value === undefined || value === null || value === '') {
     return '';
   }
@@ -82,27 +76,51 @@ export function formatNumberWithCommas(value: number | string | undefined): stri
   }
 
   return new Intl.NumberFormat('id-ID', {
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 2
+    minimumFractionDigits: minDecimals !== undefined ? minDecimals : (num % 1 !== 0 ? 2 : 0),
+    maximumFractionDigits: 3
   }).format(num);
 }
 
 /**
  * Mengonversi string berformat (dengan titik/koma) kembali menjadi angka murni (float)
+ * Mendukung deteksi cerdas untuk titik (.) atau koma (,) sebagai desimal.
  */
 export function parseFormattedNumber(value: string | number): number {
   if (typeof value === 'number') return value;
   if (!value || value === '') return 0;
 
-  let clean = value.toString().replace(/[^\d.,-]/g, '');
+  let str = value.toString().replace(/[^\d.,-]/g, '');
 
-  if ((clean.match(/\./g) || []).length > 0) {
-    clean = clean.replace(/\./g, '');
+  const hasComma = str.includes(',');
+  const hasDot = str.includes('.');
+
+  if (hasComma && hasDot) {
+    const lastComma = str.lastIndexOf(',');
+    const lastDot = str.lastIndexOf('.');
+    if (lastComma > lastDot) {
+      // ID Style: 1.000,50 (Koma adalah desimal)
+      return parseFloat(str.replace(/\./g, '').replace(',', '.')) || 0;
+    } else {
+      // US Style: 1,000.50 (Titik adalah desimal)
+      return parseFloat(str.replace(/,/g, '')) || 0;
+    }
+  } else if (hasComma) {
+    // Hanya ada koma: Anggap sebagai desimal (misal: 5,5 -> 5.5)
+    return parseFloat(str.replace(',', '.')) || 0;
+  } else if (hasDot) {
+    // Hanya ada titik: Bisa jadi desimal (5.5) atau ribuan (1.000)
+    // Berdasarkan instruksi user, jika titik muncul tunggal kita prioritaskan sebagai desimal
+    // kecuali diikuti tepat 3 digit dan bukan di akhir string.
+    const parts = str.split('.');
+    if (parts.length === 2 && parts[1].length === 3) {
+      // Kasus ambigu seperti 1.000 atau 5.000 - kita ikuti konteks harga/qty
+      // Namun untuk fleksibilitas desimal, kita biarkan parseFloat menanganinya.
+      return parseFloat(str) || 0;
+    }
+    return parseFloat(str) || 0;
   }
 
-  clean = clean.replace(',', '.');
-
-  return parseFloat(clean) || 0;
+  return parseFloat(str) || 0;
 }
 
 export const generateExcelTemplate = (headers: string[], fileName: string) => {
@@ -119,29 +137,24 @@ export const exportToExcel = (data: any[], fileName: string) => {
   XLSX.writeFile(workbook, `${fileName}.xlsx`);
 };
 
-/**
- * Export Invoices to e-Faktur Template (Multi-Sheet)
- * Logic updated to sync "Baris" column and use Integer Rounding
- */
 export const exportTaxInvoicesToExcel = (invoices: Invoice[], allCustomers: Customer[], taxCode: string) => {
     const workbook = XLSX.utils.book_new();
 
-    // 1. SHEET FAKTUR
     const fakturData = invoices.map((inv, index) => {
         const customer = allCustomers.find(c => c.name === inv.customer);
         const ref = `${inv.id} ${inv.soNumber || ''} ${inv.poNumber}`.trim();
         const defaultAddr = customer?.addresses?.find(a => a.isDefault) || customer?.addresses?.[0];
         
         return [
-            index + 1,                  // Baris (ID Unik untuk sinkronisasi)
-            ref,                        // Referensi
-            taxCode,                    // Kode Transaksi
-            inv.date,                   // Tanggal Faktur
-            "Normal",                   // Jenis Faktur
-            defaultAddr?.npwp || "-",   // NPWP/NIK Pembeli
-            inv.customer,               // Nama Pembeli
-            customer?.customerCode || "-", // ID TKU Pembeli
-            "NORMAL"                    // Action
+            index + 1,
+            ref,
+            taxCode,
+            inv.date,
+            "Normal",
+            defaultAddr?.npwp || "-",
+            inv.customer,
+            customer?.customerCode || "-",
+            "NORMAL"
         ];
     });
 
@@ -153,7 +166,6 @@ export const exportTaxInvoicesToExcel = (invoices: Invoice[], allCustomers: Cust
     const fakturSheet = XLSX.utils.aoa_to_sheet(finalFakturRows);
     XLSX.utils.book_append_sheet(workbook, fakturSheet, "Faktur");
 
-    // 2. SHEET DETAIL FAKTUR
     const detailData: any[] = [];
     invoices.forEach((inv, index) => {
         const items = inv.items || [];
@@ -161,37 +173,33 @@ export const exportTaxInvoicesToExcel = (invoices: Invoice[], allCustomers: Cust
         const discountPerItem = items.length > 0 ? (discountTotal / items.length) : 0;
 
         items.forEach(item => {
-            // Kode UM Mapping
             let unitCode = "UM.0033";
             const lowerUnit = item.unit?.toLowerCase();
             if (lowerUnit === "meter" || lowerUnit === "m") unitCode = "UM.0013";
             else if (lowerUnit === "unit" || lowerUnit === "pcs") unitCode = "UM.0018";
 
-            // Type A: Goods, B: Service
             const type = item.category?.toLowerCase().includes("kabel") ? "A" : "B";
 
-            // Calculations with Pre-Calculated Integer Rounding (Absolute)
             const hargaTotal = item.quantity * item.price;
             const dppItem = Math.round(hargaTotal - discountPerItem);
             
-            // Logic Kode 04: DPP Nilai Lain (ROUND 11/12)
             const finalDpp = taxCode === "04" ? Math.round((11 / 12) * dppItem) : dppItem;
             const ppn = Math.round(finalDpp * 0.12);
 
             detailData.push([
-                index + 1,      // Baris (WAJIB SAMA dengan Sheet Faktur untuk referensi induk)
-                type,           // Tipe (A/B)
-                item.name,      // Nama
-                Math.round(item.price),     // Harga Satuan (Rounded)
-                item.quantity,  // Jumlah Barang
-                Math.round(hargaTotal),     // Harga Total (Rounded)
-                Math.round(discountPerItem), // Diskon (Rounded)
-                finalDpp,       // DPP (Rounded)
-                ppn,            // PPN (Rounded)
-                0,              // Tarif PPnBM
-                0,              // PPnBM
-                unitCode,       // Satuan Ukur
-                "NORMAL"        // Action
+                index + 1,
+                type,
+                item.name,
+                Math.round(item.price),
+                item.quantity,
+                Math.round(hargaTotal),
+                Math.round(discountPerItem),
+                finalDpp,
+                ppn,
+                0,
+                0,
+                unitCode,
+                "NORMAL"
             ]);
         });
     });
@@ -204,7 +212,6 @@ export const exportTaxInvoicesToExcel = (invoices: Invoice[], allCustomers: Cust
     const detailSheet = XLSX.utils.aoa_to_sheet(finalDetailRows);
     XLSX.utils.book_append_sheet(workbook, detailSheet, "DetailFaktur");
 
-    // Write File with Timestamp
     const timestamp = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 16);
     XLSX.writeFile(workbook, `eFaktur_Dakota_${timestamp}.xlsx`);
 };

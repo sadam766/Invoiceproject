@@ -1,3 +1,4 @@
+
 'use client';
 import { Button } from '@/components/ui/button';
 import {
@@ -57,11 +58,17 @@ export function AddProductDialog({ isOpen, onOpenChange, onSave, productData, on
   const handleNumericChange = (setter: (v: string) => void) => (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
     if (value === '') { setter(''); return; }
+    
+    // Allow digits, dot, comma, minus - preserve raw typing for decimals
+    if (!/^[0-9.,-]*$/.test(value)) return;
+    
     const num = parseFormattedNumber(value);
     if (!isNaN(num)) {
         let formatted = formatNumberWithCommas(num);
+        // Special hack to allow typing trailing separator
         if (value.endsWith(',') || value.endsWith('.')) {
-            if (!formatted.includes(',')) formatted += ',';
+            const sep = value.includes(',') ? ',' : '.';
+            if (!formatted.includes(sep)) formatted += sep;
         }
         setter(formatted);
     }
@@ -80,9 +87,6 @@ export function AddProductDialog({ isOpen, onOpenChange, onSave, productData, on
     onOpenChange(false);
   };
 
-  const dialogTitle = productData ? "Edit Master Item" : "Add New Master Item";
-  const dialogDescription = productData ? "Update item specifications and standard pricing." : "Register a new commercial item with a standard Unit of Measurement (UOM).";
-
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
       <DialogTrigger asChild>
@@ -92,24 +96,20 @@ export function AddProductDialog({ isOpen, onOpenChange, onSave, productData, on
       </DialogTrigger>
       <DialogContent className="sm:max-w-[450px] rounded-3xl">
         <DialogHeader>
-          <DialogTitle className="uppercase font-black tracking-tight">{dialogTitle}</DialogTitle>
-          <DialogDescription className="text-xs font-bold text-slate-400">
-            {dialogDescription}
-          </DialogDescription>
+          <DialogTitle className="uppercase font-black tracking-tight">{productData ? "Edit Master Item" : "Add New Master Item"}</DialogTitle>
+          <DialogDescription className="text-xs font-bold text-slate-400">Update item specifications and standard pricing.</DialogDescription>
         </DialogHeader>
         <div className="grid gap-6 py-6">
           <div className="space-y-2">
             <Label htmlFor="product-name" className="text-[10px] font-black uppercase text-slate-400">Official Product Name</Label>
-            <Input id="product-name" value={name} onChange={(e) => setName(e.target.value)} className="font-bold h-11 bg-slate-50 border-slate-200" placeholder="E.g. NYYGBY 4x10mm" />
+            <Input id="product-name" value={name} onChange={(e) => setName(e.target.value)} className="font-bold h-11 bg-slate-50 border-slate-200" />
           </div>
           
           <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="category" className="text-[10px] font-black uppercase text-slate-400">Category</Label>
                 <Select value={category} onValueChange={setCategory}>
-                  <SelectTrigger className="h-11 font-bold bg-slate-50 border-slate-200">
-                    <SelectValue placeholder="Select" />
-                  </SelectTrigger>
+                  <SelectTrigger className="h-11 font-bold bg-slate-50 border-slate-200"><SelectValue placeholder="Select" /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="kabel">Kabel</SelectItem>
                     <SelectItem value="aksesoris">Aksesoris</SelectItem>
@@ -118,18 +118,18 @@ export function AddProductDialog({ isOpen, onOpenChange, onSave, productData, on
               </div>
               <div className="space-y-2">
                 <Label htmlFor="unit" className="text-[10px] font-black uppercase text-slate-400">Unit (UOM)</Label>
-                <Input id="unit" value={unit} onChange={(e) => setUnit(e.target.value)} className="h-11 font-black text-indigo-600 bg-indigo-50/50 border-indigo-100" placeholder="Meter / Pcs / Roll" />
+                <Input id="unit" value={unit} onChange={(e) => setUnit(e.target.value)} className="h-11 font-black text-indigo-600 bg-indigo-50/50 border-indigo-100" />
               </div>
           </div>
 
           <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="quantity" className="text-[10px] font-black uppercase text-slate-400">Initial Stock</Label>
-                <Input id="quantity" value={quantity} onChange={handleNumericChange(setQuantity)} className="h-11 font-bold" placeholder="0" />
+                <Input type="text" step="any" id="quantity" value={quantity} onChange={handleNumericChange(setQuantity)} className="h-11 font-bold" />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="price" className="text-[10px] font-black uppercase text-slate-400">Standard Price (IDR)</Label>
-                <Input id="price" value={price} onChange={handleNumericChange(setPrice)} className="h-11 font-black text-slate-900" placeholder="0"/>
+                <Input type="text" step="any" id="price" value={price} onChange={handleNumericChange(setPrice)} className="h-11 font-black text-slate-900" />
               </div>
           </div>
         </div>

@@ -1,3 +1,4 @@
+
 'use client';
 import { Button } from '@/components/ui/button';
 import {
@@ -66,11 +67,15 @@ export function AddSalesOrderDialog({ isOpen, onOpenChange, onSave, orderData, o
   const handleNumericChange = (setter: (v: string) => void) => (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
     if (value === '') { setter(''); return; }
+    
+    if (!/^[0-9.,-]*$/.test(value)) return;
+    
     const num = parseFormattedNumber(value);
     if (!isNaN(num)) {
         let formatted = formatNumberWithCommas(num);
         if (value.endsWith(',') || value.endsWith('.')) {
-            if (!formatted.includes(',')) formatted += ',';
+            const sep = value.includes(',') ? ',' : '.';
+            if (!formatted.includes(sep)) formatted += sep;
         }
         setter(formatted);
     }
@@ -91,22 +96,15 @@ export function AddSalesOrderDialog({ isOpen, onOpenChange, onSave, orderData, o
     onOpenChange(false);
   };
 
-  const dialogTitle = orderData ? "Edit Sales Order" : "Add New Sales Order";
-  const dialogDescription = orderData ? "Update the sales order details below." : "Fill in the details below to add a new sales order.";
-
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
       <DialogTrigger asChild>
-        <Button onClick={onAddClick}>
-          <Plus className="mr-2 h-4 w-4" /> Add Sales Order
-        </Button>
+        <Button onClick={onAddClick}><Plus className="mr-2 h-4 w-4" /> Add Sales Order</Button>
       </DialogTrigger>
       <DialogContent className="sm:max-w-[500px]">
         <DialogHeader>
-          <DialogTitle>{dialogTitle}</DialogTitle>
-          <DialogDescription>
-            {dialogDescription}
-          </DialogDescription>
+          <DialogTitle>{orderData ? "Edit Sales Order" : "Add New Sales Order"}</DialogTitle>
+          <DialogDescription>Fill in the details below to add a new sales order.</DialogDescription>
         </DialogHeader>
         <div className="grid gap-4 py-4">
           <div className="grid grid-cols-4 items-center gap-4">
@@ -115,42 +113,22 @@ export function AddSalesOrderDialog({ isOpen, onOpenChange, onSave, orderData, o
           </div>
           <div className="grid grid-cols-4 items-center gap-4">
             <Label htmlFor="po-number" className="text-right">PO Reference</Label>
-            <Input id="po-number" value={poNumber} onChange={(e) => setPoNumber(e.target.value)} className="col-span-3" placeholder="Penting untuk sinkronisasi DP" />
-          </div>
-          <div className="grid grid-cols-4 items-center gap-4">
-            <Label htmlFor="customer" className="text-right">Customer</Label>
-            <Input id="customer" value={customer} onChange={(e) => setCustomer(e.target.value)} className="col-span-3" />
+            <Input id="po-number" value={poNumber} onChange={(e) => setPoNumber(e.target.value)} className="col-span-3" />
           </div>
           <div className="my-2 border-t" />
-          <div className="grid grid-cols-4 items-center gap-4">
-            <Label htmlFor="product-name" className="text-right">Product (Alias)</Label>
-            <Input id="product-name" value={productName} onChange={(e) => setProductName(e.target.value)} className="col-span-3 bg-blue-50/50" placeholder="Gunakan nama sesuai PO Customer" />
-          </div>
-          <div className="grid grid-cols-4 items-center gap-4">
-            <Label htmlFor="category" className="text-right">Category</Label>
-            <Select value={category} onValueChange={setCategory}>
-              <SelectTrigger className="col-span-3">
-                <SelectValue placeholder="Pilih kategori" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="kabel">Kabel</SelectItem>
-                <SelectItem value="aksesoris">Aksesoris</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
           <div className="grid grid-cols-2 gap-4 ml-[25%]">
             <div className="space-y-1">
                 <Label htmlFor="quantity">Quantity</Label>
-                <Input id="quantity" value={quantity} onChange={handleNumericChange(setQuantity)} placeholder="0"/>
+                <Input type="text" step="any" id="quantity" value={quantity} onChange={handleNumericChange(setQuantity)} />
             </div>
             <div className="space-y-1">
                 <Label htmlFor="unit">Unit</Label>
-                <Input id="unit" value={unit} onChange={(e) => setUnit(e.target.value)} placeholder="pcs/m" />
+                <Input id="unit" value={unit} onChange={(e) => setUnit(e.target.value)} />
             </div>
           </div>
           <div className="grid grid-cols-4 items-center gap-4">
             <Label htmlFor="price" className="text-right">Price</Label>
-            <Input id="price" value={price} onChange={handleNumericChange(setPrice)} className="col-span-3" placeholder="0" />
+            <Input type="text" step="any" id="price" value={price} onChange={handleNumericChange(setPrice)} className="col-span-3" />
           </div>
         </div>
         <DialogFooter>

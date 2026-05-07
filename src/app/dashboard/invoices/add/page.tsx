@@ -121,13 +121,15 @@ export default function AddInvoicePage() {
   const [productPopoverOpen, setProductPopoverOpen] = useState(false);
   const [isProcessing, setIsSaving] = useState(false);
 
+  // Buffer state to keep raw input string during typing to avoid losing dots/commas
+  const [inputBuffer, setInputBuffer] = useState<Record<string, string>>({});
+
   // DP & Discount States
   const [dpDescription, setDpDescription] = useState('DP 35%');
   const [dpValue, setDpValue] = useState<string>('0');
   const [dpMode, setDpMode] = useState<'tagih' | 'kurangi'>('kurangi');
   const [discountValue, setDiscountValue] = useState<string>('0');
 
-  // DEDUPLICATED CATALOG: Remove duplicate item names from master products
   const uniqueMasterProducts = useMemo(() => {
     if (!masterProducts) return [];
     const seen = new Set();
@@ -139,7 +141,6 @@ export default function AddInvoicePage() {
     });
   }, [masterProducts]);
 
-  // SMART HISTORY: Build a list of unique previously used items for this customer
   const itemHistorySuggestions = useMemo(() => {
     if (!activeIdentity?.customer || !allInvoices) return [];
     const customerItems: Record<string, { name: string, price: number, unit: string }> = {};
@@ -157,74 +158,41 @@ export default function AddInvoicePage() {
     return Object.values(customerItems);
   }, [activeIdentity?.customer, allInvoices]);
 
-  // PO Monitoring Logic
   const poRecord = useMemo(() => {
     if (!activeIdentity?.poNumber || !allSalesRecords) return null;
     return allSalesRecords.find(s => s.poNumber === activeIdentity.poNumber);
   }, [activeIdentity?.poNumber, allSalesRecords]);
 
-  // SMART LOGIC: Auto-apply Payment Scheme from PO Blueprint
   useEffect(() => {
     if (poRecord && poRecord.paymentScheme && items.length > 0 && !editInvoiceId) {
-        // Find existing invoices for this PO
         const poInvoices = allInvoices?.filter(inv => inv.poNumber === poRecord.poNumber && inv.status !== 'cancelled') || [];
-        
-        // Count how many stages are already invoiced
-        const invoicedStagesCount = poInvoices.length;
-        const currentStageIndex = invoicedStagesCount;
+        const currentStageIndex = poInvoices.length;
         
         if (currentStageIndex < poRecord.paymentScheme.length) {
             const nextStage = poRecord.paymentScheme[currentStageIndex];
-            
-            // Auto-configure DP section based on blueprint
             setDpDescription(nextStage.label + " " + nextStage.percent + "%");
-            
-            // Logic: First stage is usually "Tagih DP", subsequent are "Kurangi DP" (Pelunasan)
-            if (currentStageIndex === 0) {
-                setDpMode('tagih');
-            } else {
-                setDpMode('kurangi');
-            }
-            
-            toast({ 
-                title: "Blueprint Applied", 
-                description: `Mengikuti skema penagihan PO: Tahap ${currentStageIndex + 1} (${nextStage.label}).`,
-                duration: 5000
-            });
+            if (currentStageIndex === 0) setDpMode('tagih');
+            else setDpMode('kurangi');
         }
     }
-  }, [poRecord, items.length, editInvoiceId, allInvoices, toast]);
+  }, [poRecord, items.length, editInvoiceId, allInvoices]);
 
-  // Load Initial Data
   useEffect(() => {
       if (activeIdentity) {
           if (!selectedSoNumber) setSelectedSoNumber(activeIdentity.salesOrder || '');
-          
           if (activeIdentity.items && activeIdentity.items.length > 0 && items.length === 0) {
               setItems(activeIdentity.items);
           } 
-          else if ((!activeIdentity.items || activeIdentity.items.length === 0) && items.length === 0 && activeIdentity.poNumber && allInvoices) {
-              const prevInvoices = allInvoices
-                .filter(inv => inv.poNumber === activeIdentity.poNumber && inv.status !== 'cancelled')
-                .sort((a, b) => b.date.localeCompare(a.date));
-              
-              if (prevInvoices.length > 0 && prevInvoices[0].items) {
-                  setItems(prevInvoices[0].items);
-                  toast({ title: "Items Auto-Pulled", description: "Mengambil data rincian barang dari invoice terakhir untuk PO yang sama." });
-              }
-          }
-
           if (activeIdentity.billingAddress) setBillingAddress(activeIdentity.billingAddress);
           if ((activeIdentity as Invoice).paymentMode) setPaymentMode((activeIdentity as Invoice).paymentMode as any);
           if ((activeIdentity as Invoice).paymentTerms) setPaymentTerms((activeIdentity as Invoice).paymentTerms!);
           if ((activeIdentity as Invoice).vaNumber) setManualVaNumber((activeIdentity as Invoice).vaNumber!);
-          
           if ((activeIdentity as Invoice).dpDescription) setDpDescription((activeIdentity as Invoice).dpDescription!);
           if ((activeIdentity as Invoice).dpValue) setDpValue(formatNumberWithCommas((activeIdentity as Invoice).dpValue!));
           if ((activeIdentity as Invoice).dpMode) setDpMode((activeIdentity as Invoice).dpMode!);
           if ((activeIdentity as Invoice).discount) setDiscountValue(formatNumberWithCommas((activeIdentity as Invoice).discount!));
       }
-  }, [activeIdentity, allInvoices, items.length, selectedSoNumber, toast]);
+  }, [activeIdentity, items.length, selectedSoNumber]);
 
   const currentCustomer = useMemo(() => {
     if (!activeIdentity?.customer || !allCustomers) return null;
@@ -238,7 +206,6 @@ export default function AddInvoicePage() {
       .reduce((sum, inv) => sum + inv.amount, 0);
   }, [activeIdentity?.poNumber, allInvoices, activeIdentity?.id]);
 
-  // Auto-calculate DP from percentage
   useEffect(() => {
     const match = dpDescription.match(/(\d+)%/);
     if (match && match[1]) {
@@ -268,6 +235,24 @@ export default function AddInvoicePage() {
     }));
   };
 
+  // Helper for numeric inputs that preserves typing state (including dot/comma)
+  const handleNumericInputChange = (id: string | number, field: 'quantity' | 'price', rawValue: string) => {
+    const key = `${id}-${field}`;
+    setInputBuffer(prev => ({ ...prev, [key]: rawValue }));
+    
+    const parsed = parseFormattedNumber(rawValue);
+    updateItemField(id, field, parsed);
+  };
+
+  const handleNumericInputBlur = (id: string | number, field: 'quantity' | 'price') => {
+    const key = `${id}-${field}`;
+    setInputBuffer(prev => {
+        const next = { ...prev };
+        delete next[key];
+        return next;
+    });
+  };
+
   const removeItem = (id: string | number) => {
     setItems(items.filter(i => i.id !== id));
   };
@@ -284,19 +269,11 @@ export default function AddInvoicePage() {
         baseValue = Math.max(0, subTotalItems - dpVal - discVal);
     }
 
-    // Logic e-Faktur: 11/12 integer rounding for DPP Nilai Lain
     const dppVat = Math.round(baseValue * (11 / 12));
     const vat12 = Math.round(dppVat * 0.12);
     const totalRp = dppVat + vat12;
 
-    return {
-        subTotalItems,
-        dpValue: dpVal,
-        discountValue: discVal,
-        dppVat,
-        vat12,
-        totalRp
-    };
+    return { subTotalItems, dpValue: dpVal, discountValue: discVal, dppVat, vat12, totalRp };
   }, [items, dpValue, dpMode, discountValue]);
 
   const poUtilization = useMemo(() => {
@@ -317,9 +294,8 @@ export default function AddInvoicePage() {
 
   const handleSaveInvoice = async (invoiceStatus: any = 'sent', redirectToPreview = false) => {
     if (!firestore || !user || !activeIdentity) return;
-    
     if (poUtilization.isOverLimit) {
-        toast({ variant: "destructive", title: "Plafon PO Terlampaui", description: "Nilai tagihan melebihi sisa plafon PO. Silakan sesuaikan item barang." });
+        toast({ variant: "destructive", title: "Plafon PO Terlampaui" });
         return;
     }
 
@@ -341,9 +317,7 @@ export default function AddInvoicePage() {
         }
     } else {
         finalVaStatus = 'approved';
-        if (invoiceStatus === 'sent') {
-            finalStatus = 'sent'; 
-        }
+        if (invoiceStatus === 'sent') finalStatus = 'sent'; 
     }
 
     const dataToSave: any = {
@@ -383,12 +357,10 @@ export default function AddInvoicePage() {
 
     try {
         await setDoc(invoiceDocRef, dataToSave, { merge: true });
-
         if (requiresVaApproval) {
             const leadersQuery = query(collection(firestore, 'users'), where('role', '==', 'admin'));
             const leadersSnap = await getDocs(leadersQuery);
-            
-            const notifPromises = leadersSnap.docs.map(lDoc => {
+            leadersSnap.docs.map(lDoc => {
                 return addDoc(collection(firestore, 'notifications'), {
                     recipientId: lDoc.id,
                     senderId: user.uid,
@@ -399,14 +371,9 @@ export default function AddInvoicePage() {
                     createdAt: timestamp
                 });
             });
-            await Promise.all(notifPromises);
         }
-
-        if (redirectToPreview) {
-            router.push(`/dashboard/invoices/preview/${encodeURIComponent(activeIdentity.id)}`);
-        } else {
-            router.push('/dashboard/invoices');
-        }
+        if (redirectToPreview) router.push(`/dashboard/invoices/preview/${encodeURIComponent(activeIdentity.id)}`);
+        else router.push('/dashboard/invoices');
     } catch (err) {
         errorEmitter.emit('permission-error', new FirestorePermissionError({
             path: invoiceDocRef.path, operation: 'write', requestResourceData: dataToSave
@@ -495,30 +462,8 @@ export default function AddInvoicePage() {
                                     <span>Pemanfaatan PO</span>
                                     <span>{poUtilization.percent.toFixed(1)}%</span>
                                 </div>
-                                <Progress 
-                                    value={Math.min(100, poUtilization.percent)} 
-                                    className={cn("h-1.5", poUtilization.isOverLimit ? "bg-rose-100" : "bg-slate-100")} 
-                                />
-                                <div className="flex gap-4 pt-2">
-                                    <div className="flex items-center gap-1.5 text-[8px] font-bold text-slate-300">
-                                        <div className="w-1.5 h-1.5 rounded-full bg-slate-300" /> Prev: Rp {formatNumberWithCommas(poUtilization.used)}
-                                    </div>
-                                    <div className="flex items-center gap-1.5 text-[8px] font-bold text-indigo-500">
-                                        <div className="w-1.5 h-1.5 rounded-full bg-indigo-500" /> Current: Rp {formatNumberWithCommas(poUtilization.current)}
-                                    </div>
-                                </div>
+                                <Progress value={Math.min(100, poUtilization.percent)} className={cn("h-1.5", poUtilization.isOverLimit ? "bg-rose-100" : "bg-slate-100")} />
                             </div>
-
-                            {/* SMART BLUEPRINT STATUS */}
-                            {poRecord.paymentScheme && (
-                                <div className="mt-6 pt-4 border-t border-dashed flex items-center gap-3">
-                                    <Zap className="h-4 w-4 text-amber-500" />
-                                    <div className="flex flex-col">
-                                        <span className="text-[8px] font-black uppercase text-slate-400">Blueprint Active</span>
-                                        <span className="text-[10px] font-bold text-slate-700">Scheme: {poRecord.paymentScheme.map(s => `${s.percent}%`).join(' - ')}</span>
-                                    </div>
-                                </div>
-                            )}
                         </CardContent>
                     </Card>
                   )}
@@ -542,54 +487,13 @@ export default function AddInvoicePage() {
                                 <Input value={paymentTerms} onChange={e => setPaymentTerms(e.target.value)} placeholder="E.g. 90 Hari" className="h-10 font-black border-indigo-200" />
                             </div>
                         </div>
-
-                        <div className="space-y-3">
-                            <div className="flex justify-between items-center">
-                                <Label className="text-[9px] font-black uppercase text-slate-400 flex items-center gap-1.5">
-                                    <MapPin className="h-3 w-3 text-indigo-500" /> Billing Address
-                                </Label>
-                                <Popover>
-                                    <PopoverTrigger asChild>
-                                        <Button variant="ghost" size="sm" className="h-6 text-[8px] font-black uppercase bg-slate-100" disabled={!currentCustomer}>
-                                            <Building2 className="h-2.5 w-2.5 mr-1" /> Pick from Hub
-                                        </Button>
-                                    </PopoverTrigger>
-                                    <PopoverContent className="w-[350px] p-2">
-                                        <div className="space-y-1">
-                                            {currentCustomer?.addresses?.map((addr) => (
-                                                <Button 
-                                                    key={addr.id} 
-                                                    variant="ghost" 
-                                                    className="w-full justify-start text-left h-auto py-3 px-3 rounded-lg hover:bg-indigo-50"
-                                                    onClick={() => setBillingAddress(addr.address)}
-                                                >
-                                                    <div className="flex items-start gap-3">
-                                                        {addr.label.toLowerCase().includes('office') ? <Home className="h-4 w-4 text-indigo-600 mt-0.5" /> : <Building2 className="h-4 w-4 text-amber-600 mt-0.5" />}
-                                                        <div className="flex flex-col">
-                                                            <span className="font-black uppercase text-[9px] tracking-tight">{addr.label}</span>
-                                                            <p className="text-[10px] text-muted-foreground line-clamp-1 italic">{addr.address}</p>
-                                                        </div>
-                                                    </div>
-                                                </Button>
-                                            ))}
-                                        </div>
-                                    </PopoverContent>
-                                </Popover>
-                            </div>
-                            <textarea 
-                                className="w-full rounded-xl border border-slate-200 bg-slate-50/50 p-4 text-[10px] leading-tight font-medium italic min-h-[80px] focus:ring-1 focus:ring-indigo-400 outline-none"
-                                value={billingAddress}
-                                onChange={e => setBillingAddress(e.target.value)}
-                                placeholder="Enter specific billing address..."
-                            />
-                        </div>
                     </CardContent>
                   </Card>
 
                   <Card className="shadow-sm border-none ring-1 ring-slate-200 overflow-hidden">
                     <CardHeader className="bg-white border-b py-3 px-6">
                         <CardTitle className="text-[10px] font-black uppercase text-slate-500 tracking-widest flex items-center gap-2">
-                            <Layers className="h-4 w-4 text-indigo-600" /> Line Items (Max 10)
+                            <Layers className="h-4 w-4 text-indigo-600" /> Line Items (Decimal Support)
                         </CardTitle>
                     </CardHeader>
                     <CardContent className="p-0">
@@ -598,9 +502,9 @@ export default function AddInvoicePage() {
                                 <TableHeader className="bg-slate-50/50 sticky top-0 z-10 shadow-sm">
                                     <TableRow>
                                         <TableHead className="py-3 px-6 text-[10px] font-black uppercase">Description</TableHead>
-                                        <TableHead className="w-[130px] text-center text-[10px] font-black uppercase">Qty</TableHead>
-                                        <TableHead className="w-[120px] text-center text-[10px] font-black uppercase">Unit</TableHead>
-                                        <TableHead className="w-[190px] text-right text-[10px] font-black uppercase">Price</TableHead>
+                                        <TableHead className="w-[110px] text-center text-[10px] font-black uppercase">Qty</TableHead>
+                                        <TableHead className="w-[100px] text-center text-[10px] font-black uppercase">Unit</TableHead>
+                                        <TableHead className="w-[160px] text-right text-[10px] font-black uppercase">Price</TableHead>
                                         <TableHead className="w-[60px]"></TableHead>
                                     </TableRow>
                                 </TableHeader>
@@ -612,11 +516,7 @@ export default function AddInvoicePage() {
                                             <TableCell className="px-6 py-4">
                                                 <Popover>
                                                     <PopoverTrigger asChild>
-                                                        <Input 
-                                                            value={item.name} 
-                                                            onChange={e => updateItemField(item.id, 'name', e.target.value)}
-                                                            className="h-11 text-sm font-bold border-none shadow-none bg-transparent p-0 w-full focus-visible:ring-0"
-                                                        />
+                                                        <Input value={item.name} onChange={e => updateItemField(item.id, 'name', e.target.value)} className="h-11 text-sm font-bold border-none shadow-none bg-transparent p-0 w-full focus-visible:ring-0" />
                                                     </PopoverTrigger>
                                                     <PopoverContent className="w-[450px] p-0 shadow-2xl" align="start">
                                                         <Command>
@@ -647,24 +547,25 @@ export default function AddInvoicePage() {
                                             </TableCell>
                                             <TableCell className="py-4">
                                                 <Input 
-                                                    value={formatNumberWithCommas(item.quantity)} 
-                                                    onChange={e => updateItemField(item.id, 'quantity', parseFormattedNumber(e.target.value))} 
-                                                    className="text-center h-11 text-sm font-bold border-slate-200 px-3 min-w-[80px] w-full rounded-md focus-visible:ring-2 focus-visible:ring-indigo-500 shadow-sm transition-all" 
+                                                    type="text"
+                                                    step="any"
+                                                    value={inputBuffer[`${item.id}-quantity`] !== undefined ? inputBuffer[`${item.id}-quantity`] : formatNumberWithCommas(item.quantity)} 
+                                                    onChange={e => handleNumericInputChange(item.id, 'quantity', e.target.value)}
+                                                    onBlur={() => handleNumericInputBlur(item.id, 'quantity')}
+                                                    className="text-center h-11 text-sm font-bold border-slate-200 px-3 w-full rounded-md focus-visible:ring-2 focus-visible:ring-indigo-500 shadow-sm" 
                                                 />
                                             </TableCell>
                                             <TableCell className="py-4">
-                                                <Input 
-                                                    value={item.unit} 
-                                                    onChange={e => updateItemField(item.id, 'unit', e.target.value)} 
-                                                    className="text-center h-11 text-sm font-bold bg-slate-50/50 border-slate-200 px-3 min-w-[80px] w-full rounded-md shadow-sm transition-all" 
-                                                    placeholder="Meter"
-                                                />
+                                                <Input value={item.unit} onChange={e => updateItemField(item.id, 'unit', e.target.value)} className="text-center h-11 text-sm font-bold bg-slate-50/50 border-slate-200 px-3 w-full rounded-md shadow-sm" />
                                             </TableCell>
                                             <TableCell className="py-4 text-right">
                                                 <Input 
-                                                    value={formatNumberWithCommas(item.price)} 
-                                                    onChange={e => updateItemField(item.id, 'price', parseFormattedNumber(e.target.value))}
-                                                    className="h-11 text-right text-sm font-bold border-slate-200 px-3 min-w-[140px] w-full rounded-md focus-visible:ring-2 focus-visible:ring-indigo-500 shadow-sm transition-all"
+                                                    type="text"
+                                                    step="any"
+                                                    value={inputBuffer[`${item.id}-price`] !== undefined ? inputBuffer[`${item.id}-price`] : formatNumberWithCommas(item.price)} 
+                                                    onChange={e => handleNumericInputChange(item.id, 'price', e.target.value)}
+                                                    onBlur={() => handleNumericInputBlur(item.id, 'price')}
+                                                    className="h-11 text-right text-sm font-bold border-slate-200 px-3 w-full rounded-md focus-visible:ring-2 focus-visible:ring-indigo-500 shadow-sm"
                                                 />
                                             </TableCell>
                                             <TableCell className="py-4 text-center">
@@ -734,40 +635,14 @@ export default function AddInvoicePage() {
                                 <div className="grid grid-cols-2 gap-3">
                                     <div className="space-y-1.5">
                                         <Label className="text-[8px] font-bold uppercase text-slate-400">Deskripsi (e.g. DP 35%)</Label>
-                                        <Input 
-                                            value={dpDescription} 
-                                            onChange={e => setDpDescription(e.target.value)} 
-                                            className="h-9 font-bold text-xs" 
-                                            placeholder="Ketik persentase..."
-                                        />
+                                        <Input value={dpDescription} onChange={e => setDpDescription(e.target.value)} className="h-9 font-bold text-xs" />
                                     </div>
                                     <div className="space-y-1.5">
                                         <Label className="text-[8px] font-bold uppercase text-slate-400">Nominal DP</Label>
-                                        <Input value={dpValue} onChange={e => setDpValue(e.target.value)} className="h-9 font-black text-xs text-right bg-white" />
+                                        <Input type="text" value={dpValue} onChange={e => setDpValue(e.target.value)} className="h-9 font-black text-xs text-right bg-white" />
                                     </div>
                                 </div>
                             </div>
-
-                            <div className="space-y-2 px-1">
-                                <Label className="text-[10px] font-black uppercase text-slate-400">Potongan Diskon (Nominal)</Label>
-                                <Input value={discountValue} onChange={e => setDiscountValue(e.target.value)} className="h-10 font-black text-right border-emerald-100" />
-                            </div>
-                        </div>
-
-                        <div className="space-y-4 pt-4 border-t border-dashed">
-                             <div className="flex justify-between items-center">
-                                <Label className="text-[9px] font-black uppercase text-slate-400">Payment Matrix</Label>
-                                <div className="flex bg-slate-100 rounded-lg p-1 gap-1">
-                                    <Button variant={paymentMode === 'manual' ? 'default' : 'ghost'} size="sm" onClick={() => setPaymentMode('manual')} className="h-7 text-[8px] font-black uppercase rounded-md px-3">Manual Bank</Button>
-                                    <Button variant={paymentMode === 'virtual_account' ? 'default' : 'ghost'} size="sm" onClick={() => setPaymentMode('virtual_account')} className="h-7 text-[8px] font-black uppercase rounded-md px-3">Virtual Account</Button>
-                                </div>
-                             </div>
-                             {paymentMode === 'virtual_account' && (
-                                 <div className="bg-indigo-900 p-4 rounded-xl space-y-2">
-                                     <Label className="text-[8px] font-black uppercase text-indigo-300">Target Virtual Account</Label>
-                                     <Input value={manualVaNumber} onChange={e => setManualVaNumber(e.target.value)} className="bg-indigo-800 border-indigo-700 text-white font-mono font-black text-center tracking-[0.2em] h-9 text-xs" />
-                                 </div>
-                             )}
                         </div>
                     </CardContent>
                   </Card>
