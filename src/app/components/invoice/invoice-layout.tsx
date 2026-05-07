@@ -78,7 +78,7 @@ export const InvoiceTemplate = ({ type, invoiceData, items, calculations }: Invo
       </div>
 
       <main className="relative flex-grow flex flex-col overflow-hidden">
-        <div className="min-h-[400px]">
+        <div className="min-h-[380px]">
           <table className="w-full border-collapse">
             <thead>
               <tr className="border border-black text-[9pt]">
@@ -105,7 +105,7 @@ export const InvoiceTemplate = ({ type, invoiceData, items, calculations }: Invo
           </table>
         </div>
 
-        <div className="mt-4 mb-4 flex justify-end print:page-break-inside-avoid">
+        <div className="mt-2 mb-4 flex justify-end print:page-break-inside-avoid">
           <div className="w-[300px] flex flex-col items-end"> 
             <div className="border-t border-black w-[180px] mb-1"></div>
             <div className="flex justify-between w-full text-[9pt] font-normal">
@@ -160,7 +160,7 @@ export const InvoiceTemplate = ({ type, invoiceData, items, calculations }: Invo
             </div>
           </div>
           <div className="border-t border-black w-full my-2"></div>
-          <div className="flex justify-between items-start">
+          <div className="flex justify-between items-start print:page-break-inside-avoid">
             <div className="w-[68%] text-[10px] leading-tight space-y-2">
               <div className="flex">
                 <span className="w-[60px] font-bold">Payment:</span>
@@ -171,7 +171,7 @@ export const InvoiceTemplate = ({ type, invoiceData, items, calculations }: Invo
                 <p className="font-bold">For payment, please transfer to our account:</p>
                 <p className="font-bold pt-1 uppercase">PT. Jembo Cable Company Tbk</p>
               </div>
-              <div className="mt-2">
+              <div className="mt-1">
                 {invoiceData.paymentMode === 'virtual_account' ? (
                   <div className="w-[280px] bg-slate-50 p-2 rounded border border-slate-200">
                     <p className="font-bold text-[9px] mb-1 underline">VIRTUAL ACCOUNT</p>
@@ -209,7 +209,7 @@ export const InvoiceTemplate = ({ type, invoiceData, items, calculations }: Invo
               </div>
             </div>
             <div className="w-[32%] flex flex-col items-center">
-              <p className="font-bold text-[10px] uppercase">PT. JEMBO CABLE COMPANY Tbk</p>
+              <p className="font-bold text-[10px] uppercase">PT. PT JEMBO CABLE COMPANY Tbk</p>
               <div className="mt-24 border-t border-black w-full"></div>
               <p className="font-bold uppercase pt-1 text-[10px]">Finance</p>
             </div>
