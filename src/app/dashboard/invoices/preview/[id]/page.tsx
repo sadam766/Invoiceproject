@@ -29,7 +29,7 @@ const InvoicePreviewPage = () => {
       margin: 0,
       filename: `Invoice_${invoiceData.id.replace(/\//g, '_')}.pdf`,
       image: { type: 'jpeg', quality: 0.98 },
-      html2canvas: { scale: 2, useCORS: true },
+      html2canvas: { scale: 3, useCORS: true },
       jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
       pagebreak: { mode: 'css' }
     };
@@ -39,34 +39,6 @@ const InvoicePreviewPage = () => {
 
   if (isLoading) return <div className="p-20 text-center font-black uppercase text-slate-400 animate-pulse tracking-widest">Memuat Dokumen...</div>;
   if (!invoiceData) return <div className="p-20 text-center text-rose-600 font-bold">Dokumen tidak ditemukan.</div>;
-
-  const items = invoiceData.items || [];
-  
-  // Perhitungan Data Finansial
-  const subTotalItems = items.reduce((acc, curr) => acc + (curr.total || 0), 0);
-  const dpVal = invoiceData.dpValue || 0;
-  const discVal = invoiceData.discount || 0;
-  const dpMode = invoiceData.dpMode || 'kurangi';
-
-  let baseValue = subTotalItems;
-  if (dpMode === 'tagih') {
-      baseValue = dpVal;
-  } else {
-      baseValue = Math.max(0, subTotalItems - dpVal - discVal);
-  }
-
-  const dppVat = Math.round(baseValue * (11 / 12));
-  const vat12 = Math.round(dppVat * 0.12);
-  const totalRp = dppVat + vat12;
-
-  const calcs = {
-    subTotalItems,
-    dpValue: dpVal,
-    discountValue: discVal,
-    dppVat,
-    vat12,
-    totalRp
-  };
 
   return (
     <main className="min-h-screen bg-slate-100 py-12 px-4 flex flex-col items-center print:p-0 print:bg-white">
@@ -84,28 +56,18 @@ const InvoicePreviewPage = () => {
       </div>
 
       <div ref={invoiceContainerRef} className="print:m-0 print:p-0 flex flex-col items-center">
-        <InvoiceTemplate 
-          type="Original" 
-          invoiceData={invoiceData} 
-          items={items} 
-          calculations={calcs} 
-        />
+        <InvoiceTemplate invoiceData={{ ...invoiceData, printType: 'original' }} />
 
-        {/* Pemisah visual hanya di layar - Bersih tanpa teks sesuai instruksi */}
+        {/* Visual Divider Only on screen */}
         <div className="w-[210mm] py-10 print:hidden text-center">
            <div className="relative flex items-center justify-center">
               <div className="absolute inset-0 flex items-center"><span className="w-full border-t-2 border-dashed border-slate-300"></span></div>
-              <span className="relative bg-slate-100 px-4"></span>
+              <span className="relative bg-slate-100 px-4 text-slate-400 text-xs font-bold uppercase tracking-[0.2em]">Pemisah Lembar A4</span>
            </div>
         </div>
 
         <div className="print:page-break-before-always">
-            <InvoiceTemplate 
-              type="Copy" 
-              invoiceData={invoiceData} 
-              items={items} 
-              calculations={calcs} 
-            />
+            <InvoiceTemplate invoiceData={{ ...invoiceData, printType: 'copy' }} />
         </div>
       </div>
     </main>
