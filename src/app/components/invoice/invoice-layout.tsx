@@ -2,7 +2,6 @@
 import React, { useRef, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Download, ArrowLeft, Printer } from 'lucide-react';
-import { useToast } from '@/hooks/use-toast';
 import html2pdf from 'html2pdf.js';
 
 // --- DATA TYPES ---
@@ -106,14 +105,14 @@ export const InvoiceTemplate = ({ invoiceData, type }: { invoiceData: InvoiceDat
                         style={{ 
                             width: '210mm', 
                             minHeight: '296mm', 
-                            padding: '50mm 15mm 15mm 15mm', // 50mm top padding for kop surat
-                            fontSize: '9pt',
+                            padding: '50mm 15mm 15mm 15mm',
+                            fontSize: '10pt',
                             fontFamily: 'Arial, Helvetica, sans-serif',
                             boxSizing: 'border-box'
                         }}
                     >
                         {/* TYPE INDICATOR */}
-                        <div className="absolute right-8 top-8 text-[10pt] text-slate-400 uppercase italic font-normal">
+                        <div className="absolute right-8 top-8 text-[10pt] text-slate-300 uppercase italic font-normal">
                             {type}
                         </div>
 
@@ -180,11 +179,11 @@ export const InvoiceTemplate = ({ invoiceData, type }: { invoiceData: InvoiceDat
                                                 <td colSpan={5} style={{ height: '8cm' }}></td>
                                             </tr>
 
-                                            {/* SUB-TOTAL ITEM */}
+                                            {/* SUB-TOTAL ITEM (Orange slot recovered) */}
                                             <tr className="border-t-2 border-black">
                                                 <td colSpan={3}></td>
-                                                <td className="py-1.5 px-2 text-left font-bold">Subtotal</td>
-                                                <td className="py-1.5 px-2 text-right font-bold">
+                                                <td className="py-1.5 px-2 text-left"></td>
+                                                <td className="py-1.5 px-2 text-right">
                                                     {formatCurrency(subTotalItems)}
                                                 </td>
                                             </tr>

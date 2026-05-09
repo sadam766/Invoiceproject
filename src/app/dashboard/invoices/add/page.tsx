@@ -356,10 +356,9 @@ export default function AddInvoicePage() {
     try {
         await setDoc(invoiceDocRef, dataToSave, { merge: true });
         
-        // Simpan data lengkap untuk pratinjau instan
         sessionStorage.setItem('invoicePreviewData', JSON.stringify({
             ...dataToSave,
-            grandTotal: calcs.subTotalItems // Mapping for "Goods" row
+            grandTotal: calcs.subTotalItems 
         }));
 
         if (requiresVaApproval) {
@@ -391,6 +390,10 @@ export default function AddInvoicePage() {
   const previewInvoiceData = {
       ...activeIdentity,
       items: items,
+      customer: {
+          name: activeIdentity?.customer,
+          address: billingAddress
+      },
       customerName: activeIdentity?.customer,
       customerCode: currentCustomer?.customerCode || '',
       billingAddress,
@@ -401,7 +404,7 @@ export default function AddInvoicePage() {
       dpMode,
       dpValue: calcs.dpValue,
       discount: calcs.discountValue,
-      grandTotal: calcs.subTotalItems, // Goods Row
+      grandTotal: calcs.subTotalItems, 
       dppVat: calcs.dppVat,
       vat12: calcs.vat12,
       totalRp: calcs.totalRp,
