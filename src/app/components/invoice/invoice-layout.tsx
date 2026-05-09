@@ -99,15 +99,16 @@ export const InvoiceTemplate = ({ invoiceData, type }: { invoiceData: InvoiceDat
                 return (
                     <div 
                         key={pageIndex}
-                        className="relative bg-white mx-auto flex flex-col text-black overflow-hidden"
+                        className="relative bg-white mx-auto flex flex-col text-black"
                         style={{ 
                             width: '210mm', 
-                            height: '296mm', 
+                            minHeight: '296mm', // MENGGUNAKAN MIN-HEIGHT AGAR TIDAK TERPOTONG
                             padding: '50mm 15mm 15mm 15mm',
                             fontSize: '10pt',
                             fontFamily: 'Arial, Helvetica, sans-serif',
                             boxSizing: 'border-box',
-                            pageBreakAfter: 'always'
+                            pageBreakAfter: 'always',
+                            color: '#000000'
                         }}
                     >
                         {/* TYPE INDICATOR */}
@@ -143,7 +144,7 @@ export const InvoiceTemplate = ({ invoiceData, type }: { invoiceData: InvoiceDat
                         </header>
 
                         {/* TABLE SECTION */}
-                        <main className='relative'>
+                        <main className='relative flex-1'>
                             <table className="w-full border-collapse text-[8.5pt]">
                                 <thead>
                                     <tr className='border-y-[1.5pt] border-black'>
@@ -168,7 +169,7 @@ export const InvoiceTemplate = ({ invoiceData, type }: { invoiceData: InvoiceDat
                                     {isLastPage ? (
                                         <>
                                             <tr>
-                                                <td colSpan={5} style={{ height: '8cm' }}></td>
+                                                <td colSpan={5} style={{ height: '6cm' }}></td>
                                             </tr>
 
                                             {/* SUB-TOTAL ITEM (SLOT 0 CHECKMARK) */}
@@ -207,7 +208,7 @@ export const InvoiceTemplate = ({ invoiceData, type }: { invoiceData: InvoiceDat
                                 </tbody>
                             </table>
                             {isLastPage ? (
-                                <div className="mt-20 mb-1 px-2">
+                                <div className="mt-12 mb-1 px-2">
                                     <p className="font-bold text-[9pt]">NO PO : {poNumber}</p>
                                 </div>
                             ) : null}
@@ -218,7 +219,7 @@ export const InvoiceTemplate = ({ invoiceData, type }: { invoiceData: InvoiceDat
                             <footer 
                                 className="mt-auto pt-2" 
                                 style={{ 
-                                    pageBreakInside: 'avoid',
+                                    pageBreakInside: 'avoid', // MENCEGAH FOOTER TERPOTONG ANTAR HALAMAN
                                     breakInside: 'avoid',
                                     display: 'block'
                                 }}
@@ -294,8 +295,8 @@ export const InvoiceTemplate = ({ invoiceData, type }: { invoiceData: InvoiceDat
                                     <div className="w-[35%] flex flex-col items-center self-stretch justify-between py-1">
                                         <p className="font-bold text-[9pt] text-center">PT. JEMBO CABLE COMPANY Tbk</p>
                                         <div className="mt-auto flex flex-col items-center">
-                                            <div className="mt-16 border-t-[1.5pt] border-black w-[160px]"></div>
-                                            <p className="font-bold uppercase pt-1 text-[9pt]">Finance</p>
+                                            <div className="mt-20 border-t-[1.5pt] border-black w-[160px]"></div>
+                                            <p className="font-bold uppercase pt-1 text-[9pt] underline">Finance</p>
                                         </div>
                                     </div>
                                 </div>
