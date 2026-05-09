@@ -56,19 +56,8 @@ const InvoicePreviewPage = () => {
       </div>
 
       <div ref={invoiceContainerRef} className="print:m-0 print:p-0 flex flex-col items-center">
-        <InvoiceTemplate invoiceData={{ ...invoiceData, printType: 'original' }} />
-
-        {/* Visual Divider Only on screen */}
-        <div className="w-[210mm] py-10 print:hidden text-center">
-           <div className="relative flex items-center justify-center">
-              <div className="absolute inset-0 flex items-center"><span className="w-full border-t-2 border-dashed border-slate-300"></span></div>
-              <span className="relative bg-slate-100 px-4 text-slate-400 text-xs font-bold uppercase tracking-[0.2em]">Pemisah Lembar A4</span>
-           </div>
-        </div>
-
-        <div className="print:page-break-before-always">
-            <InvoiceTemplate invoiceData={{ ...invoiceData, printType: 'copy' }} />
-        </div>
+        <InvoiceTemplate invoiceData={{ ...invoiceData, printType: 'Original' }} type="Original" />
+        <InvoiceTemplate invoiceData={{ ...invoiceData, printType: 'Copy' }} type="Copy" />
       </div>
     </main>
   );
