@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useRef } from 'react';
+import React, { useRef, useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { doc } from 'firebase/firestore';
 import { useFirestore, useDoc, useMemoFirebase } from '@/firebase';
@@ -21,13 +21,29 @@ const InvoicePreviewPage = () => {
   const invoiceRef = useMemoFirebase(() => (firestore && safeId ? doc(firestore, 'invoices', safeId) : null), [firestore, safeId]);
   const { data: invoiceData, isLoading } = useDoc<Invoice>(invoiceRef);
 
+  const [formattedData, setFormattedData] = useState<any>(null);
+
+  useEffect(() => {
+    if (invoiceData) {
+        // Map data from Firestore to match InvoiceTemplate expected props
+        setFormattedData({
+            ...invoiceData,
+            grandTotal: invoiceData.amount, // Placeholder, usually calculated from items in DB
+            customer: {
+                name: invoiceData.customerName || invoiceData.customer,
+                address: invoiceData.billingAddress || 'N/A'
+            }
+        });
+    }
+  }, [invoiceData]);
+
   const handleDownloadPdf = () => {
     const element = invoiceContainerRef.current;
-    if (!element || !invoiceData) return;
+    if (!element || !formattedData) return;
 
     const opt = {
       margin: 0,
-      filename: `Invoice_${invoiceData.id.replace(/\//g, '_')}.pdf`,
+      filename: `Invoice_${formattedData.id.replace(/\//g, '_')}.pdf`,
       image: { type: 'jpeg', quality: 0.98 },
       html2canvas: { scale: 3, useCORS: true },
       jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
@@ -38,7 +54,7 @@ const InvoicePreviewPage = () => {
   };
 
   if (isLoading) return <div className="p-20 text-center font-black uppercase text-slate-400 animate-pulse tracking-widest">Memuat Dokumen...</div>;
-  if (!invoiceData) return <div className="p-20 text-center text-rose-600 font-bold">Dokumen tidak ditemukan.</div>;
+  if (!formattedData) return <div className="p-20 text-center text-rose-600 font-bold">Dokumen tidak ditemukan.</div>;
 
   return (
     <main className="min-h-screen bg-slate-100 py-12 px-4 flex flex-col items-center print:p-0 print:bg-white">
@@ -56,8 +72,8 @@ const InvoicePreviewPage = () => {
       </div>
 
       <div ref={invoiceContainerRef} className="print:m-0 print:p-0 flex flex-col items-center">
-        <InvoiceTemplate invoiceData={{ ...invoiceData, printType: 'Original' }} type="Original" />
-        <InvoiceTemplate invoiceData={{ ...invoiceData, printType: 'Copy' }} type="Copy" />
+        <InvoiceTemplate invoiceData={{ ...formattedData, printType: 'Original' }} type="Original" />
+        <InvoiceTemplate invoiceData={{ ...formattedData, printType: 'Copy' }} type="Copy" />
       </div>
     </main>
   );

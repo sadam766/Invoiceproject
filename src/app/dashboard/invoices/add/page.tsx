@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useEffect, useState, useMemo } from 'react';
@@ -356,6 +355,13 @@ export default function AddInvoicePage() {
 
     try {
         await setDoc(invoiceDocRef, dataToSave, { merge: true });
+        
+        // Simpan data lengkap untuk pratinjau instan
+        sessionStorage.setItem('invoicePreviewData', JSON.stringify({
+            ...dataToSave,
+            grandTotal: calcs.subTotalItems // Mapping for "Goods" row
+        }));
+
         if (requiresVaApproval) {
             const leadersQuery = query(collection(firestore, 'users'), where('role', '==', 'admin'));
             const leadersSnap = await getDocs(leadersQuery);
@@ -384,7 +390,9 @@ export default function AddInvoicePage() {
 
   const previewInvoiceData = {
       ...activeIdentity,
+      items: items,
       customerName: activeIdentity?.customer,
+      customerCode: currentCustomer?.customerCode || '',
       billingAddress,
       paymentMode,
       paymentTerms,
@@ -393,7 +401,11 @@ export default function AddInvoicePage() {
       dpMode,
       dpValue: calcs.dpValue,
       discount: calcs.discountValue,
-      date: format(issueDate, 'dd MMM yyyy'),
+      grandTotal: calcs.subTotalItems, // Goods Row
+      dppVat: calcs.dppVat,
+      vat12: calcs.vat12,
+      totalRp: calcs.totalRp,
+      date: format(issueDate, 'yyyy-MM-dd'),
       isProforma: activeIdentity?.id.startsWith('KW')
   };
 
@@ -642,6 +654,10 @@ export default function AddInvoicePage() {
                                     </div>
                                 </div>
                             </div>
+                            <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200 space-y-3">
+                                <Label className="text-[10px] font-black uppercase text-slate-600">Additional Discount</Label>
+                                <Input type="text" value={discountValue} onChange={e => setDiscountValue(e.target.value)} className="h-10 font-black text-xs text-right" placeholder="Rp 0" />
+                            </div>
                         </div>
                     </CardContent>
                   </Card>
@@ -654,8 +670,6 @@ export default function AddInvoicePage() {
                   <InvoiceTemplate 
                     type="Original"
                     invoiceData={previewInvoiceData}
-                    items={items}
-                    calculations={calcs}
                   />
               </div>
           </div>
