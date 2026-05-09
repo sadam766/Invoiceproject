@@ -23,7 +23,7 @@ interface InvoiceData {
         address: string;
     };
     customerCode?: string;
-    date: string; // YYYY-MM-DD
+    date: string; 
     soNumber: string;
     poNumber: string;
     grandTotal: number;
@@ -36,9 +36,9 @@ interface InvoiceData {
     dpValue?: number;
     dpPercent?: number | string;
     pelunasan?: number;
+    discount?: number;
 }
 
-// --- UTILITY FUNCTIONS ---
 const formatCurrency = (amount: any): string => {
     if (amount === undefined || amount === null) return '0,00';
     const num = typeof amount === 'number' ? amount : parseFloat(amount);
@@ -50,9 +50,7 @@ const formatCurrency = (amount: any): string => {
 };
 
 const formatDate = (dateString: string): string => {
-    if (!dateString || isNaN(new Date(dateString).getTime())) {
-        return '';
-    }
+    if (!dateString || isNaN(new Date(dateString).getTime())) return '';
     const date = new Date(dateString);
     return date.toLocaleDateString('id-ID', {
         day: '2-digit',
@@ -61,9 +59,8 @@ const formatDate = (dateString: string): string => {
     }).replace(/\//g, '-');
 };
 
-const ITEMS_PER_PAGE = 10;
+const ITEMS_PER_PAGE = 15;
 
-// --- REUSABLE TEMPLATE COMPONENT ---
 export const InvoiceTemplate = ({ invoiceData }: { invoiceData: InvoiceData }) => {
     if (!invoiceData) return null;
 
@@ -83,8 +80,7 @@ export const InvoiceTemplate = ({ invoiceData }: { invoiceData: InvoiceData }) =
         printType = 'original',
         negotiation = 0,
         dpValue = 0,
-        dpPercent = 0,
-        pelunasan = 0
+        dpPercent = 0
     } = invoiceData;
 
     const displayInvoiceId = invoiceId.replace(/_/g, '/');
@@ -105,157 +101,213 @@ export const InvoiceTemplate = ({ invoiceData }: { invoiceData: InvoiceData }) =
                         className={`relative bg-white flex flex-col shadow-none print:shadow-none mx-auto ${pageIndex > 0 ? 'page-break' : ''}`} 
                         style={{ 
                             width: '210mm',
-                            height: '297mm', 
-                            paddingTop: '50mm', // Margin for physical letterhead
-                            paddingBottom: '15mm',
+                            height: '296.5mm', // Safety margin to prevent blank page
+                            paddingTop: '35mm',
+                            paddingBottom: '10mm',
                             paddingLeft: '15mm',
                             paddingRight: '15mm',
                             color: '#000000', 
                             fontFamily: 'Arial, Helvetica, sans-serif',
                             boxSizing: 'border-box',
-                            fontSize: '10pt'
+                            fontSize: '9.5pt',
+                            overflow: 'hidden' // Lock content inside
                         }}
                     >
                         {/* TYPE INDICATOR */}
-                        <p className="absolute right-12 top-10 text-[10pt] uppercase text-slate-300 font-normal">{printType}</p>
+                        <p className="absolute right-12 top-8 text-[9pt] uppercase text-slate-400 font-normal italic">{printType}</p>
 
-                        {/* CENTERED HEADER */}
-                        <header className="relative mb-6">
-                            <div className="w-full text-center mb-8">
-                                <h1 className="font-bold uppercase text-[14pt] leading-tight mb-1">{invoiceTitle}</h1>
-                                <p className="font-bold text-[12pt]">{displayInvoiceId}</p>
+                        {/* HEADER SECTION */}
+                        <header className="relative">
+                            <div className="w-full text-center mb-6">
+                                <h1 className="font-bold uppercase text-[13pt] leading-tight mb-0.5">{invoiceTitle}</h1>
+                                <p className="font-bold text-[11pt]">{displayInvoiceId}</p>
                             </div>
                             
-                            <div className='flex justify-between items-start'>
-                                <div className='w-[55%]'>
-                                    <h2 className="font-bold text-[11pt] uppercase mb-1">{customer.name}</h2>
-                                    <p className="text-[9pt] leading-tight opacity-90 max-w-sm">{customer.address}</p>
+                            <div className='flex justify-between items-start mb-2'>
+                                <div className='w-[60%]'>
+                                    <h2 className="font-bold text-[10pt] uppercase mb-0.5">{customer.name}</h2>
+                                    <p className="text-[9pt] leading-tight max-w-sm whitespace-pre-wrap">{customer.address}</p>
                                 </div>
-                                <div className="w-[35%] text-[9pt] text-left leading-normal space-y-0.5">
-                                    <div className="grid grid-cols-[90px_5px_1fr]"><span>Sales Order</span><span>:</span><span>{soNumber}</span></div>
-                                    <div className="grid grid-cols-[90px_5px_1fr]"><span>Order Date</span><span>:</span><span>{formatDate(date)}</span></div>
-                                    <div className="grid grid-cols-[90px_5px_1fr]"><span>Reference A</span><span>:</span><span>-</span></div>
+                                <div className="w-[30%] text-[8.5pt] leading-tight">
+                                    <div className="grid grid-cols-[80px_5px_1fr] gap-y-0.5">
+                                        <span>Sales Order</span><span>:</span><span>{soNumber}</span>
+                                        <span>Order Date</span><span>:</span><span>{formatDate(date)}</span>
+                                        <span>Reference A</span><span>:</span><span>-</span>
+                                    </div>
                                 </div>
                             </div>
 
-                            <div className='flex justify-between text-[9pt] mt-6 py-2 border-t border-slate-200 uppercase'>
-                                <p className='mb-0'>Customer Code : {customerCode}</p>
-                                <p className='mb-0'>Date: {formatDate(date)}</p>
+                            <div className='flex justify-between text-[8.5pt] py-1 uppercase'>
+                                <p className='m-0'>Customer Code : {customerCode}</p>
+                                <p className='m-0'>Date: {formatDate(date)}</p>
                             </div>
                         </header>
 
-                        {/* CLEAN TABLE (NO VERTICAL BORDERS) */}
-                        <main className='flex-grow'>
-                            <table className="w-full border-collapse text-[9pt]">
+                        {/* TABLE SECTION */}
+                        <main className='relative'>
+                            <table className="w-full border-collapse text-[8.5pt]">
                                 <thead>
-                                    <tr className='border-y-2 border-black bg-gray-100'>
-                                        <th className="py-2 px-3 text-left w-[6%] font-bold uppercase">No.</th>
-                                        <th className="py-2 px-3 text-left w-[45%] font-bold uppercase">Item Description</th>
-                                        <th className="py-2 px-3 text-center w-[18%] font-bold uppercase">Quantity Unit</th>
-                                        <th className="py-2 px-3 text-right w-[15%] font-bold uppercase">Unit Price</th>
-                                        <th className="py-2 px-3 text-right w-[16%] font-bold uppercase">Amount</th>
+                                    <tr className='border-y-[1.5pt] border-black'>
+                                        <th className="py-1.5 px-2 text-left w-[5%] font-bold">NO.</th>
+                                        <th className="py-1.5 px-2 text-left w-[45%] font-bold">ITEM DESCRIPTION</th>
+                                        <th className="py-1.5 px-2 text-center w-[15%] font-bold">QUANTITY UNIT</th>
+                                        <th className="py-1.5 px-2 text-right w-[15%] font-bold">UNIT PRICE</th>
+                                        <th className="py-1.5 px-2 text-right w-[20%] font-bold">AMOUNT</th>
                                     </tr>
                                 </thead>
                                 <tbody>
                                     {chunk.map((item, itemIdx) => (
                                         <tr key={item.id} className='align-top'>
-                                            <td className="py-2 px-3">{pageIndex * ITEMS_PER_PAGE + itemIdx + 1}</td>
-                                            <td className="py-2 px-3 uppercase">{item.name}</td>
-                                            <td className="py-2 px-3 text-center">{item.quantity?.toLocaleString('id-ID')} {item.unit}</td>
-                                            <td className="py-2 px-3 text-right">{formatCurrency(item.price)}</td>
-                                            <td className="py-2 px-3 text-right">{formatCurrency(item.total)}</td>
+                                            <td className="py-1 px-2">{pageIndex * ITEMS_PER_PAGE + itemIdx + 1}</td>
+                                            <td className="py-1 px-2 uppercase font-medium">{item.name}</td>
+                                            <td className="py-1 px-2 text-center">{item.quantity?.toLocaleString('id-ID')} {item.unit}</td>
+                                            <td className="py-1 px-2 text-right">{formatCurrency(item.price)}</td>
+                                            <td className="py-1 px-2 text-right">{formatCurrency(item.total)}</td>
                                         </tr>
                                     ))}
+                                    
+                                    {isLastPage && (
+                                        <>
+                                            {/* BARIS PENGATUR JARAK */}
+                                            <tr>
+                                                <td colSpan={5} style={{ height: '7.5cm' }}></td>
+                                            </tr>
+
+                                            {/* SUB-TOTAL ITEM */}
+                                            <tr>
+                                                <td colSpan={3}></td>
+                                                <td className="py-1 px-2 text-left"></td>
+                                                <td className="py-1 px-2 text-right border-t border-black">
+                                                    {formatCurrency(subTotalItems)}
+                                                </td>
+                                            </tr>
+
+                                            {/* DP / RETENSI */}
+                                            {dpValue > 0 && (
+                                                <tr>
+                                                    <td colSpan={3}></td>
+                                                    <td className="py-1 px-2 text-left flex justify-between">
+                                                        <span>DP</span>
+                                                        <span>{dpPercent}%</span>
+                                                    </td>
+                                                    <td className="py-1 px-2 text-right">
+                                                        {formatCurrency(dpValue)}
+                                                    </td>
+                                                </tr>
+                                            )}
+
+                                            {/* DISKON */}
+                                            {invoiceData.discount && invoiceData.discount > 0 && (
+                                                <tr>
+                                                    <td colSpan={3}></td>
+                                                    <td className="py-1 px-2 text-left">Diskon</td>
+                                                    <td className="py-1 px-2 text-right">
+                                                        - {formatCurrency(invoiceData.discount)}
+                                                    </td>
+                                                </tr>
+                                            )}
+                                        </>
+                                    )}
                                 </tbody>
                             </table>
-
                             {isLastPage && (
-                                <div className="flex justify-end mt-2">
-                                    <div className="text-right w-[16%] pr-3 border-t border-black pt-1">
-                                        <p className="font-normal text-[9pt]">{formatCurrency(subTotalItems)}</p>
-                                    </div>
+                                <div className="mt-16 mb-1 px-2">
+                                    <p className="font-bold text-[9pt]">NO PO : {poNumber}</p>
                                 </div>
                             )}
                         </main>
-                        
-                        {/* FOOTER - ONLY ON LAST PAGE */}
-                        {isLastPage ? (
-                            <footer className="mt-auto pt-4">
-                                <div className="flex justify-between items-start leading-tight mb-4">
-                                    <div className='w-1/2 text-[9pt] space-y-1 pl-2'>
-                                        {negotiation > 0 && (
-                                            <div className='flex gap-2'>
-                                                <p>A/Negotiation :</p>
-                                                <p>({formatCurrency(negotiation)})</p> 
-                                            </div>
-                                        )}
-                                        {dpValue > 0 && (
-                                            <div className='flex gap-2'>
-                                                <p>Down Payment ({dpPercent}%) :</p>
-                                                <p>({formatCurrency(dpValue)})</p>
-                                            </div>
-                                        )}
-                                        {pelunasan > 0 && (
-                                            <div className='flex gap-2 font-bold mt-2'>
-                                                <p>Pelunasan :</p>
-                                                <p>{formatCurrency(pelunasan)}</p>
-                                            </div>
-                                        )}
-                                        <div className="pt-2">
-                                            <p className="font-bold text-[9pt] uppercase">No PO : {poNumber}</p>
-                                        </div>
-                                    </div>
 
-                                    {/* CALCULATIONS SECTION */}
-                                    <div className="w-[38%] space-y-0.5 text-[9pt] border-t-2 border-black pt-2">
-                                        <div className="flex justify-between"><span>Goods:</span><span>{formatCurrency(grandTotal)}</span></div>
-                                        <div className="flex justify-between"><span>DPP VAT (11/12):</span><span>{formatCurrency(dppVat)}</span></div>
-                                        <div className="flex justify-between"><span>VAT 12%:</span><span>{formatCurrency(vat12)}</span></div>
-                                        <div className="flex justify-between pt-1 font-bold text-[11pt] uppercase mt-1 border-y-2 border-black py-1">
-                                            <span>Total Rp:</span><span>{formatCurrency(totalRp)}</span>
+                        {/* FOOTER SECTION */}
+                        {isLastPage && (
+                            <footer 
+                                className="mt-auto pt-2" 
+                                style={{ 
+                                    pageBreakInside: 'avoid',
+                                    breakInside: 'avoid',
+                                    display: 'block'
+                                }}
+                            >
+                                {/* SECTION KALKULASI */}
+                                <div className="flex justify-between items-start border-y-[1.5pt] border-black py-1 mb-1">
+                                    <div className="w-[50%]"></div>
+                                    <div className="w-[35%] text-[8.5pt] leading-tight">
+                                        <div className="flex justify-between">
+                                            <span>Goods :</span>
+                                            <span>{formatCurrency(grandTotal)}</span>
+                                        </div>
+                                        <div className="flex justify-between">
+                                            <span>DPP VAT (11/12) :</span>
+                                            <span>{formatCurrency(dppVat)}</span>
+                                        </div>
+                                        <div className="flex justify-between">
+                                            <span>VAT 12 % :</span>
+                                            <span>{formatCurrency(vat12)}</span>
+                                        </div>
+                                        <div className="flex justify-between font-black">
+                                            <span>Total Rp :</span>
+                                            <span>{formatCurrency(totalRp)}</span>
                                         </div>
                                     </div>
                                 </div>
 
-                                <div className="flex justify-between items-end pb-2">
-                                    {/* BANK INFORMATION */}
-                                    <div className="w-[65%] space-y-3 text-[8pt] leading-tight"> 
-                                        <div className="space-y-0.5">
-                                            <p className="font-bold">Payment Terms: {paymentTerms}</p>
-                                            <p className='font-bold uppercase'>Please state with your payment: {displayInvoiceId}</p>
-                                            <p className='mt-2'>For payment, please transfer to our account:</p>
-                                            <p className="font-bold text-[9pt] uppercase mb-1">PT. JEMBO CABLE COMPANY Tbk</p>
-                                        </div>
-                                        
-                                        <div className="grid grid-cols-1 gap-1">
-                                            <div className="flex items-start"><span className="w-[100px] font-bold">Bank Mandiri -</span><span className="flex-1 text-black font-medium">Jakarta Cabang A/C No.: 102-0100206827 (Rp)</span></div>
-                                            <div className="flex items-start"><span className="w-[100px] font-bold">Bank Mandiri -</span><span className="flex-1 text-black font-medium">Jakarta Cabang A/C No.: 102-0005000218 (Rp)</span></div>
-                                            <div className="flex items-start"><span className="w-[100px] font-bold">Bank Mandiri -</span><span className="flex-1 text-black font-medium">Jakarta Cabang A/C No.: 102-0005000226 (USD)</span></div>
-                                            <div className="flex items-center gap-4 py-0.5"><div className="h-px bg-slate-200 flex-1"></div><span className="text-[7pt] font-black text-slate-300">OR</span><div className="h-px bg-slate-200 flex-1"></div></div>
+                                {/* INFORMASI PEMBAYARAN & TANDA TANGAN */}
+                                <div className="flex justify-between items-start mt-1" style={{ breakInside: 'avoid' }}>
+                                    <div className="w-[65%] text-[8.5pt] leading-normal space-y-1">
+                                    <div className="flex mb-1">
+                                        <span className="w-[65px] font-bold">Payment:</span>
+                                        <span>{paymentTerms}</span>
+                                    </div>
+
+                                    <div className="flex flex-col"> 
+                                        <p className="font-bold m-0 leading-tight">
+                                            Please state with your payment: {displayInvoiceId}
+                                        </p>
+                                        <p className="font-bold m-0 leading-tight">
+                                            For payment, please transfer to our account:
+                                        </p>
+                                        <p className="font-bold uppercase m-0 leading-tight">
+                                            PT. Jembo Cable Company Tbk
+                                        </p>
+                                    </div>
+                                        {/* Detail Bank Mandiri */}
+                                        <div className="mt-2 space-y-0.5">
                                             <div className="flex items-start">
-                                                <div className="w-[100px] font-bold">Bank BCA -<br/>Jakarta</div>
-                                                <div className="flex-1">
-                                                    <p className="font-medium text-black">A/C No.: 684-0198977 (Rp)</p>
-                                                    <p className="text-[7pt] italic opacity-70">Cabang KEM TOWER</p>
-                                                </div>
+                                                <span className="w-[100px] font-bold">Bank Mandiri -</span>
+                                                <span>A/C No. : 102-0100206827 (Rp)</span>
+                                            </div>
+                                            <div className="flex items-start">
+                                                <span className="w-[100px]">Cabang</span>
+                                                <span>A/C No. : 102-0005000218 (Rp)</span>
+                                            </div>
+                                            <div className="flex items-start">
+                                                <span className="w-[100px]">Jakarta</span>
+                                                <span>A/C No. : 102-0005000226 (USD)</span>
                                             </div>
                                         </div>
+
+                                        <div className="w-[280px] text-center font-bold text-[8pt] py-1">OR</div>
+
+                                        {/* Detail Bank BCA */}
+                                        <div className="flex items-start space-x-0">
+                                            <div className="w-[100px] font-bold leading-[1.2]">
+                                                Bank BCA - Jakarta<br/>
+                                                <span className="font-normal text-[7.5pt]">Cabang KEM TOWER</span>
+                                            </div>
+                                            <div className="pt-0.5">A/C No. : 684-0198977 (Rp)</div>
+                                        </div>
                                     </div>
-                                    
-                                    {/* SIGNATURE AREA */}
-                                    <div className="w-[30%] text-center flex flex-col justify-between" style={{ minHeight: '140px' }}>
-                                        <p className="font-bold text-[9pt] uppercase">PT. JEMBO CABLE COMPANY Tbk</p>
-                                        <div className="mt-auto">
-                                            <p className="font-bold uppercase text-[10pt] underline underline-offset-8 decoration-2">Finance</p>
+
+                                    {/* Bagian Kanan: Tanda Tangan */}
+                                    <div className="w-[35%] flex flex-col items-center self-stretch justify-between py-1">
+                                        <p className="font-bold text-[9pt] text-center">PT. JEMBO CABLE COMPANY Tbk</p>
+                                        <div className="mt-auto flex flex-col items-center">
+                                            <div className="mt-16 border-t-[1.5pt] border-black w-[160px]"></div>
+                                            <p className="font-bold uppercase pt-1 text-[9pt]">Finance</p>
                                         </div>
                                     </div>
                                 </div>
                             </footer>
-                        ) : null}
-                        
-                        <div className="text-center text-slate-300 text-[8px] mt-auto pt-2 print:hidden">
-                            Halaman {pageIndex + 1} dari {totalPages}
-                        </div>
+                        )}
                     </div>
                 );
             })}
@@ -263,116 +315,120 @@ export const InvoiceTemplate = ({ invoiceData }: { invoiceData: InvoiceData }) =
     );
 };
 
-// --- PREVIEW PAGE ---
+// --- MAIN PAGE ---
 export default function InvoicePreviewPage() {
     const invoiceContainerRef = useRef<HTMLDivElement>(null);
     const [invoiceData, setInvoiceData] = useState<InvoiceData | null>(null);
-    const { toast } = useToast();
     const router = useRouter();
 
     useEffect(() => {
-        try {
-            const dataFromSession = sessionStorage.getItem('invoicePreviewData');
-            if (dataFromSession) {
-                const parsedData = JSON.parse(dataFromSession);
-                const items = (parsedData.items || []).map((item: any) => ({
-                    id: item.id?.toString() ?? Math.random().toString(36).substr(2,9),
-                    name: item.name ?? item.item ?? 'N/A',
-                    quantity: Number(item.quantity) || 0,
-                    unit: item.unit ?? 'Pcs',
-                    price: Number(item.price) || 0,
-                    total: Number(item.total ?? (item.quantity * item.price)) || 0,
-                }));
+        const dataFromSession = sessionStorage.getItem('invoicePreviewData');
+        if (dataFromSession) {
+            const parsedData = JSON.parse(dataFromSession);
+            const items = (parsedData.items || []).map((item: any) => ({
+                id: item.id?.toString() || Math.random().toString(36).substr(2, 9),
+                name: item.name || item.item || 'N/A',
+                quantity: Number(item.quantity) || 0,
+                unit: item.unit || 'Pcs',
+                price: Number(item.price) || 0,
+                total: Number(item.total || (item.quantity * item.price)) || 0,
+            }));
 
-                const gTotal = items.reduce((s: number, i: any) => s + i.total, 0);
-                const dpp = Math.round(gTotal * (11/12));
-                const vat = Math.round(dpp * 0.12);
+            const gTotal = items.reduce((s: number, i: any) => s + i.total, 0);
+            const dpp = Math.round(gTotal * (11 / 12));
+            const vat = Math.round(dpp * 0.12);
 
-                setInvoiceData({
-                    id: parsedData.id || 'N/A',
-                    items: items,
-                    customer: {
-                        name: parsedData.customer?.name ?? 'N/A',
-                        address: parsedData.customer?.address ?? parsedData.billingAddress ?? 'N/A',
-                    },
-                    customerCode: parsedData.customer?.customerCode || parsedData.customerCode || '-',
-                    date: parsedData.date || new Date().toISOString(),
-                    soNumber: parsedData.soNumber || '-',
-                    poNumber: parsedData.poNumber || '-',
-                    grandTotal: gTotal,
-                    dppVat: dpp,
-                    vat12: vat,
-                    totalRp: dpp + vat,
-                    paymentTerms: parsedData.paymentTerms || '90 Hari setelah invoice diterima',
-                    printType: parsedData.printType || 'original',
-                    negotiation: Number(parsedData.negotiation) || 0,
-                    dpPercent: parsedData.dpPercent || 0,
-                    dpValue: Number(parsedData.dpValue) || 0,
-                    pelunasan: Number(parsedData.pelunasan) || 0,
-                });
-            }
-        } catch (error) {
-            console.error("Failed to load invoice data:", error);
+            setInvoiceData({
+                id: parsedData.id || 'N/A',
+                items: items,
+                customer: {
+                    name: parsedData.customer?.name || 'N/A',
+                    address: parsedData.customer?.address || parsedData.billingAddress || 'N/A',
+                },
+                customerCode: parsedData.customer?.customerCode || parsedData.customerCode || '-',
+                date: parsedData.date || new Date().toISOString(),
+                soNumber: parsedData.soNumber || '-',
+                poNumber: parsedData.poNumber || '-',
+                grandTotal: gTotal,
+                dppVat: dpp,
+                vat12: vat,
+                totalRp: dpp + vat,
+                paymentTerms: parsedData.paymentTerms || '90 Hari setelah invoice diterima',
+                printType: 'original',
+                discount: Number(parsedData.discount) || 0,
+                dpValue: Number(parsedData.dpValue) || 0,
+                dpPercent: parsedData.dpPercent || 0
+            });
         }
     }, []);
 
     const handleDownloadPdf = () => {
         const element = invoiceContainerRef.current;
         if (!element || !invoiceData) return;
+        
         const opt = {
-          margin: [0, 0, 0, 0],
-          filename: `Invoice-${invoiceData.id.replace(/\//g, '_')}.pdf`,
-          image: { type: 'jpeg', quality: 0.98 },
-          html2canvas: { scale: 3, useCORS: true },
-          jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+            margin: 0,
+            filename: `Invoice-${invoiceData.id.replace(/\//g, '_')}.pdf`,
+            pagebreak: { mode: ['css', 'avoid-all'], before: '.page-wrapper' },
+            image: { type: 'jpeg', quality: 1 },
+            html2canvas: { 
+                scale: 2, 
+                useCORS: true, 
+                logging: false,
+                letterRendering: true 
+            },
+            jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
         };
+    
         html2pdf().from(element).set(opt).save();
     };
 
-    if (!invoiceData) {
-        return (
-            <div className="flex h-screen items-center justify-center bg-slate-50">
-                <div className="text-center space-y-4">
-                    <div className="animate-spin h-10 w-10 border-4 border-indigo-600 border-t-transparent rounded-full mx-auto" />
-                    <p className="font-black uppercase text-[10px] tracking-widest text-slate-400">Loading Precision Engine...</p>
-                </div>
-            </div>
-        );
-    }
+    if (!invoiceData) return <div className="p-10 text-center">Loading Data...</div>;
 
     return (
-        <div className="bg-slate-100 min-h-screen p-4 sm:p-10 font-sans text-black animate-in fade-in duration-500">
+        <div className="bg-slate-100 min-h-screen p-4 sm:p-10 font-sans text-black">
             <style>{`
+                @media screen {
+                    .pdf-page {
+                        background: white;
+                        box-shadow: 0 0 10px rgba(0,0,0,0.1);
+                        margin: 0 auto;
+                        width: 210mm;
+                        min-height: 297mm;
+                        position: relative;
+                        display: flex;
+                        flex-direction: column;
+                    }
+                    .page-wrapper { margin-bottom: 0px; }
+                }
+                
                 @media print {
-                    body { background-color: #fff !important; }
-                    .page-break { page-break-before: always; }
-                    .print-container { box-shadow: none !important; border: none !important; margin: 0 !important; padding: 0 !important; }
-                    .print-hidden { display: none !important; }
+                    .no-print { display: none !important; }
+                    .page-wrapper { page-break-before: always !important; }
+                    .page-wrapper:first-child { page-break-before: avoid !important; }
+                }
+
+                .invoice-print-wrapper {
+                    background: white;
                 }
             `}</style>
             
-            <div className="fixed top-6 right-6 z-50 flex gap-3 print:hidden">
-                <button onClick={() => router.back()} className="flex items-center gap-2 px-6 py-2.5 bg-white text-slate-900 border border-slate-200 rounded-xl hover:bg-slate-50 shadow-md font-bold text-sm">
-                    <ArrowLeft size={18} /> Kembali
-                </button>
-                <button onClick={handleDownloadPdf} className="flex items-center gap-2 px-6 py-2.5 bg-indigo-600 text-white rounded-xl hover:bg-indigo-700 shadow-xl font-black uppercase text-[10px] tracking-widest">
-                    Simpan PDF
-                </button>
-                <button onClick={() => window.print()} className="flex items-center gap-2 px-10 py-2.5 bg-slate-900 text-white rounded-xl hover:bg-black shadow-xl font-black uppercase text-[10px] tracking-widest">
-                    Cetak Invoice
-                </button>
+            <div className="fixed top-6 right-6 z-50 flex gap-3 no-print">
+                <button onClick={() => router.back()} className="px-6 py-2 bg-white border rounded-xl font-bold text-sm shadow-sm hover:bg-slate-50 transition-all">Kembali</button>
+                <button onClick={handleDownloadPdf} className="px-6 py-2 bg-indigo-600 text-white rounded-xl font-bold text-[10px] tracking-widest shadow-lg hover:bg-indigo-700 transition-all">SIMPAN PDF</button>
             </div>
             
-            <div ref={invoiceContainerRef} className="print-container">
-                <InvoiceTemplate invoiceData={invoiceData} />
-                
-                {/* Visual Divider Only on screen */}
-                <div className="my-10 border-b-2 border-dashed border-slate-300 print:hidden text-center">
-                    <span className="bg-slate-100 px-2 text-slate-400 text-xs uppercase tracking-widest italic">Pemisah Lembar (Batas A4)</span>
+            {/* CONTAINER UTAMA PDF */}
+            <div ref={invoiceContainerRef} className="mx-auto invoice-print-wrapper">
+                {/* HALAMAN ORIGINAL */}
+                <div className="page-wrapper">
+                    <InvoiceTemplate invoiceData={{...invoiceData, printType: 'original'}} />
                 </div>
-
-                {/* COPY VERSION */}
-                <InvoiceTemplate invoiceData={{...invoiceData, printType: 'copy'}} />
+                
+                {/* HALAMAN COPY (TIDAK ADA PEMISAH VISUAL) */}
+                <div className="page-wrapper">
+                    <InvoiceTemplate invoiceData={{...invoiceData, printType: 'copy'}} />
+                </div>
             </div>
         </div>
     );
