@@ -90,12 +90,14 @@ export const InvoiceTemplate = ({ invoiceData, type }: { invoiceData: InvoiceDat
             className="relative bg-white mx-auto flex flex-col text-black border-none"
             style={{ 
                 width: '210mm', 
-                minHeight: '296mm', 
+                height: '297mm', 
                 padding: '50mm 15mm 15mm 15mm',
                 fontSize: '10pt',
                 fontFamily: 'Arial, Helvetica, sans-serif',
                 boxSizing: 'border-box',
                 color: '#000000',
+                pageBreakInside: 'avoid',
+                breakInside: 'avoid'
             }}
         >
             {/* TYPE INDICATOR */}
@@ -105,18 +107,18 @@ export const InvoiceTemplate = ({ invoiceData, type }: { invoiceData: InvoiceDat
 
             {/* HEADER SECTION */}
             <header className="relative">
-                <div className="w-full text-center mb-8">
-                    <h1 className="font-bold uppercase text-[14pt] leading-tight mb-0.5">{invoiceTitle}</h1>
-                    <p className="font-bold text-[12pt]">{displayInvoiceId}</p>
+                <div className="w-full text-center mb-6">
+                    <h1 className="font-bold uppercase text-[13pt] leading-tight mb-0.5">{invoiceTitle}</h1>
+                    <p className="font-bold text-[11pt]">{displayInvoiceId}</p>
                 </div>
                 
                 <div className='flex justify-between items-start mb-2'>
                     <div className='w-[60%]'>
-                        <h2 className="font-bold text-[11pt] uppercase mb-0.5">{customer.name}</h2>
-                        <p className="text-[9.5pt] leading-tight max-w-sm whitespace-pre-wrap">{customer.address}</p>
+                        <h2 className="font-bold text-[10pt] uppercase mb-0.5">{customer.name}</h2>
+                        <p className="text-[9pt] leading-tight max-w-sm whitespace-pre-wrap">{customer.address}</p>
                     </div>
-                    <div className="w-[35%] text-[9pt] leading-tight">
-                        <div className="grid grid-cols-[90px_5px_1fr] gap-y-1">
+                    <div className="w-[30%] text-[8.5pt] leading-tight">
+                        <div className="grid grid-cols-[80px_5px_1fr] gap-y-0.5">
                             <span>Sales Order</span><span>:</span><span>{soNumber}</span>
                             <span>Order Date</span><span>:</span><span>{formatDate(date)}</span>
                             <span>Reference A</span><span>:</span><span>-</span>
@@ -124,38 +126,38 @@ export const InvoiceTemplate = ({ invoiceData, type }: { invoiceData: InvoiceDat
                     </div>
                 </div>
 
-                <div className='flex justify-between text-[9pt] py-2 uppercase'>
+                <div className='flex justify-between text-[8.5pt] py-1 uppercase'>
                     <p className='m-0'>Customer Code : {customerCode}</p>
                     <p className='m-0'>Date: {formatDate(date)}</p>
                 </div>
             </header>
 
             {/* TABLE SECTION */}
-            <main className='relative flex-1'>
-                <table className="w-full border-collapse text-[9pt]">
+            <main className='relative'>
+                <table className="w-full border-collapse text-[8.5pt]">
                     <thead>
-                        <tr className='border-y-[2px] border-black bg-slate-50'>
-                            <th className="py-2 px-2 text-left w-[5%] font-bold">NO.</th>
-                            <th className="py-2 px-2 text-left w-[45%] font-bold">ITEM DESCRIPTION</th>
-                            <th className="py-2 px-2 text-center w-[15%] font-bold">QUANTITY UNIT</th>
-                            <th className="py-2 px-2 text-right w-[15%] font-bold">UNIT PRICE</th>
-                            <th className="py-2 px-2 text-right w-[20%] font-bold">AMOUNT</th>
+                        <tr className='border-y-[1.5pt] border-black'>
+                            <th className="py-1.5 px-2 text-left w-[5%] font-bold">NO.</th>
+                            <th className="py-1.5 px-2 text-left w-[45%] font-bold">ITEM DESCRIPTION</th>
+                            <th className="py-1.5 px-2 text-center w-[15%] font-bold">QUANTITY UNIT</th>
+                            <th className="py-1.5 px-2 text-right w-[15%] font-bold">UNIT PRICE</th>
+                            <th className="py-1.5 px-2 text-right w-[20%] font-bold">AMOUNT</th>
                         </tr>
                     </thead>
                     <tbody>
                         {items.map((item, itemIdx) => (
                             <tr key={item.id} className='align-top'>
-                                <td className="py-1.5 px-2">{itemIdx + 1}</td>
-                                <td className="py-1.5 px-2 uppercase font-medium">{item.name}</td>
-                                <td className="py-1.5 px-2 text-center">{item.quantity?.toLocaleString('id-ID')} {item.unit}</td>
-                                <td className="py-1.5 px-2 text-right">{formatCurrency(item.price)}</td>
-                                <td className="py-1.5 px-2 text-right">{formatCurrency(item.total)}</td>
+                                <td className="py-1 px-2">{itemIdx + 1}</td>
+                                <td className="py-1 px-2 uppercase font-medium">{item.name}</td>
+                                <td className="py-1 px-2 text-center">{item.quantity?.toLocaleString('id-ID')} {item.unit}</td>
+                                <td className="py-1 px-2 text-right">{formatCurrency(item.price)}</td>
+                                <td className="py-1 px-2 text-right">{formatCurrency(item.total)}</td>
                             </tr>
                         ))}
                         
                         {/* BARIS PENGATUR JARAK AGAR FOOTER TERDORONG KE BAWAH */}
                         <tr>
-                            <td colSpan={5} style={{ height: '7.5cm' }}></td>
+                            <td colSpan={5} style={{ height: '8cm' }}></td>
                         </tr>
 
                         {/* SLOT ANGKA NOL (ORANGE CHECKMARK) */}
@@ -191,8 +193,8 @@ export const InvoiceTemplate = ({ invoiceData, type }: { invoiceData: InvoiceDat
                         ) : null}
                     </tbody>
                 </table>
-                <div className="mt-8 mb-2 px-2">
-                    <p className="font-bold text-[10pt]">NO PO : {poNumber}</p>
+                <div className="mt-20 mb-1 px-2">
+                    <p className="font-bold text-[9pt]">NO PO : {poNumber}</p>
                 </div>
             </main>
 
@@ -206,22 +208,22 @@ export const InvoiceTemplate = ({ invoiceData, type }: { invoiceData: InvoiceDat
                 }}
             >
                 {/* SECTION KALKULASI */}
-                <div className="flex justify-between items-start border-y-[2px] border-black py-2 mb-2">
+                <div className="flex justify-between items-start border-y-[1.5pt] border-black py-1 mb-1">
                     <div className="w-[50%]"></div>
-                    <div className="w-[40%] text-[9pt] leading-tight">
-                        <div className="flex justify-between py-0.5">
+                    <div className="w-[35%] text-[8.5pt] leading-tight">
+                        <div className="flex justify-between">
                             <span>Goods :</span>
                             <span>{formatCurrency(grandTotal)}</span>
                         </div>
-                        <div className="flex justify-between py-0.5">
+                        <div className="flex justify-between">
                             <span>DPP VAT (11/12) :</span>
                             <span>{formatCurrency(dppVat)}</span>
                         </div>
-                        <div className="flex justify-between py-0.5">
+                        <div className="flex justify-between">
                             <span>VAT 12 % :</span>
                             <span>{formatCurrency(vat12)}</span>
                         </div>
-                        <div className="flex justify-between py-1 font-black border-t border-slate-300 mt-1 text-[10pt]">
+                        <div className="flex justify-between font-black border-t border-slate-300 mt-0.5 text-[9pt]">
                             <span>Total Rp :</span>
                             <span>{formatCurrency(totalRp)}</span>
                         </div>
@@ -229,10 +231,10 @@ export const InvoiceTemplate = ({ invoiceData, type }: { invoiceData: InvoiceDat
                 </div>
 
                 {/* INFORMASI PEMBAYARAN & TANDA TANGAN */}
-                <div className="flex justify-between items-start mt-2" style={{ breakInside: 'avoid' }}>
-                    <div className="w-[65%] text-[9pt] leading-normal space-y-1">
+                <div className="flex justify-between items-start mt-1" style={{ breakInside: 'avoid' }}>
+                    <div className="w-[65%] text-[8.5pt] leading-normal space-y-1">
                         <div className="flex mb-1">
-                            <span className="w-[70px] font-bold">Payment:</span>
+                            <span className="w-[65px] font-bold">Payment:</span>
                             <span>{paymentTerms}</span>
                         </div>
 
@@ -249,15 +251,15 @@ export const InvoiceTemplate = ({ invoiceData, type }: { invoiceData: InvoiceDat
                         </div>
                         <div className="mt-2 space-y-0.5">
                             <div className="flex items-start">
-                                <span className="w-[110px] font-bold">Bank Mandiri -</span>
+                                <span className="w-[100px] font-bold">Bank Mandiri -</span>
                                 <span>A/C No. : 102-0100206827 (Rp)</span>
                             </div>
                             <div className="flex items-start">
-                                <span className="w-[110px]">Cabang</span>
+                                <span className="w-[100px]">Cabang</span>
                                 <span>A/C No. : 102-0005000218 (Rp)</span>
                             </div>
                             <div className="flex items-start">
-                                <span className="w-[110px]">Jakarta</span>
+                                <span className="w-[100px]">Jakarta</span>
                                 <span>A/C No. : 102-0005000226 (USD)</span>
                             </div>
                         </div>
@@ -265,7 +267,7 @@ export const InvoiceTemplate = ({ invoiceData, type }: { invoiceData: InvoiceDat
                         <div className="w-[280px] text-center font-bold text-[8pt] py-1">OR</div>
 
                         <div className="flex items-start">
-                            <div className="w-[110px] font-bold leading-[1.2]">
+                            <div className="w-[100px] font-bold leading-[1.2]">
                                 Bank BCA - Jakarta<br/>
                                 <span className="font-normal text-[7.5pt]">Cabang KEM TOWER</span>
                             </div>
@@ -274,10 +276,10 @@ export const InvoiceTemplate = ({ invoiceData, type }: { invoiceData: InvoiceDat
                     </div>
 
                     <div className="w-[35%] flex flex-col items-center self-stretch justify-between py-1">
-                        <p className="font-bold text-[10pt] text-center">PT. JEMBO CABLE COMPANY Tbk</p>
+                        <p className="font-bold text-[9pt] text-center">PT. JEMBO CABLE COMPANY Tbk</p>
                         <div className="mt-auto flex flex-col items-center">
-                            <div className="mt-16 border-t-[2px] border-black w-[180px]"></div>
-                            <p className="font-bold uppercase pt-1.5 text-[10pt] underline decoration-2 underline-offset-4">Finance</p>
+                            <div className="mt-16 border-t-[1.5pt] border-black w-[160px]"></div>
+                            <p className="font-bold uppercase pt-1 text-[9pt] underline decoration-1 underline-offset-2">Finance</p>
                         </div>
                     </div>
                 </div>
