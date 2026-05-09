@@ -1,7 +1,6 @@
 'use client';
 import React, { useRef, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Download, ArrowLeft, Printer } from 'lucide-react';
 import html2pdf from 'html2pdf.js';
 
 // --- DATA TYPES ---
@@ -95,19 +94,22 @@ export const InvoiceTemplate = ({ invoiceData, type }: { invoiceData: InvoiceDat
     return (
         <div className="flex flex-col bg-white">
             {itemChunks.map((chunk, pageIndex) => {
-                const isLastPage = pageIndex === totalPages - 1;
+                const isLastPageOfSection = pageIndex === totalPages - 1;
+                // LOGIC: Jangan buat page-break baru jika ini adalah HALAMAN TERAKHIR dari Lembar COPY (Akhir Dokumen)
+                const shouldBreak = !(type === 'Copy' && isLastPageOfSection);
+
                 return (
                     <div 
                         key={pageIndex}
-                        className="relative bg-white mx-auto flex flex-col text-black"
+                        className="relative bg-white mx-auto flex flex-col text-black shadow-none border-none"
                         style={{ 
                             width: '210mm', 
-                            minHeight: '296mm', // MENGGUNAKAN MIN-HEIGHT AGAR TIDAK TERPOTONG
+                            minHeight: '296mm',
                             padding: '50mm 15mm 15mm 15mm',
                             fontSize: '10pt',
                             fontFamily: 'Arial, Helvetica, sans-serif',
                             boxSizing: 'border-box',
-                            pageBreakAfter: 'always',
+                            pageBreakAfter: shouldBreak ? 'always' : 'avoid',
                             color: '#000000'
                         }}
                     >
@@ -166,10 +168,11 @@ export const InvoiceTemplate = ({ invoiceData, type }: { invoiceData: InvoiceDat
                                         </tr>
                                     ))}
                                     
-                                    {isLastPage ? (
+                                    {isLastPageOfSection ? (
                                         <>
+                                            {/* BARIS PENGATUR JARAK (ORANGE CHECKMARK LOGIC) */}
                                             <tr>
-                                                <td colSpan={5} style={{ height: '6cm' }}></td>
+                                                <td colSpan={5} style={{ height: '8cm' }}></td>
                                             </tr>
 
                                             {/* SUB-TOTAL ITEM (SLOT 0 CHECKMARK) */}
@@ -207,7 +210,7 @@ export const InvoiceTemplate = ({ invoiceData, type }: { invoiceData: InvoiceDat
                                     ) : null}
                                 </tbody>
                             </table>
-                            {isLastPage ? (
+                            {isLastPageOfSection ? (
                                 <div className="mt-12 mb-1 px-2">
                                     <p className="font-bold text-[9pt]">NO PO : {poNumber}</p>
                                 </div>
@@ -215,11 +218,11 @@ export const InvoiceTemplate = ({ invoiceData, type }: { invoiceData: InvoiceDat
                         </main>
 
                         {/* FOOTER SECTION */}
-                        {isLastPage ? (
+                        {isLastPageOfSection ? (
                             <footer 
                                 className="mt-auto pt-2" 
                                 style={{ 
-                                    pageBreakInside: 'avoid', // MENCEGAH FOOTER TERPOTONG ANTAR HALAMAN
+                                    pageBreakInside: 'avoid',
                                     breakInside: 'avoid',
                                     display: 'block'
                                 }}
@@ -367,6 +370,7 @@ export default function InvoicePreviewPage() {
                 @media print {
                     .no-print { display: none !important; }
                     body { background: white !important; padding: 0 !important; }
+                    .invoice-page-preview { box-shadow: none !important; margin-bottom: 0 !important; }
                 }
             `}</style>
             
