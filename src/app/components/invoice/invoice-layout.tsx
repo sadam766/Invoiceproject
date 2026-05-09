@@ -86,19 +86,21 @@ export const InvoiceTemplate = ({ invoiceData, type }: { invoiceData: InvoiceDat
 
     return (
         <div 
-            className="relative bg-white mx-auto flex flex-col text-black shadow-none border-none overflow-hidden"
+            className="relative bg-white mx-auto flex flex-col text-black border-none overflow-hidden"
             style={{ 
                 width: '210mm', 
-                minHeight: '296mm',
+                height: '297mm', // Strict A4 Height
                 padding: '50mm 15mm 15mm 15mm',
                 fontSize: '10pt',
                 fontFamily: 'Arial, Helvetica, sans-serif',
                 boxSizing: 'border-box',
-                color: '#000000'
+                color: '#000000',
+                pageBreakInside: 'avoid',
+                breakInside: 'avoid'
             }}
         >
             {/* TYPE INDICATOR */}
-            <div className="absolute right-12 top-8 text-[10pt] text-slate-300 uppercase italic font-normal">
+            <div className="absolute right-12 top-10 text-[10pt] text-slate-300 uppercase italic font-normal">
                 {type}
             </div>
 
@@ -133,7 +135,7 @@ export const InvoiceTemplate = ({ invoiceData, type }: { invoiceData: InvoiceDat
             <main className='relative flex-1'>
                 <table className="w-full border-collapse text-[9pt]">
                     <thead>
-                        <tr className='border-y-[2px] border-black'>
+                        <tr className='border-y-[2px] border-black bg-slate-50'>
                             <th className="py-2 px-2 text-left w-[5%] font-bold">NO.</th>
                             <th className="py-2 px-2 text-left w-[45%] font-bold">ITEM DESCRIPTION</th>
                             <th className="py-2 px-2 text-center w-[15%] font-bold">QUANTITY UNIT</th>
@@ -144,24 +146,24 @@ export const InvoiceTemplate = ({ invoiceData, type }: { invoiceData: InvoiceDat
                     <tbody>
                         {items.map((item, itemIdx) => (
                             <tr key={item.id} className='align-top'>
-                                <td className="py-1 px-2">{itemIdx + 1}</td>
-                                <td className="py-1 px-2 uppercase font-medium">{item.name}</td>
-                                <td className="py-1 px-2 text-center">{item.quantity?.toLocaleString('id-ID')} {item.unit}</td>
-                                <td className="py-1 px-2 text-right">{formatCurrency(item.price)}</td>
-                                <td className="py-1 px-2 text-right">{formatCurrency(item.total)}</td>
+                                <td className="py-1.5 px-2">{itemIdx + 1}</td>
+                                <td className="py-1.5 px-2 uppercase font-medium">{item.name}</td>
+                                <td className="py-1.5 px-2 text-center">{item.quantity?.toLocaleString('id-ID')} {item.unit}</td>
+                                <td className="py-1.5 px-2 text-right">{formatCurrency(item.price)}</td>
+                                <td className="py-1.5 px-2 text-right">{formatCurrency(item.total)}</td>
                             </tr>
                         ))}
                         
-                        {/* BARIS PENGATUR JARAK (ORANGE CHECKMARK LOGIC) */}
+                        {/* BARIS PENGATUR JARAK AGAR FOOTER TERDORONG KE BAWAH */}
                         <tr>
-                            <td colSpan={5} style={{ height: '8cm' }}></td>
+                            <td colSpan={5} style={{ height: '7cm' }}></td>
                         </tr>
 
                         {/* SUB-TOTAL ITEM (SLOT 0 CHECKMARK) */}
                         <tr>
                             <td colSpan={3}></td>
                             <td className="py-1 px-2 text-left"></td>
-                            <td className="py-1 px-2 text-right border-t border-black">
+                            <td className="py-1 px-2 text-right border-t border-black font-bold">
                                 {formatCurrency(subTotalItems)}
                             </td>
                         </tr>
@@ -200,13 +202,13 @@ export const InvoiceTemplate = ({ invoiceData, type }: { invoiceData: InvoiceDat
                 className="mt-auto pt-2" 
                 style={{ 
                     pageBreakInside: 'avoid',
-                    display: 'block'
+                    breakInside: 'avoid'
                 }}
             >
                 {/* SECTION KALKULASI */}
-                <div className="flex justify-between items-start border-y-[2px] border-black py-1.5 mb-2">
+                <div className="flex justify-between items-start border-y-[2px] border-black py-2 mb-2">
                     <div className="w-[50%]"></div>
-                    <div className="w-[38%] text-[9pt] leading-tight">
+                    <div className="w-[40%] text-[9pt] leading-tight">
                         <div className="flex justify-between py-0.5">
                             <span>Goods :</span>
                             <span>{formatCurrency(grandTotal)}</span>
@@ -219,7 +221,7 @@ export const InvoiceTemplate = ({ invoiceData, type }: { invoiceData: InvoiceDat
                             <span>VAT 12 % :</span>
                             <span>{formatCurrency(vat12)}</span>
                         </div>
-                        <div className="flex justify-between py-1 font-black border-t border-slate-200 mt-1">
+                        <div className="flex justify-between py-1 font-black border-t border-slate-300 mt-1 text-[10pt]">
                             <span>Total Rp :</span>
                             <span>{formatCurrency(totalRp)}</span>
                         </div>
@@ -227,7 +229,7 @@ export const InvoiceTemplate = ({ invoiceData, type }: { invoiceData: InvoiceDat
                 </div>
 
                 {/* INFORMASI PEMBAYARAN & TANDA TANGAN */}
-                <div className="flex justify-between items-start mt-2" style={{ pageBreakInside: 'avoid' }}>
+                <div className="flex justify-between items-start mt-2" style={{ breakInside: 'avoid' }}>
                     <div className="w-[65%] text-[9pt] leading-normal space-y-1">
                         <div className="flex mb-1">
                             <span className="w-[70px] font-bold">Payment:</span>
@@ -274,8 +276,8 @@ export const InvoiceTemplate = ({ invoiceData, type }: { invoiceData: InvoiceDat
                     <div className="w-[35%] flex flex-col items-center self-stretch justify-between py-1">
                         <p className="font-bold text-[10pt] text-center">PT. JEMBO CABLE COMPANY Tbk</p>
                         <div className="mt-auto flex flex-col items-center">
-                            <div className="mt-24 border-t-[2px] border-black w-[180px]"></div>
-                            <p className="font-bold uppercase pt-1.5 text-[10pt] underline decoration-1 underline-offset-4">Finance</p>
+                            <div className="mt-16 border-t-[2px] border-black w-[180px]"></div>
+                            <p className="font-bold uppercase pt-1.5 text-[10pt] underline decoration-2 underline-offset-4">Finance</p>
                         </div>
                     </div>
                 </div>
@@ -323,16 +325,16 @@ export default function InvoicePreviewPage() {
         html2pdf().from(element).set(opt).save();
     };
 
-    if (!invoiceData) return <div className="p-10 text-center font-bold text-slate-400 animate-pulse">MEMUAT DATA PENAGIHAN...</div>;
+    if (!invoiceData) return <div className="p-10 text-center font-bold text-slate-400 animate-pulse uppercase tracking-widest">Memuat Data Penagihan...</div>;
 
     return (
-        <div className="bg-slate-100 min-h-screen py-10 px-4 font-sans text-black">
+        <div className="bg-slate-200 min-h-screen py-10 px-4 font-sans text-black">
             <style>{`
                 @media screen {
                     .invoice-page-preview {
                         background: white;
-                        box-shadow: 0 0 40px rgba(0,0,0,0.1);
-                        margin-bottom: 20px;
+                        box-shadow: 0 0 30px rgba(0,0,0,0.15);
+                        margin-bottom: 30px;
                     }
                 }
                 @media print {
@@ -343,16 +345,16 @@ export default function InvoicePreviewPage() {
             `}</style>
             
             <div className="fixed top-6 right-6 z-50 flex gap-3 no-print">
-                <button onClick={() => router.back()} className="px-6 py-2 bg-white border rounded-xl font-bold text-sm shadow-sm hover:bg-slate-50 transition-all">Kembali</button>
+                <button onClick={() => router.back()} className="px-6 py-2 bg-white border border-slate-300 rounded-xl font-bold text-sm shadow-sm hover:bg-slate-50 transition-all">Kembali</button>
                 <button onClick={handleDownloadPdf} className="px-6 py-2 bg-indigo-600 text-white rounded-xl font-bold text-[10px] tracking-widest shadow-lg hover:bg-indigo-700 transition-all">SIMPAN PDF</button>
                 <button onClick={() => window.print()} className="px-6 py-2 bg-slate-800 text-white rounded-xl font-bold text-[10px] tracking-widest shadow-lg hover:bg-slate-900 transition-all">CETAK</button>
             </div>
             
             <div ref={invoiceContainerRef} className="mx-auto" style={{ width: '210mm' }}>
-                <div className="invoice-page-preview" style={{ pageBreakAfter: 'always' }}>
+                <div className="invoice-page-preview" style={{ pageBreakAfter: 'always', pageBreakInside: 'avoid' }}>
                     <InvoiceTemplate invoiceData={invoiceData} type="Original" />
                 </div>
-                <div className="invoice-page-preview" style={{ pageBreakAfter: 'avoid' }}>
+                <div className="invoice-page-preview" style={{ pageBreakAfter: 'avoid', pageBreakInside: 'avoid' }}>
                     <InvoiceTemplate invoiceData={invoiceData} type="Copy" />
                 </div>
             </div>
