@@ -85,6 +85,9 @@ export const InvoiceTemplate = ({ invoiceData, type }: { invoiceData: InvoiceDat
     const subTotalItems = items.reduce((acc, item) => acc + (Number(item.total) || 0), 0);
     const invoiceTitle = (invoiceId || '').startsWith('KW') ? 'PROFORMA INVOICE' : 'INVOICE/OFFICIAL RECEIPT';
 
+    // Page break logic: Only the Original sheet triggers a page break after it
+    const pageBreakStyle = type === 'Original' ? 'always' : 'avoid';
+
     return (
         <div 
             className="relative bg-white mx-auto flex flex-col text-black border-none"
@@ -96,6 +99,8 @@ export const InvoiceTemplate = ({ invoiceData, type }: { invoiceData: InvoiceDat
                 fontFamily: 'Arial, Helvetica, sans-serif',
                 boxSizing: 'border-box',
                 color: '#000000',
+                pageBreakAfter: pageBreakStyle as any,
+                breakAfter: pageBreakStyle as any,
                 pageBreakInside: 'avoid',
                 breakInside: 'avoid'
             }}
@@ -106,7 +111,7 @@ export const InvoiceTemplate = ({ invoiceData, type }: { invoiceData: InvoiceDat
             </div>
 
             {/* HEADER SECTION */}
-            <header className="relative">
+            <header className="relative shrink-0">
                 <div className="w-full text-center mb-6">
                     <h1 className="font-bold uppercase text-[13pt] leading-tight mb-0.5">{invoiceTitle}</h1>
                     <p className="font-bold text-[11pt]">{displayInvoiceId}</p>
@@ -133,7 +138,7 @@ export const InvoiceTemplate = ({ invoiceData, type }: { invoiceData: InvoiceDat
             </header>
 
             {/* TABLE SECTION */}
-            <main className='relative'>
+            <main className='relative flex-1 flex flex-col'>
                 <table className="w-full border-collapse text-[8.5pt]">
                     <thead>
                         <tr className='border-y-[1.5pt] border-black'>
@@ -155,11 +160,6 @@ export const InvoiceTemplate = ({ invoiceData, type }: { invoiceData: InvoiceDat
                             </tr>
                         ))}
                         
-                        {/* BARIS PENGATUR JARAK AGAR FOOTER TERDORONG KE BAWAH */}
-                        <tr>
-                            <td colSpan={5} style={{ height: '8cm' }}></td>
-                        </tr>
-
                         {/* SLOT ANGKA NOL (ORANGE CHECKMARK) */}
                         <tr>
                             <td colSpan={3}></td>
@@ -172,9 +172,11 @@ export const InvoiceTemplate = ({ invoiceData, type }: { invoiceData: InvoiceDat
                         {Number(dpValue) > 0 ? (
                             <tr>
                                 <td colSpan={3}></td>
-                                <td className="py-1 px-2 text-left flex justify-between">
-                                    <span>DP</span>
-                                    <span>{dpPercent}%</span>
+                                <td className="py-1 px-2 text-left">
+                                    <div className="flex justify-between w-full pr-4">
+                                        <span>DP</span>
+                                        <span>{dpPercent}%</span>
+                                    </div>
                                 </td>
                                 <td className="py-1 px-2 text-right">
                                     {formatCurrency(dpValue)}
@@ -193,22 +195,17 @@ export const InvoiceTemplate = ({ invoiceData, type }: { invoiceData: InvoiceDat
                         ) : null}
                     </tbody>
                 </table>
-                <div className="mt-20 mb-1 px-2">
+                
+                {/* PO REF - Anchor to bottom of main */}
+                <div className="mt-auto pt-10 pb-4 px-2">
                     <p className="font-bold text-[9pt]">NO PO : {poNumber}</p>
                 </div>
             </main>
 
-            {/* FOOTER SECTION - PREVENT SPLITTING */}
-            <footer 
-                className="mt-auto pt-2" 
-                style={{ 
-                    pageBreakInside: 'avoid',
-                    breakInside: 'avoid',
-                    display: 'block'
-                }}
-            >
+            {/* FOOTER SECTION - FIXED AT BOTTOM */}
+            <footer className="shrink-0 pt-2 border-t border-black">
                 {/* SECTION KALKULASI */}
-                <div className="flex justify-between items-start border-y-[1.5pt] border-black py-1 mb-1">
+                <div className="flex justify-between items-start border-b-[1.5pt] border-black pb-2 mb-2">
                     <div className="w-[50%]"></div>
                     <div className="w-[35%] text-[8.5pt] leading-tight">
                         <div className="flex justify-between">
@@ -231,7 +228,7 @@ export const InvoiceTemplate = ({ invoiceData, type }: { invoiceData: InvoiceDat
                 </div>
 
                 {/* INFORMASI PEMBAYARAN & TANDA TANGAN */}
-                <div className="flex justify-between items-start mt-1" style={{ breakInside: 'avoid' }}>
+                <div className="flex justify-between items-start" style={{ breakInside: 'avoid' }}>
                     <div className="w-[65%] text-[8.5pt] leading-normal space-y-1">
                         <div className="flex mb-1">
                             <span className="w-[65px] font-bold">Payment:</span>
@@ -320,8 +317,8 @@ export default function InvoicePreviewPage() {
             margin: 0,
             filename: `Invoice-${(invoiceData.id || '').replace(/\//g, '_')}.pdf`,
             image: { type: 'jpeg', quality: 1 },
-            html2canvas: { scale: 2, useCORS: true, logging: false },
-            jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
+            html2canvas: { scale: 3, useCORS: true, logging: false, letterRendering: true },
+            jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait', compress: true },
             pagebreak: { mode: ['css', 'avoid-all'] }
         };
         html2pdf().from(element).set(opt).save();
@@ -337,26 +334,27 @@ export default function InvoicePreviewPage() {
                         background: white;
                         box-shadow: 0 0 30px rgba(0,0,0,0.15);
                         margin-bottom: 30px;
+                        display: block;
                     }
                 }
                 @media print {
                     .no-print { display: none !important; }
                     body { background: white !important; padding: 0 !important; }
-                    .invoice-page-preview { box-shadow: none !important; margin-bottom: 0 !important; border: none !important; }
+                    .invoice-page-preview { box-shadow: none !important; margin: 0 !important; border: none !important; }
                 }
             `}</style>
             
             <div className="fixed top-6 right-6 z-50 flex gap-3 no-print">
                 <button onClick={() => router.back()} className="px-6 py-2 bg-white border border-slate-300 rounded-xl font-bold text-sm shadow-sm hover:bg-slate-50 transition-all">Kembali</button>
-                <button onClick={handleDownloadPdf} className="px-6 py-2 bg-indigo-600 text-white rounded-xl font-bold text-[10px] tracking-widest shadow-lg hover:bg-indigo-700 transition-all">SIMPAN PDF</button>
-                <button onClick={() => window.print()} className="px-6 py-2 bg-slate-800 text-white rounded-xl font-bold text-[10px] tracking-widest shadow-lg hover:bg-slate-900 transition-all">CETAK</button>
+                <button onClick={handleDownloadPdf} className="px-6 py-2 bg-indigo-600 text-white rounded-xl font-black uppercase text-[10px] tracking-widest shadow-lg hover:bg-indigo-700 transition-all">SIMPAN PDF</button>
+                <button onClick={() => window.print()} className="px-6 py-2 bg-slate-800 text-white rounded-xl font-black uppercase text-[10px] tracking-widest shadow-lg hover:bg-slate-900 transition-all">CETAK</button>
             </div>
             
             <div ref={invoiceContainerRef} className="mx-auto" style={{ width: '210mm' }}>
-                <div className="invoice-page-preview" style={{ pageBreakAfter: 'always', pageBreakInside: 'avoid' }}>
+                <div className="invoice-page-preview">
                     <InvoiceTemplate invoiceData={invoiceData} type="Original" />
                 </div>
-                <div className="invoice-page-preview" style={{ pageBreakAfter: 'avoid', pageBreakInside: 'avoid' }}>
+                <div className="invoice-page-preview">
                     <InvoiceTemplate invoiceData={invoiceData} type="Copy" />
                 </div>
             </div>
