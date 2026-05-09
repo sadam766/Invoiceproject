@@ -117,79 +117,75 @@ export const InvoiceTemplate = ({ invoiceData, type }: { invoiceData: InvoiceDat
                         </div>
 
                         {/* HEADER SECTION */}
-                        <header className="relative mb-6">
+                        <header className="relative">
                             <div className="w-full text-center mb-6">
-                                <h1 className="font-bold uppercase text-[14pt] leading-tight mb-0.5" style={{ color: '#000000' }}>
-                                    {invoiceTitle}
-                                </h1>
-                                <p className="font-bold text-[12pt]" style={{ color: '#000000' }}>{displayInvoiceId}</p>
+                                <h1 className="font-bold uppercase text-[13pt] leading-tight mb-0.5">{invoiceTitle}</h1>
+                                <p className="font-bold text-[11pt]">{displayInvoiceId}</p>
                             </div>
                             
                             <div className='flex justify-between items-start mb-2'>
                                 <div className='w-[60%]'>
-                                    <h2 className="font-bold text-[11pt] uppercase mb-1" style={{ color: '#000000' }}>
-                                        {customerName || customer.name}
-                                    </h2>
-                                    <p className="text-[10pt] leading-tight whitespace-pre-wrap text-slate-800">
-                                        {billingAddress || customer.address}
-                                    </p>
+                                    <h2 className="font-bold text-[10pt] uppercase mb-0.5">{customer.name}</h2>
+                                    <p className="text-[9pt] leading-tight max-w-sm whitespace-pre-wrap">{customer.address}</p>
                                 </div>
-                                <div className="w-[35%] text-[9pt] leading-tight">
-                                    <div className="grid grid-cols-[90px_10px_1fr] gap-y-1">
-                                        <span className="font-bold">Sales Order</span><span>:</span><span>{soNumber}</span>
-                                        <span className="font-bold">Order Date</span><span>:</span><span>{formatDate(date)}</span>
-                                        <span className="font-bold">Reference A</span><span>:</span><span>-</span>
+                                <div className="w-[30%] text-[8.5pt] leading-tight">
+                                    <div className="grid grid-cols-[80px_5px_1fr] gap-y-0.5">
+                                        <span>Sales Order</span><span>:</span><span>{soNumber}</span>
+                                        <span>Order Date</span><span>:</span><span>{formatDate(date)}</span>
+                                        <span>Reference A</span><span>:</span><span>-</span>
                                     </div>
                                 </div>
                             </div>
 
-                            <div className='flex justify-between text-[10pt] py-2 border-y border-black uppercase mt-4 font-bold'>
+                            {/* Customer Code & Date (Garis biru dihapus, nempel ke tabel) */}
+                            <div className='flex justify-between text-[8.5pt] py-1 uppercase'>
                                 <p className='m-0'>Customer Code : {customerCode}</p>
                                 <p className='m-0'>Date: {formatDate(date)}</p>
                             </div>
                         </header>
 
                         {/* TABLE SECTION */}
-                        <main className='relative flex-1'>
-                            <table className="w-full border-collapse">
+                        <main className='relative'>
+                            <table className="w-full border-collapse text-[8.5pt]">
                                 <thead>
-                                    <tr className='bg-gray-100 border-y-2 border-black'>
-                                        <th className="py-2 px-2 text-left w-[5%] font-bold">NO.</th>
-                                        <th className="py-2 px-2 text-left w-[45%] font-bold">ITEM DESCRIPTION</th>
-                                        <th className="py-2 px-2 text-center w-[15%] font-bold">QUANTITY UNIT</th>
-                                        <th className="py-2 px-2 text-right w-[15%] font-bold">UNIT PRICE</th>
-                                        <th className="py-2 px-2 text-right w-[20%] font-bold">AMOUNT</th>
+                                    <tr className='border-y-[1.5pt] border-black'>
+                                        <th className="py-1.5 px-2 text-left w-[5%] font-bold">NO.</th>
+                                        <th className="py-1.5 px-2 text-left w-[45%] font-bold">ITEM DESCRIPTION</th>
+                                        <th className="py-1.5 px-2 text-center w-[15%] font-bold">QUANTITY UNIT</th>
+                                        <th className="py-1.5 px-2 text-right w-[15%] font-bold">UNIT PRICE</th>
+                                        <th className="py-1.5 px-2 text-right w-[20%] font-bold">AMOUNT</th>
                                     </tr>
                                 </thead>
                                 <tbody>
                                     {chunk.map((item, itemIdx) => (
-                                        <tr key={item.id || itemIdx} className='align-top border-b border-gray-100'>
-                                            <td className="py-2 px-2">{pageIndex * ITEMS_PER_PAGE + itemIdx + 1}</td>
-                                            <td className="py-2 px-2 uppercase font-medium">{item.name}</td>
-                                            <td className="py-2 px-2 text-center">{item.quantity?.toLocaleString('id-ID')} {item.unit}</td>
-                                            <td className="py-2 px-2 text-right">{formatCurrency(item.price)}</td>
-                                            <td className="py-2 px-2 text-right">{formatCurrency(item.total)}</td>
+                                        <tr key={item.id} className='align-top'>
+                                            <td className="py-1 px-2">{pageIndex * ITEMS_PER_PAGE + itemIdx + 1}</td>
+                                            <td className="py-1 px-2 uppercase font-medium">{item.name}</td>
+                                            <td className="py-1 px-2 text-center">{item.quantity?.toLocaleString('id-ID')} {item.unit}</td>
+                                            <td className="py-1 px-2 text-right">{formatCurrency(item.price)}</td>
+                                            <td className="py-1 px-2 text-right">{formatCurrency(item.total)}</td>
                                         </tr>
                                     ))}
                                     
+                                    {/* SPACING AGAR KONDISIONAL BERADA DI BAWAH */}
                                     {isLastPage ? (
                                         <>
-                                            {/* SPACER TO PUSH FOOTER DOWN */}
+                                            {/* --- BARIS PENGATUR JARAK --- */}
                                             <tr>
                                                 <td colSpan={5} style={{ height: '8cm' }}></td>
                                             </tr>
 
-                                            {/* SUB-TOTAL ITEM (Orange slot recovered) */}
-                                            <tr className="border-t-2 border-black">
+                                            {/* SUB-TOTAL ITEM */}
+                                            <tr>
                                                 <td colSpan={3}></td>
-                                                <td className="py-1.5 px-2 text-left"></td>
-                                                <td className="py-1.5 px-2 text-right">
+                                                <td className="py-1 px-2 text-left"></td>
+                                                <td className="py-1 px-2 text-right border-t border-black">
                                                     {formatCurrency(subTotalItems)}
                                                 </td>
                                             </tr>
 
-                                            {/* DP ROW */}
-                                            {dpValue > 0 ? (
+                                            {/* DP / RETENSI (Hanya muncul jika ada nilai) */}
+                                            {Number(dpValue) > 0 ? (
                                                 <tr>
                                                     <td colSpan={3}></td>
                                                     <td className="py-1 px-2 text-left flex justify-between">
@@ -202,8 +198,8 @@ export const InvoiceTemplate = ({ invoiceData, type }: { invoiceData: InvoiceDat
                                                 </tr>
                                             ) : null}
 
-                                            {/* DISCOUNT ROW */}
-                                            {discount > 0 ? (
+                                            {/* DISKON (Opsional) */}
+                                            {Number(discount) > 0 ? (
                                                 <tr>
                                                     <td colSpan={3}></td>
                                                     <td className="py-1 px-2 text-left">Diskon</td>
@@ -216,20 +212,28 @@ export const InvoiceTemplate = ({ invoiceData, type }: { invoiceData: InvoiceDat
                                     ) : null}
                                 </tbody>
                             </table>
-
+                            {/* POSISI NO PO */}
                             {isLastPage ? (
-                                <div className="mt-8 mb-4 px-2">
-                                    <p className="font-bold text-[10pt]">NO PO : {poNumber}</p>
+                                <div className="mt-20 mb-1 px-2">
+                                    <p className="font-bold text-[9pt]">NO PO : {poNumber}</p>
                                 </div>
                             ) : null}
                         </main>
 
                         {/* FOOTER SECTION */}
                         {isLastPage ? (
-                            <footer className="mt-auto pt-4 border-t-2 border-black">
-                                <div className="flex justify-between items-start mb-6">
+                            <footer 
+                                className="mt-auto pt-2" 
+                                style={{ 
+                                    pageBreakInside: 'avoid',
+                                    breakInside: 'avoid',
+                                    display: 'block'
+                                }}
+                            >
+                                {/* SECTION KALKULASI */}
+                                <div className="flex justify-between items-start border-y-[1.5pt] border-black py-1 mb-1">
                                     <div className="w-[50%]"></div>
-                                    <div className="w-[40%] text-[10pt] space-y-1">
+                                    <div className="w-[35%] text-[8.5pt] leading-tight">
                                         <div className="flex justify-between">
                                             <span>Goods :</span>
                                             <span>{formatCurrency(grandTotal)}</span>
@@ -242,47 +246,67 @@ export const InvoiceTemplate = ({ invoiceData, type }: { invoiceData: InvoiceDat
                                             <span>VAT 12 % :</span>
                                             <span>{formatCurrency(vat12)}</span>
                                         </div>
-                                        <div className="flex justify-between font-bold text-[11pt] border-t border-black pt-1">
+                                        <div className="flex justify-between font-black">
                                             <span>Total Rp :</span>
                                             <span>{formatCurrency(totalRp)}</span>
                                         </div>
                                     </div>
                                 </div>
 
-                                <div className="flex justify-between items-start mt-2">
-                                    {/* BANK INFO */}
-                                    <div className="w-[60%] text-[9pt] leading-normal space-y-2">
-                                        <div className="flex">
-                                            <span className="w-[70px] font-bold">Payment:</span>
-                                            <span>{paymentTerms}</span>
+                                {/* INFORMASI PEMBAYARAN & TANDA TANGAN */}
+                                <div className="flex justify-between items-start mt-1" style={{ breakInside: 'avoid' }}>
+                                    {/* Bagian Kiri: Info Bank */}
+                                    <div className="w-[65%] text-[8.5pt] leading-normal space-y-1">
+                                    <div className="flex mb-1">
+                                        <span className="w-[65px] font-bold">Payment:</span>
+                                        <span>{paymentTerms}</span>
+                                    </div>
+
+                                    <div className="flex flex-col"> 
+                                        <p className="font-bold m-0 leading-tight">
+                                            Please state with your payment: {displayInvoiceId}
+                                        </p>
+                                        <p className="font-bold m-0 leading-tight">
+                                            For payment, please transfer to our account:
+                                        </p>
+                                        <p className="font-bold uppercase m-0 leading-tight">
+                                            PT. Jembo Cable Company Tbk
+                                        </p>
+                                    </div>
+                                        {/* Detail Bank Mandiri */}
+                                        <div className="mt-2 space-y-0.5">
+                                            <div className="flex items-start">
+                                                <span className="w-[100px] font-bold">Bank Mandiri -</span>
+                                                <span>A/C No. : 102-0100206827 (Rp)</span>
+                                            </div>
+                                            <div className="flex items-start">
+                                                <span className="w-[100px]">Cabang</span>
+                                                <span>A/C No. : 102-0005000218 (Rp)</span>
+                                            </div>
+                                            <div className="flex items-start">
+                                                <span className="w-[100px]">Jakarta</span>
+                                                <span>A/C No. : 102-0005000226 (USD)</span>
+                                            </div>
                                         </div>
 
-                                        <div className="space-y-0.5"> 
-                                            <p className="font-bold m-0 italic">Please state with your payment: {displayInvoiceId}</p>
-                                            <p className="font-bold m-0">For payment, please transfer to our account:</p>
-                                            <p className="font-bold uppercase m-0 text-[10pt]">PT. JEMBO CABLE COMPANY Tbk</p>
-                                        </div>
-                                        
-                                        <div className="space-y-0.5 pl-2 border-l-2 border-slate-100">
-                                            <div className="flex"><span className="w-[110px] font-bold">Bank Mandiri</span><span>A/C No. : 102-0100206827 (Rp)</span></div>
-                                            <div className="flex"><span className="w-[110px]">Cabang</span><span>A/C No. : 102-0005000218 (Rp)</span></div>
-                                            <div className="flex"><span className="w-[110px]">Jakarta</span><span>A/C No. : 102-0005000226 (USD)</span></div>
-                                        </div>
+                                        <div className="w-[280px] text-center font-bold text-[8pt] py-1">OR</div>
 
-                                        <div className="w-full text-center font-bold text-slate-300 py-1 text-[8pt]">--- OR ---</div>
-
-                                        <div className="flex items-start pl-2 border-l-2 border-slate-100">
-                                            <div className="w-[110px] font-bold leading-tight">Bank BCA<br/><span className="font-normal text-[8pt]">KEM TOWER</span></div>
-                                            <div className="font-bold">A/C No. : 684-0198977 (Rp)</div>
+                                        {/* Detail Bank BCA */}
+                                        <div className="flex items-start space-x-0">
+                                            <div className="w-[100px] font-bold leading-[1.2]">
+                                                Bank BCA - Jakarta<br/>
+                                                <span className="font-normal text-[7.5pt]">Cabang KEM TOWER</span>
+                                            </div>
+                                            <div className="pt-0.5">A/C No. : 684-0198977 (Rp)</div>
                                         </div>
                                     </div>
 
-                                    {/* SIGNATURE */}
-                                    <div className="w-[35%] flex flex-col items-center justify-between min-h-[160px]">
-                                        <p className="font-bold text-[10pt] text-center">PT. JEMBO CABLE COMPANY Tbk</p>
-                                        <div className="mt-auto flex flex-col items-center w-full">
-                                            <div className="mb-2 border-b-2 border-black w-40"></div>
-                                            <p className="font-bold uppercase text-[10pt] underline">Finance</p>
+                                    {/* Bagian Kanan: Tanda Tangan */}
+                                    <div className="w-[35%] flex flex-col items-center self-stretch justify-between py-1">
+                                        <p className="font-bold text-[9pt] text-center">PT. JEMBO CABLE COMPANY Tbk</p>
+                                        <div className="mt-auto flex flex-col items-center">
+                                            <div className="mt-16 border-t-[1.5pt] border-black w-[160px]"></div>
+                                            <p className="font-bold uppercase pt-1 text-[9pt]">Finance</p>
                                         </div>
                                     </div>
                                 </div>
