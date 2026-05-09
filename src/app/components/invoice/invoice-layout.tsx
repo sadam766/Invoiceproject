@@ -41,6 +41,7 @@ interface InvoiceData {
 
 // --- UTILITIES ---
 const formatCurrency = (amount: any): string => {
+    if (amount === undefined || amount === null || amount === '') return '0,00';
     const num = typeof amount === 'number' ? amount : parseFloat(amount);
     if (isNaN(num)) return '0,00';
     return num.toLocaleString('id-ID', {
@@ -86,17 +87,15 @@ export const InvoiceTemplate = ({ invoiceData, type }: { invoiceData: InvoiceDat
 
     return (
         <div 
-            className="relative bg-white mx-auto flex flex-col text-black border-none overflow-hidden"
+            className="relative bg-white mx-auto flex flex-col text-black border-none"
             style={{ 
                 width: '210mm', 
-                height: '297mm', // Strict A4 Height
+                minHeight: '296mm', 
                 padding: '50mm 15mm 15mm 15mm',
                 fontSize: '10pt',
                 fontFamily: 'Arial, Helvetica, sans-serif',
                 boxSizing: 'border-box',
                 color: '#000000',
-                pageBreakInside: 'avoid',
-                breakInside: 'avoid'
             }}
         >
             {/* TYPE INDICATOR */}
@@ -106,7 +105,7 @@ export const InvoiceTemplate = ({ invoiceData, type }: { invoiceData: InvoiceDat
 
             {/* HEADER SECTION */}
             <header className="relative">
-                <div className="w-full text-center mb-6">
+                <div className="w-full text-center mb-8">
                     <h1 className="font-bold uppercase text-[14pt] leading-tight mb-0.5">{invoiceTitle}</h1>
                     <p className="font-bold text-[12pt]">{displayInvoiceId}</p>
                 </div>
@@ -156,10 +155,10 @@ export const InvoiceTemplate = ({ invoiceData, type }: { invoiceData: InvoiceDat
                         
                         {/* BARIS PENGATUR JARAK AGAR FOOTER TERDORONG KE BAWAH */}
                         <tr>
-                            <td colSpan={5} style={{ height: '7cm' }}></td>
+                            <td colSpan={5} style={{ height: '7.5cm' }}></td>
                         </tr>
 
-                        {/* SUB-TOTAL ITEM (SLOT 0 CHECKMARK) */}
+                        {/* SLOT ANGKA NOL (ORANGE CHECKMARK) */}
                         <tr>
                             <td colSpan={3}></td>
                             <td className="py-1 px-2 text-left"></td>
@@ -197,12 +196,13 @@ export const InvoiceTemplate = ({ invoiceData, type }: { invoiceData: InvoiceDat
                 </div>
             </main>
 
-            {/* FOOTER SECTION */}
+            {/* FOOTER SECTION - PREVENT SPLITTING */}
             <footer 
                 className="mt-auto pt-2" 
                 style={{ 
                     pageBreakInside: 'avoid',
-                    breakInside: 'avoid'
+                    breakInside: 'avoid',
+                    display: 'block'
                 }}
             >
                 {/* SECTION KALKULASI */}
@@ -340,7 +340,7 @@ export default function InvoicePreviewPage() {
                 @media print {
                     .no-print { display: none !important; }
                     body { background: white !important; padding: 0 !important; }
-                    .invoice-page-preview { box-shadow: none !important; margin-bottom: 0 !important; }
+                    .invoice-page-preview { box-shadow: none !important; margin-bottom: 0 !important; border: none !important; }
                 }
             `}</style>
             
