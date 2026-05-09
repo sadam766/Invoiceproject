@@ -64,28 +64,30 @@ const formatDate = (dateString: string): string => {
 const ITEMS_PER_PAGE = 15;
 
 export const InvoiceTemplate = ({ invoiceData, type }: { invoiceData: InvoiceData, type: 'Original' | 'Copy' }) => {
+    if (!invoiceData) return null;
+
     const {
-        id: invoiceId,
+        id: invoiceId = '',
         items = [],
-        customer,
-        date,
-        soNumber,
-        poNumber,
-        grandTotal,
-        dppVat,
-        vat12,
-        paymentTerms,
-        totalRp,
+        customer = { name: 'N/A', address: 'N/A' },
+        date = '',
+        soNumber = '-',
+        poNumber = '-',
+        grandTotal = 0,
+        dppVat = 0,
+        vat12 = 0,
+        paymentTerms = '-',
+        totalRp = 0,
         customerCode = '-',
         dpValue = 0,
         dpPercent = 0
     } = invoiceData;
 
-    const displayInvoiceId = invoiceId.replace(/_/g, '/');
+    const displayInvoiceId = (invoiceId || '').replace(/_/g, '/');
     const subTotalItems = items.reduce((acc, item) => acc + (Number(item.total) || 0), 0);
-    const invoiceTitle = invoiceId.startsWith('KW') ? 'PROFORMA INVOICE' : 'INVOICE/OFFICIAL RECEIPT';
+    const invoiceTitle = (invoiceId || '').startsWith('KW') ? 'PROFORMA INVOICE' : 'INVOICE/OFFICIAL RECEIPT';
 
-    const itemChunks = Array.from({ length: Math.ceil(items.length / ITEMS_PER_PAGE) }, (_, i) =>
+    const itemChunks = Array.from({ length: Math.ceil(items.length / ITEMS_PER_PAGE) || 1 }, (_, i) =>
         items.slice(i * ITEMS_PER_PAGE, i * ITEMS_PER_PAGE + ITEMS_PER_PAGE)
     );
     const totalPages = itemChunks.length;
@@ -118,7 +120,7 @@ export const InvoiceTemplate = ({ invoiceData, type }: { invoiceData: InvoiceDat
                             <div className='flex justify-between items-start mb-2'>
                                 <div className='w-[60%]'>
                                     <h2 className="font-bold text-[10pt] uppercase mb-0.5">{invoiceData.customerName || customer.name}</h2>
-                                    <p className="text-[9pt] leading-tight max-w-sm whitespace-pre-wrap">{customer.address}</p>
+                                    <p className="text-[9pt] leading-tight max-sm whitespace-pre-wrap">{customer.address}</p>
                                 </div>
                                 <div className="w-[30%] text-[8.5pt] leading-tight">
                                     <div className="grid grid-cols-[80px_5px_1fr] gap-y-0.5">
@@ -306,12 +308,16 @@ export default function InvoicePreviewPage() {
     useEffect(() => {
         const dataFromSession = sessionStorage.getItem('invoicePreviewData');
         if (dataFromSession) {
-            const parsed = JSON.parse(dataFromSession);
-            setInvoiceData({
-                ...parsed,
-                items: parsed.items || [],
-                customer: parsed.customer || { name: 'N/A', address: 'N/A' },
-            });
+            try {
+                const parsed = JSON.parse(dataFromSession);
+                setInvoiceData({
+                    ...parsed,
+                    items: parsed.items || [],
+                    customer: parsed.customer || { name: 'N/A', address: 'N/A' },
+                });
+            } catch (e) {
+                console.error("Failed to parse invoice data", e);
+            }
         }
     }, []);
 
@@ -321,7 +327,7 @@ export default function InvoicePreviewPage() {
         
         const opt = {
             margin: 0,
-            filename: `Invoice-${invoiceData.id.replace(/\//g, '_')}.pdf`,
+            filename: `Invoice-${(invoiceData.id || '').replace(/\//g, '_')}.pdf`,
             image: { type: 'jpeg', quality: 1 },
             html2canvas: { scale: 2, useCORS: true, logging: false },
             jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
