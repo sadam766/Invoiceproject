@@ -25,10 +25,9 @@ const InvoicePreviewPage = () => {
 
   useEffect(() => {
     if (invoiceData) {
-        // Map data from Firestore to match InvoiceTemplate expected props
         setFormattedData({
             ...invoiceData,
-            grandTotal: invoiceData.amount, // Placeholder, usually calculated from items in DB
+            grandTotal: invoiceData.amount,
             customer: {
                 name: invoiceData.customerName || invoiceData.customer,
                 address: invoiceData.billingAddress || 'N/A'
@@ -44,10 +43,10 @@ const InvoicePreviewPage = () => {
     const opt = {
       margin: 0,
       filename: `Invoice_${formattedData.id.replace(/\//g, '_')}.pdf`,
-      image: { type: 'jpeg', quality: 0.98 },
-      html2canvas: { scale: 3, useCORS: true },
+      image: { type: 'jpeg', quality: 1 },
+      html2canvas: { scale: 2, useCORS: true, logging: false },
       jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
-      pagebreak: { mode: 'css' }
+      pagebreak: { mode: ['css', 'avoid-all'] }
     };
 
     html2pdf().from(element).set(opt).save();
@@ -58,8 +57,14 @@ const InvoicePreviewPage = () => {
 
   return (
     <main className="min-h-screen bg-slate-100 py-12 px-4 flex flex-col items-center print:p-0 print:bg-white">
-      {/* Floating Header Actions */}
-      <div className="fixed top-6 right-6 z-50 flex gap-3 print:hidden">
+      <style>{`
+        @media print {
+            .no-print { display: none !important; }
+            body { background: white !important; padding: 0 !important; }
+        }
+      `}</style>
+
+      <div className="fixed top-6 right-6 z-50 flex gap-3 no-print">
         <Button variant="outline" onClick={() => router.back()} className="rounded-xl font-bold bg-white shadow-md">
           <ArrowLeft size={16} className="mr-2"/> Kembali
         </Button>
@@ -71,9 +76,9 @@ const InvoicePreviewPage = () => {
         </Button>
       </div>
 
-      <div ref={invoiceContainerRef} className="print:m-0 print:p-0 flex flex-col items-center">
-        <InvoiceTemplate invoiceData={{ ...formattedData, printType: 'Original' }} type="Original" />
-        <InvoiceTemplate invoiceData={{ ...formattedData, printType: 'Copy' }} type="Copy" />
+      <div ref={invoiceContainerRef} className="print:m-0 print:p-0 flex flex-col items-center" style={{ width: '210mm' }}>
+        <InvoiceTemplate invoiceData={formattedData} type="Original" />
+        <InvoiceTemplate invoiceData={formattedData} type="Copy" />
       </div>
     </main>
   );
