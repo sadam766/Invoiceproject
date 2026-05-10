@@ -416,10 +416,21 @@ export default function AddInvoicePage() {
                                                     </PopoverTrigger>
                                                     <PopoverContent className="w-[450px] p-0 shadow-2xl" align="start">
                                                         <Command>
-                                                            <CommandInput placeholder="Search History..." />
+                                                            <CommandInput placeholder="Search Catalog or History..." />
                                                             <CommandList>
-                                                                <CommandEmpty>No history for this customer.</CommandEmpty>
-                                                                <CommandGroup heading="Recent Purchases">
+                                                                <CommandEmpty>No matches found.</CommandEmpty>
+                                                                <CommandGroup heading="Material Catalog">
+                                                                    {uniqueMasterProducts.map((p, i) => (
+                                                                        <CommandItem key={i} onSelect={() => {
+                                                                            updateItemField(item.id, 'name', p.name);
+                                                                            updateItemField(item.id, 'price', p.price);
+                                                                            updateItemField(item.id, 'unit', p.unit);
+                                                                        }}>
+                                                                            <div className="flex flex-col"><span className="text-[10px] font-bold uppercase">{p.name}</span><span className="text-[8px] text-indigo-600">{p.unit} • Catalog Std Price</span></div>
+                                                                        </CommandItem>
+                                                                    ))}
+                                                                </CommandGroup>
+                                                                <CommandGroup heading="Customer History">
                                                                     {itemHistorySuggestions.map((h, i) => (
                                                                         <CommandItem key={i} onSelect={() => {
                                                                             updateItemField(item.id, 'name', h.name);
