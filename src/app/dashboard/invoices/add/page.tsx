@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useEffect, useState, useMemo } from 'react';
@@ -37,7 +38,10 @@ import {
   Eye,
   Percent,
   Layers,
-  UserCircle2
+  UserCircle2,
+  MapPin,
+  Building2,
+  History
 } from 'lucide-react';
 import { type Invoice, type UserProfile, type InvoiceItem, type InvoiceNumber } from '@/app/lib/data';
 import { useToast } from '@/hooks/use-toast';
@@ -112,6 +116,16 @@ export default function AddInvoicePage() {
   const [discountValue, setDiscountValue] = useState<string>('0');
   const [discountLabel, setDiscountLabel] = useState('Discount');
 
+  // TRIGGER: Real-time DP % to Rp Calculation
+  useEffect(() => {
+    const p = parseFloat(dpPercent);
+    if (!isNaN(p)) {
+        const subtotal = items.reduce((acc, item) => acc + (item.total || 0), 0);
+        const calculated = (p / 100) * subtotal;
+        setDpValue(formatNumberWithCommas(calculated));
+    }
+  }, [dpPercent, items]);
+
   const uniqueMasterProducts = useMemo(() => {
     if (!masterProducts) return [];
     const seen = new Set();
@@ -140,14 +154,10 @@ export default function AddInvoicePage() {
     return Object.values(customerItems);
   }, [activeIdentity?.customer, allInvoices]);
 
-  useEffect(() => {
-    const p = parseFloat(dpPercent);
-    if (!isNaN(p)) {
-        const subtotal = items.reduce((acc, item) => acc + (item.total || 0), 0);
-        const calculated = (p / 100) * subtotal;
-        setDpValue(formatNumberWithCommas(calculated));
-    }
-  }, [dpPercent, items]);
+  const currentCustomer = useMemo(() => {
+    if (!activeIdentity?.customer || !allCustomers) return null;
+    return allCustomers.find(c => c.name.toLowerCase() === activeIdentity.customer.toLowerCase());
+  }, [activeIdentity?.customer, allCustomers]);
 
   useEffect(() => {
       if (activeIdentity) {
@@ -156,6 +166,11 @@ export default function AddInvoicePage() {
               setItems(activeIdentity.items);
           } 
           if (activeIdentity.billingAddress) setBillingAddress(activeIdentity.billingAddress);
+          else if (currentCustomer && !billingAddress) {
+              const defaultAddr = currentCustomer.addresses?.find(a => a.isDefault) || currentCustomer.addresses?.[0];
+              if (defaultAddr) setBillingAddress(defaultAddr.address);
+          }
+
           if ((activeIdentity as Invoice).paymentMode) setPaymentMode((activeIdentity as Invoice).paymentMode as any);
           if ((activeIdentity as Invoice).paymentTerms) setPaymentTerms((activeIdentity as Invoice).paymentTerms!);
           if ((activeIdentity as Invoice).vaNumber) setManualVaNumber((activeIdentity as Invoice).vaNumber!);
@@ -164,12 +179,7 @@ export default function AddInvoicePage() {
           if ((activeIdentity as Invoice).dpMode) setDpMode((activeIdentity as Invoice).dpMode!);
           if ((activeIdentity as Invoice).discount) setDiscountValue(formatNumberWithCommas((activeIdentity as Invoice).discount!));
       }
-  }, [activeIdentity, items.length, selectedSoNumber]);
-
-  const currentCustomer = useMemo(() => {
-    if (!activeIdentity?.customer || !allCustomers) return null;
-    return allCustomers.find(c => c.name.toLowerCase() === activeIdentity.customer.toLowerCase());
-  }, [activeIdentity?.customer, allCustomers]);
+  }, [activeIdentity, items.length, selectedSoNumber, currentCustomer, billingAddress]);
 
   useEffect(() => {
     if (currentCustomer && paymentMode === 'virtual_account' && !manualVaNumber) {
@@ -242,7 +252,7 @@ export default function AddInvoicePage() {
         status: invoiceStatus,
         paymentMode: paymentMode,
         paymentTerms: paymentTerms,
-        vaNumber: paymentMode === 'virtual_account' ? manualVaNumber : '',
+        vaNumber: (paymentMode === 'virtual_account' || manualVaNumber) ? manualVaNumber : '',
         dpValue: calcs.dpValue,
         dpDescription: dpDescription,
         dpMode: dpMode,
@@ -259,7 +269,6 @@ export default function AddInvoicePage() {
 
     try {
         await setDoc(invoiceDocRef, dataToSave, { merge: true });
-        sessionStorage.setItem('invoicePreviewData', JSON.stringify({ ...dataToSave, grandTotal: calcs.subTotalItems }));
         if (redirectToPreview) router.push(`/dashboard/invoices/preview/${encodeURIComponent(activeIdentity.id)}`);
         else router.push('/dashboard/invoices');
     } catch (err) {
@@ -299,7 +308,7 @@ export default function AddInvoicePage() {
               <Button variant="ghost" size="icon" onClick={() => router.back()} className="rounded-full h-10 w-10"><ChevronLeft className="h-5 w-5" /></Button>
               <div>
                   <h1 className="text-lg font-black tracking-tight uppercase text-slate-900 leading-tight">Billing Constructor</h1>
-                  <p className="text-slate-400 text-[10px] font-bold uppercase tracking-widest">Standard Layout V2.0 — High Precision Mode</p>
+                  <p className="text-slate-400 text-[10px] font-bold uppercase tracking-widest">Dakota Intelligent Billing Engine v2.0</p>
               </div>
           </div>
           <div className="flex items-center gap-3">
@@ -316,57 +325,73 @@ export default function AddInvoicePage() {
       <div className="flex flex-1 overflow-hidden">
           <div className="w-[48%] overflow-y-auto p-8 border-r bg-slate-50/30">
               <div className="space-y-8 max-w-2xl mx-auto pb-20">
-                  <Card className="border-none shadow-sm ring-1 ring-indigo-200 bg-indigo-50/30 overflow-hidden">
-                    <CardHeader className="py-3 px-6 bg-white border-b">
-                        <CardTitle className="text-[10px] font-black uppercase text-indigo-600 flex items-center gap-2">
-                            <UserCircle2 className="h-4 w-4" /> Verified Customer Profile
+                  
+                  {/* CUSTOMER INSIGHT SECTION */}
+                  <Card className="border-none shadow-md ring-1 ring-indigo-200 bg-white overflow-hidden rounded-3xl">
+                    <CardHeader className="py-4 px-6 bg-indigo-600 text-white">
+                        <CardTitle className="text-[10px] font-black uppercase flex items-center gap-2 tracking-widest">
+                            <Building2 className="h-4 w-4" /> Customer Profile Verification
                         </CardTitle>
                     </CardHeader>
                     <CardContent className="p-6">
-                        <div className="space-y-4">
-                            <div className="space-y-1">
-                                <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Legal PT Name</p>
-                                <p className="text-sm font-black text-slate-900 uppercase">{activeIdentity?.customer || 'Awaiting Selection...'}</p>
+                        <div className="grid gap-6">
+                            <div className="flex items-start gap-4">
+                                <div className="bg-indigo-50 p-3 rounded-2xl"><UserCircle2 className="h-6 w-6 text-indigo-600" /></div>
+                                <div className="space-y-1 flex-1">
+                                    <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Legal PT Name</p>
+                                    <p className="text-lg font-black text-slate-900 uppercase leading-none">{activeIdentity?.customer || 'Awaiting Selection...'}</p>
+                                    <div className="flex gap-2 mt-1">
+                                        <Badge variant="outline" className="text-[8px] font-black uppercase bg-slate-50 border-slate-200">{currentCustomer?.customerCode || 'NO CODE'}</Badge>
+                                        <Badge variant="outline" className="text-[8px] font-black uppercase bg-emerald-50 text-emerald-700 border-emerald-100">VA: {currentCustomer?.virtualAccountNumber || 'Manual Only'}</Badge>
+                                    </div>
+                                </div>
                             </div>
-                            <div className="space-y-1">
-                                <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Billing/Delivery Point</p>
-                                <p className="text-[11px] leading-relaxed font-medium text-slate-600 italic">
-                                    {billingAddress || 'No specific address specified.'}
-                                </p>
+                            <div className="flex items-start gap-4 pt-4 border-t border-slate-50">
+                                <div className="bg-rose-50 p-3 rounded-2xl"><MapPin className="h-6 w-6 text-rose-600" /></div>
+                                <div className="space-y-1 flex-1">
+                                    <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Official Billing Address</p>
+                                    <p className="text-[11px] leading-relaxed font-bold text-slate-600 italic">
+                                        {billingAddress || 'No address specified in record.'}
+                                    </p>
+                                    <Button variant="link" size="sm" className="h-auto p-0 text-[9px] font-black uppercase text-indigo-600">Change Address</Button>
+                                </div>
                             </div>
                         </div>
                     </CardContent>
                   </Card>
 
-                  <Card className="shadow-sm border-none ring-1 ring-slate-200 overflow-hidden">
-                    <CardHeader className="bg-white border-b py-3 px-6">
+                  <Card className="shadow-sm border-none ring-1 ring-slate-200 overflow-hidden rounded-3xl">
+                    <CardHeader className="bg-slate-50/50 border-b py-3 px-6">
                         <CardTitle className="text-[10px] font-black uppercase flex items-center gap-2 text-slate-500 tracking-widest">
-                            <ReceiptText className="h-4 w-4 text-indigo-600" /> Header Info
+                            <ReceiptText className="h-4 w-4 text-indigo-600" /> Invoice Header Info
                         </CardTitle>
                     </CardHeader>
                     <CardContent className="p-6 space-y-6">
                         <div className="grid grid-cols-2 gap-4">
                             <div className="space-y-1.5">
-                                <Label className="text-[9px] font-black uppercase text-slate-400">Invoice Date</Label>
-                                <Input type="date" value={format(issueDate, 'yyyy-MM-dd')} onChange={e => setIssueDate(new Date(e.target.value))} className="h-10 font-bold" />
+                                <Label className="text-[9px] font-black uppercase text-slate-400">Invoice Issue Date</Label>
+                                <Input type="date" value={format(issueDate, 'yyyy-MM-dd')} onChange={e => setIssueDate(new Date(e.target.value))} className="h-10 font-bold rounded-xl" />
                             </div>
                             <div className="space-y-1.5">
                                 <Label className="text-[9px] font-black uppercase text-slate-400 flex items-center gap-1">Payment Terms</Label>
-                                <Input value={paymentTerms} onChange={e => setPaymentTerms(e.target.value)} placeholder="E.g. 90 Hari" className="h-10 font-black border-indigo-200" />
+                                <Input value={paymentTerms} onChange={e => setPaymentTerms(e.target.value)} placeholder="E.g. 90 Hari" className="h-10 font-black border-indigo-200 rounded-xl" />
                             </div>
                             <div className="col-span-2 space-y-1.5">
-                                <Label className="text-[9px] font-black uppercase text-slate-400 flex items-center gap-1">Sales Order Number (SO)</Label>
-                                <Input value={selectedSoNumber} onChange={e => setSelectedSoNumber(e.target.value)} placeholder="SO-9923-..." className="h-10 font-black border-indigo-200" />
+                                <Label className="text-[9px] font-black uppercase text-slate-400 flex items-center gap-1">Sales Order Reference (SO)</Label>
+                                <Input value={selectedSoNumber} onChange={e => setSelectedSoNumber(e.target.value)} placeholder="SO-XXXX-..." className="h-10 font-black border-indigo-200 rounded-xl uppercase" />
                             </div>
                         </div>
                     </CardContent>
                   </Card>
 
-                  <Card className="shadow-sm border-none ring-1 ring-slate-200 overflow-hidden">
-                    <CardHeader className="bg-white border-b py-3 px-6">
-                        <CardTitle className="text-[10px] font-black uppercase text-slate-500 tracking-widest flex items-center gap-2">
-                            <Layers className="h-4 w-4 text-indigo-600" /> Line Items (History Supported)
-                        </CardTitle>
+                  <Card className="shadow-sm border-none ring-1 ring-slate-200 overflow-hidden rounded-3xl">
+                    <CardHeader className="bg-slate-50/50 border-b py-3 px-6">
+                        <div className="flex justify-between items-center">
+                            <CardTitle className="text-[10px] font-black uppercase text-slate-500 tracking-widest flex items-center gap-2">
+                                <Layers className="h-4 w-4 text-indigo-600" /> Line Items (Constructor)
+                            </CardTitle>
+                            <Badge variant="secondary" className="bg-indigo-50 text-indigo-700 text-[8px] font-black">History & Catalog Integrated</Badge>
+                        </div>
                     </CardHeader>
                     <CardContent className="p-0">
                         <div className="max-h-[400px] overflow-y-auto">
@@ -374,44 +399,46 @@ export default function AddInvoicePage() {
                                 <TableHeader className="bg-slate-50/50 sticky top-0 z-10 shadow-sm">
                                     <TableRow>
                                         <TableHead className="py-3 px-6 text-[10px] font-black uppercase">Description</TableHead>
-                                        <TableHead className="w-[100px] text-center text-[10px] font-black uppercase">Qty</TableHead>
+                                        <TableHead className="w-[80px] text-center text-[10px] font-black uppercase">Qty</TableHead>
                                         <TableHead className="w-[100px] text-center text-[10px] font-black uppercase">Unit</TableHead>
-                                        <TableHead className="w-[150px] text-right text-[10px] font-black uppercase">Price</TableHead>
+                                        <TableHead className="w-[140px] text-right text-[10px] font-black uppercase">Price</TableHead>
                                         <TableHead className="w-[40px]"></TableHead>
                                     </TableRow>
                                 </TableHeader>
                                 <TableBody>
                                     {items.map(item => (
-                                        <TableRow key={item.id} className="hover:bg-slate-50/50 group">
+                                        <TableRow key={item.id} className="hover:bg-slate-50/50 group border-b last:border-0">
                                             <TableCell className="px-6 py-4">
                                                 <Popover>
                                                     <PopoverTrigger asChild>
-                                                        <Input value={item.name} onChange={e => updateItemField(item.id, 'name', e.target.value)} className="h-9 text-xs font-bold border-none shadow-none bg-transparent p-0 w-full focus-visible:ring-0" />
+                                                        <Input value={item.name} onChange={e => updateItemField(item.id, 'name', e.target.value)} className="h-9 text-xs font-black uppercase border-none shadow-none bg-transparent p-0 w-full focus-visible:ring-0" placeholder="Type or Select..." />
                                                     </PopoverTrigger>
-                                                    <PopoverContent className="w-[450px] p-0 shadow-2xl" align="start">
+                                                    <PopoverContent className="w-[450px] p-0 shadow-2xl rounded-2xl overflow-hidden border-indigo-100" align="start">
                                                         <Command>
-                                                            <CommandInput placeholder="Search Catalog or History..." />
-                                                            <CommandList>
-                                                                <CommandEmpty>No matches found.</CommandEmpty>
-                                                                <CommandGroup heading="Material Catalog">
-                                                                    {uniqueMasterProducts.map((p, i) => (
-                                                                        <CommandItem key={i} onSelect={() => {
-                                                                            updateItemField(item.id, 'name', p.name);
-                                                                            updateItemField(item.id, 'price', p.price);
-                                                                            updateItemField(item.id, 'unit', p.unit);
-                                                                        }}>
-                                                                            <div className="flex flex-col"><span className="text-[10px] font-bold uppercase">{p.name}</span><span className="text-[8px] text-indigo-600">{p.unit} • Catalog Std Price</span></div>
-                                                                        </CommandItem>
-                                                                    ))}
-                                                                </CommandGroup>
-                                                                <CommandGroup heading="Customer History">
+                                                            <CommandInput placeholder="Search Material Catalog or History..." className="h-11 font-medium" />
+                                                            <CommandList className="max-h-[300px]">
+                                                                <CommandEmpty className="py-6 text-center text-xs font-bold text-slate-400 italic">No matches. Use custom text.</CommandEmpty>
+                                                                <CommandGroup heading="Recent Purchases (History)" className="px-2 font-black uppercase text-[10px] text-indigo-600">
                                                                     {itemHistorySuggestions.map((h, i) => (
-                                                                        <CommandItem key={i} onSelect={() => {
+                                                                        <CommandItem key={`hist-${i}`} onSelect={() => {
                                                                             updateItemField(item.id, 'name', h.name);
                                                                             updateItemField(item.id, 'price', h.price);
                                                                             updateItemField(item.id, 'unit', h.unit);
-                                                                        }}>
-                                                                            <div className="flex flex-col"><span className="text-[10px] font-bold uppercase">{h.name}</span><span className="text-[8px] text-muted-foreground">{h.unit} • Rp {h.price.toLocaleString()}</span></div>
+                                                                        }} className="flex items-center gap-3 p-3 rounded-xl cursor-pointer">
+                                                                            <History className="h-3.5 w-3.5 text-slate-300" />
+                                                                            <div className="flex flex-col"><span className="text-[10px] font-black uppercase">{h.name}</span><span className="text-[8px] text-muted-foreground">{h.unit} • Rp {h.price.toLocaleString()}</span></div>
+                                                                        </CommandItem>
+                                                                    ))}
+                                                                </CommandGroup>
+                                                                <CommandGroup heading="Standard Catalog" className="px-2 font-black uppercase text-[10px] text-slate-400 pt-4">
+                                                                    {uniqueMasterProducts.map((p, i) => (
+                                                                        <CommandItem key={`cat-${i}`} onSelect={() => {
+                                                                            updateItemField(item.id, 'name', p.name);
+                                                                            updateItemField(item.id, 'price', p.price);
+                                                                            updateItemField(item.id, 'unit', p.unit);
+                                                                        }} className="flex items-center gap-3 p-3 rounded-xl cursor-pointer">
+                                                                            <Layers className="h-3.5 w-3.5 text-indigo-400" />
+                                                                            <div className="flex flex-col"><span className="text-[10px] font-black uppercase">{p.name}</span><span className="text-[8px] text-indigo-600">{p.unit} • Catalog Std Price</span></div>
                                                                         </CommandItem>
                                                                     ))}
                                                                 </CommandGroup>
@@ -421,73 +448,81 @@ export default function AddInvoicePage() {
                                                 </Popover>
                                             </TableCell>
                                             <TableCell className="py-4">
-                                                <Input type="text" value={inputBuffer[`${item.id}-quantity`] || formatNumberWithCommas(item.quantity)} onChange={e => handleNumericInputChange(item.id, 'quantity', e.target.value)} className="text-center h-9 text-xs font-bold" />
+                                                <Input type="text" value={inputBuffer[`${item.id}-quantity`] || formatNumberWithCommas(item.quantity)} onChange={e => handleNumericInputChange(item.id, 'quantity', e.target.value)} className="text-center h-9 text-xs font-black rounded-lg" />
                                             </TableCell>
                                             <TableCell className="py-4">
-                                                <Input value={item.unit} onChange={e => updateItemField(item.id, 'unit', e.target.value)} className="text-center h-9 text-xs font-bold border-dashed" placeholder="Unit" />
+                                                <Input value={item.unit} onChange={e => updateItemField(item.id, 'unit', e.target.value)} className="text-center h-9 text-xs font-black border-indigo-100 bg-indigo-50/30 rounded-lg" placeholder="UOM" />
                                             </TableCell>
                                             <TableCell className="py-4 text-right">
-                                                <Input type="text" value={inputBuffer[`${item.id}-price`] || formatNumberWithCommas(item.price)} onChange={e => handleNumericInputChange(item.id, 'price', e.target.value)} className="h-9 text-right text-xs font-bold" />
+                                                <Input type="text" value={inputBuffer[`${item.id}-price`] || formatNumberWithCommas(item.price)} onChange={e => handleNumericInputChange(item.id, 'price', e.target.value)} className="h-9 text-right text-xs font-black rounded-lg" />
                                             </TableCell>
                                             <TableCell className="py-4 text-center">
-                                                <Button variant="ghost" size="icon" className="h-7 w-7 text-rose-300 hover:text-rose-600" onClick={() => removeItem(item.id)}><Trash2 className="h-4 w-4" /></Button>
+                                                <Button variant="ghost" size="icon" className="h-7 w-7 text-rose-300 hover:text-rose-600 hover:bg-rose-50 rounded-full" onClick={() => removeItem(item.id)}><Trash2 className="h-4 w-4" /></Button>
                                             </TableCell>
                                         </TableRow>
                                     ))}
                                 </TableBody>
                             </Table>
                         </div>
-                        <div className="p-4 bg-slate-50 border-t flex justify-center">
-                            <Button variant="ghost" size="sm" className="h-8 text-[9px] font-black uppercase text-indigo-600" onClick={() => setItems([...items, { id: `man-${Date.now()}`, name: '', quantity: 1, unit: 'Meter', price: 0, total: 0 }])}>
+                        <div className="p-4 bg-slate-50/50 border-t flex justify-center">
+                            <Button variant="ghost" size="sm" className="h-8 text-[9px] font-black uppercase text-indigo-600 hover:bg-indigo-50 rounded-xl" onClick={() => setItems([...items, { id: `man-${Date.now()}`, name: '', quantity: 1, unit: 'Meter', price: 0, total: 0 }])}>
                                 <Plus className="mr-1.5 h-3.5 w-3.5" /> Insert Manual Row
                             </Button>
                         </div>
                     </CardContent>
                   </Card>
 
-                  <Card className="shadow-sm border-none ring-1 ring-slate-200 overflow-hidden">
-                    <CardHeader className="bg-white border-b py-3 px-6">
+                  {/* DP & DISCOUNT LOGIC */}
+                  <Card className="shadow-sm border-none ring-1 ring-slate-200 overflow-hidden rounded-3xl">
+                    <CardHeader className="bg-slate-50/50 border-b py-3 px-6">
                         <CardTitle className="text-[10px] font-black uppercase text-slate-500 tracking-widest flex items-center gap-2">
-                            <Percent className="h-4 w-4 text-emerald-600" /> DP & Discount Logic
+                            <Percent className="h-4 w-4 text-emerald-600" /> DP & Discount Management
                         </CardTitle>
                     </CardHeader>
                     <CardContent className="p-6 space-y-6">
-                        <div className="p-4 bg-indigo-50/50 rounded-2xl border-2 border-indigo-100 space-y-4">
+                        <div className="p-5 bg-indigo-50/50 rounded-[2rem] border-2 border-indigo-100 space-y-4">
                             <div className="flex justify-between items-center">
-                                <Label className="text-[10px] font-black uppercase text-indigo-700">Uang Muka (DP)</Label>
-                                <div className="flex bg-white rounded-lg p-1 border">
-                                    <Button variant={dpMode === 'tagih' ? 'default' : 'ghost'} size="sm" onClick={() => setDpMode('tagih')} className="h-7 text-[8px] font-black uppercase">Tagih DP</Button>
-                                    <Button variant={dpMode === 'kurangi' ? 'default' : 'ghost'} size="sm" onClick={() => setDpMode('kurangi')} className="h-7 text-[8px] font-black uppercase">Kurangi DP</Button>
+                                <Label className="text-[10px] font-black uppercase text-indigo-700 tracking-widest">Down Payment (DP)</Label>
+                                <div className="flex bg-white rounded-xl p-1 border shadow-sm">
+                                    <Button variant={dpMode === 'tagih' ? 'default' : 'ghost'} size="sm" onClick={() => setDpMode('tagih')} className="h-8 text-[9px] font-black uppercase rounded-lg px-4">Tagih DP</Button>
+                                    <Button variant={dpMode === 'kurangi' ? 'default' : 'ghost'} size="sm" onClick={() => setDpMode('kurangi')} className="h-8 text-[9px] font-black uppercase rounded-lg px-4">Kurangi DP</Button>
                                 </div>
                             </div>
-                            <div className="grid grid-cols-3 gap-3">
+                            <div className="grid grid-cols-3 gap-4">
                                 <div className="space-y-1.5">
-                                    <Label className="text-[8px] font-bold uppercase text-slate-400">Percent (%)</Label>
-                                    <Input type="text" value={dpPercent} onChange={e => setDpPercent(e.target.value)} className="h-9 font-bold text-xs" />
+                                    <Label className="text-[8px] font-black uppercase text-slate-400">Percent (%)</Label>
+                                    <Input type="text" value={dpPercent} onChange={e => setDpPercent(e.target.value)} className="h-11 font-black text-center text-indigo-600 bg-white border-indigo-100 rounded-xl" />
                                 </div>
                                 <div className="col-span-2 space-y-1.5">
-                                    <Label className="text-[8px] font-bold uppercase text-slate-400">Nominal DP (Rp)</Label>
-                                    <Input type="text" value={dpValue} onChange={e => setDpValue(e.target.value)} className="h-9 font-black text-xs text-right bg-white" />
+                                    <Label className="text-[8px] font-black uppercase text-slate-400">Nominal Rp (Auto-sync)</Label>
+                                    <Input type="text" value={dpValue} onChange={e => setDpValue(e.target.value)} className="h-11 font-black text-right bg-white border-indigo-100 rounded-xl" />
                                 </div>
                             </div>
                         </div>
-                        <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200 space-y-3">
+                        
+                        <div className="p-5 bg-slate-50 rounded-[2rem] border border-slate-200 space-y-4">
                             <div className="flex justify-between items-center">
                                 <Select value={discountLabel} onValueChange={setDiscountLabel}>
-                                    <SelectTrigger className="h-7 w-32 text-[8px] font-black uppercase"><SelectValue /></SelectTrigger>
-                                    <SelectContent><SelectItem value="Discount">Discount</SelectItem><SelectItem value="Negotiation">Negotiation</SelectItem></SelectContent>
+                                    <SelectTrigger className="h-8 w-36 text-[9px] font-black uppercase bg-white rounded-lg border-none shadow-sm"><SelectValue /></SelectTrigger>
+                                    <SelectContent className="rounded-xl border-none shadow-xl"><SelectItem value="Discount">Discount</SelectItem><SelectItem value="Negotiation">Negotiation</SelectItem></SelectContent>
                                 </Select>
+                                <Badge variant="outline" className="text-[8px] font-black uppercase">Final Reduction</Badge>
                             </div>
-                            <Input type="text" value={discountValue} onChange={e => setDiscountValue(e.target.value)} className="h-10 font-black text-xs text-right" placeholder="Rp 0" />
+                            <div className="relative">
+                                <span className="absolute left-4 top-1/2 -translate-y-1/2 text-xs font-black text-slate-400">Rp</span>
+                                <Input type="text" value={discountValue} onChange={e => setDiscountValue(e.target.value)} className="h-12 font-black text-right pl-12 bg-white rounded-xl" placeholder="0" />
+                            </div>
                         </div>
                     </CardContent>
                   </Card>
               </div>
           </div>
 
+          {/* LIVE PREVIEW SECTION */}
           <div className="flex-1 bg-slate-200/50 overflow-y-auto scroll-smooth py-12 px-8">
-              <div className="max-w-[210mm] mx-auto scale-[0.85] origin-top shadow-2xl">
+              <div className="max-w-[210mm] mx-auto scale-[0.85] origin-top shadow-2xl rounded-xl overflow-hidden">
                   <InvoiceTemplate type="Original" invoiceData={previewInvoiceData} />
+                  <div className="h-8 bg-slate-400/20 backdrop-blur-sm flex items-center justify-center text-[10px] font-black uppercase text-slate-500 tracking-[0.5em]">Digital Duplication Page</div>
                   <InvoiceTemplate type="Copy" invoiceData={previewInvoiceData} />
               </div>
           </div>
