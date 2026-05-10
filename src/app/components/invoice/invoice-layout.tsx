@@ -1,6 +1,7 @@
 'use client';
 import React, { useRef, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { Download, ArrowLeft, Printer } from 'lucide-react';
 import html2pdf from 'html2pdf.js';
 
 // --- DATA TYPES ---
@@ -26,7 +27,7 @@ interface InvoiceData {
     date: string; 
     soNumber: string;
     poNumber: string;
-    grandTotal: number;
+    grandTotal: number; // This is the "Goods" subtotal before deductions
     dppVat: number;
     vat12: number;
     totalRp: number;
@@ -41,7 +42,7 @@ interface InvoiceData {
 
 // --- UTILITIES ---
 const formatCurrency = (amount: any): string => {
-    if (amount === undefined || amount === null || amount === '') return '0,00';
+    if (amount === undefined || amount === null) return '0,00';
     const num = typeof amount === 'number' ? amount : parseFloat(amount);
     if (isNaN(num)) return '0,00';
     return num.toLocaleString('id-ID', {
@@ -82,36 +83,33 @@ export const InvoiceTemplate = ({ invoiceData, type }: { invoiceData: InvoiceDat
     } = invoiceData;
 
     const displayInvoiceId = (invoiceId || '').replace(/_/g, '/');
-    const subTotalItems = items.reduce((acc, item) => acc + (Number(item.total) || 0), 0);
     const invoiceTitle = (invoiceId || '').startsWith('KW') ? 'PROFORMA INVOICE' : 'INVOICE/OFFICIAL RECEIPT';
-
-    // Page break logic: Only the Original sheet triggers a page break after it
-    const pageBreakStyle = type === 'Original' ? 'always' : 'avoid';
+    
+    // Local calculation to ensure the "0,00" slot is connected to current items
+    const subTotalItems = items.reduce((acc, item) => acc + (Number(item.total) || 0), 0);
 
     return (
         <div 
-            className="relative bg-white mx-auto flex flex-col text-black border-none"
+            className="relative bg-white mx-auto flex flex-col text-black invoice-print-unit"
             style={{ 
                 width: '210mm', 
-                height: '297mm', 
+                minHeight: '297mm', // TINGGI A4 MURNI
                 padding: '50mm 15mm 15mm 15mm',
                 fontSize: '10pt',
                 fontFamily: 'Arial, Helvetica, sans-serif',
                 boxSizing: 'border-box',
-                color: '#000000',
-                pageBreakAfter: pageBreakStyle as any,
-                breakAfter: pageBreakStyle as any,
                 pageBreakInside: 'avoid',
-                breakInside: 'avoid'
+                pageBreakAfter: type === 'Original' ? 'always' : 'avoid',
+                color: '#000000'
             }}
         >
             {/* TYPE INDICATOR */}
-            <div className="absolute right-12 top-10 text-[10pt] text-slate-300 uppercase italic font-normal">
+            <div className="absolute right-8 top-8 text-[10pt] text-slate-300 uppercase italic font-normal">
                 {type}
             </div>
 
             {/* HEADER SECTION */}
-            <header className="relative shrink-0">
+            <header className="relative">
                 <div className="w-full text-center mb-6">
                     <h1 className="font-bold uppercase text-[13pt] leading-tight mb-0.5">{invoiceTitle}</h1>
                     <p className="font-bold text-[11pt]">{displayInvoiceId}</p>
@@ -119,8 +117,8 @@ export const InvoiceTemplate = ({ invoiceData, type }: { invoiceData: InvoiceDat
                 
                 <div className='flex justify-between items-start mb-2'>
                     <div className='w-[60%]'>
-                        <h2 className="font-bold text-[10pt] uppercase mb-0.5">{customer.name}</h2>
-                        <p className="text-[9pt] leading-tight max-w-sm whitespace-pre-wrap">{customer.address}</p>
+                        <h2 className="font-bold text-[10pt] uppercase mb-0.5">{customer.name || invoiceData.customerName}</h2>
+                        <p className="text-[9pt] leading-tight max-w-sm whitespace-pre-wrap">{customer.address || invoiceData.billingAddress}</p>
                     </div>
                     <div className="w-[30%] text-[8.5pt] leading-tight">
                         <div className="grid grid-cols-[80px_5px_1fr] gap-y-0.5">
@@ -138,7 +136,7 @@ export const InvoiceTemplate = ({ invoiceData, type }: { invoiceData: InvoiceDat
             </header>
 
             {/* TABLE SECTION */}
-            <main className='relative flex-1 flex flex-col'>
+            <main className='relative flex-1'>
                 <table className="w-full border-collapse text-[8.5pt]">
                     <thead>
                         <tr className='border-y-[1.5pt] border-black'>
@@ -160,7 +158,12 @@ export const InvoiceTemplate = ({ invoiceData, type }: { invoiceData: InvoiceDat
                             </tr>
                         ))}
                         
-                        {/* SLOT ANGKA NOL (ORANGE CHECKMARK) */}
+                        {/* SPACER TO PUSH FOOTER */}
+                        <tr>
+                            <td colSpan={5} style={{ height: '2cm' }}></td>
+                        </tr>
+
+                        {/* SUB-TOTAL ITEM (SLOT 0 CHECKMARK) - CONNECTED TO LOGIC */}
                         <tr>
                             <td colSpan={3}></td>
                             <td className="py-1 px-2 text-left"></td>
@@ -172,11 +175,9 @@ export const InvoiceTemplate = ({ invoiceData, type }: { invoiceData: InvoiceDat
                         {Number(dpValue) > 0 ? (
                             <tr>
                                 <td colSpan={3}></td>
-                                <td className="py-1 px-2 text-left">
-                                    <div className="flex justify-between w-full pr-4">
-                                        <span>DP</span>
-                                        <span>{dpPercent}%</span>
-                                    </div>
+                                <td className="py-1 px-2 text-left flex justify-between">
+                                    <span>DP</span>
+                                    <span>{dpPercent}%</span>
                                 </td>
                                 <td className="py-1 px-2 text-right">
                                     {formatCurrency(dpValue)}
@@ -195,22 +196,20 @@ export const InvoiceTemplate = ({ invoiceData, type }: { invoiceData: InvoiceDat
                         ) : null}
                     </tbody>
                 </table>
-                
-                {/* PO REF - Anchor to bottom of main */}
-                <div className="mt-auto pt-10 pb-4 px-2">
+                <div className="mt-8 mb-1 px-2">
                     <p className="font-bold text-[9pt]">NO PO : {poNumber}</p>
                 </div>
             </main>
 
-            {/* FOOTER SECTION - FIXED AT BOTTOM */}
-            <footer className="shrink-0 pt-2 border-t border-black">
+            {/* FOOTER SECTION - STICK TO BOTTOM */}
+            <footer className="mt-auto pt-2" style={{ pageBreakInside: 'avoid' }}>
                 {/* SECTION KALKULASI */}
-                <div className="flex justify-between items-start border-b-[1.5pt] border-black pb-2 mb-2">
+                <div className="flex justify-between items-start border-y-[1.5pt] border-black py-1 mb-1">
                     <div className="w-[50%]"></div>
                     <div className="w-[35%] text-[8.5pt] leading-tight">
                         <div className="flex justify-between">
                             <span>Goods :</span>
-                            <span>{formatCurrency(grandTotal)}</span>
+                            <span>{formatCurrency(grandTotal || subTotalItems)}</span>
                         </div>
                         <div className="flex justify-between">
                             <span>DPP VAT (11/12) :</span>
@@ -220,7 +219,7 @@ export const InvoiceTemplate = ({ invoiceData, type }: { invoiceData: InvoiceDat
                             <span>VAT 12 % :</span>
                             <span>{formatCurrency(vat12)}</span>
                         </div>
-                        <div className="flex justify-between font-black border-t border-slate-300 mt-0.5 text-[9pt]">
+                        <div className="flex justify-between font-black">
                             <span>Total Rp :</span>
                             <span>{formatCurrency(totalRp)}</span>
                         </div>
@@ -228,7 +227,7 @@ export const InvoiceTemplate = ({ invoiceData, type }: { invoiceData: InvoiceDat
                 </div>
 
                 {/* INFORMASI PEMBAYARAN & TANDA TANGAN */}
-                <div className="flex justify-between items-start" style={{ breakInside: 'avoid' }}>
+                <div className="flex justify-between items-start mt-1">
                     <div className="w-[65%] text-[8.5pt] leading-normal space-y-1">
                         <div className="flex mb-1">
                             <span className="w-[65px] font-bold">Payment:</span>
@@ -263,7 +262,7 @@ export const InvoiceTemplate = ({ invoiceData, type }: { invoiceData: InvoiceDat
 
                         <div className="w-[280px] text-center font-bold text-[8pt] py-1">OR</div>
 
-                        <div className="flex items-start">
+                        <div className="flex items-start space-x-0">
                             <div className="w-[100px] font-bold leading-[1.2]">
                                 Bank BCA - Jakarta<br/>
                                 <span className="font-normal text-[7.5pt]">Cabang KEM TOWER</span>
@@ -275,8 +274,8 @@ export const InvoiceTemplate = ({ invoiceData, type }: { invoiceData: InvoiceDat
                     <div className="w-[35%] flex flex-col items-center self-stretch justify-between py-1">
                         <p className="font-bold text-[9pt] text-center">PT. JEMBO CABLE COMPANY Tbk</p>
                         <div className="mt-auto flex flex-col items-center">
-                            <div className="mt-16 border-t-[1.5pt] border-black w-[160px]"></div>
-                            <p className="font-bold uppercase pt-1 text-[9pt] underline decoration-1 underline-offset-2">Finance</p>
+                            <div className="mt-20 border-t-[1.5pt] border-black w-[160px]"></div>
+                            <p className="font-bold uppercase pt-1 text-[9pt] underline">Finance</p>
                         </div>
                     </div>
                 </div>
@@ -295,14 +294,7 @@ export default function InvoicePreviewPage() {
         if (dataFromSession) {
             try {
                 const parsed = JSON.parse(dataFromSession);
-                setInvoiceData({
-                    ...parsed,
-                    items: parsed.items || [],
-                    customer: parsed.customer || { name: 'N/A', address: 'N/A' },
-                    dpValue: Number(parsed.dpValue) || 0,
-                    discount: Number(parsed.discount) || 0,
-                    grandTotal: Number(parsed.grandTotal) || 0
-                });
+                setInvoiceData(parsed);
             } catch (e) {
                 console.error("Failed to parse invoice data", e);
             }
@@ -317,46 +309,33 @@ export default function InvoicePreviewPage() {
             margin: 0,
             filename: `Invoice-${(invoiceData.id || '').replace(/\//g, '_')}.pdf`,
             image: { type: 'jpeg', quality: 1 },
-            html2canvas: { scale: 3, useCORS: true, logging: false, letterRendering: true },
-            jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait', compress: true },
+            html2canvas: { scale: 2, useCORS: true, logging: false },
+            jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
             pagebreak: { mode: ['css', 'avoid-all'] }
         };
         html2pdf().from(element).set(opt).save();
     };
 
-    if (!invoiceData) return <div className="p-10 text-center font-bold text-slate-400 animate-pulse uppercase tracking-widest">Memuat Data Penagihan...</div>;
+    if (!invoiceData) return <div className="p-10 text-center font-bold text-slate-400 animate-pulse">MEMUAT DATA PENAGIHAN...</div>;
 
     return (
-        <div className="bg-slate-200 min-h-screen py-10 px-4 font-sans text-black">
+        <div className="bg-slate-100 min-h-screen py-10 px-4 font-sans text-black">
             <style>{`
-                @media screen {
-                    .invoice-page-preview {
-                        background: white;
-                        box-shadow: 0 0 30px rgba(0,0,0,0.15);
-                        margin-bottom: 30px;
-                        display: block;
-                    }
-                }
                 @media print {
                     .no-print { display: none !important; }
                     body { background: white !important; padding: 0 !important; }
-                    .invoice-page-preview { box-shadow: none !important; margin: 0 !important; border: none !important; }
                 }
             `}</style>
             
             <div className="fixed top-6 right-6 z-50 flex gap-3 no-print">
-                <button onClick={() => router.back()} className="px-6 py-2 bg-white border border-slate-300 rounded-xl font-bold text-sm shadow-sm hover:bg-slate-50 transition-all">Kembali</button>
-                <button onClick={handleDownloadPdf} className="px-6 py-2 bg-indigo-600 text-white rounded-xl font-black uppercase text-[10px] tracking-widest shadow-lg hover:bg-indigo-700 transition-all">SIMPAN PDF</button>
-                <button onClick={() => window.print()} className="px-6 py-2 bg-slate-800 text-white rounded-xl font-black uppercase text-[10px] tracking-widest shadow-lg hover:bg-slate-900 transition-all">CETAK</button>
+                <button onClick={() => router.back()} className="px-6 py-2 bg-white border rounded-xl font-bold text-sm shadow-sm hover:bg-slate-50 transition-all">Kembali</button>
+                <button onClick={handleDownloadPdf} className="px-6 py-2 bg-indigo-600 text-white rounded-xl font-bold text-[10px] tracking-widest shadow-lg hover:bg-indigo-700 transition-all">SIMPAN PDF</button>
+                <button onClick={() => window.print()} className="px-6 py-2 bg-slate-800 text-white rounded-xl font-bold text-[10px] tracking-widest shadow-lg hover:bg-slate-900 transition-all">CETAK</button>
             </div>
             
             <div ref={invoiceContainerRef} className="mx-auto" style={{ width: '210mm' }}>
-                <div className="invoice-page-preview">
-                    <InvoiceTemplate invoiceData={invoiceData} type="Original" />
-                </div>
-                <div className="invoice-page-preview">
-                    <InvoiceTemplate invoiceData={invoiceData} type="Copy" />
-                </div>
+                <InvoiceTemplate invoiceData={invoiceData} type="Original" />
+                <InvoiceTemplate invoiceData={invoiceData} type="Copy" />
             </div>
         </div>
     );

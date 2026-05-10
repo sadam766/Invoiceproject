@@ -27,7 +27,8 @@ const InvoicePreviewPage = () => {
     if (invoiceData) {
         setFormattedData({
             ...invoiceData,
-            grandTotal: invoiceData.amount,
+            // Ensure data maps to the template prop names accurately
+            grandTotal: invoiceData.grandTotal || invoiceData.amount, 
             customer: {
                 name: invoiceData.customerName || invoiceData.customer,
                 address: invoiceData.billingAddress || 'N/A'
