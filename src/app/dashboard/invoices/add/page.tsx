@@ -25,7 +25,6 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
-import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { cn, formatNumberWithCommas, parseFormattedNumber } from '@/lib/utils';
 import { format, addDays } from 'date-fns';
@@ -35,28 +34,15 @@ import {
   ReceiptText,
   Loader2,
   Trash2,
-  History,
   Eye,
-  ChevronsUpDown,
-  AlertTriangle,
-  Clock,
   Percent,
-  MapPin,
-  Building2,
-  Home,
-  Check,
-  Target,
-  Wallet,
-  ShieldAlert,
   Layers,
-  Zap,
   UserCircle2
 } from 'lucide-react';
-import { type Invoice, type UserProfile, type InvoiceItem, type InvoiceNumber, type SalesListItem } from '@/app/lib/data';
+import { type Invoice, type UserProfile, type InvoiceItem, type InvoiceNumber } from '@/app/lib/data';
 import { useToast } from '@/hooks/use-toast';
 import { useFirestore, useMemoFirebase, useUser, useDoc, errorEmitter, FirestorePermissionError } from '@/firebase';
-import { collection, query, doc, setDoc, arrayUnion, addDoc, getDocs, where } from 'firebase/firestore';
-import { Badge } from '@/components/ui/badge';
+import { doc, setDoc } from 'firebase/firestore';
 import {
     Command,
     CommandEmpty,
@@ -72,7 +58,6 @@ import {
 } from '@/components/ui/popover';
 import { useDashboardData } from '../../layout';
 import { InvoiceTemplate } from '@/app/components/invoice/invoice-layout';
-import { Progress } from '@/components/ui/progress';
 
 export default function AddInvoicePage() {
   const router = useRouter();
@@ -87,22 +72,20 @@ export default function AddInvoicePage() {
   const { 
     customers: allCustomers, 
     products: masterProducts, 
-    salesOrders: allSalesOrders, 
-    invoices: allInvoices,
-    sales: allSalesRecords
+    invoices: allInvoices
   } = useDashboardData();
 
   const identityRef = useMemoFirebase(() => {
       if (!firestore || !invoiceNumberIdParam) return null;
       return doc(firestore, 'invoiceNumbers', invoiceNumberIdParam);
   }, [firestore, invoiceNumberIdParam]);
-  const { data: identityData, isLoading: isIdentityLoading } = useDoc<InvoiceNumber>(identityRef);
+  const { data: identityData } = useDoc<InvoiceNumber>(identityRef);
 
   const existingInvoiceRef = useMemoFirebase(() => {
       if (!firestore || !editInvoiceId) return null;
       return doc(firestore, 'invoices', editInvoiceId);
   }, [firestore, editInvoiceId]);
-  const { data: existingInvoiceData, isLoading: isExistingLoading } = useDoc<Invoice>(existingInvoiceRef);
+  const { data: existingInvoiceData } = useDoc<Invoice>(existingInvoiceRef);
 
   const activeIdentity = existingInvoiceData || identityData;
 
@@ -117,8 +100,6 @@ export default function AddInvoicePage() {
   const [paymentMode, setPaymentMode] = useState<'manual' | 'virtual_account'>('virtual_account');
   const [paymentTerms, setPaymentTerms] = useState('90 Hari');
   const [manualVaNumber, setManualVaNumber] = useState('');
-  const [soPopoverOpen, setSoPopoverOpen] = useState(false);
-  const [productPopoverOpen, setProductPopoverOpen] = useState(false);
   const [isProcessing, setIsSaving] = useState(false);
 
   const [inputBuffer, setInputBuffer] = useState<Record<string, string>>({});
@@ -159,12 +140,6 @@ export default function AddInvoicePage() {
     return Object.values(customerItems);
   }, [activeIdentity?.customer, allInvoices]);
 
-  const poRecord = useMemo(() => {
-    if (!activeIdentity?.poNumber || !allSalesRecords) return null;
-    return allSalesRecords.find(s => s.poNumber === activeIdentity.poNumber);
-  }, [activeIdentity?.poNumber, allSalesRecords]);
-
-  // EFFECT: Auto-calculate DP Rp when Percent changes
   useEffect(() => {
     const p = parseFloat(dpPercent);
     if (!isNaN(p)) {
@@ -213,6 +188,10 @@ export default function AddInvoicePage() {
       }
       return item;
     }));
+  };
+
+  const removeItem = (id: string | number) => {
+    setItems(prev => prev.filter(i => i.id !== id));
   };
 
   const handleNumericInputChange = (id: string | number, field: 'quantity' | 'price', rawValue: string) => {
@@ -271,7 +250,7 @@ export default function AddInvoicePage() {
         discountLabel: discountLabel,
         dppVat: calcs.dppVat,
         vat12: calcs.vat12,
-        items: items,
+        items: items.filter(i => i.quantity > 0),
         creatorId: user.uid,
         createdBy: updater,
         lastUpdatedAt: timestamp,
@@ -292,11 +271,12 @@ export default function AddInvoicePage() {
 
   const previewInvoiceData = {
       ...activeIdentity,
-      items: items,
+      items: items.filter(i => i.quantity > 0),
       customer: { name: activeIdentity?.customer, address: billingAddress },
       customerName: activeIdentity?.customer,
       customerCode: currentCustomer?.customerCode || '',
       billingAddress,
+      soNumber: selectedSoNumber,
       paymentMode,
       paymentTerms,
       vaNumber: manualVaNumber,
@@ -336,8 +316,6 @@ export default function AddInvoicePage() {
       <div className="flex flex-1 overflow-hidden">
           <div className="w-[48%] overflow-y-auto p-8 border-r bg-slate-50/30">
               <div className="space-y-8 max-w-2xl mx-auto pb-20">
-                  
-                  {/* CUSTOMER DETAIL DISPLAY */}
                   <Card className="border-none shadow-sm ring-1 ring-indigo-200 bg-indigo-50/30 overflow-hidden">
                     <CardHeader className="py-3 px-6 bg-white border-b">
                         <CardTitle className="text-[10px] font-black uppercase text-indigo-600 flex items-center gap-2">
@@ -373,17 +351,12 @@ export default function AddInvoicePage() {
                                 <Input type="date" value={format(issueDate, 'yyyy-MM-dd')} onChange={e => setIssueDate(new Date(e.target.value))} className="h-10 font-bold" />
                             </div>
                             <div className="space-y-1.5">
-                                <Label className="text-[9px] font-black uppercase text-slate-400 flex items-center gap-1">
-                                    <Clock className="h-3 w-3 text-indigo-500" /> Payment Terms
-                                </Label>
+                                <Label className="text-[9px] font-black uppercase text-slate-400 flex items-center gap-1">Payment Terms</Label>
                                 <Input value={paymentTerms} onChange={e => setPaymentTerms(e.target.value)} placeholder="E.g. 90 Hari" className="h-10 font-black border-indigo-200" />
                             </div>
-                        </div>
-                        <div className="space-y-1.5 pt-2 border-t">
-                            <Label className="text-[9px] font-black uppercase text-slate-400">Payment Mode</Label>
-                            <div className="flex gap-2">
-                                <Button variant={paymentMode === 'manual' ? 'default' : 'outline'} size="sm" onClick={() => setPaymentMode('manual')} className="h-8 text-[9px] font-black uppercase flex-1">Manual Transfer</Button>
-                                <Button variant={paymentMode === 'virtual_account' ? 'default' : 'outline'} size="sm" onClick={() => setPaymentMode('virtual_account')} className="h-8 text-[9px] font-black uppercase flex-1">Virtual Account</Button>
+                            <div className="col-span-2 space-y-1.5">
+                                <Label className="text-[9px] font-black uppercase text-slate-400 flex items-center gap-1">Sales Order Number (SO)</Label>
+                                <Input value={selectedSoNumber} onChange={e => setSelectedSoNumber(e.target.value)} placeholder="SO-9923-..." className="h-10 font-black border-indigo-200" />
                             </div>
                         </div>
                     </CardContent>
@@ -401,9 +374,10 @@ export default function AddInvoicePage() {
                                 <TableHeader className="bg-slate-50/50 sticky top-0 z-10 shadow-sm">
                                     <TableRow>
                                         <TableHead className="py-3 px-6 text-[10px] font-black uppercase">Description</TableHead>
-                                        <TableHead className="w-[120px] text-center text-[10px] font-black uppercase">Qty</TableHead>
-                                        <TableHead className="w-[180px] text-right text-[10px] font-black uppercase">Price</TableHead>
-                                        <TableHead className="w-[50px]"></TableHead>
+                                        <TableHead className="w-[100px] text-center text-[10px] font-black uppercase">Qty</TableHead>
+                                        <TableHead className="w-[100px] text-center text-[10px] font-black uppercase">Unit</TableHead>
+                                        <TableHead className="w-[150px] text-right text-[10px] font-black uppercase">Price</TableHead>
+                                        <TableHead className="w-[40px]"></TableHead>
                                     </TableRow>
                                 </TableHeader>
                                 <TableBody>
@@ -449,11 +423,14 @@ export default function AddInvoicePage() {
                                             <TableCell className="py-4">
                                                 <Input type="text" value={inputBuffer[`${item.id}-quantity`] || formatNumberWithCommas(item.quantity)} onChange={e => handleNumericInputChange(item.id, 'quantity', e.target.value)} className="text-center h-9 text-xs font-bold" />
                                             </TableCell>
+                                            <TableCell className="py-4">
+                                                <Input value={item.unit} onChange={e => updateItemField(item.id, 'unit', e.target.value)} className="text-center h-9 text-xs font-bold border-dashed" placeholder="Unit" />
+                                            </TableCell>
                                             <TableCell className="py-4 text-right">
                                                 <Input type="text" value={inputBuffer[`${item.id}-price`] || formatNumberWithCommas(item.price)} onChange={e => handleNumericInputChange(item.id, 'price', e.target.value)} className="h-9 text-right text-xs font-bold" />
                                             </TableCell>
                                             <TableCell className="py-4 text-center">
-                                                <Button variant="ghost" size="icon" className="h-7 w-7 text-rose-300" onClick={() => setItems(items.filter(i => i.id !== item.id))}><Trash2 className="h-4 w-4" /></Button>
+                                                <Button variant="ghost" size="icon" className="h-7 w-7 text-rose-300 hover:text-rose-600" onClick={() => removeItem(item.id)}><Trash2 className="h-4 w-4" /></Button>
                                             </TableCell>
                                         </TableRow>
                                     ))}
@@ -469,7 +446,7 @@ export default function AddInvoicePage() {
                   </Card>
 
                   <Card className="shadow-sm border-none ring-1 ring-slate-200 overflow-hidden">
-                    <CardHeader className="bg-white border-b py-3 px-6 flex flex-row items-center justify-between">
+                    <CardHeader className="bg-white border-b py-3 px-6">
                         <CardTitle className="text-[10px] font-black uppercase text-slate-500 tracking-widest flex items-center gap-2">
                             <Percent className="h-4 w-4 text-emerald-600" /> DP & Discount Logic
                         </CardTitle>
@@ -511,6 +488,7 @@ export default function AddInvoicePage() {
           <div className="flex-1 bg-slate-200/50 overflow-y-auto scroll-smooth py-12 px-8">
               <div className="max-w-[210mm] mx-auto scale-[0.85] origin-top shadow-2xl">
                   <InvoiceTemplate type="Original" invoiceData={previewInvoiceData} />
+                  <InvoiceTemplate type="Copy" invoiceData={previewInvoiceData} />
               </div>
           </div>
       </div>
