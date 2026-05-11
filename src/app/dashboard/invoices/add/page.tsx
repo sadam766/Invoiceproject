@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useEffect, useState, useMemo } from 'react';
@@ -193,6 +194,7 @@ export default function AddInvoicePage() {
           if ((activeIdentity as Invoice).vaNumber) setManualVaNumber((activeIdentity as Invoice).vaNumber!);
           if ((activeIdentity as Invoice).dpDescription) setDpDescription((activeIdentity as Invoice).dpDescription!);
           if ((activeIdentity as Invoice).dpValue) setDpValue(formatNumberWithCommas((activeIdentity as Invoice).dpValue!));
+          if ((activeIdentity as Invoice).dpPercent !== undefined) setDpPercent(String((activeIdentity as Invoice).dpPercent));
           if ((activeIdentity as Invoice).dpMode) setDpMode((activeIdentity as Invoice).dpMode!);
           if ((activeIdentity as Invoice).discount) setDiscountValue(formatNumberWithCommas((activeIdentity as Invoice).discount!));
       }
@@ -271,6 +273,7 @@ export default function AddInvoicePage() {
         paymentTerms: paymentTerms,
         vaNumber: (paymentMode === 'virtual_account' || manualVaNumber) ? manualVaNumber : '',
         dpValue: calcs.dpValue,
+        dpPercent: Number(dpPercent) || 0,
         dpDescription: dpDescription,
         dpMode: dpMode,
         discount: calcs.discountValue,
@@ -309,6 +312,7 @@ export default function AddInvoicePage() {
       dpDescription,
       dpMode,
       dpValue: calcs.dpValue,
+      dpPercent: Number(dpPercent) || 0,
       discount: calcs.discountValue,
       discountLabel: discountLabel,
       grandTotal: calcs.subTotalItems, 
@@ -565,7 +569,7 @@ export default function AddInvoicePage() {
               </div>
           </div>
 
-          {/* RIGHT LIVE PREVIEW PANEL - OPTIMIZED FOR ZOOM & CLIPPING */}
+          {/* RIGHT LIVE PREVIEW PANEL */}
           <div className="flex-1 bg-slate-200/50 overflow-auto scroll-smooth py-12 px-4 md:px-8">
               <div className="flex flex-col items-center min-w-min min-h-full">
                   <div className="max-w-[210mm] w-full shadow-2xl rounded-xl overflow-visible origin-top scale-[0.7] md:scale-[0.8] xl:scale-[0.85] transition-all duration-300 bg-white">

@@ -1,3 +1,4 @@
+
 'use client';
 import React from 'react';
 
@@ -60,7 +61,7 @@ const formatDate = (dateString: string): string => {
     }).replace(/\//g, '-');
 };
 
-const ITEM_LIMIT = 12; // Maximum items per page for visual integrity
+const ITEM_LIMIT = 10; // Maximum items per page for visual integrity
 
 export const InvoiceTemplate = ({ invoiceData, type }: { invoiceData: InvoiceData, type: 'Original' | 'Copy' }) => {
     if (!invoiceData) return null;
@@ -80,6 +81,7 @@ export const InvoiceTemplate = ({ invoiceData, type }: { invoiceData: InvoiceDat
         customerCode = '-',
         vaNumber = '',
         dpValue = 0,
+        dpPercent = 0,
         discount = 0,
         discountLabel = 'Discount',
         dpMode = 'kurangi'
@@ -126,7 +128,7 @@ export const InvoiceTemplate = ({ invoiceData, type }: { invoiceData: InvoiceDat
                         </div>
 
                         {/* HEADER */}
-                        <header className="mb-6">
+                        <header className="mb-0">
                             <div className="w-full text-center mb-6">
                                 <h1 className="font-bold uppercase text-[13pt] leading-tight mb-0.5">{invoiceTitle}</h1>
                                 <p className="font-bold text-[11pt]">{displayInvoiceId}</p>
@@ -154,14 +156,14 @@ export const InvoiceTemplate = ({ invoiceData, type }: { invoiceData: InvoiceDat
 
                         {/* TABLE */}
                         <main className='relative flex-grow overflow-hidden'>
-                            <table className="w-full border-collapse text-[8.5pt]">
-                                <thead>
+                            <table className="w-full border-collapse text-[8.5pt] mt-0"> 
+                            <thead>
                                     <tr className='border-b-[1.5pt] border-black'>
-                                        <th className="py-1.5 px-2 text-left w-[5%] font-bold">NO.</th>
-                                        <th className="py-1.5 px-2 text-left w-[45%] font-bold">ITEM DESCRIPTION</th>
-                                        <th className="py-1.5 px-2 text-center w-[15%] font-bold">QUANTITY UNIT</th>
-                                        <th className="py-1.5 px-2 text-right w-[15%] font-bold">UNIT PRICE</th>
-                                        <th className="py-1.5 px-2 text-right w-[20%] font-bold">AMOUNT</th>
+                                        <th className="py-0.5 px-2 text-left w-[5%] font-bold leading-tight">NO.</th>
+                                        <th className="py-0.5 px-2 text-left w-[45%] font-bold leading-tight">ITEM DESCRIPTION</th>
+                                        <th className="py-0.5 px-2 text-center w-[15%] font-bold leading-tight">QUANTITY UNIT</th>
+                                        <th className="py-0.5 px-2 text-right w-[15%] font-bold leading-tight">UNIT PRICE</th>
+                                        <th className="py-0.5 px-2 text-right w-[20%] font-bold leading-tight">AMOUNT</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -189,7 +191,9 @@ export const InvoiceTemplate = ({ invoiceData, type }: { invoiceData: InvoiceDat
                                             {Number(dpValue) > 0 && (
                                                 <tr>
                                                     <td colSpan={3}></td>
-                                                    <td className="py-1 px-2 text-left">DP</td>
+                                                    <td className="py-1 px-2 text-left">
+                                                        DP {Number(dpPercent) > 0 ? `${dpPercent}%` : ''}
+                                                    </td>
                                                     <td className="py-1 px-2 text-right font-medium">
                                                         {dpMode === 'kurangi' ? `(${formatCurrency(dpValue)})` : formatCurrency(dpValue)}
                                                     </td>
@@ -235,7 +239,7 @@ export const InvoiceTemplate = ({ invoiceData, type }: { invoiceData: InvoiceDat
                                         </div>
                                         <div className="flex justify-between font-black">
                                             <span>Total Rp :</span>
-                                            <span>{formatCurrency(totalRp)}</span>
+                                            <span>{formatCurrency(totalRp)}</span> 
                                         </div>
                                     </div>
                                 </div>

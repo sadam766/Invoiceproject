@@ -71,6 +71,7 @@ export type Invoice = {
   negotiation?: number;
   negotiationMode?: 'percent' | 'nominal';
   dpValue?: number; 
+  dpPercent?: number;
   dpDescription?: string;
   dpMode?: 'tagih' | 'kurangi';
   dpDeduction?: number; 
@@ -192,7 +193,7 @@ export type SalesListItem = {
   id?: string;
   soNumber: string;
   customer: string;
-  customerCode?: string;
+  customerCode: string;
   sales: string;
   poNumber: string;
   amount: number;
