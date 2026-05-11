@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useEffect, useState, useMemo } from 'react';
@@ -42,7 +41,8 @@ import {
   UserCircle2,
   MapPin,
   Building2,
-  History
+  History,
+  CalendarDays
 } from 'lucide-react';
 import { type Invoice, type UserProfile, type InvoiceItem, type InvoiceNumber } from '@/app/lib/data';
 import { useToast } from '@/hooks/use-toast';
@@ -104,6 +104,7 @@ export default function AddInvoicePage() {
   const [dueDate, setDueDate] = useState<Date>(addDays(new Date(), 30));
   const [paymentMode, setPaymentMode] = useState<'manual' | 'virtual_account'>('virtual_account');
   const [paymentTerms, setPaymentTerms] = useState('90 Hari');
+  const [selectedTermPreset, setSelectedTermPreset] = useState('90');
   const [manualVaNumber, setManualVaNumber] = useState('');
   const [isProcessing, setIsSaving] = useState(false);
 
@@ -126,6 +127,17 @@ export default function AddInvoicePage() {
         setDpValue(formatNumberWithCommas(calculated));
     }
   }, [dpPercent, items]);
+
+  // TRIGGER: Hybrid Payment Term Logic (Auto Due Date)
+  useEffect(() => {
+    if (selectedTermPreset !== 'custom') {
+      const days = parseInt(selectedTermPreset);
+      if (!isNaN(days)) {
+        setDueDate(addDays(issueDate, days));
+        setPaymentTerms(days === 0 ? 'CBD' : `${days} Hari`);
+      }
+    }
+  }, [issueDate, selectedTermPreset]);
 
   const uniqueMasterProducts = useMemo(() => {
     if (!masterProducts) return [];
@@ -173,7 +185,11 @@ export default function AddInvoicePage() {
           }
 
           if ((activeIdentity as Invoice).paymentMode) setPaymentMode((activeIdentity as Invoice).paymentMode as any);
-          if ((activeIdentity as Invoice).paymentTerms) setPaymentTerms((activeIdentity as Invoice).paymentTerms!);
+          if ((activeIdentity as Invoice).paymentTerms) {
+              setPaymentTerms((activeIdentity as Invoice).paymentTerms!);
+              setSelectedTermPreset('custom');
+          }
+          if ((activeIdentity as Invoice).dueDate) setDueDate(new Date((activeIdentity as Invoice).dueDate!));
           if ((activeIdentity as Invoice).vaNumber) setManualVaNumber((activeIdentity as Invoice).vaNumber!);
           if ((activeIdentity as Invoice).dpDescription) setDpDescription((activeIdentity as Invoice).dpDescription!);
           if ((activeIdentity as Invoice).dpValue) setDpValue(formatNumberWithCommas((activeIdentity as Invoice).dpValue!));
@@ -365,7 +381,7 @@ export default function AddInvoicePage() {
                   <Card className="shadow-sm border-none ring-1 ring-slate-200 overflow-hidden rounded-3xl">
                     <CardHeader className="bg-slate-50/50 border-b py-3 px-6">
                         <CardTitle className="text-[10px] font-black uppercase flex items-center gap-2 text-slate-500 tracking-widest">
-                            <ReceiptText className="h-4 w-4 text-indigo-600" /> Invoice Header Info
+                            <ReceiptText className="h-4 w-4 text-indigo-600" /> Invoice Header & Hybrid Terms
                         </CardTitle>
                     </CardHeader>
                     <CardContent className="p-6 space-y-6">
@@ -375,8 +391,37 @@ export default function AddInvoicePage() {
                                 <Input type="date" value={format(issueDate, 'yyyy-MM-dd')} onChange={e => setIssueDate(new Date(e.target.value))} className="h-10 font-bold rounded-xl" />
                             </div>
                             <div className="space-y-1.5">
-                                <Label className="text-[9px] font-black uppercase text-slate-400 flex items-center gap-1">Payment Terms</Label>
-                                <Input value={paymentTerms} onChange={e => setPaymentTerms(e.target.value)} placeholder="E.g. 90 Hari" className="h-10 font-black border-indigo-200 rounded-xl" />
+                                <Label className="text-[9px] font-black uppercase text-slate-400">Term Preset (Mapping)</Label>
+                                <Select value={selectedTermPreset} onValueChange={setSelectedTermPreset}>
+                                    <SelectTrigger className="h-10 font-bold rounded-xl bg-white border-indigo-200">
+                                        <SelectValue placeholder="Pilih..." />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="0">CBD (0 Hari)</SelectItem>
+                                        <SelectItem value="30">Net 30 (30 Hari)</SelectItem>
+                                        <SelectItem value="60">Net 60 (60 Hari)</SelectItem>
+                                        <SelectItem value="90">Net 90 (90 Hari)</SelectItem>
+                                        <SelectItem value="custom">Custom / Lainnya...</SelectItem>
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                            <div className="space-y-1.5">
+                                <Label className="text-[9px] font-black uppercase text-slate-400 flex items-center gap-1">Display Term (Invoice)</Label>
+                                <Input 
+                                    value={paymentTerms} 
+                                    onChange={e => { setPaymentTerms(e.target.value); setSelectedTermPreset('custom'); }} 
+                                    placeholder="E.g. CBD" 
+                                    className="h-10 font-black border-indigo-200 rounded-xl" 
+                                />
+                            </div>
+                            <div className="space-y-1.5">
+                                <Label className="text-[9px] font-black uppercase text-slate-400 flex items-center gap-1">Due Date <CalendarDays className="h-3 w-3" /></Label>
+                                <Input 
+                                    type="date" 
+                                    value={format(dueDate, 'yyyy-MM-dd')} 
+                                    onChange={e => { setDueDate(new Date(e.target.value)); setSelectedTermPreset('custom'); }} 
+                                    className="h-10 font-bold rounded-xl border-indigo-200" 
+                                />
                             </div>
                             <div className="col-span-2 space-y-1.5">
                                 <Label className="text-[9px] font-black uppercase text-slate-400 flex items-center gap-1">Sales Order Reference (SO)</Label>

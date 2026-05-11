@@ -1,4 +1,3 @@
-
 'use client';
 import React from 'react';
 
@@ -117,7 +116,8 @@ export const InvoiceTemplate = ({ invoiceData, type }: { invoiceData: InvoiceDat
                             fontFamily: 'Arial, Helvetica, sans-serif',
                             boxSizing: 'border-box',
                             pageBreakAfter: (isLastPage && type === 'Copy') ? 'avoid' : 'always',
-                            breakInside: 'avoid'
+                            breakInside: 'avoid',
+                            pageBreakInside: 'avoid'
                         }}
                     >
                         {/* TYPE INDICATOR */}
@@ -213,7 +213,7 @@ export const InvoiceTemplate = ({ invoiceData, type }: { invoiceData: InvoiceDat
 
                         {/* FOOTER - ONLY ON LAST PAGE */}
                         {isLastPage ? (
-                            <footer className="mt-4 break-inside-avoid">
+                            <footer className="mt-4 break-inside-avoid" style={{ pageBreakInside: 'avoid' }}>
                                 <div className="mb-4 px-2">
                                     <p className="font-bold text-[9pt]">NO PO : {poNumber}</p>
                                 </div>
