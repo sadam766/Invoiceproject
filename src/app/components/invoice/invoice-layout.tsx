@@ -18,6 +18,7 @@ interface InvoiceData {
     customer?: {
         name: string;
         address: string;
+        vaNumber?: string;
     };
     customerName?: string;
     customerCode?: string;
@@ -60,7 +61,7 @@ const formatDate = (dateString: string): string => {
     }).replace(/\//g, '-');
 };
 
-const CHUNK_SIZE = 12; // Maximum items per page to prevent layout shifting
+const ITEM_LIMIT = 12; // Maximum items per page for visual integrity
 
 export const InvoiceTemplate = ({ invoiceData, type }: { invoiceData: InvoiceData, type: 'Original' | 'Copy' }) => {
     if (!invoiceData) return null;
@@ -68,7 +69,7 @@ export const InvoiceTemplate = ({ invoiceData, type }: { invoiceData: InvoiceDat
     const {
         id: invoiceId = '',
         items = [],
-        customer = { name: 'N/A', address: 'N/A' },
+        customer = { name: 'N/A', address: 'N/A', vaNumber: '' },
         date = '',
         soNumber = '-',
         poNumber = '-',
@@ -88,23 +89,26 @@ export const InvoiceTemplate = ({ invoiceData, type }: { invoiceData: InvoiceDat
     const displayInvoiceId = (invoiceId || '').replace(/_/g, '/');
     const subTotalItems = items.reduce((acc, item) => acc + (Number(item.total) || 0), 0);
     const invoiceTitle = (invoiceId || '').startsWith('KW') ? 'PROFORMA INVOICE' : 'INVOICE/OFFICIAL RECEIPT';
+    
+    // Virtual Account Logic (Hybrid Mode)
+    const activeVa = vaNumber || customer.vaNumber;
 
-    // PAGINATION LOGIC: Split items into chunks
-    const itemChunks = [];
-    for (let i = 0; i < items.length; i += CHUNK_SIZE) {
-        itemChunks.push(items.slice(i, i + CHUNK_SIZE));
+    // PAGINATION: Split items into chunks
+    const chunks = [];
+    for (let i = 0; i < items.length; i += ITEM_LIMIT) {
+        chunks.push(items.slice(i, i + ITEM_LIMIT));
     }
-    if (itemChunks.length === 0) itemChunks.push([]);
+    if (chunks.length === 0) chunks.push([]);
 
     return (
-        <div className="print-container">
-            {itemChunks.map((chunk, chunkIdx) => {
-                const isLastPage = chunkIdx === itemChunks.length - 1;
+        <div className="invoice-print-wrapper" style={{ color: '#000000' }}>
+            {chunks.map((chunk, idx) => {
+                const isLastPage = idx === chunks.length - 1;
                 
                 return (
                     <div 
-                        key={chunkIdx}
-                        className="relative bg-white mx-auto flex flex-col text-black border-none"
+                        key={idx}
+                        className="relative bg-white mx-auto flex flex-col print:shadow-none"
                         style={{ 
                             width: '210mm', 
                             height: '297mm', 
@@ -113,17 +117,16 @@ export const InvoiceTemplate = ({ invoiceData, type }: { invoiceData: InvoiceDat
                             fontFamily: 'Arial, Helvetica, sans-serif',
                             boxSizing: 'border-box',
                             pageBreakAfter: (isLastPage && type === 'Copy') ? 'avoid' : 'always',
-                            color: '#000000',
                             breakInside: 'avoid'
                         }}
                     >
                         {/* TYPE INDICATOR */}
-                        <div className="absolute right-8 top-8 text-[10pt] text-slate-300 uppercase italic font-normal">
-                            {type} {itemChunks.length > 1 ? `(Page ${chunkIdx + 1}/${itemChunks.length})` : ''}
+                        <div className="absolute right-8 top-8 text-[10pt] text-slate-300 uppercase italic font-normal print:hidden">
+                            {type} {chunks.length > 1 ? `(Page ${idx + 1}/${chunks.length})` : ''}
                         </div>
 
-                        {/* HEADER SECTION */}
-                        <header className="relative mb-6">
+                        {/* HEADER */}
+                        <header className="mb-6">
                             <div className="w-full text-center mb-6">
                                 <h1 className="font-bold uppercase text-[13pt] leading-tight mb-0.5">{invoiceTitle}</h1>
                                 <p className="font-bold text-[11pt]">{displayInvoiceId}</p>
@@ -149,7 +152,7 @@ export const InvoiceTemplate = ({ invoiceData, type }: { invoiceData: InvoiceDat
                             </div>
                         </header>
 
-                        {/* TABLE SECTION */}
+                        {/* TABLE */}
                         <main className='relative flex-grow overflow-hidden'>
                             <table className="w-full border-collapse text-[8.5pt]">
                                 <thead>
@@ -164,7 +167,7 @@ export const InvoiceTemplate = ({ invoiceData, type }: { invoiceData: InvoiceDat
                                 <tbody>
                                     {chunk.map((item, itemIdx) => (
                                         <tr key={item.id} className='align-top'>
-                                            <td className="py-1 px-2">{chunkIdx * CHUNK_SIZE + itemIdx + 1}</td>
+                                            <td className="py-1 px-2">{idx * ITEM_LIMIT + itemIdx + 1}</td>
                                             <td className="py-1 px-2 uppercase font-medium">{item.name}</td>
                                             <td className="py-1 px-2 text-center">{item.quantity?.toLocaleString('id-ID')} {item.unit}</td>
                                             <td className="py-1 px-2 text-right">{formatCurrency(item.price)}</td>
@@ -172,19 +175,18 @@ export const InvoiceTemplate = ({ invoiceData, type }: { invoiceData: InvoiceDat
                                         </tr>
                                     ))}
                                     
-                                    {/* CALCULATION ROWS - ONLY ON LAST PAGE */}
                                     {isLastPage && (
                                         <>
-                                            {/* SUB-TOTAL SLOT (Orange Marked in Ref) */}
+                                            {/* Subtotal Item Slot */}
                                             <tr>
                                                 <td colSpan={3}></td>
-                                                <td className="py-1 px-2 text-left"></td>
+                                                <td></td>
                                                 <td className="py-1 px-2 text-right border-t border-black font-bold">
                                                     {formatCurrency(subTotalItems)}
                                                 </td>
                                             </tr>
 
-                                            {Number(dpValue) > 0 ? (
+                                            {Number(dpValue) > 0 && (
                                                 <tr>
                                                     <td colSpan={3}></td>
                                                     <td className="py-1 px-2 text-left">DP</td>
@@ -192,9 +194,9 @@ export const InvoiceTemplate = ({ invoiceData, type }: { invoiceData: InvoiceDat
                                                         {dpMode === 'kurangi' ? `(${formatCurrency(dpValue)})` : formatCurrency(dpValue)}
                                                     </td>
                                                 </tr>
-                                            ) : null}
+                                            )}
 
-                                            {Number(discount) > 0 ? (
+                                            {Number(discount) > 0 && (
                                                 <tr>
                                                     <td colSpan={3}></td>
                                                     <td className="py-1 px-2 text-left">{discountLabel}</td>
@@ -202,16 +204,16 @@ export const InvoiceTemplate = ({ invoiceData, type }: { invoiceData: InvoiceDat
                                                         ({formatCurrency(discount)})
                                                     </td>
                                                 </tr>
-                                            ) : null}
+                                            )}
                                         </>
                                     )}
                                 </tbody>
                             </table>
                         </main>
 
-                        {/* FOOTER SECTION - ONLY ON LAST PAGE */}
+                        {/* FOOTER - ONLY ON LAST PAGE */}
                         {isLastPage ? (
-                            <footer className="mt-4" style={{ breakInside: 'avoid' }}>
+                            <footer className="mt-4 break-inside-avoid">
                                 <div className="mb-4 px-2">
                                     <p className="font-bold text-[9pt]">NO PO : {poNumber}</p>
                                 </div>
@@ -239,6 +241,7 @@ export const InvoiceTemplate = ({ invoiceData, type }: { invoiceData: InvoiceDat
                                 </div>
 
                                 <div className="flex justify-between items-start mt-1">
+                                    {/* HYBRID BANK INFO */}
                                     <div className="w-[65%] text-[8.5pt] leading-normal space-y-1">
                                         <div className="flex mb-1">
                                             <span className="w-[65px] font-bold">Payment:</span>
@@ -250,15 +253,13 @@ export const InvoiceTemplate = ({ invoiceData, type }: { invoiceData: InvoiceDat
                                             <p className="font-bold uppercase m-0 leading-tight">PT. Jembo Cable Company Tbk</p>
                                         </div>
 
-                                        {/* HYBRID PAYMENT INFO */}
                                         <div className="mt-2 space-y-2">
-                                            {/* 1. SEKSI VIRTUAL ACCOUNT (Hanya muncul jika ada data VA) */}
-                                            {vaNumber && (
+                                            {activeVa && (
                                                 <div className="border-b border-dashed border-black pb-2 mb-2">
                                                     <div className="font-bold text-[8pt] text-blue-800 mb-1 uppercase tracking-tight">PEMBAYARAN VIA VIRTUAL ACCOUNT:</div>
                                                     <div className="flex items-start">
                                                         <span className="w-[100px] font-bold">Bank Mandiri</span>
-                                                        <span className="font-bold">: {vaNumber}</span>
+                                                        <span className="font-bold">: {activeVa}</span>
                                                     </div>
                                                     <div className="flex items-start">
                                                         <span className="w-[100px]">Nama A/C</span>
@@ -267,7 +268,6 @@ export const InvoiceTemplate = ({ invoiceData, type }: { invoiceData: InvoiceDat
                                                 </div>
                                             )}
 
-                                            {/* 2. SEKSI NOMOR REKENING MANUAL (Tetap dipertahankan) */}
                                             <div className="space-y-0.5">
                                                 <div className="flex items-start">
                                                     <span className="w-[100px] font-bold">Bank Mandiri -</span>
@@ -285,7 +285,7 @@ export const InvoiceTemplate = ({ invoiceData, type }: { invoiceData: InvoiceDat
 
                                             <div className="w-[280px] text-center font-bold text-[8pt] py-1">OR</div>
 
-                                            <div className="flex items-start space-x-0">
+                                            <div className="flex items-start">
                                                 <div className="w-[100px] font-bold leading-[1.2]">
                                                     Bank BCA - Jakarta<br/>
                                                     <span className="font-normal text-[7.5pt]">Cabang KEM TOWER</span>
@@ -295,6 +295,7 @@ export const InvoiceTemplate = ({ invoiceData, type }: { invoiceData: InvoiceDat
                                         </div>
                                     </div>
 
+                                    {/* SIGNATURE */}
                                     <div className="w-[35%] flex flex-col items-center self-stretch justify-between py-1">
                                         <p className="font-bold text-[9pt] text-center">PT. JEMBO CABLE COMPANY Tbk</p>
                                         <div className="mt-auto flex flex-col items-center">
@@ -306,7 +307,7 @@ export const InvoiceTemplate = ({ invoiceData, type }: { invoiceData: InvoiceDat
                             </footer>
                         ) : (
                             <footer className="mt-auto text-right text-[8pt] italic text-slate-400">
-                                Continued on page {chunkIdx + 2}...
+                                Continued on page {idx + 2}...
                             </footer>
                         )}
                     </div>

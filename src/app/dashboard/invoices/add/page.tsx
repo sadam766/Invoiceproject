@@ -300,7 +300,7 @@ export default function AddInvoicePage() {
       vat12: calcs.vat12,
       totalRp: calcs.totalRp,
       date: format(issueDate, 'yyyy-MM-dd')
-  };
+  } as any;
 
   return (
     <main className="flex flex-1 flex-col h-full bg-background animate-in fade-in duration-500 overflow-hidden">
@@ -324,6 +324,7 @@ export default function AddInvoicePage() {
       </div>
 
       <div className="flex flex-1 overflow-hidden">
+          {/* LEFT FORM PANEL */}
           <div className="w-[48%] overflow-y-auto p-8 border-r bg-slate-50/30">
               <div className="space-y-8 max-w-2xl mx-auto pb-20">
                   
@@ -519,12 +520,14 @@ export default function AddInvoicePage() {
               </div>
           </div>
 
-          {/* LIVE PREVIEW SECTION */}
-          <div className="flex-1 bg-slate-200/50 overflow-y-auto scroll-smooth py-12 px-8">
-              <div className="max-w-[210mm] mx-auto scale-[0.85] origin-top shadow-2xl rounded-xl overflow-hidden">
-                  <InvoiceTemplate type="Original" invoiceData={previewInvoiceData} />
-                  <div className="h-8 bg-slate-400/20 backdrop-blur-sm flex items-center justify-center text-[10px] font-black uppercase text-slate-500 tracking-[0.5em]">Digital Duplication Page</div>
-                  <InvoiceTemplate type="Copy" invoiceData={previewInvoiceData} />
+          {/* RIGHT LIVE PREVIEW PANEL - OPTIMIZED FOR ZOOM & CLIPPING */}
+          <div className="flex-1 bg-slate-200/50 overflow-auto scroll-smooth py-12 px-4 md:px-8">
+              <div className="flex flex-col items-center min-w-min min-h-full">
+                  <div className="max-w-[210mm] w-full shadow-2xl rounded-xl overflow-visible origin-top scale-[0.7] md:scale-[0.8] xl:scale-[0.85] transition-all duration-300 bg-white">
+                      <InvoiceTemplate type="Original" invoiceData={previewInvoiceData} />
+                      <div className="h-10 bg-slate-400/20 backdrop-blur-sm flex items-center justify-center text-[10px] font-black uppercase text-slate-500 tracking-[0.5em] print:hidden">Digital Duplication Page</div>
+                      <InvoiceTemplate type="Copy" invoiceData={previewInvoiceData} />
+                  </div>
               </div>
           </div>
       </div>
