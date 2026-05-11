@@ -1,6 +1,7 @@
 
 'use client';
 import React from 'react';
+import { parseFormattedNumber } from '@/lib/utils';
 
 // --- DATA TYPES ---
 interface Item {
@@ -43,7 +44,8 @@ interface InvoiceData {
 
 // --- UTILITIES ---
 const formatCurrency = (amount: any): string => {
-    const num = typeof amount === 'number' ? amount : parseFloat(amount);
+    // Gunakan parseFormattedNumber agar string "3.280" terbaca 3280 (bukan 3.28)
+    const num = typeof amount === 'number' ? amount : parseFormattedNumber(amount);
     if (isNaN(num)) return '0,00';
     return num.toLocaleString('id-ID', {
         minimumFractionDigits: 2,

@@ -83,43 +83,50 @@ export function formatNumberWithCommas(value: number | string | undefined, minDe
 
 /**
  * Mengonversi string berformat (dengan titik/koma) kembali menjadi angka murni (float)
- * Mendukung deteksi cerdas untuk titik (.) atau koma (,) sebagai desimal.
+ * Perbaikan: Mendeteksi format Indonesia X.XXX sebagai ribuan (bukan desimal).
  */
 export function parseFormattedNumber(value: string | number): number {
   if (typeof value === 'number') return value;
   if (!value || value === '') return 0;
 
+  // Hapus karakter non-numerik kecuali titik, koma, dan minus
   let str = value.toString().replace(/[^\d.,-]/g, '');
 
   const hasComma = str.includes(',');
   const hasDot = str.includes('.');
 
+  // Kasus 1: Ada Titik dan Koma (Contoh: 1.234,56)
   if (hasComma && hasDot) {
     const lastComma = str.lastIndexOf(',');
     const lastDot = str.lastIndexOf('.');
     if (lastComma > lastDot) {
-      // ID Style: 1.000,50 (Koma adalah desimal)
+      // Format Indonesia: Koma adalah desimal
       return parseFloat(str.replace(/\./g, '').replace(',', '.')) || 0;
     } else {
-      // US Style: 1,000.50 (Titik adalah desimal)
+      // Format US: Titik adalah desimal
       return parseFloat(str.replace(/,/g, '')) || 0;
     }
-  } else if (hasComma) {
-    // Hanya ada koma: Anggap sebagai desimal (misal: 5,5 -> 5.5)
+  } 
+  
+  // Kasus 2: Hanya ada Koma (Contoh: 1234,56 atau 5,5)
+  if (hasComma) {
+    // Dalam konteks aplikasi ini, koma tunggal selalu dianggap desimal
     return parseFloat(str.replace(',', '.')) || 0;
-  } else if (hasDot) {
-    // Hanya ada titik: Bisa jadi desimal (5.5) atau ribuan (1.000)
-    // Berdasarkan instruksi user, jika titik muncul tunggal kita prioritaskan sebagai desimal
-    // kecuali diikuti tepat 3 digit dan bukan di akhir string.
+  }
+  
+  // Kasus 3: Hanya ada Titik (Contoh: 3.280 atau 5.5)
+  if (hasDot) {
     const parts = str.split('.');
+    // Logika Cerdas: Jika tepat 3 digit setelah titik, kemungkinan besar itu RIBUAN (Format ID)
+    // Contoh: 3.280 -> 3280. Jika 5.5 -> 5.5.
     if (parts.length === 2 && parts[1].length === 3) {
-      // Kasus ambigu seperti 1.000 atau 5.000 - kita ikuti konteks harga/qty
-      // Namun untuk fleksibilitas desimal, kita biarkan parseFloat menanganinya.
-      return parseFloat(str) || 0;
+      return parseFloat(str.replace(/\./g, '')) || 0;
     }
+    // Jika tidak, biarkan parseFloat menangani sebagai desimal standar
     return parseFloat(str) || 0;
   }
 
+  // Kasus 4: Angka bersih
   return parseFloat(str) || 0;
 }
 
