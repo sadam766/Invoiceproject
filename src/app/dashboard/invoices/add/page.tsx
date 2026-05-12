@@ -152,7 +152,7 @@ export default function AddInvoicePage() {
     }
   }, [issueDate, selectedTermPreset]);
 
-  // NEW LOGIC: Pull History & DP consistency based on PO Number
+  // PO History Pulling
   useEffect(() => {
     const po = activeIdentity?.poNumber;
     if (!po || !allInvoices || items.length > 0 || editInvoiceId) return;
@@ -163,21 +163,16 @@ export default function AddInvoicePage() {
 
     if (previousInvoices.length > 0) {
       const latest = previousInvoices[0];
-      
-      // Pull Items automatically if current items are empty
       if (latest.items && latest.items.length > 0) {
         setItems(latest.items.map(item => ({ ...item, id: `hist-${Date.now()}-${Math.random().toString(36).substr(2, 5)}` })));
         toast({ title: "PO History Restored", description: `Menarik data item dari penagihan sebelumnya untuk PO ${po}.` });
       }
-
-      // Pull DP Consistency
       if (latest.dpPercent !== undefined) {
         setDpPercent(String(latest.dpPercent));
         setDpMode(latest.dpMode || 'kurangi');
         setDpDescription(latest.dpDescription || 'DP');
         toast({ title: "DP Consistency Applied", description: `Mengikuti skema DP ${latest.dpPercent}% dari penagihan sebelumnya.` });
       }
-
       if (latest.paymentTerms) setPaymentTerms(latest.paymentTerms);
       if (latest.paymentMode) setPaymentMode(latest.paymentMode as any);
       if (latest.vaNumber) setManualVaNumber(latest.vaNumber);
@@ -187,7 +182,6 @@ export default function AddInvoicePage() {
   const itemHistorySuggestions = useMemo(() => {
     if (!activeIdentity?.customer || !allInvoices) return [];
     const customerItems: Record<string, { name: string, price: number, unit: string }> = {};
-    
     allInvoices
         .filter(inv => inv.customer === activeIdentity.customer)
         .forEach(inv => {
@@ -217,7 +211,6 @@ export default function AddInvoicePage() {
               const defaultAddr = currentCustomer.addresses?.find(a => a.isDefault) || currentCustomer.addresses?.[0];
               if (defaultAddr) setBillingAddress(defaultAddr.address);
           }
-
           if ((activeIdentity as Invoice).paymentMode) setPaymentMode((activeIdentity as Invoice).paymentMode as any);
           if ((activeIdentity as Invoice).paymentTerms) {
               setPaymentTerms((activeIdentity as Invoice).paymentTerms!);
@@ -230,7 +223,6 @@ export default function AddInvoicePage() {
           if ((activeIdentity as Invoice).dpPercent !== undefined) setDpPercent(String((activeIdentity as Invoice).dpPercent));
           if ((activeIdentity as Invoice).dpMode) setDpMode((activeIdentity as Invoice).dpMode!);
           if ((activeIdentity as Invoice).discount) setDiscountValue(formatNumberWithCommas((activeIdentity as Invoice).discount!));
-          
           if ((activeIdentity as Invoice).dppVat) setManualDppVat(formatNumberWithCommas((activeIdentity as Invoice).dppVat));
           if ((activeIdentity as Invoice).vat12) setManualVat12(formatNumberWithCommas((activeIdentity as Invoice).vat12));
       }
@@ -313,7 +305,7 @@ export default function AddInvoicePage() {
         date: format(issueDate, 'yyyy-MM-dd'),
         dueDate: format(dueDate, 'yyyy-MM-dd'),
         amount: calcs.totalRp,
-        grandTotal: calcs.subTotalItems,
+        grandTotal: calcs.goodsNet, // BENAR: Menggunakan nilai Net untuk kolom Goods di footer
         status: invoiceStatus,
         paymentMode: paymentMode,
         paymentTerms: paymentTerms,
@@ -362,7 +354,7 @@ export default function AddInvoicePage() {
       dpPercent: Number(dpPercent) || 0,
       discount: calcs.discountValue,
       discountLabel: discountLabel,
-      grandTotal: calcs.subTotalItems, 
+      grandTotal: calcs.goodsNet, // BENAR: Menggunakan nilai Net untuk kolom Goods di footer
       dppVat: calcs.finalDppVat,
       vat12: calcs.finalVat12,
       totalRp: calcs.totalRp,
