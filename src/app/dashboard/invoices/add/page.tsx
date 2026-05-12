@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useEffect, useState, useMemo } from 'react';
@@ -43,7 +42,11 @@ import {
   MapPin,
   Building2,
   History,
-  CalendarDays
+  CalendarDays,
+  Zap,
+  TrendingUp,
+  Wallet,
+  ShieldCheck
 } from 'lucide-react';
 import { type Invoice, type UserProfile, type InvoiceItem, type InvoiceNumber } from '@/app/lib/data';
 import { useToast } from '@/hooks/use-toast';
@@ -235,19 +238,14 @@ export default function AddInvoicePage() {
     const dpVal = parseFormattedNumber(dpValue);
     const discVal = parseFormattedNumber(discountValue);
 
-    let baseValue = subTotalItems;
-    if (dpMode === 'tagih') {
-        baseValue = subTotalItems + dpVal - discVal;
-    } else {
-        baseValue = Math.max(0, subTotalItems - dpVal - discVal);
-    }
-
-    const dppVat = Math.round(baseValue * (11 / 12));
+    // FIXED LOGIC: DPP = Total Goods - Diskon - Nominal DP
+    // Rumus ini memastikan nilai pajak dihitung dari basis netto.
+    const dppVat = Math.max(0, subTotalItems - discVal - dpVal);
     const vat12 = Math.round(dppVat * 0.12);
     const totalRp = dppVat + vat12;
 
     return { subTotalItems, dpValue: dpVal, discountValue: discVal, dppVat, vat12, totalRp };
-  }, [items, dpValue, dpMode, discountValue]);
+  }, [items, dpValue, discountValue]);
 
   const handleSaveInvoice = async (invoiceStatus: any = 'sent', redirectToPreview = false) => {
     if (!firestore || !user || !activeIdentity) return;
@@ -348,7 +346,7 @@ export default function AddInvoicePage() {
       <div className="flex flex-1 overflow-hidden">
           {/* LEFT FORM PANEL - Responsive Flex Layout */}
           <div className="flex-1 min-w-0 overflow-y-auto p-8 border-r bg-slate-50/30">
-              <div className="space-y-8 max-w-4xl mx-auto pb-20">
+              <div className="space-y-8 max-w-4xl mx-auto pb-32">
                   
                   {/* CUSTOMER INSIGHT SECTION */}
                   <Card className="border-none shadow-md ring-1 ring-indigo-200 bg-white overflow-hidden rounded-3xl">
@@ -568,6 +566,45 @@ export default function AddInvoicePage() {
                         </div>
                     </CardContent>
                   </Card>
+
+                  {/* SUMMARY BAR FOR VALIDATION */}
+                  <div className="p-8 bg-slate-900 rounded-[2.5rem] shadow-2xl border border-slate-800 animate-in slide-in-from-bottom-4 duration-700">
+                    <div className="flex flex-col lg:flex-row justify-between items-center gap-8">
+                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-8 flex-1 w-full">
+                            <div className="space-y-1">
+                                <p className="text-[9px] font-black uppercase text-slate-500 tracking-[0.2em] flex items-center gap-2">
+                                    <Layers className="h-3 w-3" /> Gross Goods
+                                </p>
+                                <p className="text-sm font-black text-white">Rp {formatNumberWithCommas(calcs.subTotalItems)}</p>
+                            </div>
+                            <div className="space-y-1">
+                                <p className="text-[9px] font-black uppercase text-slate-500 tracking-[0.2em] flex items-center gap-2">
+                                    <TrendingUp className="h-3 w-3" /> Deductions
+                                </p>
+                                <p className="text-sm font-black text-rose-400">- Rp {formatNumberWithCommas(calcs.dpValue + calcs.discountValue)}</p>
+                            </div>
+                            <div className="space-y-1">
+                                <p className="text-[9px] font-black uppercase text-indigo-400 tracking-[0.2em] flex items-center gap-2">
+                                    <Zap className="h-3 w-3" /> Net Basis (DPP)
+                                </p>
+                                <p className="text-sm font-black text-indigo-300">Rp {formatNumberWithCommas(calcs.dppVat)}</p>
+                            </div>
+                            <div className="space-y-1">
+                                <p className="text-[9px] font-black uppercase text-emerald-500 tracking-[0.2em] flex items-center gap-2">
+                                    <ShieldCheck className="h-3 w-3" /> VAT (12%)
+                                </p>
+                                <p className="text-sm font-black text-emerald-400">+ Rp {formatNumberWithCommas(calcs.vat12)}</p>
+                            </div>
+                        </div>
+                        <div className="h-px lg:h-12 w-full lg:w-px bg-slate-800" />
+                        <div className="text-right min-w-[200px]">
+                            <p className="text-[10px] font-black uppercase text-slate-400 tracking-[0.3em] mb-1 flex items-center justify-end gap-2">
+                                <Wallet className="h-3 w-3" /> Total Payable
+                            </p>
+                            <p className="text-3xl font-black text-white tracking-tighter italic">Rp {formatNumberWithCommas(calcs.totalRp)}</p>
+                        </div>
+                    </div>
+                  </div>
               </div>
           </div>
 
