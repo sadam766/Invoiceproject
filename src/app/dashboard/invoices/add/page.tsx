@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useEffect, useState, useMemo } from 'react';
@@ -399,7 +398,6 @@ export default function AddInvoicePage() {
                     </CardContent>
                   </Card>
 
-                  {/* PAYMENT MODE SELECTOR (HYBRID) */}
                   <Card className="shadow-sm border-none ring-1 ring-indigo-100 overflow-hidden rounded-3xl">
                     <CardHeader className="bg-indigo-50/50 border-b py-3 px-6">
                         <CardTitle className="text-[10px] font-black uppercase flex items-center gap-2 text-indigo-600 tracking-widest">
@@ -716,9 +714,8 @@ export default function AddInvoicePage() {
 
           <div className="w-[45%] bg-slate-200/50 overflow-auto scroll-smooth py-12 px-4 md:px-8">
               <div className="flex flex-col items-center min-w-min min-h-full">
-                  <div className="max-w-[210mm] w-full shadow-2xl rounded-xl overflow-visible origin-top scale-[0.7] md:scale-[0.8] xl:scale-[0.85] transition-all duration-300 bg-white">
+                  <div className="invoice-print-wrapper max-w-[210mm] w-full shadow-2xl rounded-xl overflow-visible origin-top scale-[0.7] md:scale-[0.8] xl:scale-[0.85] transition-all duration-300 bg-white">
                       <InvoiceTemplate type="Original" invoiceData={previewInvoiceData} />
-                      <div className="h-10 bg-slate-400/20 backdrop-blur-sm flex items-center justify-center text-[10px] font-black uppercase text-slate-500 tracking-[0.5em] print:hidden">Digital Duplication Page</div>
                       <InvoiceTemplate type="Copy" invoiceData={previewInvoiceData} />
                   </div>
               </div>

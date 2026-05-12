@@ -1,4 +1,3 @@
-
 'use client';
 import React from 'react';
 import { parseFormattedNumber } from '@/lib/utils';
@@ -114,14 +113,15 @@ export const InvoiceTemplate = ({ invoiceData, type }: { invoiceData: InvoiceDat
                         className="relative bg-white mx-auto flex flex-col print:shadow-none"
                         style={{ 
                             width: '210mm', 
-                            height: '297mm', 
+                            minHeight: '297mm',
+                            height: 'auto',
                             padding: '50mm 15mm 15mm 15mm',
                             fontSize: '10pt',
                             fontFamily: 'Arial, Helvetica, sans-serif',
                             boxSizing: 'border-box',
-                            pageBreakAfter: (isLastPage && type === 'Copy') ? 'avoid' : 'always',
-                            breakInside: 'avoid',
-                            pageBreakInside: 'avoid'
+                            overflow: 'hidden',
+                            pageBreakAfter: (isLastPage && type === 'Copy') ? 'auto' : 'always',
+                            pageBreakInside: 'avoid',
                         }}
                     >
                         {/* TYPE INDICATOR */}
@@ -216,64 +216,65 @@ export const InvoiceTemplate = ({ invoiceData, type }: { invoiceData: InvoiceDat
                                 </tbody>
                             </table>
                         </main>
+                            {/* FOOTER - ONLY ON LAST PAGE */}
+                            {isLastPage ? (
+                                <footer className="mt-4" style={{ pageBreakInside: 'avoid' }}>
+                                    <div className="mb-4 px-2">
+                                        <p className="font-bold text-[9pt]">NO PO : {poNumber}</p>
+                                    </div>
 
-                        {/* FOOTER - ONLY ON LAST PAGE */}
-                        {isLastPage ? (
-                            <footer className="mt-4 break-inside-avoid" style={{ pageBreakInside: 'avoid' }}>
-                                <div className="mb-4 px-2">
-                                    <p className="font-bold text-[9pt]">NO PO : {poNumber}</p>
-                                </div>
-
-                                <div className="flex justify-between items-start border-y-[1.5pt] border-black py-1 mb-1">
-                                    <div className="w-[50%]"></div>
-                                    <div className="w-[35%] text-[8.5pt] leading-tight">
-                                        <div className="flex justify-between">
-                                            <span>Goods :</span>
-                                            <span>{formatCurrency(grandTotal)}</span>
-                                        </div>
-                                        <div className="flex justify-between">
-                                            <span>DPP VAT (11/12) :</span>
-                                            <span>{formatCurrency(dppVat)}</span>
-                                        </div>
-                                        <div className="flex justify-between">
-                                            <span>VAT 12 % :</span>
-                                            <span>{formatCurrency(vat12)}</span>
-                                        </div>
-                                        <div className="flex justify-between font-black">
-                                            <span>Total Rp :</span>
-                                            <span>{formatCurrency(totalRp)}</span> 
+                                    {/* Tabel Goods/VAT */}
+                                    <div className="flex justify-between items-start border-y-[1.5pt] border-black py-1 mb-1">
+                                        <div className="w-[50%]"></div>
+                                        <div className="w-[35%] text-[8.5pt] leading-tight">
+                                            <div className="flex justify-between">
+                                                <span>Goods :</span>
+                                                <span>{formatCurrency(grandTotal)}</span>
+                                            </div>
+                                            <div className="flex justify-between">
+                                                <span>DPP VAT (11/12) :</span>
+                                                <span>{formatCurrency(dppVat)}</span>
+                                            </div>
+                                            <div className="flex justify-between">
+                                                <span>VAT 12 % :</span>
+                                                <span>{formatCurrency(vat12)}</span>
+                                            </div>
+                                            <div className="flex justify-between font-black">
+                                                <span>Total Rp :</span>
+                                                <span>{formatCurrency(totalRp)}</span> 
+                                            </div>
                                         </div>
                                     </div>
-                                </div>
 
-                                <div className="flex justify-between items-start mt-1">
-                                    {/* SELECTIVE BANK INFO */}
-                                    <div className="w-[65%] text-[8.5pt] leading-normal space-y-1">
-                                        <div className="flex mb-1">
-                                            <span className="w-[65px] font-bold">Payment:</span>
-                                            <span>{paymentTerms}</span>
-                                        </div>
-                                        <div className="flex flex-col"> 
-                                            <p className="font-bold m-0 leading-tight">Please state with your payment: {displayInvoiceId}</p>
-                                            <p className="font-bold m-0 leading-tight">For payment, please transfer to our account:</p>
-                                            <p className="font-bold uppercase m-0 leading-tight">PT. Jembo Cable Company Tbk</p>
-                                        </div>
+                                    <div className="flex justify-between items-stretch mt-1 h-[180px]">
+                                        
+                                        {/* SISI KIRI: INFO BANK */}
+                                        <div className="w-[60%] flex flex-col justify-start text-[8.5pt] leading-normal">
+                                            <div className="flex mb-1">
+                                                <span className="w-[65px] font-bold">Payment:</span>
+                                                <span>{paymentTerms}</span>
+                                            </div>
+                                            <div className="flex flex-col mb-1"> 
+                                                <p className="font-bold m-0 leading-tight">Please state with your payment: {displayInvoiceId}</p>
+                                                <p className="font-bold m-0 leading-tight">For payment, please transfer to our account:</p>
+                                                <p className="font-bold uppercase m-0 leading-tight">PT. Jembo Cable Company Tbk</p>
+                                            </div>
 
-                                        <div className="mt-2 space-y-2">
-                                            {paymentMode === 'virtual_account' && activeVa ? (
-                                                <div className="pb-2 mb-2">
-                                                    <div className="font-bold text-[8pt] text-blue-800 mb-1 uppercase tracking-tight">PEMBAYARAN VIA VIRTUAL ACCOUNT:</div>
-                                                    <div className="flex items-start">
-                                                        <span className="w-[100px] font-bold">Bank Mandiri</span>
-                                                        <span className="font-bold">: {activeVa}</span>
+                                            <div className="mt-1">
+                                                {paymentMode === 'virtual_account' && activeVa ? (
+                                                    <div className="space-y-0.5">
+                                                        <div className="font-bold text-[8pt] text-blue-800 mb-0.5 uppercase">PEMBAYARAN VIA VIRTUAL ACCOUNT:</div>
+                                                        <div className="flex items-start">
+                                                            <span className="w-[100px] font-bold">Bank Mandiri</span>
+                                                            <span className="font-bold">: {activeVa}</span>
+                                                        </div>
+                                                        <div className="flex items-start">
+                                                            <span className="w-[100px]">Nama A/C</span>
+                                                            <span className="uppercase">: {customer.name}</span>
+                                                        </div>
                                                     </div>
-                                                    <div className="flex items-start">
-                                                        <span className="w-[100px]">Nama A/C</span>
-                                                        <span className="uppercase">: {customer.name}</span>
-                                                    </div>
-                                                </div>
-                                            ) : (
-                                                <div>
+                                                ) : (
+                                                    <div>
                                                     <div className="space-y-0.5">
                                                         <div className="flex items-start">
                                                             <span className="w-[100px] font-bold">Bank Mandiri -</span>
@@ -303,21 +304,21 @@ export const InvoiceTemplate = ({ invoiceData, type }: { invoiceData: InvoiceDat
                                         </div>
                                     </div>
 
-                                    {/* SIGNATURE - FIXED FOR PDF READER */}
-                                    <div className="w-[35%] flex flex-col items-center justify-end min-h-[120px] py-1">
-                                        <p className="font-bold text-[9pt] text-center mb-auto">PT. JEMBO CABLE COMPANY Tbk</p>
-                                        <div className="flex flex-col items-center">
-                                            <div className="border-t-[1.5pt] border-black w-[160px]"></div>
-                                            <p className="font-bold uppercase pt-1 text-[9pt]">Finance</p>
+                                        <div className="w-[35%] flex flex-col justify-end min-h-[120px] py-1">
+                                            <p className="font-bold text-[9pt] text-center mb-auto">PT. JEMBO CABLE COMPANY Tbk</p>
+                                            <div className="flex flex-col items-center">
+                                                <div className="border-t-[1.5pt] border-black w-[160px]"></div>
+                                                <p className="font-bold uppercase pt-1 text-[9pt]">Finance</p>
+                                            </div>
                                         </div>
+
                                     </div>
-                                </div>
-                            </footer>
-                        ) : (
-                            <footer className="mt-auto text-right text-[8pt] italic text-slate-400">
-                                Continued on page {idx + 2}...
-                            </footer>
-                        )}
+                                </footer>
+                            ) : (
+                                <footer className="mt-auto text-right text-[8pt] italic text-slate-400">
+                                    Continued on page {idx + 2}...
+                                </footer>
+                            )}
                     </div>
                 );
             })}

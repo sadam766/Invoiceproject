@@ -1,4 +1,3 @@
-
 'use client';
 
 import React, { useRef, useEffect, useState } from 'react';
@@ -28,7 +27,6 @@ const InvoicePreviewPage = () => {
     if (invoiceData) {
         setFormattedData({
             ...invoiceData,
-            // Ensure data consistency for the template
             paymentMode: invoiceData.paymentMode || 'manual',
             vaNumber: invoiceData.vaNumber || '',
             grandTotal: invoiceData.grandTotal ?? (invoiceData.amount - (invoiceData.vat12 || 0)), 
@@ -82,9 +80,8 @@ const InvoicePreviewPage = () => {
         </Button>
       </div>
 
-      <div ref={invoiceContainerRef} className="print:m-0 print:p-0 flex flex-col items-center" style={{ width: '210mm' }}>
+      <div ref={invoiceContainerRef} className="invoice-print-wrapper flex flex-col items-center print:m-0 print:p-0" style={{ width: '210mm' }}>
         <InvoiceTemplate invoiceData={formattedData} type="Original" />
-        <div className="h-10 bg-slate-400/20 backdrop-blur-sm flex items-center justify-center text-[10px] font-black uppercase text-slate-500 tracking-[0.5em] print:hidden">Digital Duplication Page</div>
         <InvoiceTemplate invoiceData={formattedData} type="Copy" />
       </div>
     </main>

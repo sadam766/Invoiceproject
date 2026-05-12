@@ -97,15 +97,26 @@
 }
 
 @media print {
-  .print-break-inside-avoid {
-    page-break-inside: avoid;
+  @page {
+    size: A4;
+    margin: 0;
   }
   
   body {
     background: white !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+  
+  .print-break-inside-avoid {
+    page-break-inside: avoid;
   }
   
   .print-no-shadow {
     box-shadow: none !important;
+  }
+
+  .invoice-print-wrapper > div:last-child {
+    page-break-after: auto !important;
   }
 }
