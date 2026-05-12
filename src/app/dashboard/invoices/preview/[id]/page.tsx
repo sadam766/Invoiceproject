@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { useRef, useEffect, useState } from 'react';
@@ -27,8 +28,10 @@ const InvoicePreviewPage = () => {
     if (invoiceData) {
         setFormattedData({
             ...invoiceData,
-            // Ensure data maps to the template prop names accurately
-            grandTotal: invoiceData.grandTotal || invoiceData.amount, 
+            // REVISI LOGIKA DATA MAPPING:
+            // 1. grandTotal (Lable 'Goods :') = Harus murni nilai Net setelah potongan, bukan total akhir.
+            // 2. totalRp (Lable 'Total Rp :') = Adalah nilai akhir (Goods + VAT).
+            grandTotal: invoiceData.grandTotal ?? (invoiceData.amount - (invoiceData.vat12 || 0)), 
             customer: {
                 name: invoiceData.customerName || invoiceData.customer,
                 address: invoiceData.billingAddress || 'N/A'

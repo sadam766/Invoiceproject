@@ -258,19 +258,30 @@ export default function AddInvoicePage() {
     updateItemField(id, field, parsed);
   };
 
+  /**
+   * AKUNTANSI DAKOTA HUB LOGIC (REVISED)
+   * 1. Goods (Net) = Subtotal Item - DP - Diskon
+   * 2. DPP VAT (11/12) = ROUND(Goods * 11/12, 0)
+   * 3. VAT 12% = ROUND(DPP VAT * 12/100, 0)
+   * 4. Total Rp = Goods + VAT 12%
+   */
   const calcs = useMemo(() => {
     const subTotalItems = items.reduce((acc, item) => acc + (item.total || 0), 0);
     const dpVal = parseFormattedNumber(dpValue);
     const discVal = parseFormattedNumber(discountValue);
 
+    // Variabel "Goods" adalah nilai Net setelah potongan
     const goodsNet = Math.max(0, subTotalItems - discVal - dpVal);
     
+    // Hitung DPP murni dari Goods Net
     const autoDppVat = Math.round(goodsNet * 11 / 12);
     const finalDppVat = manualDppVat !== null ? parseFormattedNumber(manualDppVat) : autoDppVat;
 
+    // Hitung VAT 12% dari DPP
     const autoVat12 = Math.round(finalDppVat * 0.12);
     const finalVat12 = manualVat12 !== null ? parseFormattedNumber(manualVat12) : autoVat12;
 
+    // Total Rp = Goods + VAT
     const totalRp = goodsNet + finalVat12;
 
     return { 
@@ -305,7 +316,7 @@ export default function AddInvoicePage() {
         date: format(issueDate, 'yyyy-MM-dd'),
         dueDate: format(dueDate, 'yyyy-MM-dd'),
         amount: calcs.totalRp,
-        grandTotal: calcs.goodsNet, // BENAR: Menggunakan nilai Net untuk kolom Goods di footer
+        grandTotal: calcs.goodsNet, // REVISI: Goods adalah Subtotal - DP - Diskon
         status: invoiceStatus,
         paymentMode: paymentMode,
         paymentTerms: paymentTerms,
@@ -354,7 +365,7 @@ export default function AddInvoicePage() {
       dpPercent: Number(dpPercent) || 0,
       discount: calcs.discountValue,
       discountLabel: discountLabel,
-      grandTotal: calcs.goodsNet, // BENAR: Menggunakan nilai Net untuk kolom Goods di footer
+      grandTotal: calcs.goodsNet, // Label "Goods :" di template
       dppVat: calcs.finalDppVat,
       vat12: calcs.finalVat12,
       totalRp: calcs.totalRp,
@@ -621,19 +632,19 @@ export default function AddInvoicePage() {
                         <div className="grid grid-cols-2 sm:grid-cols-4 gap-8 flex-1 w-full">
                             <div className="space-y-1">
                                 <p className="text-[9px] font-black uppercase text-slate-500 tracking-[0.2em] flex items-center gap-2">
-                                    <Layers className="h-3 w-3" /> Gross Goods
+                                    <Layers className="h-3 w-3" /> Gross Goods (Bruto)
                                 </p>
                                 <p className="text-sm font-black text-white">Rp {formatNumberWithCommas(calcs.subTotalItems)}</p>
                             </div>
                             <div className="space-y-1">
                                 <p className="text-[9px] font-black uppercase text-slate-500 tracking-[0.2em] flex items-center gap-2">
-                                    <TrendingUp className="h-3 w-3" /> Deductions
+                                    <TrendingUp className="h-3 w-3" /> Potongan (DP+Disc)
                                 </p>
                                 <p className="text-sm font-black text-rose-400">- Rp {formatNumberWithCommas(calcs.dpValue + calcs.discountValue)}</p>
                             </div>
                             <div className="space-y-1">
                                 <p className="text-[9px] font-black uppercase text-indigo-400 tracking-[0.2em] flex items-center gap-2">
-                                    <Zap className="h-3 w-3" /> Goods (Net)
+                                    <Zap className="h-3 w-3" /> Goods (Basis Pajak)
                                 </p>
                                 <p className="text-sm font-black text-indigo-300">Rp {formatNumberWithCommas(calcs.goodsNet)}</p>
                             </div>
@@ -680,7 +691,7 @@ export default function AddInvoicePage() {
 
                             <div className="text-right">
                                 <p className="text-[10px] font-black uppercase text-slate-400 tracking-[0.3em] mb-1 flex items-center justify-end gap-2">
-                                    <Wallet className="h-3 w-3" /> Total Payable
+                                    <Wallet className="h-3 w-3" /> Total Rp (Grand Total)
                                 </p>
                                 <p className="text-3xl font-black text-white tracking-tighter italic">Rp {formatNumberWithCommas(calcs.totalRp)}</p>
                             </div>
