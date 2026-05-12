@@ -261,7 +261,7 @@ export const InvoiceTemplate = ({ invoiceData, type }: { invoiceData: InvoiceDat
 
                                         <div className="mt-2 space-y-2">
                                             {paymentMode === 'virtual_account' && activeVa ? (
-                                                <div className="border-b border-dashed border-black pb-2 mb-2">
+                                                <div className="pb-2 mb-2">
                                                     <div className="font-bold text-[8pt] text-blue-800 mb-1 uppercase tracking-tight">PEMBAYARAN VIA VIRTUAL ACCOUNT:</div>
                                                     <div className="flex items-start">
                                                         <span className="w-[100px] font-bold">Bank Mandiri</span>
@@ -303,12 +303,12 @@ export const InvoiceTemplate = ({ invoiceData, type }: { invoiceData: InvoiceDat
                                         </div>
                                     </div>
 
-                                    {/* SIGNATURE */}
-                                    <div className="w-[35%] flex flex-col items-center self-stretch justify-between py-1">
-                                        <p className="font-bold text-[9pt] text-center">PT. JEMBO CABLE COMPANY Tbk</p>
-                                        <div className="mt-auto flex flex-col items-center">
-                                            <div className="mt-12 border-t-[1.5pt] border-black w-[160px]"></div>
-                                            <p className="font-bold uppercase pt-1 text-[9pt] underline">Finance</p>
+                                    {/* SIGNATURE - FIXED FOR PDF READER */}
+                                    <div className="w-[35%] flex flex-col items-center justify-end min-h-[120px] py-1">
+                                        <p className="font-bold text-[9pt] text-center mb-auto">PT. JEMBO CABLE COMPANY Tbk</p>
+                                        <div className="flex flex-col items-center">
+                                            <div className="border-t-[1.5pt] border-black w-[160px]"></div>
+                                            <p className="font-bold uppercase pt-1 text-[9pt]">Finance</p>
                                         </div>
                                     </div>
                                 </div>
