@@ -261,7 +261,7 @@ export const InvoiceTemplate = ({ invoiceData, type }: { invoiceData: InvoiceDat
 
                                         <div className="mt-2 space-y-2">
                                             {paymentMode === 'virtual_account' && activeVa ? (
-                                                <div className="border-b border-dashed border-black pb-2 mb-2 animate-in fade-in duration-500">
+                                                <div className="border-b border-dashed border-black pb-2 mb-2">
                                                     <div className="font-bold text-[8pt] text-blue-800 mb-1 uppercase tracking-tight">PEMBAYARAN VIA VIRTUAL ACCOUNT:</div>
                                                     <div className="flex items-start">
                                                         <span className="w-[100px] font-bold">Bank Mandiri</span>
@@ -273,7 +273,7 @@ export const InvoiceTemplate = ({ invoiceData, type }: { invoiceData: InvoiceDat
                                                     </div>
                                                 </div>
                                             ) : (
-                                                <div className="animate-in fade-in duration-500">
+                                                <div>
                                                     <div className="space-y-0.5">
                                                         <div className="flex items-start">
                                                             <span className="w-[100px] font-bold">Bank Mandiri -</span>

@@ -28,13 +28,15 @@ const InvoicePreviewPage = () => {
     if (invoiceData) {
         setFormattedData({
             ...invoiceData,
-            // REVISI LOGIKA DATA MAPPING:
-            // 1. grandTotal (Lable 'Goods :') = Harus murni nilai Net setelah potongan, bukan total akhir.
-            // 2. totalRp (Lable 'Total Rp :') = Adalah nilai akhir (Goods + VAT).
+            // Ensure data consistency for the template
+            paymentMode: invoiceData.paymentMode || 'manual',
+            vaNumber: invoiceData.vaNumber || '',
             grandTotal: invoiceData.grandTotal ?? (invoiceData.amount - (invoiceData.vat12 || 0)), 
             customer: {
+                ...(typeof invoiceData.customer === 'object' ? invoiceData.customer : {}),
                 name: invoiceData.customerName || invoiceData.customer,
-                address: invoiceData.billingAddress || 'N/A'
+                address: invoiceData.billingAddress || 'N/A',
+                vaNumber: invoiceData.vaNumber || (invoiceData.customer as any)?.vaNumber || ''
             }
         });
     }
@@ -48,7 +50,7 @@ const InvoicePreviewPage = () => {
       margin: 0,
       filename: `Invoice_${formattedData.id.replace(/\//g, '_')}.pdf`,
       image: { type: 'jpeg', quality: 1 },
-      html2canvas: { scale: 2, useCORS: true, logging: false },
+      html2canvas: { scale: 3, useCORS: true, logging: false },
       jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
       pagebreak: { mode: ['css', 'avoid-all'] }
     };
@@ -82,6 +84,7 @@ const InvoicePreviewPage = () => {
 
       <div ref={invoiceContainerRef} className="print:m-0 print:p-0 flex flex-col items-center" style={{ width: '210mm' }}>
         <InvoiceTemplate invoiceData={formattedData} type="Original" />
+        <div className="h-10 bg-slate-400/20 backdrop-blur-sm flex items-center justify-center text-[10px] font-black uppercase text-slate-500 tracking-[0.5em] print:hidden">Digital Duplication Page</div>
         <InvoiceTemplate invoiceData={formattedData} type="Copy" />
       </div>
     </main>
