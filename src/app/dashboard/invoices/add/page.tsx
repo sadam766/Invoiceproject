@@ -46,7 +46,8 @@ import {
   Zap,
   TrendingUp,
   Wallet,
-  ShieldCheck
+  ShieldCheck,
+  Edit3
 } from 'lucide-react';
 import { type Invoice, type UserProfile, type InvoiceItem, type InvoiceNumber } from '@/app/lib/data';
 import { useToast } from '@/hooks/use-toast';
@@ -122,6 +123,10 @@ export default function AddInvoicePage() {
   const [discountValue, setDiscountValue] = useState<string>('0');
   const [discountLabel, setDiscountLabel] = useState('Discount');
 
+  // OVERRIDE States for DPP and VAT (Excel Rule Support)
+  const [manualDppVat, setManualDppVat] = useState<string | null>(null);
+  const [manualVat12, setManualVat12] = useState<string | null>(null);
+
   // TRIGGER: Real-time DP % to Rp Calculation
   useEffect(() => {
     const p = parseFloat(dpPercent);
@@ -142,17 +147,6 @@ export default function AddInvoicePage() {
       }
     }
   }, [issueDate, selectedTermPreset]);
-
-  const uniqueMasterProducts = useMemo(() => {
-    if (!masterProducts) return [];
-    const seen = new Set();
-    return masterProducts.filter(p => {
-      const nameLower = p.name.toLowerCase().trim();
-      const duplicate = seen.has(nameLower);
-      seen.add(nameLower);
-      return !duplicate;
-    });
-  }, [masterProducts]);
 
   const itemHistorySuggestions = useMemo(() => {
     if (!activeIdentity?.customer || !allInvoices) return [];
@@ -200,6 +194,10 @@ export default function AddInvoicePage() {
           if ((activeIdentity as Invoice).dpPercent !== undefined) setDpPercent(String((activeIdentity as Invoice).dpPercent));
           if ((activeIdentity as Invoice).dpMode) setDpMode((activeIdentity as Invoice).dpMode!);
           if ((activeIdentity as Invoice).discount) setDiscountValue(formatNumberWithCommas((activeIdentity as Invoice).discount!));
+          
+          // Hydrate Manual Overrides if editing
+          if ((activeIdentity as Invoice).dppVat) setManualDppVat(formatNumberWithCommas((activeIdentity as Invoice).dppVat));
+          if ((activeIdentity as Invoice).vat12) setManualVat12(formatNumberWithCommas((activeIdentity as Invoice).vat12));
       }
   }, [activeIdentity, items.length, selectedSoNumber, currentCustomer, billingAddress]);
 
@@ -238,14 +236,32 @@ export default function AddInvoicePage() {
     const dpVal = parseFormattedNumber(dpValue);
     const discVal = parseFormattedNumber(discountValue);
 
-    // FIXED LOGIC: DPP = Total Goods - Diskon - Nominal DP
-    // Rumus ini memastikan nilai pajak dihitung dari basis netto.
-    const dppVat = Math.max(0, subTotalItems - discVal - dpVal);
-    const vat12 = Math.round(dppVat * 0.12);
-    const totalRp = dppVat + vat12;
+    // LOGIC: Goods (Net) = Subtotal - Discount - DP
+    const goodsNet = Math.max(0, subTotalItems - discVal - dpVal);
+    
+    // EXCEL RULE: DPP = ROUND(Goods * 11 / 12, 0)
+    const autoDppVat = Math.round(goodsNet * 11 / 12);
+    const finalDppVat = manualDppVat !== null ? parseFormattedNumber(manualDppVat) : autoDppVat;
 
-    return { subTotalItems, dpValue: dpVal, discountValue: discVal, dppVat, vat12, totalRp };
-  }, [items, dpValue, discountValue]);
+    // EXCEL RULE: VAT 12% = ROUND(DPP * 12 / 100, 0)
+    const autoVat12 = Math.round(finalDppVat * 0.12);
+    const finalVat12 = manualVat12 !== null ? parseFormattedNumber(manualVat12) : autoVat12;
+
+    // EXCEL RULE: Total Rp = Goods (Net) + VAT 12%
+    const totalRp = goodsNet + finalVat12;
+
+    return { 
+        subTotalItems, 
+        dpValue: dpVal, 
+        discountValue: discVal, 
+        goodsNet,
+        autoDppVat,
+        finalDppVat,
+        autoVat12,
+        finalVat12,
+        totalRp 
+    };
+  }, [items, dpValue, discountValue, manualDppVat, manualVat12]);
 
   const handleSaveInvoice = async (invoiceStatus: any = 'sent', redirectToPreview = false) => {
     if (!firestore || !user || !activeIdentity) return;
@@ -277,8 +293,8 @@ export default function AddInvoicePage() {
         dpMode: dpMode,
         discount: calcs.discountValue,
         discountLabel: discountLabel,
-        dppVat: calcs.dppVat,
-        vat12: calcs.vat12,
+        dppVat: calcs.finalDppVat,
+        vat12: calcs.finalVat12,
         totalRp: calcs.totalRp,
         items: items.filter(i => i.quantity > 0),
         creatorId: user.uid,
@@ -316,8 +332,8 @@ export default function AddInvoicePage() {
       discount: calcs.discountValue,
       discountLabel: discountLabel,
       grandTotal: calcs.subTotalItems, 
-      dppVat: calcs.dppVat,
-      vat12: calcs.vat12,
+      dppVat: calcs.finalDppVat,
+      vat12: calcs.finalVat12,
       totalRp: calcs.totalRp,
       date: format(issueDate, 'yyyy-MM-dd')
   } as any;
@@ -344,7 +360,7 @@ export default function AddInvoicePage() {
       </div>
 
       <div className="flex flex-1 overflow-hidden">
-          {/* LEFT FORM PANEL - Responsive Flex Layout */}
+          {/* LEFT FORM PANEL */}
           <div className="flex-1 min-w-0 overflow-y-auto p-8 border-r bg-slate-50/30">
               <div className="space-y-8 max-w-4xl mx-auto pb-32">
                   
@@ -481,18 +497,6 @@ export default function AddInvoicePage() {
                                                                         </CommandItem>
                                                                     ))}
                                                                 </CommandGroup>
-                                                                <CommandGroup heading="Standard Catalog" className="px-2 font-black uppercase text-[10px] text-slate-400 pt-4">
-                                                                    {uniqueMasterProducts.map((p, i) => (
-                                                                        <CommandItem key={`cat-${i}`} onSelect={() => {
-                                                                            updateItemField(item.id, 'name', p.name);
-                                                                            updateItemField(item.id, 'price', p.price);
-                                                                            updateItemField(item.id, 'unit', p.unit);
-                                                                        }} className="flex items-center gap-3 p-3 rounded-xl cursor-pointer">
-                                                                            <Layers className="h-3.5 w-3.5 text-indigo-400" />
-                                                                            <div className="flex flex-col"><span className="text-[10px] font-black uppercase">{p.name}</span><span className="text-[8px] text-indigo-600">{p.unit} • Catalog Std Price</span></div>
-                                                                        </CommandItem>
-                                                                    ))}
-                                                                </CommandGroup>
                                                             </CommandList>
                                                         </Command>
                                                     </PopoverContent>
@@ -567,9 +571,9 @@ export default function AddInvoicePage() {
                     </CardContent>
                   </Card>
 
-                  {/* SUMMARY BAR FOR VALIDATION */}
+                  {/* SUMMARY BAR (EDITABLE EXCEL RULES) */}
                   <div className="p-8 bg-slate-900 rounded-[2.5rem] shadow-2xl border border-slate-800 animate-in slide-in-from-bottom-4 duration-700">
-                    <div className="flex flex-col lg:flex-row justify-between items-center gap-8">
+                    <div className="flex flex-col gap-8">
                         <div className="grid grid-cols-2 sm:grid-cols-4 gap-8 flex-1 w-full">
                             <div className="space-y-1">
                                 <p className="text-[9px] font-black uppercase text-slate-500 tracking-[0.2em] flex items-center gap-2">
@@ -585,24 +589,71 @@ export default function AddInvoicePage() {
                             </div>
                             <div className="space-y-1">
                                 <p className="text-[9px] font-black uppercase text-indigo-400 tracking-[0.2em] flex items-center gap-2">
-                                    <Zap className="h-3 w-3" /> Net Basis (DPP)
+                                    <Zap className="h-3 w-3" /> Goods (Net)
                                 </p>
-                                <p className="text-sm font-black text-indigo-300">Rp {formatNumberWithCommas(calcs.dppVat)}</p>
-                            </div>
-                            <div className="space-y-1">
-                                <p className="text-[9px] font-black uppercase text-emerald-500 tracking-[0.2em] flex items-center gap-2">
-                                    <ShieldCheck className="h-3 w-3" /> VAT (12%)
-                                </p>
-                                <p className="text-sm font-black text-emerald-400">+ Rp {formatNumberWithCommas(calcs.vat12)}</p>
+                                <p className="text-sm font-black text-indigo-300">Rp {formatNumberWithCommas(calcs.goodsNet)}</p>
                             </div>
                         </div>
-                        <div className="h-px lg:h-12 w-full lg:w-px bg-slate-800" />
-                        <div className="text-right min-w-[200px]">
-                            <p className="text-[10px] font-black uppercase text-slate-400 tracking-[0.3em] mb-1 flex items-center justify-end gap-2">
-                                <Wallet className="h-3 w-3" /> Total Payable
-                            </p>
-                            <p className="text-3xl font-black text-white tracking-tighter italic">Rp {formatNumberWithCommas(calcs.totalRp)}</p>
+
+                        <div className="h-px w-full bg-slate-800" />
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 items-end">
+                            <div className="space-y-3">
+                                <Label className="text-[10px] font-black uppercase text-slate-500 flex items-center gap-2">
+                                    <Edit3 className="h-3 w-3 text-indigo-400" /> DPP VAT (11/12)
+                                </Label>
+                                <div className="relative">
+                                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[10px] font-black text-slate-500">Rp</span>
+                                    <Input 
+                                        type="text" 
+                                        value={manualDppVat !== null ? manualDppVat : formatNumberWithCommas(calcs.autoDppVat)} 
+                                        onChange={e => setManualDppVat(e.target.value)}
+                                        className={cn(
+                                            "h-11 pl-9 font-black text-right rounded-xl border-none transition-all",
+                                            manualDppVat !== null ? "bg-indigo-950 text-indigo-300 ring-1 ring-indigo-500" : "bg-slate-800 text-slate-300"
+                                        )}
+                                    />
+                                </div>
+                            </div>
+
+                            <div className="space-y-3">
+                                <Label className="text-[10px] font-black uppercase text-slate-500 flex items-center gap-2">
+                                    <Edit3 className="h-3 w-3 text-emerald-400" /> VAT 12%
+                                </Label>
+                                <div className="relative">
+                                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[10px] font-black text-slate-500">Rp</span>
+                                    <Input 
+                                        type="text" 
+                                        value={manualVat12 !== null ? manualVat12 : formatNumberWithCommas(calcs.autoVat12)} 
+                                        onChange={e => setManualVat12(e.target.value)}
+                                        className={cn(
+                                            "h-11 pl-9 font-black text-right rounded-xl border-none transition-all",
+                                            manualVat12 !== null ? "bg-emerald-950 text-emerald-300 ring-1 ring-emerald-500" : "bg-slate-800 text-slate-300"
+                                        )}
+                                    />
+                                </div>
+                            </div>
+
+                            <div className="text-right">
+                                <p className="text-[10px] font-black uppercase text-slate-400 tracking-[0.3em] mb-1 flex items-center justify-end gap-2">
+                                    <Wallet className="h-3 w-3" /> Total Payable
+                                </p>
+                                <p className="text-3xl font-black text-white tracking-tighter italic">Rp {formatNumberWithCommas(calcs.totalRp)}</p>
+                            </div>
                         </div>
+
+                        {(manualDppVat !== null || manualVat12 !== null) && (
+                            <div className="flex justify-center">
+                                <Button 
+                                    variant="ghost" 
+                                    size="sm" 
+                                    onClick={() => { setManualDppVat(null); setManualVat12(null); }}
+                                    className="text-[9px] font-black uppercase text-slate-500 hover:text-white"
+                                >
+                                    Reset to Auto-Calculation
+                                </Button>
+                            </div>
+                        )}
                     </div>
                   </div>
               </div>
