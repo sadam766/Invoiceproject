@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useEffect, useState, useMemo } from 'react';
@@ -47,9 +48,12 @@ import {
   TrendingUp,
   Wallet,
   ShieldCheck,
-  Edit3
+  Edit3,
+  Package,
+  Search,
+  Database
 } from 'lucide-react';
-import { type Invoice, type UserProfile, type InvoiceItem, type InvoiceNumber } from '@/app/lib/data';
+import { type Invoice, type UserProfile, type InvoiceItem, type InvoiceNumber, type ProductListItem } from '@/app/lib/data';
 import { useToast } from '@/hooks/use-toast';
 import { useFirestore, useMemoFirebase, useUser, useDoc, errorEmitter, FirestorePermissionError } from '@/firebase';
 import { doc, setDoc } from 'firebase/firestore';
@@ -148,6 +152,38 @@ export default function AddInvoicePage() {
     }
   }, [issueDate, selectedTermPreset]);
 
+  // NEW LOGIC: Pull History & DP consistency based on PO Number
+  useEffect(() => {
+    const po = activeIdentity?.poNumber;
+    if (!po || !allInvoices || items.length > 0 || editInvoiceId) return;
+
+    const previousInvoices = allInvoices
+      .filter(inv => inv.poNumber === po && inv.id !== activeIdentity?.id && inv.status !== 'cancelled')
+      .sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+
+    if (previousInvoices.length > 0) {
+      const latest = previousInvoices[0];
+      
+      // Pull Items automatically if current items are empty
+      if (latest.items && latest.items.length > 0) {
+        setItems(latest.items.map(item => ({ ...item, id: `hist-${Date.now()}-${Math.random().toString(36).substr(2, 5)}` })));
+        toast({ title: "PO History Restored", description: `Menarik data item dari penagihan sebelumnya untuk PO ${po}.` });
+      }
+
+      // Pull DP Consistency
+      if (latest.dpPercent !== undefined) {
+        setDpPercent(String(latest.dpPercent));
+        setDpMode(latest.dpMode || 'kurangi');
+        setDpDescription(latest.dpDescription || 'DP');
+        toast({ title: "DP Consistency Applied", description: `Mengikuti skema DP ${latest.dpPercent}% dari penagihan sebelumnya.` });
+      }
+
+      if (latest.paymentTerms) setPaymentTerms(latest.paymentTerms);
+      if (latest.paymentMode) setPaymentMode(latest.paymentMode as any);
+      if (latest.vaNumber) setManualVaNumber(latest.vaNumber);
+    }
+  }, [activeIdentity?.poNumber, allInvoices, items.length, editInvoiceId, toast, activeIdentity?.id]);
+
   const itemHistorySuggestions = useMemo(() => {
     if (!activeIdentity?.customer || !allInvoices) return [];
     const customerItems: Record<string, { name: string, price: number, unit: string }> = {};
@@ -195,7 +231,6 @@ export default function AddInvoicePage() {
           if ((activeIdentity as Invoice).dpMode) setDpMode((activeIdentity as Invoice).dpMode!);
           if ((activeIdentity as Invoice).discount) setDiscountValue(formatNumberWithCommas((activeIdentity as Invoice).discount!));
           
-          // Hydrate Manual Overrides if editing
           if ((activeIdentity as Invoice).dppVat) setManualDppVat(formatNumberWithCommas((activeIdentity as Invoice).dppVat));
           if ((activeIdentity as Invoice).vat12) setManualVat12(formatNumberWithCommas((activeIdentity as Invoice).vat12));
       }
@@ -236,18 +271,14 @@ export default function AddInvoicePage() {
     const dpVal = parseFormattedNumber(dpValue);
     const discVal = parseFormattedNumber(discountValue);
 
-    // LOGIC: Goods (Net) = Subtotal - Discount - DP
     const goodsNet = Math.max(0, subTotalItems - discVal - dpVal);
     
-    // EXCEL RULE: DPP = ROUND(Goods * 11 / 12, 0)
     const autoDppVat = Math.round(goodsNet * 11 / 12);
     const finalDppVat = manualDppVat !== null ? parseFormattedNumber(manualDppVat) : autoDppVat;
 
-    // EXCEL RULE: VAT 12% = ROUND(DPP * 12 / 100, 0)
     const autoVat12 = Math.round(finalDppVat * 0.12);
     const finalVat12 = manualVat12 !== null ? parseFormattedNumber(manualVat12) : autoVat12;
 
-    // EXCEL RULE: Total Rp = Goods (Net) + VAT 12%
     const totalRp = goodsNet + finalVat12;
 
     return { 
@@ -360,11 +391,9 @@ export default function AddInvoicePage() {
       </div>
 
       <div className="flex flex-1 overflow-hidden">
-          {/* LEFT FORM PANEL */}
           <div className="flex-1 min-w-0 overflow-y-auto p-8 border-r bg-slate-50/30">
               <div className="space-y-8 max-w-4xl mx-auto pb-32">
                   
-                  {/* CUSTOMER INSIGHT SECTION */}
                   <Card className="border-none shadow-md ring-1 ring-indigo-200 bg-white overflow-hidden rounded-3xl">
                     <CardHeader className="py-4 px-6 bg-indigo-600 text-white">
                         <CardTitle className="text-[10px] font-black uppercase flex items-center gap-2 tracking-widest">
@@ -391,7 +420,6 @@ export default function AddInvoicePage() {
                                     <p className="text-[11px] leading-relaxed font-bold text-slate-600 italic">
                                         {billingAddress || 'No address specified in record.'}
                                     </p>
-                                    <Button variant="link" size="sm" className="h-auto p-0 text-[9px] font-black uppercase text-indigo-600">Change Address</Button>
                                 </div>
                             </div>
                         </div>
@@ -455,9 +483,9 @@ export default function AddInvoicePage() {
                     <CardHeader className="bg-slate-50/50 border-b py-3 px-6">
                         <div className="flex justify-between items-center">
                             <CardTitle className="text-[10px] font-black uppercase text-slate-500 tracking-widest flex items-center gap-2">
-                                <Layers className="h-4 w-4 text-indigo-600" /> Line Items (Constructor)
+                                <Layers className="h-4 w-4 text-indigo-600" /> Line Items (Hybrid Input)
                             </CardTitle>
-                            <Badge variant="secondary" className="bg-indigo-50 text-indigo-700 text-[8px] font-black">History & Catalog Integrated</Badge>
+                            <Badge variant="secondary" className="bg-indigo-50 text-indigo-700 text-[8px] font-black uppercase tracking-tighter">Auto-pull PO History Active</Badge>
                         </div>
                     </CardHeader>
                     <CardContent className="p-0">
@@ -465,7 +493,7 @@ export default function AddInvoicePage() {
                             <Table className="w-full">
                                 <TableHeader className="bg-slate-50/50 sticky top-0 z-10 shadow-sm">
                                     <TableRow>
-                                        <TableHead className="py-3 px-6 text-[10px] font-black uppercase min-w-[300px]">Description</TableHead>
+                                        <TableHead className="py-3 px-6 text-[10px] font-black uppercase min-w-[350px]">Item Description (Catalog & Manual)</TableHead>
                                         <TableHead className="w-[100px] text-center text-[10px] font-black uppercase">Qty</TableHead>
                                         <TableHead className="w-[120px] text-center text-[10px] font-black uppercase">Unit</TableHead>
                                         <TableHead className="w-[180px] text-right text-[10px] font-black uppercase">Price</TableHead>
@@ -478,22 +506,46 @@ export default function AddInvoicePage() {
                                             <TableCell className="px-6 py-4">
                                                 <Popover>
                                                     <PopoverTrigger asChild>
-                                                        <Input value={item.name} onChange={e => updateItemField(item.id, 'name', e.target.value)} className="h-9 text-xs font-black uppercase border-none shadow-none bg-transparent p-0 w-full focus-visible:ring-0" placeholder="Type or Select..." />
+                                                        <div className="relative cursor-text">
+                                                            <Input 
+                                                                value={item.name} 
+                                                                onChange={e => updateItemField(item.id, 'name', e.target.value)} 
+                                                                className="h-9 text-xs font-black uppercase border-none shadow-none bg-transparent p-0 w-full focus-visible:ring-0 placeholder:italic" 
+                                                                placeholder="Type Manual or Search Catalog..." 
+                                                            />
+                                                            <Search className="absolute right-0 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-300 pointer-events-none" />
+                                                        </div>
                                                     </PopoverTrigger>
-                                                    <PopoverContent className="w-[450px] p-0 shadow-2xl rounded-2xl overflow-hidden border-indigo-100" align="start">
+                                                    <PopoverContent className="w-[550px] p-0 shadow-2xl rounded-2xl overflow-hidden border-indigo-100" align="start">
                                                         <Command>
-                                                            <CommandInput placeholder="Search Material Catalog or History..." className="h-11 font-medium" />
-                                                            <CommandList className="max-h-[300px]">
-                                                                <CommandEmpty className="py-6 text-center text-xs font-bold text-slate-400 italic">No matches. Use custom text.</CommandEmpty>
-                                                                <CommandGroup heading="Recent Purchases (History)" className="px-2 font-black uppercase text-[10px] text-indigo-600">
-                                                                    {itemHistorySuggestions.map((h, i) => (
-                                                                        <CommandItem key={`hist-${i}`} onSelect={() => {
-                                                                            updateItemField(item.id, 'name', h.name);
-                                                                            updateItemField(item.id, 'price', h.price);
-                                                                            updateItemField(item.id, 'unit', h.unit);
+                                                            <CommandInput placeholder="Cari Nama Material atau History..." className="h-11 font-medium" />
+                                                            <CommandList className="max-h-[350px]">
+                                                                <CommandEmpty className="py-6 text-center text-xs font-bold text-slate-400 italic">Material tidak ditemukan. Lanjutkan ketik manual.</CommandEmpty>
+                                                                
+                                                                {itemHistorySuggestions.length > 0 && (
+                                                                    <CommandGroup heading="PO History Suggestions" className="px-2 font-black uppercase text-[10px] text-indigo-600">
+                                                                        {itemHistorySuggestions.map((h, i) => (
+                                                                            <CommandItem key={`hist-${i}`} onSelect={() => {
+                                                                                updateItemField(item.id, 'name', h.name);
+                                                                                updateItemField(item.id, 'price', h.price);
+                                                                                updateItemField(item.id, 'unit', h.unit);
+                                                                            }} className="flex items-center gap-3 p-3 rounded-xl cursor-pointer">
+                                                                                <History className="h-3.5 w-3.5 text-slate-300" />
+                                                                                <div className="flex flex-col"><span className="text-[10px] font-black uppercase">{h.name}</span><span className="text-[8px] text-muted-foreground">{h.unit} • Rp {h.price.toLocaleString()}</span></div>
+                                                                            </CommandItem>
+                                                                        ))}
+                                                                    </CommandGroup>
+                                                                )}
+
+                                                                <CommandGroup heading="Material Catalog (Pusat)" className="px-2 font-black uppercase text-[10px] text-emerald-600">
+                                                                    {masterProducts?.map((p, i) => (
+                                                                        <CommandItem key={`cat-${i}`} onSelect={() => {
+                                                                            updateItemField(item.id, 'name', p.name);
+                                                                            updateItemField(item.id, 'price', p.price);
+                                                                            updateItemField(item.id, 'unit', p.unit);
                                                                         }} className="flex items-center gap-3 p-3 rounded-xl cursor-pointer">
-                                                                            <History className="h-3.5 w-3.5 text-slate-300" />
-                                                                            <div className="flex flex-col"><span className="text-[10px] font-black uppercase">{h.name}</span><span className="text-[8px] text-muted-foreground">{h.unit} • Rp {h.price.toLocaleString()}</span></div>
+                                                                            <Package className="h-3.5 w-3.5 text-emerald-300" />
+                                                                            <div className="flex flex-col"><span className="text-[10px] font-black uppercase">{p.name}</span><span className="text-[8px] text-muted-foreground">{p.unit} • Rp {p.price.toLocaleString()}</span></div>
                                                                         </CommandItem>
                                                                     ))}
                                                                 </CommandGroup>
@@ -506,7 +558,7 @@ export default function AddInvoicePage() {
                                                 <Input type="text" value={inputBuffer[`${item.id}-quantity`] || formatNumberWithCommas(item.quantity)} onChange={e => handleNumericInputChange(item.id, 'quantity', e.target.value)} className="text-center h-9 text-xs font-black rounded-lg" />
                                             </TableCell>
                                             <TableCell className="py-4">
-                                                <Input value={item.unit} onChange={e => updateItemField(item.id, 'unit', e.target.value)} className="text-center h-9 text-xs font-black border-indigo-100 bg-indigo-50/30 rounded-lg" placeholder="UOM" />
+                                                <Input value={item.unit} onChange={e => updateItemField(item.id, 'unit', e.target.value)} className="text-center h-9 text-xs font-black border-indigo-100 bg-indigo-50/30 rounded-lg uppercase" placeholder="UOM" />
                                             </TableCell>
                                             <TableCell className="py-4 text-right">
                                                 <Input type="text" value={inputBuffer[`${item.id}-price`] || formatNumberWithCommas(item.price)} onChange={e => handleNumericInputChange(item.id, 'price', e.target.value)} className="h-9 text-right text-xs font-black rounded-lg" />
@@ -527,7 +579,6 @@ export default function AddInvoicePage() {
                     </CardContent>
                   </Card>
 
-                  {/* DP & DISCOUNT LOGIC */}
                   <Card className="shadow-sm border-none ring-1 ring-slate-200 overflow-hidden rounded-3xl">
                     <CardHeader className="bg-slate-50/50 border-b py-3 px-6">
                         <CardTitle className="text-[10px] font-black uppercase text-slate-500 tracking-widest flex items-center gap-2">
@@ -537,7 +588,9 @@ export default function AddInvoicePage() {
                     <CardContent className="p-6 space-y-6">
                         <div className="p-5 bg-indigo-50/50 rounded-[2rem] border-2 border-indigo-100 space-y-4">
                             <div className="flex justify-between items-center">
-                                <Label className="text-[10px] font-black uppercase text-indigo-700 tracking-widest">Down Payment (DP)</Label>
+                                <Label className="text-[10px] font-black uppercase text-indigo-700 tracking-widest flex items-center gap-2">
+                                    <Database className="h-3.5 w-3.5" /> Down Payment (DP) - PO Synchronized
+                                </Label>
                                 <div className="flex bg-white rounded-xl p-1 border shadow-sm">
                                     <Button variant={dpMode === 'tagih' ? 'default' : 'ghost'} size="sm" onClick={() => setDpMode('tagih')} className="h-8 text-[9px] font-black uppercase rounded-lg px-4">Tagih DP</Button>
                                     <Button variant={dpMode === 'kurangi' ? 'default' : 'ghost'} size="sm" onClick={() => setDpMode('kurangi')} className="h-8 text-[9px] font-black uppercase rounded-lg px-4">Kurangi DP</Button>
@@ -571,7 +624,6 @@ export default function AddInvoicePage() {
                     </CardContent>
                   </Card>
 
-                  {/* SUMMARY BAR (EDITABLE EXCEL RULES) */}
                   <div className="p-8 bg-slate-900 rounded-[2.5rem] shadow-2xl border border-slate-800 animate-in slide-in-from-bottom-4 duration-700">
                     <div className="flex flex-col gap-8">
                         <div className="grid grid-cols-2 sm:grid-cols-4 gap-8 flex-1 w-full">
@@ -659,7 +711,6 @@ export default function AddInvoicePage() {
               </div>
           </div>
 
-          {/* RIGHT LIVE PREVIEW PANEL */}
           <div className="w-[45%] bg-slate-200/50 overflow-auto scroll-smooth py-12 px-4 md:px-8">
               <div className="flex flex-col items-center min-w-min min-h-full">
                   <div className="max-w-[210mm] w-full shadow-2xl rounded-xl overflow-visible origin-top scale-[0.7] md:scale-[0.8] xl:scale-[0.85] transition-all duration-300 bg-white">
