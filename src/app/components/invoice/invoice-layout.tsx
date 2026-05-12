@@ -44,7 +44,6 @@ interface InvoiceData {
 
 // --- UTILITIES ---
 const formatCurrency = (amount: any): string => {
-    // Gunakan parseFormattedNumber agar string "3.280" terbaca 3280 (bukan 3.28)
     const num = typeof amount === 'number' ? amount : parseFormattedNumber(amount);
     if (isNaN(num)) return '0,00';
     return num.toLocaleString('id-ID', {
@@ -63,7 +62,7 @@ const formatDate = (dateString: string): string => {
     }).replace(/\//g, '-');
 };
 
-const ITEM_LIMIT = 10; // Maximum items per page for visual integrity
+const ITEM_LIMIT = 12; // Maximum items per page for visual integrity
 
 export const InvoiceTemplate = ({ invoiceData, type }: { invoiceData: InvoiceData, type: 'Original' | 'Copy' }) => {
     if (!invoiceData) return null;
@@ -81,6 +80,7 @@ export const InvoiceTemplate = ({ invoiceData, type }: { invoiceData: InvoiceDat
         paymentTerms = '-',
         totalRp = 0,
         customerCode = '-',
+        paymentMode = 'manual',
         vaNumber = '',
         dpValue = 0,
         dpPercent = 0,
@@ -93,7 +93,7 @@ export const InvoiceTemplate = ({ invoiceData, type }: { invoiceData: InvoiceDat
     const subTotalItems = items.reduce((acc, item) => acc + (Number(item.total) || 0), 0);
     const invoiceTitle = (invoiceId || '').startsWith('KW') ? 'PROFORMA INVOICE' : 'INVOICE/OFFICIAL RECEIPT';
     
-    // Virtual Account Logic (Hybrid Mode)
+    // Virtual Account Logic (Selector Based)
     const activeVa = vaNumber || customer.vaNumber;
 
     // PAGINATION: Split items into chunks
@@ -247,7 +247,7 @@ export const InvoiceTemplate = ({ invoiceData, type }: { invoiceData: InvoiceDat
                                 </div>
 
                                 <div className="flex justify-between items-start mt-1">
-                                    {/* HYBRID BANK INFO */}
+                                    {/* SELECTIVE BANK INFO */}
                                     <div className="w-[65%] text-[8.5pt] leading-normal space-y-1">
                                         <div className="flex mb-1">
                                             <span className="w-[65px] font-bold">Payment:</span>
@@ -260,8 +260,8 @@ export const InvoiceTemplate = ({ invoiceData, type }: { invoiceData: InvoiceDat
                                         </div>
 
                                         <div className="mt-2 space-y-2">
-                                            {activeVa && (
-                                                <div className="border-b border-dashed border-black pb-2 mb-2">
+                                            {paymentMode === 'virtual_account' && activeVa ? (
+                                                <div className="border-b border-dashed border-black pb-2 mb-2 animate-in fade-in duration-500">
                                                     <div className="font-bold text-[8pt] text-blue-800 mb-1 uppercase tracking-tight">PEMBAYARAN VIA VIRTUAL ACCOUNT:</div>
                                                     <div className="flex items-start">
                                                         <span className="w-[100px] font-bold">Bank Mandiri</span>
@@ -272,32 +272,34 @@ export const InvoiceTemplate = ({ invoiceData, type }: { invoiceData: InvoiceDat
                                                         <span className="uppercase">: {customer.name}</span>
                                                     </div>
                                                 </div>
+                                            ) : (
+                                                <div className="animate-in fade-in duration-500">
+                                                    <div className="space-y-0.5">
+                                                        <div className="flex items-start">
+                                                            <span className="w-[100px] font-bold">Bank Mandiri -</span>
+                                                            <span>A/C No. : 102-0100206827 (Rp)</span>
+                                                        </div>
+                                                        <div className="flex items-start">
+                                                            <span className="w-[100px]">Cabang</span>
+                                                            <span>A/C No. : 102-0005000218 (Rp)</span>
+                                                        </div>
+                                                        <div className="flex items-start">
+                                                            <span className="w-[100px]">Jakarta</span>
+                                                            <span>A/C No. : 102-0005000226 (USD)</span>
+                                                        </div>
+                                                    </div>
+
+                                                    <div className="w-[280px] text-center font-bold text-[8pt] py-1">OR</div>
+
+                                                    <div className="flex items-start">
+                                                        <div className="w-[100px] font-bold leading-[1.2]">
+                                                            Bank BCA - Jakarta<br/>
+                                                            <span className="font-normal text-[7.5pt]">Cabang KEM TOWER</span>
+                                                        </div>
+                                                        <div className="pt-0.5">A/C No. : 684-0198977 (Rp)</div>
+                                                    </div>
+                                                </div>
                                             )}
-
-                                            <div className="space-y-0.5">
-                                                <div className="flex items-start">
-                                                    <span className="w-[100px] font-bold">Bank Mandiri -</span>
-                                                    <span>A/C No. : 102-0100206827 (Rp)</span>
-                                                </div>
-                                                <div className="flex items-start">
-                                                    <span className="w-[100px]">Cabang</span>
-                                                    <span>A/C No. : 102-0005000218 (Rp)</span>
-                                                </div>
-                                                <div className="flex items-start">
-                                                    <span className="w-[100px]">Jakarta</span>
-                                                    <span>A/C No. : 102-0005000226 (USD)</span>
-                                                </div>
-                                            </div>
-
-                                            <div className="w-[280px] text-center font-bold text-[8pt] py-1">OR</div>
-
-                                            <div className="flex items-start">
-                                                <div className="w-[100px] font-bold leading-[1.2]">
-                                                    Bank BCA - Jakarta<br/>
-                                                    <span className="font-normal text-[7.5pt]">Cabang KEM TOWER</span>
-                                                </div>
-                                                <div className="pt-0.5">A/C No. : 684-0198977 (Rp)</div>
-                                            </div>
                                         </div>
                                     </div>
 

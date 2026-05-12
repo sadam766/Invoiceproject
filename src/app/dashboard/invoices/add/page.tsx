@@ -51,7 +51,9 @@ import {
   Edit3,
   Package,
   Search,
-  Database
+  Database,
+  CreditCard,
+  Banknote
 } from 'lucide-react';
 import { type Invoice, type UserProfile, type InvoiceItem, type InvoiceNumber, type ProductListItem } from '@/app/lib/data';
 import { useToast } from '@/hooks/use-toast';
@@ -111,7 +113,7 @@ export default function AddInvoicePage() {
   const [billingAddress, setBillingAddress] = useState('');
   const [issueDate, setIssueDate] = useState<Date>(new Date());
   const [dueDate, setDueDate] = useState<Date>(addDays(new Date(), 30));
-  const [paymentMode, setPaymentMode] = useState<'manual' | 'virtual_account'>('virtual_account');
+  const [paymentMode, setPaymentMode] = useState<'manual' | 'virtual_account'>('manual');
   const [paymentTerms, setPaymentTerms] = useState('90 Hari');
   const [selectedTermPreset, setSelectedTermPreset] = useState('90');
   const [manualVaNumber, setManualVaNumber] = useState('');
@@ -152,6 +154,11 @@ export default function AddInvoicePage() {
     }
   }, [issueDate, selectedTermPreset]);
 
+  const currentCustomer = useMemo(() => {
+    if (!activeIdentity?.customer || !allCustomers) return null;
+    return allCustomers.find(c => c.name.toLowerCase() === activeIdentity.customer.toLowerCase());
+  }, [activeIdentity?.customer, allCustomers]);
+
   // PO History Pulling
   useEffect(() => {
     const po = activeIdentity?.poNumber;
@@ -165,40 +172,17 @@ export default function AddInvoicePage() {
       const latest = previousInvoices[0];
       if (latest.items && latest.items.length > 0) {
         setItems(latest.items.map(item => ({ ...item, id: `hist-${Date.now()}-${Math.random().toString(36).substr(2, 5)}` })));
-        toast({ title: "PO History Restored", description: `Menarik data item dari penagihan sebelumnya untuk PO ${po}.` });
       }
       if (latest.dpPercent !== undefined) {
         setDpPercent(String(latest.dpPercent));
         setDpMode(latest.dpMode || 'kurangi');
         setDpDescription(latest.dpDescription || 'DP');
-        toast({ title: "DP Consistency Applied", description: `Mengikuti skema DP ${latest.dpPercent}% dari penagihan sebelumnya.` });
       }
       if (latest.paymentTerms) setPaymentTerms(latest.paymentTerms);
       if (latest.paymentMode) setPaymentMode(latest.paymentMode as any);
       if (latest.vaNumber) setManualVaNumber(latest.vaNumber);
     }
-  }, [activeIdentity?.poNumber, allInvoices, items.length, editInvoiceId, toast, activeIdentity?.id]);
-
-  const itemHistorySuggestions = useMemo(() => {
-    if (!activeIdentity?.customer || !allInvoices) return [];
-    const customerItems: Record<string, { name: string, price: number, unit: string }> = {};
-    allInvoices
-        .filter(inv => inv.customer === activeIdentity.customer)
-        .forEach(inv => {
-            inv.items?.forEach(item => {
-                const key = item.name.toLowerCase().trim();
-                if (!customerItems[key]) {
-                    customerItems[key] = { name: item.name, price: item.price, unit: item.unit };
-                }
-            });
-        });
-    return Object.values(customerItems);
-  }, [activeIdentity?.customer, allInvoices]);
-
-  const currentCustomer = useMemo(() => {
-    if (!activeIdentity?.customer || !allCustomers) return null;
-    return allCustomers.find(c => c.name.toLowerCase() === activeIdentity.customer.toLowerCase());
-  }, [activeIdentity?.customer, allCustomers]);
+  }, [activeIdentity?.poNumber, allInvoices, items.length, editInvoiceId, activeIdentity?.id]);
 
   useEffect(() => {
       if (activeIdentity) {
@@ -258,30 +242,16 @@ export default function AddInvoicePage() {
     updateItemField(id, field, parsed);
   };
 
-  /**
-   * AKUNTANSI DAKOTA HUB LOGIC (REVISED)
-   * 1. Goods (Net) = Subtotal Item - DP - Diskon
-   * 2. DPP VAT (11/12) = ROUND(Goods * 11/12, 0)
-   * 3. VAT 12% = ROUND(DPP VAT * 12/100, 0)
-   * 4. Total Rp = Goods + VAT 12%
-   */
   const calcs = useMemo(() => {
     const subTotalItems = items.reduce((acc, item) => acc + (item.total || 0), 0);
     const dpVal = parseFormattedNumber(dpValue);
     const discVal = parseFormattedNumber(discountValue);
 
-    // Variabel "Goods" adalah nilai Net setelah potongan
     const goodsNet = Math.max(0, subTotalItems - discVal - dpVal);
-    
-    // Hitung DPP murni dari Goods Net
     const autoDppVat = Math.round(goodsNet * 11 / 12);
     const finalDppVat = manualDppVat !== null ? parseFormattedNumber(manualDppVat) : autoDppVat;
-
-    // Hitung VAT 12% dari DPP
     const autoVat12 = Math.round(finalDppVat * 0.12);
     const finalVat12 = manualVat12 !== null ? parseFormattedNumber(manualVat12) : autoVat12;
-
-    // Total Rp = Goods + VAT
     const totalRp = goodsNet + finalVat12;
 
     return { 
@@ -316,7 +286,7 @@ export default function AddInvoicePage() {
         date: format(issueDate, 'yyyy-MM-dd'),
         dueDate: format(dueDate, 'yyyy-MM-dd'),
         amount: calcs.totalRp,
-        grandTotal: calcs.goodsNet, // REVISI: Goods adalah Subtotal - DP - Diskon
+        grandTotal: calcs.goodsNet, 
         status: invoiceStatus,
         paymentMode: paymentMode,
         paymentTerms: paymentTerms,
@@ -365,7 +335,7 @@ export default function AddInvoicePage() {
       dpPercent: Number(dpPercent) || 0,
       discount: calcs.discountValue,
       discountLabel: discountLabel,
-      grandTotal: calcs.goodsNet, // Label "Goods :" di template
+      grandTotal: calcs.goodsNet, 
       dppVat: calcs.finalDppVat,
       vat12: calcs.finalVat12,
       totalRp: calcs.totalRp,
@@ -426,6 +396,51 @@ export default function AddInvoicePage() {
                                 </div>
                             </div>
                         </div>
+                    </CardContent>
+                  </Card>
+
+                  {/* PAYMENT MODE SELECTOR (HYBRID) */}
+                  <Card className="shadow-sm border-none ring-1 ring-indigo-100 overflow-hidden rounded-3xl">
+                    <CardHeader className="bg-indigo-50/50 border-b py-3 px-6">
+                        <CardTitle className="text-[10px] font-black uppercase flex items-center gap-2 text-indigo-600 tracking-widest">
+                            <Wallet className="h-4 w-4" /> Hybrid Payment Selector
+                        </CardTitle>
+                    </CardHeader>
+                    <CardContent className="p-6">
+                        <div className="grid grid-cols-2 gap-4">
+                            <Button 
+                                variant={paymentMode === 'manual' ? 'default' : 'outline'} 
+                                onClick={() => setPaymentMode('manual')}
+                                className={cn("h-14 rounded-2xl flex flex-col items-center gap-1 font-black uppercase text-[10px] tracking-widest", paymentMode === 'manual' ? "bg-indigo-600" : "border-indigo-100")}
+                            >
+                                <Banknote className="h-4 w-4" /> Manual Transfer
+                                <span className="text-[7px] opacity-60">Display Mandiri & BCA Regular</span>
+                            </Button>
+                            <Button 
+                                variant={paymentMode === 'virtual_account' ? 'default' : 'outline'} 
+                                onClick={() => setPaymentMode('virtual_account')}
+                                className={cn("h-14 rounded-2xl flex flex-col items-center gap-1 font-black uppercase text-[10px] tracking-widest", paymentMode === 'virtual_account' ? "bg-emerald-600 hover:bg-emerald-700" : "border-emerald-100")}
+                            >
+                                <CreditCard className="h-4 w-4" /> Virtual Account
+                                <span className="text-[7px] opacity-60">Display Only Mandiri VA</span>
+                            </Button>
+                        </div>
+
+                        {paymentMode === 'virtual_account' && (
+                            <div className="mt-4 p-4 bg-emerald-50 rounded-2xl border-2 border-emerald-100 border-dashed animate-in slide-in-from-top-2 duration-300">
+                                <div className="flex items-center justify-between mb-2">
+                                    <Label className="text-[9px] font-black uppercase text-emerald-700">Verified Virtual Account Number</Label>
+                                    <Badge className="bg-emerald-600 text-[7px] font-black uppercase">Active</Badge>
+                                </div>
+                                <Input 
+                                    value={manualVaNumber} 
+                                    onChange={e => setManualVaNumber(e.target.value)} 
+                                    className="font-mono text-lg font-black tracking-widest text-emerald-900 bg-white border-emerald-200"
+                                    placeholder="86625XXXXXXXXXXX"
+                                />
+                                <p className="text-[8px] text-emerald-600 font-bold uppercase mt-2 italic">*Hanya nomor ini yang akan muncul di footer invoice.</p>
+                            </div>
+                        )}
                     </CardContent>
                   </Card>
 
@@ -525,21 +540,6 @@ export default function AddInvoicePage() {
                                                             <CommandList className="max-h-[350px]">
                                                                 <CommandEmpty className="py-6 text-center text-xs font-bold text-slate-400 italic">Material tidak ditemukan. Lanjutkan ketik manual.</CommandEmpty>
                                                                 
-                                                                {itemHistorySuggestions.length > 0 && (
-                                                                    <CommandGroup heading="PO History Suggestions" className="px-2 font-black uppercase text-[10px] text-indigo-600">
-                                                                        {itemHistorySuggestions.map((h, i) => (
-                                                                            <CommandItem key={`hist-${i}`} onSelect={() => {
-                                                                                updateItemField(item.id, 'name', h.name);
-                                                                                updateItemField(item.id, 'price', h.price);
-                                                                                updateItemField(item.id, 'unit', h.unit);
-                                                                            }} className="flex items-center gap-3 p-3 rounded-xl cursor-pointer">
-                                                                                <History className="h-3.5 w-3.5 text-slate-300" />
-                                                                                <div className="flex flex-col"><span className="text-[10px] font-black uppercase">{h.name}</span><span className="text-[8px] text-muted-foreground">{h.unit} • Rp {h.price.toLocaleString()}</span></div>
-                                                                            </CommandItem>
-                                                                        ))}
-                                                                    </CommandGroup>
-                                                                )}
-
                                                                 <CommandGroup heading="Material Catalog (Pusat)" className="px-2 font-black uppercase text-[10px] text-emerald-600">
                                                                     {masterProducts?.map((p, i) => (
                                                                         <CommandItem key={`cat-${i}`} onSelect={() => {
