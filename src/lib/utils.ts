@@ -83,46 +83,49 @@ export function formatNumberWithCommas(value: number | string | undefined, minDe
 
 /**
  * Mengonversi string berformat (dengan titik/koma) kembali menjadi angka murni (float)
- * Perbaikan: Mendeteksi format Indonesia X.XXX sebagai ribuan (bukan desimal).
+ * Perbaikan Robust: Menangani ribuan Indonesia (titik) vs desimal (koma).
  */
 export function parseFormattedNumber(value: string | number): number {
   if (typeof value === 'number') return value;
   if (!value || value === '') return 0;
 
-  // Hapus karakter non-numerik kecuali titik, koma, dan minus
+  // Hapus semua karakter kecuali angka, titik, koma, dan minus
   let str = value.toString().replace(/[^\d.,-]/g, '');
 
   const hasComma = str.includes(',');
   const hasDot = str.includes('.');
 
-  // Kasus 1: Ada Titik dan Koma (Contoh: 1.234,56)
+  // Kasus 1: Format Indonesia Campuran (Contoh: 1.234.567,89)
   if (hasComma && hasDot) {
     const lastComma = str.lastIndexOf(',');
     const lastDot = str.lastIndexOf('.');
     if (lastComma > lastDot) {
-      // Format Indonesia: Koma adalah desimal
+      // Format Indonesia: Titik adalah ribuan, Koma adalah desimal
       return parseFloat(str.replace(/\./g, '').replace(',', '.')) || 0;
     } else {
-      // Format US: Titik adalah desimal
+      // Format US: Koma adalah ribuan, Titik adalah desimal
       return parseFloat(str.replace(/,/g, '')) || 0;
     }
   } 
   
-  // Kasus 2: Hanya ada Koma (Contoh: 1234,56 atau 5,5)
+  // Kasus 2: Hanya ada Koma (Contoh: 1234,56) -> Anggap Desimal
   if (hasComma) {
-    // Dalam konteks aplikasi ini, koma tunggal selalu dianggap desimal
     return parseFloat(str.replace(',', '.')) || 0;
   }
   
-  // Kasus 3: Hanya ada Titik (Contoh: 3.280 atau 5.5)
+  // Kasus 3: Hanya ada Titik (Contoh: 3.280 atau 1.643.280)
   if (hasDot) {
     const parts = str.split('.');
-    // Logika Cerdas: Jika tepat 3 digit setelah titik, kemungkinan besar itu RIBUAN (Format ID)
-    // Contoh: 3.280 -> 3280. Jika 5.5 -> 5.5.
-    if (parts.length === 2 && parts[1].length === 3) {
+    // Jika ada lebih dari satu titik, pasti itu ribuan
+    if (parts.length > 2) {
       return parseFloat(str.replace(/\./g, '')) || 0;
     }
-    // Jika tidak, biarkan parseFloat menangani sebagai desimal standar
+    // Jika satu titik, cek digit belakangnya. 
+    // Dalam konteks Dakota Hub, angka ribuan tanpa desimal sangat umum (X.000)
+    if (parts[1].length === 3) {
+      return parseFloat(str.replace(/\./g, '')) || 0;
+    }
+    // Jika digit belakang bukan 3 (misal: 1.5), anggap desimal standar
     return parseFloat(str) || 0;
   }
 

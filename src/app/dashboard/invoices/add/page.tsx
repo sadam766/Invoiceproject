@@ -175,7 +175,7 @@ export default function AddInvoicePage() {
 
   useEffect(() => {
       if (activeIdentity) {
-          if (!selectedSoNumber) setSelectedSoNumber(activeIdentity.salesOrder || '');
+          if (!selectedSoNumber) setSelectedSoNumber(activeIdentity.salesOrder || (activeIdentity as any).soNumber || '');
           if (activeIdentity.items && activeIdentity.items.length > 0 && items.length === 0) {
               setItems(activeIdentity.items);
           } 
@@ -268,6 +268,7 @@ export default function AddInvoicePage() {
         date: format(issueDate, 'yyyy-MM-dd'),
         dueDate: format(dueDate, 'yyyy-MM-dd'),
         amount: calcs.totalRp,
+        grandTotal: calcs.subTotalItems,
         status: invoiceStatus,
         paymentMode: paymentMode,
         paymentTerms: paymentTerms,
@@ -280,6 +281,7 @@ export default function AddInvoicePage() {
         discountLabel: discountLabel,
         dppVat: calcs.dppVat,
         vat12: calcs.vat12,
+        totalRp: calcs.totalRp,
         items: items.filter(i => i.quantity > 0),
         creatorId: user.uid,
         createdBy: updater,
@@ -344,9 +346,9 @@ export default function AddInvoicePage() {
       </div>
 
       <div className="flex flex-1 overflow-hidden">
-          {/* LEFT FORM PANEL */}
-          <div className="w-[48%] overflow-y-auto p-8 border-r bg-slate-50/30">
-              <div className="space-y-8 max-w-2xl mx-auto pb-20">
+          {/* LEFT FORM PANEL - Responsive Flex Layout */}
+          <div className="flex-1 min-w-0 overflow-y-auto p-8 border-r bg-slate-50/30">
+              <div className="space-y-8 max-w-4xl mx-auto pb-20">
                   
                   {/* CUSTOMER INSIGHT SECTION */}
                   <Card className="border-none shadow-md ring-1 ring-indigo-200 bg-white overflow-hidden rounded-3xl">
@@ -445,14 +447,14 @@ export default function AddInvoicePage() {
                         </div>
                     </CardHeader>
                     <CardContent className="p-0">
-                        <div className="max-h-[400px] overflow-y-auto">
-                            <Table className="table-auto w-full">
+                        <div className="overflow-x-auto">
+                            <Table className="w-full">
                                 <TableHeader className="bg-slate-50/50 sticky top-0 z-10 shadow-sm">
                                     <TableRow>
-                                        <TableHead className="py-3 px-6 text-[10px] font-black uppercase">Description</TableHead>
-                                        <TableHead className="w-[80px] text-center text-[10px] font-black uppercase">Qty</TableHead>
-                                        <TableHead className="w-[100px] text-center text-[10px] font-black uppercase">Unit</TableHead>
-                                        <TableHead className="w-[140px] text-right text-[10px] font-black uppercase">Price</TableHead>
+                                        <TableHead className="py-3 px-6 text-[10px] font-black uppercase min-w-[300px]">Description</TableHead>
+                                        <TableHead className="w-[100px] text-center text-[10px] font-black uppercase">Qty</TableHead>
+                                        <TableHead className="w-[120px] text-center text-[10px] font-black uppercase">Unit</TableHead>
+                                        <TableHead className="w-[180px] text-right text-[10px] font-black uppercase">Price</TableHead>
                                         <TableHead className="w-[40px]"></TableHead>
                                     </TableRow>
                                 </TableHeader>
@@ -570,7 +572,7 @@ export default function AddInvoicePage() {
           </div>
 
           {/* RIGHT LIVE PREVIEW PANEL */}
-          <div className="flex-1 bg-slate-200/50 overflow-auto scroll-smooth py-12 px-4 md:px-8">
+          <div className="w-[45%] bg-slate-200/50 overflow-auto scroll-smooth py-12 px-4 md:px-8">
               <div className="flex flex-col items-center min-w-min min-h-full">
                   <div className="max-w-[210mm] w-full shadow-2xl rounded-xl overflow-visible origin-top scale-[0.7] md:scale-[0.8] xl:scale-[0.85] transition-all duration-300 bg-white">
                       <InvoiceTemplate type="Original" invoiceData={previewInvoiceData} />
