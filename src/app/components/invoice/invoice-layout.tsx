@@ -113,14 +113,17 @@ export const InvoiceTemplate = ({ invoiceData, type }: { invoiceData: InvoiceDat
                         className="relative bg-white mx-auto flex flex-col print:shadow-none"
                         style={{ 
                             width: '210mm', 
-                            minHeight: '297mm',
-                            height: 'auto',
+                            height: '297mm',      // Kunci tinggi pas A4
+                            minHeight: '297mm', 
+                            maxHeight: '297mm', 
                             padding: '50mm 15mm 15mm 15mm',
-                            fontSize: '10pt',
-                            fontFamily: 'Arial, Helvetica, sans-serif',
-                            boxSizing: 'border-box',
-                            overflow: 'hidden',
-                            pageBreakAfter: (isLastPage && type === 'Copy') ? 'auto' : 'always',
+                            boxSizing: 'border-box', // WAJIB: Agar padding tidak membuat kertas melar
+                            position: 'relative',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            backgroundColor: 'white',
+                            overflow: 'hidden',      // Mencegah konten meluber keluar kertas
+                            pageBreakAfter: type === 'Original' ? 'always' : 'auto', // Hanya lembar Original yang memicu halaman baru
                             pageBreakInside: 'avoid',
                         }}
                     >

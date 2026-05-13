@@ -97,26 +97,17 @@
 }
 
 @media print {
+  * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
   @page {
     size: A4;
-    margin: 0;
+    margin: 0 !important; /* Memaksa margin nol pada settingan browser */
   }
-  
-  body {
-    background: white !important;
-    margin: 0 !important;
-    padding: 0 !important;
-  }
-  
-  .print-break-inside-avoid {
-    page-break-inside: avoid;
-  }
-  
-  .print-no-shadow {
-    box-shadow: none !important;
-  }
-
+  /* Menghilangkan sisa halaman kosong di akhir */
   .invoice-print-wrapper > div:last-child {
     page-break-after: auto !important;
+    margin-bottom: 0 !important;
   }
 }

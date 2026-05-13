@@ -56,18 +56,34 @@ const InvoicePreviewPage = () => {
     html2pdf().from(element).set(opt).save();
   };
 
-  if (isLoading) return <div className="p-20 text-center font-black uppercase text-slate-400 animate-pulse tracking-widest">Memuat Dokumen...</div>;
-  if (!formattedData) return <div className="p-20 text-center text-rose-600 font-bold">Dokumen tidak ditemukan.</div>;
+  if (isLoading) return <div className="flex items-center justify-center min-h-screen">Loading...</div>;
+  if (!formattedData) return <div className="p-8 text-red-500 font-bold">Dokumen tidak ditemukan.</div>;
 
   return (
-    <main className="min-h-screen bg-slate-100 py-12 px-4 flex flex-col items-center print:p-0 print:bg-white">
+    <main className="min-h-screen bg-slate-100 py-12 px-4 flex flex-col items-center print:p-0 print:m-0 print:bg-white print:block">
+      {/* CSS Reset Khusus Print */}
       <style>{`
         @media print {
             .no-print { display: none !important; }
-            body { background: white !important; padding: 0 !important; }
+            body { 
+              background: white !important; 
+              margin: 0 !important; 
+              padding: 0 !important; 
+              -webkit-print-color-adjust: exact;
+            }
+            @page {
+              size: A4;
+              margin: 0 !important;
+            }
+            /* Memastikan tidak ada sisa ruang di bawah container */
+            .invoice-print-wrapper {
+              margin: 0 !important;
+              padding: 0 !important;
+            }
         }
       `}</style>
 
+      {/* Button Group - Hilang saat print */}
       <div className="fixed top-6 right-6 z-50 flex gap-3 no-print">
         <Button variant="outline" onClick={() => router.back()} className="rounded-xl font-bold bg-white shadow-md">
           <ArrowLeft size={16} className="mr-2"/> Kembali
@@ -80,9 +96,20 @@ const InvoicePreviewPage = () => {
         </Button>
       </div>
 
-      <div ref={invoiceContainerRef} className="invoice-print-wrapper flex flex-col items-center print:m-0 print:p-0" style={{ width: '210mm' }}>
-        <InvoiceTemplate invoiceData={formattedData} type="Original" />
-        <InvoiceTemplate invoiceData={formattedData} type="Copy" />
+      {/* Container Utama Invoice */}
+      <div 
+        ref={invoiceContainerRef} 
+        className="invoice-print-wrapper print:block print:m-0 print:p-0"
+      >
+        {/* Container di bawah ini HANYA flex saat di layar, saat print jadi block polos */}
+        <div className="flex flex-col items-center print:block print:m-0 print:p-0">
+            <InvoiceTemplate type="Original" invoiceData={formattedData} />
+            
+            {/* Jeda ini HANYA untuk tampilan di web agar tidak menempel */}
+            <div className="print:hidden h-12" /> 
+            
+            <InvoiceTemplate type="Copy" invoiceData={formattedData} />
+        </div>
       </div>
     </main>
   );
