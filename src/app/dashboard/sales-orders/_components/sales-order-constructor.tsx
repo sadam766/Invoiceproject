@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
@@ -151,8 +150,9 @@ export function SalesOrderConstructor({ isOpen, onOpenChange, orderData, onSave 
 
     const handleNumericChange = (id: string | number, field: 'quantity' | 'price', rawValue: string) => {
         const key = `${id}-${field}`;
-        setInputBuffers(prev => ({ ...prev, [key]: rawValue }));
-        updateItem(id, field, parseFormattedNumber(rawValue));
+        const cleanValue = rawValue.replace(/[^0-9.,-]/g, '');
+        setInputBuffers(prev => ({ ...prev, [key]: cleanValue }));
+        updateItem(id, field, parseFormattedNumber(cleanValue));
     };
 
     const handleNumericBlur = (id: string | number, field: 'quantity' | 'price') => {
@@ -242,7 +242,6 @@ export function SalesOrderConstructor({ isOpen, onOpenChange, orderData, onSave 
                                                 <TableCell>
                                                     <Input 
                                                         type="text"
-                                                        step="any"
                                                         value={inputBuffers[`${item.id}-quantity`] !== undefined ? inputBuffers[`${item.id}-quantity`] : formatNumberWithCommas(item.quantity)} 
                                                         onChange={e => handleNumericChange(item.id, 'quantity', e.target.value)}
                                                         onBlur={() => handleNumericBlur(item.id, 'quantity')}
@@ -252,7 +251,6 @@ export function SalesOrderConstructor({ isOpen, onOpenChange, orderData, onSave 
                                                 <TableCell>
                                                     <Input 
                                                         type="text"
-                                                        step="any"
                                                         value={inputBuffers[`${item.id}-price`] !== undefined ? inputBuffers[`${item.id}-price`] : formatNumberWithCommas(item.price)} 
                                                         onChange={e => handleNumericChange(item.id, 'price', e.target.value)}
                                                         onBlur={() => handleNumericBlur(item.id, 'price')}

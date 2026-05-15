@@ -134,7 +134,7 @@ export default function AddInvoicePage() {
 
   // TRIGGER: Real-time DP % to Rp Calculation
   useEffect(() => {
-    const p = parseFloat(dpPercent);
+    const p = parseFloat(dpPercent.replace(',', '.'));
     if (!isNaN(p)) {
         const subtotal = items.reduce((acc, item) => acc + (item.total || 0), 0);
         const calculated = (p / 100) * subtotal;
@@ -236,8 +236,9 @@ export default function AddInvoicePage() {
 
   const handleNumericInputChange = (id: string | number, field: 'quantity' | 'price', rawValue: string) => {
     const key = `${id}-${field}`;
-    setInputBuffer(prev => ({ ...prev, [key]: rawValue }));
-    const parsed = parseFormattedNumber(rawValue);
+    const cleanValue = rawValue.replace(/[^0-9.,-]/g, '');
+    setInputBuffer(prev => ({ ...prev, [key]: cleanValue }));
+    const parsed = parseFormattedNumber(cleanValue);
     updateItemField(id, field, parsed);
   };
 
@@ -291,7 +292,7 @@ export default function AddInvoicePage() {
         paymentTerms: paymentTerms,
         vaNumber: (paymentMode === 'virtual_account' || manualVaNumber) ? manualVaNumber : '',
         dpValue: calcs.dpValue,
-        dpPercent: Number(dpPercent) || 0,
+        dpPercent: Number(dpPercent.replace(',', '.')) || 0,
         dpDescription: dpDescription,
         dpMode: dpMode,
         discount: calcs.discountValue,
@@ -331,7 +332,7 @@ export default function AddInvoicePage() {
       dpDescription,
       dpMode,
       dpValue: calcs.dpValue,
-      dpPercent: Number(dpPercent) || 0,
+      dpPercent: Number(dpPercent.replace(',', '.')) || 0,
       discount: calcs.discountValue,
       discountLabel: discountLabel,
       grandTotal: calcs.goodsNet, 
@@ -432,7 +433,7 @@ export default function AddInvoicePage() {
                                 </div>
                                 <Input 
                                     value={manualVaNumber} 
-                                    onChange={e => setManualVaNumber(e.target.value)} 
+                                    onChange={e => setManualVaNumber(e.target.value.replace(/[^0-9]/g, ''))} 
                                     className="font-mono text-lg font-black tracking-widest text-emerald-900 bg-white border-emerald-200"
                                     placeholder="86625XXXXXXXXXXX"
                                 />
@@ -600,11 +601,21 @@ export default function AddInvoicePage() {
                             <div className="grid grid-cols-3 gap-4">
                                 <div className="space-y-1.5">
                                     <Label className="text-[8px] font-black uppercase text-slate-400">Percent (%)</Label>
-                                    <Input type="text" value={dpPercent} onChange={e => setDpPercent(e.target.value)} className="h-11 font-black text-center text-indigo-600 bg-white border-indigo-100 rounded-xl" />
+                                    <Input 
+                                        type="text" 
+                                        value={dpPercent} 
+                                        onChange={e => setDpPercent(e.target.value.replace(/[^0-9,]/g, ''))} 
+                                        className="h-11 font-black text-center text-indigo-600 bg-white border-indigo-100 rounded-xl" 
+                                    />
                                 </div>
                                 <div className="col-span-2 space-y-1.5">
                                     <Label className="text-[8px] font-black uppercase text-slate-400">Nominal Rp (Auto-sync)</Label>
-                                    <Input type="text" value={dpValue} onChange={e => setDpValue(e.target.value)} className="h-11 font-black text-right bg-white border-indigo-100 rounded-xl" />
+                                    <Input 
+                                        type="text" 
+                                        value={dpValue} 
+                                        onChange={e => setDpValue(e.target.value.replace(/[^0-9.,-]/g, ''))} 
+                                        className="h-11 font-black text-right bg-white border-indigo-100 rounded-xl" 
+                                    />
                                 </div>
                             </div>
                         </div>
@@ -619,7 +630,13 @@ export default function AddInvoicePage() {
                             </div>
                             <div className="relative">
                                 <span className="absolute left-4 top-1/2 -translate-y-1/2 text-xs font-black text-slate-400">Rp</span>
-                                <Input type="text" value={discountValue} onChange={e => setDiscountValue(e.target.value)} className="h-12 font-black text-right pl-12 bg-white rounded-xl" placeholder="0" />
+                                <Input 
+                                    type="text" 
+                                    value={discountValue} 
+                                    onChange={e => setDiscountValue(e.target.value.replace(/[^0-9.,-]/g, ''))} 
+                                    className="h-12 font-black text-right pl-12 bg-white rounded-xl" 
+                                    placeholder="0" 
+                                />
                             </div>
                         </div>
                     </CardContent>
@@ -660,7 +677,7 @@ export default function AddInvoicePage() {
                                     <Input 
                                         type="text" 
                                         value={manualDppVat !== null ? manualDppVat : formatNumberWithCommas(calcs.autoDppVat)} 
-                                        onChange={e => setManualDppVat(e.target.value)}
+                                        onChange={e => setManualDppVat(e.target.value.replace(/[^0-9.,-]/g, ''))}
                                         className={cn(
                                             "h-11 pl-9 font-black text-right rounded-xl border-none transition-all",
                                             manualDppVat !== null ? "bg-indigo-950 text-indigo-300 ring-1 ring-indigo-500" : "bg-slate-800 text-slate-300"
@@ -678,7 +695,7 @@ export default function AddInvoicePage() {
                                     <Input 
                                         type="text" 
                                         value={manualVat12 !== null ? manualVat12 : formatNumberWithCommas(calcs.autoVat12)} 
-                                        onChange={e => setManualVat12(e.target.value)}
+                                        onChange={e => setManualVat12(e.target.value.replace(/[^0-9.,-]/g, ''))}
                                         className={cn(
                                             "h-11 pl-9 font-black text-right rounded-xl border-none transition-all",
                                             manualVat12 !== null ? "bg-emerald-950 text-emerald-300 ring-1 ring-emerald-500" : "bg-slate-800 text-slate-300"

@@ -1,4 +1,3 @@
-
 'use client';
 import { Button } from '@/components/ui/button';
 import {
@@ -56,21 +55,19 @@ export function AddProductDialog({ isOpen, onOpenChange, onSave, productData, on
   }, [productData, isOpen]);
   
   const handleNumericChange = (setter: (v: string) => void) => (e: React.ChangeEvent<HTMLInputElement>) => {
-    const value = e.target.value;
+    const value = e.target.value.replace(/[^0-9.,-]/g, '');
     if (value === '') { setter(''); return; }
-    
-    // Allow digits, dot, comma, minus - preserve raw typing for decimals
-    if (!/^[0-9.,-]*$/.test(value)) return;
     
     const num = parseFormattedNumber(value);
     if (!isNaN(num)) {
         let formatted = formatNumberWithCommas(num);
-        // Special hack to allow typing trailing separator
         if (value.endsWith(',') || value.endsWith('.')) {
             const sep = value.includes(',') ? ',' : '.';
             if (!formatted.includes(sep)) formatted += sep;
         }
         setter(formatted);
+    } else {
+        setter(value);
     }
   };
 
@@ -125,11 +122,11 @@ export function AddProductDialog({ isOpen, onOpenChange, onSave, productData, on
           <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="quantity" className="text-[10px] font-black uppercase text-slate-400">Initial Stock</Label>
-                <Input type="text" step="any" id="quantity" value={quantity} onChange={handleNumericChange(setQuantity)} className="h-11 font-bold rounded-[6px] px-[15px] min-w-[100px]" />
+                <Input type="text" id="quantity" value={quantity} onChange={handleNumericChange(setQuantity)} className="h-11 font-bold rounded-[6px] px-[15px] min-w-[100px]" />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="price" className="text-[10px] font-black uppercase text-slate-400">Standard Price (IDR)</Label>
-                <Input type="text" step="any" id="price" value={price} onChange={handleNumericChange(setPrice)} className="h-11 font-black text-slate-900 rounded-[6px] px-[15px] min-w-[160px]" />
+                <Input type="text" id="price" value={price} onChange={handleNumericChange(setPrice)} className="h-11 font-black text-slate-900 rounded-[6px] px-[15px] min-w-[160px]" />
               </div>
           </div>
         </div>

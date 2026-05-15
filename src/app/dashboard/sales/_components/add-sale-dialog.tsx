@@ -120,15 +120,18 @@ export function AddSaleDialog({ isOpen, onOpenChange, onSave, saleData, onAddCli
     }, [saleData, isOpen]);
     
     const handleNumericChange = (setter: (v: string) => void) => (e: React.ChangeEvent<HTMLInputElement>) => {
-        const value = e.target.value;
+        const value = e.target.value.replace(/[^0-9.,-]/g, '');
         if (value === '') { setter(''); return; }
         const num = parseFormattedNumber(value);
         if (!isNaN(num)) {
             let formatted = formatNumberWithCommas(num);
             if (value.endsWith(',') || value.endsWith('.')) {
-                if (!formatted.includes(',')) formatted += ',';
+                const sep = value.includes(',') ? ',' : '.';
+                if (!formatted.includes(sep)) formatted += sep;
             }
             setter(formatted);
+        } else {
+            setter(value);
         }
     };
 
@@ -228,7 +231,7 @@ export function AddSaleDialog({ isOpen, onOpenChange, onSave, saleData, onAddCli
           <div className="grid grid-cols-2 gap-4">
               <div className="grid gap-2">
                 <Label htmlFor="amount" className="font-bold">Total Nilai PO</Label>
-                <Input id="amount" value={amount} onChange={handleNumericChange(setAmount)} placeholder="Rp 0" />
+                <Input type="text" id="amount" value={amount} onChange={handleNumericChange(setAmount)} placeholder="Rp 0" />
               </div>
               <div className="grid gap-2">
                 <Label htmlFor="so-number">No. SO Produksi</Label>
@@ -283,6 +286,7 @@ export function AddSaleDialog({ isOpen, onOpenChange, onSave, saleData, onAddCli
               <div className="grid gap-2">
                 <Label htmlFor="paid-offline" className="text-[10px] uppercase font-black text-blue-700">Saldo Terbayar (Sistem Lama)</Label>
                 <Input 
+                    type="text"
                     id="paid-offline" 
                     value={paidOffline} 
                     onChange={handleNumericChange(setPaidOffline)} 

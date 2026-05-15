@@ -44,15 +44,18 @@ export function RecordPaymentDialog({ isOpen, onOpenChange, onSave, selectedCoun
   }, [isOpen, totalAmount]);
 
   const handleNumericChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const value = e.target.value;
+    const value = e.target.value.replace(/[^0-9.,-]/g, '');
     if (value === '') { setAmountInput(''); return; }
     const num = parseFormattedNumber(value);
     if (!isNaN(num)) {
         let formatted = formatNumberWithCommas(num);
         if (value.endsWith(',') || value.endsWith('.')) {
-            if (!formatted.includes(',')) formatted += ',';
+            const sep = value.includes(',') ? ',' : '.';
+            if (!formatted.includes(sep)) formatted += sep;
         }
         setAmountInput(formatted);
+    } else {
+        setAmountInput(value);
     }
   };
 
@@ -85,6 +88,7 @@ export function RecordPaymentDialog({ isOpen, onOpenChange, onSave, selectedCoun
                 <div className="flex items-center gap-1">
                    <span className="text-sm font-bold text-emerald-600">Rp</span>
                    <Input 
+                      type="text"
                       value={amountInput} 
                       onChange={handleNumericChange}
                       className="text-xl font-black text-emerald-800 bg-transparent border-none p-0 h-auto focus-visible:ring-0 shadow-none w-full"
