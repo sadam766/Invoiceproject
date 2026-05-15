@@ -84,52 +84,52 @@ export function formatNumberWithCommas(value: number | string | undefined, minDe
 /**
  * Mengonversi string berformat (dengan titik/koma) kembali menjadi angka murni (float)
  * Perbaikan Robust: Menangani ribuan Indonesia (titik) vs desimal (koma).
+ * Jika hanya ada titik, dianggap pemisah ribuan jika diikuti angka.
  */
 export function parseFormattedNumber(value: string | number): number {
   if (typeof value === 'number') return value;
   if (!value || value === '') return 0;
 
-  // Hapus semua karakter kecuali angka, titik, koma, dan minus
+  // Bersihkan karakter non-digit kecuali titik, koma, dan minus
   let str = value.toString().replace(/[^\d.,-]/g, '');
 
-  const hasComma = str.includes(',');
-  const hasDot = str.includes('.');
+  const lastDot = str.lastIndexOf('.');
+  const lastComma = str.lastIndexOf(',');
 
-  // Kasus 1: Format Indonesia Campuran (Contoh: 1.234.567,89)
-  if (hasComma && hasDot) {
-    const lastComma = str.lastIndexOf(',');
-    const lastDot = str.lastIndexOf('.');
-    if (lastComma > lastDot) {
-      // Format Indonesia: Titik adalah ribuan, Koma adalah desimal
-      return parseFloat(str.replace(/\./g, '').replace(',', '.')) || 0;
-    } else {
-      // Format US: Koma adalah ribuan, Titik adalah desimal
+  // Jika ada keduanya (1.234,56 atau 1,234.56)
+  if (lastDot !== -1 && lastComma !== -1) {
+    if (lastDot > lastComma) {
+      // Format US: 1,234.56
       return parseFloat(str.replace(/,/g, '')) || 0;
+    } else {
+      // Format ID: 1.234,56
+      return parseFloat(str.replace(/\./g, '').replace(',', '.')) || 0;
     }
-  } 
-  
-  // Kasus 2: Hanya ada Koma (Contoh: 1234,56) -> Anggap Desimal
-  if (hasComma) {
+  }
+
+  // Jika hanya ada koma (1234,56) -> Desimal ID
+  if (lastComma !== -1) {
     return parseFloat(str.replace(',', '.')) || 0;
   }
-  
-  // Kasus 3: Hanya ada Titik (Contoh: 3.280 atau 1.643.280)
-  if (hasDot) {
+
+  // Jika hanya ada titik (1.234) -> Ribuan ID (Asumsi umum aplikasi bisnis Indonesia)
+  if (lastDot !== -1) {
     const parts = str.split('.');
-    // Jika ada lebih dari satu titik, pasti itu ribuan
+    // Jika ada lebih dari satu titik, pasti ribuan
     if (parts.length > 2) {
-      return parseFloat(str.replace(/\./g, '')) || 0;
+        return parseFloat(str.replace(/\./g, '')) || 0;
     }
-    // Jika satu titik, cek digit belakangnya. 
-    // Dalam konteks Dakota Hub, angka ribuan tanpa desimal sangat umum (X.000)
+    // Jika cuma satu titik, cek jumlah digit belakangnya. 
+    // Jika 3 digit (misal .500), hampir pasti ribuan.
+    // Jika bukan 3 (misal .5 atau .50), bisa jadi desimal.
     if (parts[1].length === 3) {
-      return parseFloat(str.replace(/\./g, '')) || 0;
+        return parseFloat(str.replace(/\./g, '')) || 0;
     }
-    // Jika digit belakang bukan 3 (misal: 1.5), anggap desimal standar
-    return parseFloat(str) || 0;
+    // Default: tetap anggap ribuan jika dalam pengetikan real-time (mencegah lompatan 5600 -> 5.6)
+    // Dalam konteks Dakota Hub, kita prioritaskan ribuan.
+    return parseFloat(str.replace(/\./g, '')) || 0;
   }
 
-  // Kasus 4: Angka bersih
   return parseFloat(str) || 0;
 }
 
@@ -224,6 +224,13 @@ export const exportTaxInvoicesToExcel = (invoices: Invoice[], allCustomers: Cust
 
     const timestamp = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 16);
     XLSX.writeFile(workbook, `eFaktur_Dakota_${timestamp}.xlsx`);
+};
+
+export const exportToExcelDynamic = (data: any[], fileName: string) => {
+  const worksheet = XLSX.utils.json_to_sheet(data);
+  const workbook = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(workbook, worksheet, 'Data');
+  XLSX.writeFile(workbook, `${fileName}.xlsx`);
 };
 
 export const importFromExcel = (file: File): Promise<any[]> => {

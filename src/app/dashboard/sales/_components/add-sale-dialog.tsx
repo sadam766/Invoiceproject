@@ -1,3 +1,4 @@
+
 'use client';
 import { Button } from '@/components/ui/button';
 import {
@@ -34,7 +35,7 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { Plus, Check, ChevronsUpDown, Info, Layers, Percent } from 'lucide-react';
 import type { SalesListItem, Customer, UserProfile, PaymentStage } from '@/app/lib/data';
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect } from 'react';
 import { formatNumberWithCommas, parseFormattedNumber, cn } from '@/lib/utils';
 import { useFirestore, useCollection, useMemoFirebase } from '@/firebase';
 import { collection, query } from 'firebase/firestore';
@@ -78,7 +79,6 @@ export function AddSaleDialog({ isOpen, onOpenChange, onSave, saleData, onAddCli
     const [customerPopoverOpen, setCustomerPopoverOpen] = useState(false);
     const [salesPopoverOpen, setSalesPopoverOpen] = useState(false);
 
-    // Data Fetching for Dropdowns
     const customersCollection = useMemoFirebase(() => {
         if (!firestore) return null;
         return query(collection(firestore, 'customers'));
@@ -120,21 +120,14 @@ export function AddSaleDialog({ isOpen, onOpenChange, onSave, saleData, onAddCli
     }, [saleData, isOpen]);
     
     const handleNumericChange = (setter: (v: string) => void) => (e: React.ChangeEvent<HTMLInputElement>) => {
-        // ALLOW ALL NUMBERS, NO LENGTH LIMIT
-        const value = e.target.value.replace(/[^0-9.,-]/g, '');
+        // Hapus karakter non-numeric agar user bebas mengetik
+        const value = e.target.value.replace(/[^0-9]/g, '');
         if (value === '') { setter(''); return; }
         
-        const num = parseFormattedNumber(value);
+        // Simpan dalam format bertitik (ribuan) untuk kenyamanan visual
+        const num = parseInt(value, 10);
         if (!isNaN(num)) {
-            // Keep user typing experience smooth while maintaining formatting
-            let formatted = formatNumberWithCommas(num);
-            if (value.endsWith(',') || value.endsWith('.')) {
-                const sep = value.includes(',') ? ',' : '.';
-                if (!formatted.includes(sep)) formatted += sep;
-            }
-            setter(formatted);
-        } else {
-            setter(value);
+            setter(num.toLocaleString('id-ID'));
         }
     };
 
@@ -160,30 +153,30 @@ export function AddSaleDialog({ isOpen, onOpenChange, onSave, saleData, onAddCli
           <Plus className="mr-2 h-4 w-4" /> Register New PO
         </Button>
       </DialogTrigger>
-      <DialogContent className="sm:max-w-[550px] max-h-[90vh] overflow-y-auto">
+      <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto rounded-3xl">
         <DialogHeader>
-          <DialogTitle>{saleData ? "Edit PO Data" : "Register Incoming PO"}</DialogTitle>
-          <DialogDescription>
-            Masukkan data sesuai Purchase Order (PO) dari Customer.
+          <DialogTitle className="text-xl font-black uppercase">Register Incoming PO</DialogTitle>
+          <DialogDescription className="text-xs font-bold text-slate-400">
+            Masukkan data sesuai Purchase Order (PO) dari Customer. Tidak ada batasan jumlah digit.
           </DialogDescription>
         </DialogHeader>
         <div className="grid gap-6 py-4">
           <div className="grid gap-2">
-            <Label htmlFor="po-number" className="font-bold">Nomor PO Customer <span className="text-red-500">*</span></Label>
-            <Input id="po-number" value={poNumber} onChange={e => setPoNumber(e.target.value)} placeholder="Contoh: PO/2024/001" disabled={!!saleData} />
+            <Label htmlFor="po-number" className="text-[10px] font-black uppercase text-slate-400">Nomor PO Customer <span className="text-red-500">*</span></Label>
+            <Input id="po-number" value={poNumber} onChange={e => setPoNumber(e.target.value)} placeholder="Contoh: PO/2024/001" disabled={!!saleData} className="font-bold h-11" />
           </div>
 
           <div className="grid grid-cols-2 gap-4">
               <div className="grid gap-2">
-                <Label>Customer</Label>
+                <Label className="text-[10px] font-black uppercase text-slate-400">Customer</Label>
                 <Popover open={customerPopoverOpen} onOpenChange={setCustomerPopoverOpen}>
                     <PopoverTrigger asChild>
-                        <Button variant="outline" role="combobox" className="w-full justify-between">
-                            {customer || "Pilih..."}
+                        <Button variant="outline" role="combobox" className="w-full justify-between h-11 font-bold">
+                            {customer || "Pilih Customer..."}
                             <ChevronsUpDown className="ml-2 h-4 w-4 opacity-50" />
                         </Button>
                     </PopoverTrigger>
-                    <PopoverContent className="w-[300px] p-0 shadow-xl border border-muted" align="start">
+                    <PopoverContent className="w-[300px] p-0 shadow-xl border border-muted rounded-xl overflow-hidden" align="start">
                         <Command>
                             <CommandInput placeholder="Cari..." />
                             <CommandList>
@@ -203,15 +196,15 @@ export function AddSaleDialog({ isOpen, onOpenChange, onSave, saleData, onAddCli
               </div>
 
               <div className="grid gap-2">
-                <Label>Sales Person</Label>
+                <Label className="text-[10px] font-black uppercase text-slate-400">Sales Person</Label>
                 <Popover open={salesPopoverOpen} onOpenChange={setSalesPopoverOpen}>
                     <PopoverTrigger asChild>
-                        <Button variant="outline" role="combobox" className="w-full justify-between">
-                            {sales || "Pilih..."}
+                        <Button variant="outline" role="combobox" className="w-full justify-between h-11 font-bold">
+                            {sales || "Pilih Sales..."}
                             <ChevronsUpDown className="ml-2 h-4 w-4 opacity-50" />
                         </Button>
                     </PopoverTrigger>
-                    <PopoverContent className="w-full p-0 shadow-xl border border-muted" align="start">
+                    <PopoverContent className="w-full p-0 shadow-xl border border-muted rounded-xl overflow-hidden" align="start">
                         <Command>
                             <CommandInput placeholder="Cari..." />
                             <CommandList>
@@ -231,79 +224,89 @@ export function AddSaleDialog({ isOpen, onOpenChange, onSave, saleData, onAddCli
               </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 gap-4">
               <div className="grid gap-2">
-                <Label htmlFor="amount" className="font-bold">Total Nilai PO</Label>
-                <Input type="text" id="amount" value={amount} onChange={handleNumericChange(setAmount)} placeholder="Rp 0" />
+                <Label htmlFor="amount" className="text-[10px] font-black uppercase text-slate-400">Total Nilai PO (Netto)</Label>
+                <div className="relative">
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 font-bold text-slate-400">Rp</span>
+                    <Input 
+                        type="text" 
+                        id="amount" 
+                        value={amount} 
+                        onChange={handleNumericChange(setAmount)} 
+                        placeholder="0" 
+                        className="pl-10 h-14 text-lg font-black bg-slate-50 border-indigo-100 focus-visible:ring-indigo-500 rounded-2xl"
+                    />
+                </div>
               </div>
               <div className="grid gap-2">
-                <Label htmlFor="so-number">No. SO Produksi</Label>
-                <Input id="so-number" value={soNumber} onChange={e => setSoNumber(e.target.value)} placeholder="Waiting SO" />
+                <Label htmlFor="so-number" className="text-[10px] font-black uppercase text-slate-400">No. SO Produksi (Optional)</Label>
+                <Input id="so-number" value={soNumber} onChange={e => setSoNumber(e.target.value)} placeholder="E.g. SO/2024/..." className="h-11 font-bold rounded-xl" />
               </div>
           </div>
 
-          {/* PAYMENT SCHEME SECTION */}
-          <div className="p-4 bg-indigo-50/30 rounded-2xl border-2 border-indigo-100 space-y-4">
+          <div className="p-5 bg-indigo-50/30 rounded-3xl border-2 border-indigo-100 space-y-4">
               <div className="flex items-center justify-between">
                   <Label className="text-[10px] font-black uppercase text-indigo-700 tracking-widest flex items-center gap-2">
-                      <Layers className="h-4 w-4" /> Payment Term Scheme
+                      <Layers className="h-4 w-4" /> Payment Term Blueprint
                   </Label>
-                  <Badge variant="secondary" className="bg-indigo-100 text-indigo-700 text-[8px] font-black">BLUEPRINT</Badge>
+                  <Badge variant="secondary" className="bg-indigo-100 text-indigo-700 text-[8px] font-black">STANDARD</Badge>
               </div>
               
               <Select value={selectedSchemeKey} onValueChange={setSelectedSchemeKey}>
-                  <SelectTrigger className="bg-white">
+                  <SelectTrigger className="bg-white h-11 font-bold rounded-xl border-indigo-200">
                       <SelectValue placeholder="Pilih Skema Bayar" />
                   </SelectTrigger>
-                  <SelectContent>
+                  <SelectContent className="rounded-xl">
                       <SelectItem value="full">Full Payment (100%)</SelectItem>
                       <SelectItem value="split_30_70">Standard Split (30% DP - 70% Final)</SelectItem>
                       <SelectItem value="split_50_50">Standard Split (50% DP - 50% Final)</SelectItem>
                       <SelectItem value="split_20_70_10">Project (20% DP - 70% Prog - 10% Ret)</SelectItem>
-                      <SelectItem value="custom">Custom Scheme...</SelectItem>
                   </SelectContent>
               </Select>
 
               <div className="grid gap-2 pt-2">
                   {(selectedSchemeKey === 'custom' ? customStages : SCHEME_PRESETS[selectedSchemeKey])?.map((stage, idx) => (
-                      <div key={idx} className="flex items-center justify-between bg-white/60 p-2 rounded-lg border border-indigo-50 text-[10px] font-bold">
-                          <span className="flex items-center gap-2">
-                              <div className="w-1.5 h-1.5 rounded-full bg-indigo-500" />
+                      <div key={idx} className="flex items-center justify-between bg-white/60 p-3 rounded-xl border border-indigo-50 text-[11px] font-black">
+                          <span className="flex items-center gap-2 uppercase">
+                              <div className="w-2 h-2 rounded-full bg-indigo-500" />
                               {stage.label}
                           </span>
-                          <span className="text-indigo-600 flex items-center gap-1">
-                              {stage.percent}% <Percent className="h-2 w-2" />
+                          <span className="text-indigo-600">
+                              {stage.percent}%
                           </span>
                       </div>
                   ))}
               </div>
-              <p className="text-[8px] text-indigo-400 font-medium italic">
-                  Blueprint ini akan otomatis menarik data ke Billing Constructor saat penagihan dimulai.
-              </p>
           </div>
 
-          <div className="bg-blue-50/50 p-4 rounded-xl border border-blue-100 space-y-3">
-              <div className="flex items-center gap-2 text-blue-800 font-bold text-xs uppercase tracking-widest">
-                  <Info className="h-4 w-4" /> Migration Adjustment
+          <div className="bg-blue-50/50 p-6 rounded-3xl border-2 border-blue-100 space-y-4 shadow-sm">
+              <div className="flex items-center gap-2 text-blue-800 font-black text-[10px] uppercase tracking-widest">
+                  <Info className="h-4 w-4" /> Legacy Migration Adjustment
               </div>
               <div className="grid gap-2">
                 <Label htmlFor="paid-offline" className="text-[10px] uppercase font-black text-blue-700">Saldo Terbayar (Sistem Lama)</Label>
-                <Input 
-                    type="text"
-                    id="paid-offline" 
-                    value={paidOffline} 
-                    onChange={handleNumericChange(setPaidOffline)} 
-                    placeholder="Rp 0" 
-                    className="border-blue-200 focus-visible:ring-blue-500 bg-white"
-                />
-                <p className="text-[9px] text-blue-600 leading-tight italic">
-                    Masukkan total uang yang sudah masuk di sistem lama agar piutang di sistem baru sinkron.
+                <div className="relative">
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 font-bold text-blue-400">Rp</span>
+                    <Input 
+                        type="text"
+                        id="paid-offline" 
+                        value={paidOffline} 
+                        onChange={handleNumericChange(setPaidOffline)} 
+                        placeholder="0" 
+                        className="pl-10 h-12 text-md font-black border-blue-200 focus-visible:ring-blue-500 bg-white rounded-2xl"
+                    />
+                </div>
+                <p className="text-[9px] text-blue-600 leading-tight italic font-medium px-1">
+                    *Masukkan total dana yang sudah masuk di sistem lama agar piutang tersinkronisasi sempurna.
                 </p>
               </div>
           </div>
         </div>
-        <DialogFooter className="pt-4 border-t">
-          <Button type="button" onClick={handleSave} className="w-full h-12 font-black uppercase tracking-widest shadow-xl shadow-indigo-100">Simpan Data & Blueprint</Button>
+        <DialogFooter className="pt-6 border-t">
+          <Button type="button" onClick={handleSave} className="w-full h-14 bg-indigo-600 hover:bg-indigo-700 font-black uppercase text-xs tracking-[0.2em] rounded-2xl shadow-xl shadow-indigo-100">
+            Simpan Data & Kunci Kontrak
+          </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

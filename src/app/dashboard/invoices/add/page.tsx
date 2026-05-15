@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useEffect, useState, useMemo } from 'react';
@@ -118,6 +119,7 @@ export default function AddInvoicePage() {
   const [manualVaNumber, setManualVaNumber] = useState('');
   const [isProcessing, setIsSaving] = useState(false);
 
+  // Buffer state to keep input fluid without instant formatting cursor jumps
   const [inputBuffer, setInputBuffer] = useState<Record<string, string>>({});
 
   // DP & Discount States
@@ -236,11 +238,17 @@ export default function AddInvoicePage() {
 
   const handleNumericInputChange = (id: string | number, field: 'quantity' | 'price', rawValue: string) => {
     const key = `${id}-${field}`;
-    // HAPUS BATAS DIGIT (NO LENGTH LIMIT)
-    const cleanValue = rawValue.replace(/[^0-9.,-]/g, '');
-    setInputBuffer(prev => ({ ...prev, [key]: cleanValue }));
-    const parsed = parseFormattedNumber(cleanValue);
-    updateItemField(id, field, parsed);
+    // HAPUS BATAS DIGIT & FIX LOGIC PARSING
+    const cleanValue = rawValue.replace(/[^0-9]/g, '');
+    if (cleanValue === '') {
+        setInputBuffer(prev => ({ ...prev, [key]: '' }));
+        updateItemField(id, field, 0);
+        return;
+    }
+    
+    const num = parseInt(cleanValue, 10);
+    setInputBuffer(prev => ({ ...prev, [key]: num.toLocaleString('id-ID') }));
+    updateItemField(id, field, num);
   };
 
   const calcs = useMemo(() => {
@@ -366,7 +374,7 @@ export default function AddInvoicePage() {
 
       <div className="flex flex-1 overflow-hidden">
           <div className="flex-1 min-w-0 overflow-y-auto p-8 border-r bg-slate-50/30">
-              <div className="space-y-8 max-w-4xl mx-auto pb-32">
+              <div className="space-y-8 max-w-5xl mx-auto pb-32">
                   
                   <Card className="border-none shadow-md ring-1 ring-indigo-200 bg-white overflow-hidden rounded-3xl">
                     <CardHeader className="py-4 px-6 bg-indigo-600 text-white">
@@ -454,12 +462,12 @@ export default function AddInvoicePage() {
                         <div className="grid grid-cols-2 gap-4">
                             <div className="space-y-1.5">
                                 <Label className="text-[9px] font-black uppercase text-slate-400">Invoice Issue Date</Label>
-                                <Input type="date" value={format(issueDate, 'yyyy-MM-dd')} onChange={e => setIssueDate(new Date(e.target.value))} className="h-10 font-bold rounded-xl" />
+                                <Input type="date" value={format(issueDate, 'yyyy-MM-dd')} onChange={e => setIssueDate(new Date(e.target.value))} className="h-11 font-bold rounded-xl" />
                             </div>
                             <div className="space-y-1.5">
                                 <Label className="text-[9px] font-black uppercase text-slate-400">Term Preset (Mapping)</Label>
                                 <Select value={selectedTermPreset} onValueChange={setSelectedTermPreset}>
-                                    <SelectTrigger className="h-10 font-bold rounded-xl bg-white border-indigo-200">
+                                    <SelectTrigger className="h-11 font-bold rounded-xl bg-white border-indigo-200">
                                         <SelectValue placeholder="Pilih..." />
                                     </SelectTrigger>
                                     <SelectContent>
@@ -477,7 +485,7 @@ export default function AddInvoicePage() {
                                     value={paymentTerms} 
                                     onChange={e => { setPaymentTerms(e.target.value); setSelectedTermPreset('custom'); }} 
                                     placeholder="E.g. CBD" 
-                                    className="h-10 font-black border-indigo-200 rounded-xl" 
+                                    className="h-11 font-black border-indigo-200 rounded-xl" 
                                 />
                             </div>
                             <div className="space-y-1.5">
@@ -486,12 +494,12 @@ export default function AddInvoicePage() {
                                     type="date" 
                                     value={format(dueDate, 'yyyy-MM-dd')} 
                                     onChange={e => { setDueDate(new Date(e.target.value)); setSelectedTermPreset('custom'); }} 
-                                    className="h-10 font-bold rounded-xl border-indigo-200" 
+                                    className="h-11 font-bold rounded-xl border-indigo-200" 
                                 />
                             </div>
                             <div className="col-span-2 space-y-1.5">
                                 <Label className="text-[9px] font-black uppercase text-slate-400 flex items-center gap-1">Sales Order Reference (SO)</Label>
-                                <Input value={selectedSoNumber} onChange={e => setSelectedSoNumber(e.target.value)} placeholder="SO-XXXX-..." className="h-10 font-black border-indigo-200 rounded-xl uppercase" />
+                                <Input value={selectedSoNumber} onChange={e => setSelectedSoNumber(e.target.value)} placeholder="SO-XXXX-..." className="h-11 font-black border-indigo-200 rounded-xl uppercase" />
                             </div>
                         </div>
                     </CardContent>
@@ -501,17 +509,17 @@ export default function AddInvoicePage() {
                     <CardHeader className="bg-slate-50/50 border-b py-3 px-6">
                         <div className="flex justify-between items-center">
                             <CardTitle className="text-[10px] font-black uppercase text-slate-500 tracking-widest flex items-center gap-2">
-                                <Layers className="h-4 w-4 text-indigo-600" /> Line Items (Hybrid Input)
+                                <Layers className="h-4 w-4 text-indigo-600" /> Line Items (Constructor)
                             </CardTitle>
-                            <Badge variant="secondary" className="bg-indigo-50 text-indigo-700 text-[8px] font-black uppercase tracking-tighter">Auto-pull PO History Active</Badge>
+                            <Badge variant="secondary" className="bg-indigo-50 text-indigo-700 text-[8px] font-black uppercase tracking-tighter">No digit limits enabled</Badge>
                         </div>
                     </CardHeader>
                     <CardContent className="p-0">
-                        <div className="overflow-x-auto">
+                        <div className="overflow-x-auto scroll-smooth">
                             <Table className="w-full">
                                 <TableHeader className="bg-slate-50/50 sticky top-0 z-10 shadow-sm">
                                     <TableRow>
-                                        <TableHead className="py-3 px-6 text-[10px] font-black uppercase min-w-[350px]">Item Description (Catalog & Manual)</TableHead>
+                                        <TableHead className="py-3 px-6 text-[10px] font-black uppercase min-w-[300px]">Item Description (Catalog & Manual)</TableHead>
                                         <TableHead className="w-[100px] text-center text-[10px] font-black uppercase">Qty</TableHead>
                                         <TableHead className="w-[120px] text-center text-[10px] font-black uppercase">Unit</TableHead>
                                         <TableHead className="w-[180px] text-right text-[10px] font-black uppercase">Price</TableHead>
@@ -528,7 +536,7 @@ export default function AddInvoicePage() {
                                                             <Input 
                                                                 value={item.name} 
                                                                 onChange={e => updateItemField(item.id, 'name', e.target.value)} 
-                                                                className="h-9 text-xs font-black uppercase border-none shadow-none bg-transparent p-0 w-full focus-visible:ring-0 placeholder:italic" 
+                                                                className="h-10 text-xs font-black uppercase border-none shadow-none bg-transparent p-0 w-full focus-visible:ring-0 placeholder:italic" 
                                                                 placeholder="Type Manual or Search Catalog..." 
                                                             />
                                                             <Search className="absolute right-0 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-300 pointer-events-none" />
@@ -536,11 +544,11 @@ export default function AddInvoicePage() {
                                                     </PopoverTrigger>
                                                     <PopoverContent className="w-[550px] p-0 shadow-2xl rounded-2xl overflow-hidden border-indigo-100" align="start">
                                                         <Command>
-                                                            <CommandInput placeholder="Cari Nama Material atau History..." className="h-11 font-medium" />
+                                                            <CommandInput placeholder="Cari Nama Material..." className="h-11 font-medium" />
                                                             <CommandList className="max-h-[350px]">
-                                                                <CommandEmpty className="py-6 text-center text-xs font-bold text-slate-400 italic">Material tidak ditemukan. Lanjutkan ketik manual.</CommandEmpty>
+                                                                <CommandEmpty className="py-6 text-center text-xs font-bold text-slate-400 italic">Material tidak ditemukan.</CommandEmpty>
                                                                 
-                                                                <CommandGroup heading="Material Catalog (Pusat)" className="px-2 font-black uppercase text-[10px] text-emerald-600">
+                                                                <CommandGroup heading="Material Catalog" className="px-2 font-black uppercase text-[10px] text-emerald-600">
                                                                     {masterProducts?.map((p, i) => (
                                                                         <CommandItem key={`cat-${i}`} onSelect={() => {
                                                                             updateItemField(item.id, 'name', p.name);
@@ -558,13 +566,23 @@ export default function AddInvoicePage() {
                                                 </Popover>
                                             </TableCell>
                                             <TableCell className="py-4">
-                                                <Input type="text" value={inputBuffer[`${item.id}-quantity`] || formatNumberWithCommas(item.quantity)} onChange={e => handleNumericInputChange(item.id, 'quantity', e.target.value)} className="text-center h-9 text-xs font-black rounded-lg" />
+                                                <Input 
+                                                    type="text" 
+                                                    value={inputBuffer[`${item.id}-quantity`] !== undefined ? inputBuffer[`${item.id}-quantity`] : formatNumberWithCommas(item.quantity)} 
+                                                    onChange={e => handleNumericInputChange(item.id, 'quantity', e.target.value)} 
+                                                    className="text-center h-10 text-xs font-black rounded-lg min-w-[80px]" 
+                                                />
                                             </TableCell>
                                             <TableCell className="py-4">
-                                                <Input value={item.unit} onChange={e => updateItemField(item.id, 'unit', e.target.value)} className="text-center h-9 text-xs font-black border-indigo-100 bg-indigo-50/30 rounded-lg uppercase" placeholder="UOM" />
+                                                <Input value={item.unit} onChange={e => updateItemField(item.id, 'unit', e.target.value)} className="text-center h-10 text-xs font-black border-indigo-100 bg-indigo-50/30 rounded-lg uppercase" placeholder="UOM" />
                                             </TableCell>
                                             <TableCell className="py-4 text-right">
-                                                <Input type="text" value={inputBuffer[`${item.id}-price`] || formatNumberWithCommas(item.price)} onChange={e => handleNumericInputChange(item.id, 'price', e.target.value)} className="h-9 text-right text-xs font-black rounded-lg" />
+                                                <Input 
+                                                    type="text" 
+                                                    value={inputBuffer[`${item.id}-price`] !== undefined ? inputBuffer[`${item.id}-price`] : formatNumberWithCommas(item.price)} 
+                                                    onChange={e => handleNumericInputChange(item.id, 'price', e.target.value)} 
+                                                    className="h-10 text-right text-xs font-black rounded-lg min-w-[140px]" 
+                                                />
                                             </TableCell>
                                             <TableCell className="py-4 text-center">
                                                 <Button variant="ghost" size="icon" className="h-7 w-7 text-rose-300 hover:text-rose-600 hover:bg-rose-50 rounded-full" onClick={() => removeItem(item.id)}><Trash2 className="h-4 w-4" /></Button>
@@ -575,8 +593,8 @@ export default function AddInvoicePage() {
                             </Table>
                         </div>
                         <div className="p-4 bg-slate-50/50 border-t flex justify-center">
-                            <Button variant="ghost" size="sm" className="h-8 text-[9px] font-black uppercase text-indigo-600 hover:bg-indigo-50 rounded-xl" onClick={() => setItems([...items, { id: `man-${Date.now()}`, name: '', quantity: 1, unit: 'Meter', price: 0, total: 0 }])}>
-                                <Plus className="mr-1.5 h-3.5 w-3.5" /> Insert Manual Row
+                            <Button variant="ghost" size="sm" className="h-9 text-[10px] font-black uppercase text-indigo-600 hover:bg-indigo-50 rounded-xl" onClick={() => setItems([...items, { id: `man-${Date.now()}`, name: '', quantity: 1, unit: 'Meter', price: 0, total: 0 }])}>
+                                <Plus className="mr-1.5 h-4 w-4" /> Insert Manual Row
                             </Button>
                         </div>
                     </CardContent>
@@ -592,7 +610,7 @@ export default function AddInvoicePage() {
                         <div className="p-5 bg-indigo-50/50 rounded-[2rem] border-2 border-indigo-100 space-y-4">
                             <div className="flex justify-between items-center">
                                 <Label className="text-[10px] font-black uppercase text-indigo-700 tracking-widest flex items-center gap-2">
-                                    <Database className="h-3.5 w-3.5" /> Down Payment (DP) - PO Synchronized
+                                    <Database className="h-3.5 w-3.5" /> Down Payment (DP)
                                 </Label>
                                 <div className="flex bg-white rounded-xl p-1 border shadow-sm">
                                     <Button variant={dpMode === 'tagih' ? 'default' : 'ghost'} size="sm" onClick={() => setDpMode('tagih')} className="h-8 text-[9px] font-black uppercase rounded-lg px-4">Tagih DP</Button>
@@ -614,7 +632,7 @@ export default function AddInvoicePage() {
                                     <Input 
                                         type="text" 
                                         value={dpValue} 
-                                        onChange={e => setDpValue(e.target.value.replace(/[^0-9.,-]/g, ''))} 
+                                        onChange={e => setDpValue(e.target.value.replace(/[^0-9]/g, '').replace(/\B(?=(\d{3})+(?!\d))/g, "."))} 
                                         className="h-11 font-black text-right bg-white border-indigo-100 rounded-xl" 
                                     />
                                 </div>
@@ -634,7 +652,7 @@ export default function AddInvoicePage() {
                                 <Input 
                                     type="text" 
                                     value={discountValue} 
-                                    onChange={e => setDiscountValue(e.target.value.replace(/[^0-9.,-]/g, ''))} 
+                                    onChange={e => setDiscountValue(e.target.value.replace(/[^0-9]/g, '').replace(/\B(?=(\d{3})+(?!\d))/g, "."))} 
                                     className="h-12 font-black text-right pl-12 bg-white rounded-xl" 
                                     placeholder="0" 
                                 />
@@ -678,9 +696,9 @@ export default function AddInvoicePage() {
                                     <Input 
                                         type="text" 
                                         value={manualDppVat !== null ? manualDppVat : formatNumberWithCommas(calcs.autoDppVat)} 
-                                        onChange={e => setManualDppVat(e.target.value.replace(/[^0-9.,-]/g, ''))}
+                                        onChange={e => setManualDppVat(e.target.value.replace(/[^0-9]/g, '').replace(/\B(?=(\d{3})+(?!\d))/g, "."))}
                                         className={cn(
-                                            "h-11 pl-9 font-black text-right rounded-xl border-none transition-all",
+                                            "h-12 pl-9 font-black text-right rounded-2xl border-none transition-all",
                                             manualDppVat !== null ? "bg-indigo-950 text-indigo-300 ring-1 ring-indigo-500" : "bg-slate-800 text-slate-300"
                                         )}
                                     />
@@ -696,9 +714,9 @@ export default function AddInvoicePage() {
                                     <Input 
                                         type="text" 
                                         value={manualVat12 !== null ? manualVat12 : formatNumberWithCommas(calcs.autoVat12)} 
-                                        onChange={e => setManualVat12(e.target.value.replace(/[^0-9.,-]/g, ''))}
+                                        onChange={e => setManualVat12(e.target.value.replace(/[^0-9]/g, '').replace(/\B(?=(\d{3})+(?!\d))/g, "."))}
                                         className={cn(
-                                            "h-11 pl-9 font-black text-right rounded-xl border-none transition-all",
+                                            "h-12 pl-9 font-black text-right rounded-2xl border-none transition-all",
                                             manualVat12 !== null ? "bg-emerald-950 text-emerald-300 ring-1 ring-emerald-500" : "bg-slate-800 text-slate-300"
                                         )}
                                     />

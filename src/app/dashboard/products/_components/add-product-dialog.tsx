@@ -1,3 +1,4 @@
+
 'use client';
 import { Button } from '@/components/ui/button';
 import {
@@ -55,20 +56,13 @@ export function AddProductDialog({ isOpen, onOpenChange, onSave, productData, on
   }, [productData, isOpen]);
   
   const handleNumericChange = (setter: (v: string) => void) => (e: React.ChangeEvent<HTMLInputElement>) => {
-    // HAPUS BATAS DIGIT (NO LENGTH LIMIT)
-    const value = e.target.value.replace(/[^0-9.,-]/g, '');
+    // HAPUS BATAS DIGIT & FIX LOGIC
+    const value = e.target.value.replace(/[^0-9]/g, '');
     if (value === '') { setter(''); return; }
     
-    const num = parseFormattedNumber(value);
+    const num = parseInt(value, 10);
     if (!isNaN(num)) {
-        let formatted = formatNumberWithCommas(num);
-        if (value.endsWith(',') || value.endsWith('.')) {
-            const sep = value.includes(',') ? ',' : '.';
-            if (!formatted.includes(sep)) formatted += sep;
-        }
-        setter(formatted);
-    } else {
-        setter(value);
+        setter(num.toLocaleString('id-ID'));
     }
   };
 
@@ -95,7 +89,7 @@ export function AddProductDialog({ isOpen, onOpenChange, onSave, productData, on
       <DialogContent className="sm:max-w-[450px] rounded-3xl">
         <DialogHeader>
           <DialogTitle className="uppercase font-black tracking-tight">{productData ? "Edit Master Item" : "Add New Master Item"}</DialogTitle>
-          <DialogDescription className="text-xs font-bold text-slate-400">Update item specifications and standard pricing.</DialogDescription>
+          <DialogDescription className="text-xs font-bold text-slate-400">Update item specifications. No digit limits.</DialogDescription>
         </DialogHeader>
         <div className="grid gap-6 py-6">
           <div className="space-y-2">
@@ -116,24 +110,24 @@ export function AddProductDialog({ isOpen, onOpenChange, onSave, productData, on
               </div>
               <div className="space-y-2">
                 <Label htmlFor="unit" className="text-[10px] font-black uppercase text-slate-400">Unit (UOM)</Label>
-                <Input id="unit" value={unit} onChange={(e) => setUnit(e.target.value)} className="h-11 font-black text-indigo-600 bg-indigo-50/50 border-indigo-100 rounded-[6px] px-[15px] min-w-[100px]" />
+                <Input id="unit" value={unit} onChange={(e) => setUnit(e.target.value)} className="h-11 font-black text-indigo-600 bg-indigo-50/50 border-indigo-100 rounded-md px-4" />
               </div>
           </div>
 
           <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="quantity" className="text-[10px] font-black uppercase text-slate-400">Initial Stock</Label>
-                <Input type="text" id="quantity" value={quantity} onChange={handleNumericChange(setQuantity)} className="h-11 font-bold rounded-[6px] px-[15px] min-w-[100px]" />
+                <Input type="text" id="quantity" value={quantity} onChange={handleNumericChange(setQuantity)} className="h-11 font-bold rounded-md px-4" />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="price" className="text-[10px] font-black uppercase text-slate-400">Standard Price (IDR)</Label>
-                <Input type="text" id="price" value={price} onChange={handleNumericChange(setPrice)} className="h-11 font-black text-slate-900 rounded-[6px] px-[15px] min-w-[160px]" />
+                <Input type="text" id="price" value={price} onChange={handleNumericChange(setPrice)} className="h-11 font-black text-slate-900 rounded-md px-4 border-indigo-100" />
               </div>
           </div>
         </div>
         <DialogFooter className="bg-slate-50 -mx-6 -mb-6 p-6 rounded-b-3xl">
           <Button variant="ghost" onClick={() => onOpenChange(false)}>Cancel</Button>
-          <Button type="button" onClick={handleSave} className="bg-indigo-600 hover:bg-indigo-700 font-black uppercase tracking-widest px-8">Save Master Data</Button>
+          <Button type="button" onClick={handleSave} className="bg-indigo-600 hover:bg-indigo-700 font-black uppercase tracking-widest px-8 h-12">Save Master Data</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

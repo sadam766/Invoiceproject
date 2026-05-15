@@ -1,3 +1,4 @@
+
 'use client';
 import { Button } from '@/components/ui/button';
 import {
@@ -64,21 +65,12 @@ export function AddSalesOrderDialog({ isOpen, onOpenChange, onSave, orderData, o
   }, [orderData, isOpen]);
 
   const handleNumericChange = (setter: (v: string) => void) => (e: React.ChangeEvent<HTMLInputElement>) => {
-    // HAPUS BATAS DIGIT (NO LENGTH LIMIT)
-    const value = e.target.value;
+    const value = e.target.value.replace(/[^0-9]/g, '');
     if (value === '') { setter(''); return; }
     
-    // Allow all chars but parse clean numbers
-    const num = parseFormattedNumber(value);
+    const num = parseInt(value, 10);
     if (!isNaN(num)) {
-        let formatted = formatNumberWithCommas(num);
-        if (value.endsWith(',') || value.endsWith('.')) {
-            const sep = value.includes(',') ? ',' : '.';
-            if (!formatted.includes(sep)) formatted += sep;
-        }
-        setter(formatted);
-    } else {
-        setter(value.replace(/[^0-9.,-]/g, ''));
+        setter(num.toLocaleString('id-ID'));
     }
   };
 
@@ -102,38 +94,37 @@ export function AddSalesOrderDialog({ isOpen, onOpenChange, onSave, orderData, o
       <DialogTrigger asChild>
         <Button onClick={onAddClick}><Plus className="mr-2 h-4 w-4" /> Add Sales Order</Button>
       </DialogTrigger>
-      <DialogContent className="sm:max-w-[500px]">
+      <DialogContent className="sm:max-w-[550px] rounded-3xl">
         <DialogHeader>
-          <DialogTitle>{orderData ? "Edit Sales Order" : "Add New Sales Order"}</DialogTitle>
-          <DialogDescription>Fill in the details below to add a new sales order.</DialogDescription>
+          <DialogTitle className="uppercase font-black">Sales Order Data</DialogTitle>
+          <DialogDescription className="text-xs font-bold text-slate-400">Masukkan detail pesanan. Mendukung angka skala besar.</DialogDescription>
         </DialogHeader>
-        <div className="grid gap-4 py-4">
+        <div className="grid gap-6 py-4">
           <div className="grid grid-cols-4 items-center gap-4">
-            <Label htmlFor="so-number" className="text-right">SO Number</Label>
-            <Input id="so-number" value={soNumber} onChange={(e) => setSoNumber(e.target.value)} className="col-span-3 font-bold" />
+            <Label htmlFor="so-number" className="text-right text-[10px] font-black uppercase text-slate-400">SO Number</Label>
+            <Input id="so-number" value={soNumber} onChange={(e) => setSoNumber(e.target.value)} className="col-span-3 font-bold h-11" />
           </div>
           <div className="grid grid-cols-4 items-center gap-4">
-            <Label htmlFor="po-number" className="text-right">PO Reference</Label>
-            <Input id="po-number" value={poNumber} onChange={(e) => setPoNumber(e.target.value)} className="col-span-3" />
+            <Label htmlFor="po-number" className="text-right text-[10px] font-black uppercase text-slate-400">PO Reference</Label>
+            <Input id="po-number" value={poNumber} onChange={(e) => setPoNumber(e.target.value)} className="col-span-3 h-11" />
           </div>
-          <div className="my-2 border-t" />
-          <div className="grid grid-cols-2 gap-4 ml-[25%]">
-            <div className="space-y-1">
-                <Label htmlFor="quantity">Quantity</Label>
-                <Input type="text" id="quantity" value={quantity} onChange={handleNumericChange(setQuantity)} />
+          
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+                <Label htmlFor="quantity" className="text-[10px] font-black uppercase text-slate-400">Quantity</Label>
+                <div className="flex gap-2">
+                    <Input type="text" id="quantity" value={quantity} onChange={handleNumericChange(setQuantity)} className="font-black h-11" />
+                    <Input id="unit" value={unit} onChange={(e) => setUnit(e.target.value)} placeholder="UOM" className="w-24 h-11 font-bold bg-slate-50" />
+                </div>
             </div>
-            <div className="space-y-1">
-                <Label htmlFor="unit">Unit</Label>
-                <Input id="unit" value={unit} onChange={(e) => setUnit(e.target.value)} />
+            <div className="space-y-2">
+                <Label htmlFor="price" className="text-[10px] font-black uppercase text-slate-400">Unit Price (IDR)</Label>
+                <Input type="text" id="price" value={price} onChange={handleNumericChange(setPrice)} className="font-black h-11 border-indigo-100" />
             </div>
-          </div>
-          <div className="grid grid-cols-4 items-center gap-4">
-            <Label htmlFor="price" className="text-right">Price</Label>
-            <Input type="text" id="price" value={price} onChange={handleNumericChange(setPrice)} className="col-span-3" />
           </div>
         </div>
-        <DialogFooter>
-          <Button type="button" onClick={handleSave}>Save Sales Order</Button>
+        <DialogFooter className="bg-slate-50 -mx-6 -mb-6 p-6 rounded-b-3xl">
+          <Button type="button" onClick={handleSave} className="bg-indigo-600 hover:bg-indigo-700 font-black uppercase tracking-widest px-8 h-12">Update Sales Order</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
