@@ -149,6 +149,7 @@ export function SalesOrderConstructor({ isOpen, onOpenChange, orderData, onSave 
     };
 
     const handleNumericChange = (id: string | number, field: 'quantity' | 'price', rawValue: string) => {
+        // HAPUS BATAS DIGIT (NO LENGTH LIMIT)
         const key = `${id}-${field}`;
         const cleanValue = rawValue.replace(/[^0-9.,-]/g, '');
         setInputBuffers(prev => ({ ...prev, [key]: cleanValue }));

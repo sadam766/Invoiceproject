@@ -236,6 +236,7 @@ export default function AddInvoicePage() {
 
   const handleNumericInputChange = (id: string | number, field: 'quantity' | 'price', rawValue: string) => {
     const key = `${id}-${field}`;
+    // HAPUS BATAS DIGIT (NO LENGTH LIMIT)
     const cleanValue = rawValue.replace(/[^0-9.,-]/g, '');
     setInputBuffer(prev => ({ ...prev, [key]: cleanValue }));
     const parsed = parseFormattedNumber(cleanValue);

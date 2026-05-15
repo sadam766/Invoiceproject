@@ -1,4 +1,3 @@
-
 'use client';
 import { Button } from '@/components/ui/button';
 import {
@@ -65,11 +64,11 @@ export function AddSalesOrderDialog({ isOpen, onOpenChange, onSave, orderData, o
   }, [orderData, isOpen]);
 
   const handleNumericChange = (setter: (v: string) => void) => (e: React.ChangeEvent<HTMLInputElement>) => {
+    // HAPUS BATAS DIGIT (NO LENGTH LIMIT)
     const value = e.target.value;
     if (value === '') { setter(''); return; }
     
-    if (!/^[0-9.,-]*$/.test(value)) return;
-    
+    // Allow all chars but parse clean numbers
     const num = parseFormattedNumber(value);
     if (!isNaN(num)) {
         let formatted = formatNumberWithCommas(num);
@@ -78,6 +77,8 @@ export function AddSalesOrderDialog({ isOpen, onOpenChange, onSave, orderData, o
             if (!formatted.includes(sep)) formatted += sep;
         }
         setter(formatted);
+    } else {
+        setter(value.replace(/[^0-9.,-]/g, ''));
     }
   };
 
@@ -119,7 +120,7 @@ export function AddSalesOrderDialog({ isOpen, onOpenChange, onSave, orderData, o
           <div className="grid grid-cols-2 gap-4 ml-[25%]">
             <div className="space-y-1">
                 <Label htmlFor="quantity">Quantity</Label>
-                <Input type="text" step="any" id="quantity" value={quantity} onChange={handleNumericChange(setQuantity)} />
+                <Input type="text" id="quantity" value={quantity} onChange={handleNumericChange(setQuantity)} />
             </div>
             <div className="space-y-1">
                 <Label htmlFor="unit">Unit</Label>
@@ -128,7 +129,7 @@ export function AddSalesOrderDialog({ isOpen, onOpenChange, onSave, orderData, o
           </div>
           <div className="grid grid-cols-4 items-center gap-4">
             <Label htmlFor="price" className="text-right">Price</Label>
-            <Input type="text" step="any" id="price" value={price} onChange={handleNumericChange(setPrice)} className="col-span-3" />
+            <Input type="text" id="price" value={price} onChange={handleNumericChange(setPrice)} className="col-span-3" />
           </div>
         </div>
         <DialogFooter>

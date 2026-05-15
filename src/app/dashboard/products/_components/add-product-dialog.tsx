@@ -55,6 +55,7 @@ export function AddProductDialog({ isOpen, onOpenChange, onSave, productData, on
   }, [productData, isOpen]);
   
   const handleNumericChange = (setter: (v: string) => void) => (e: React.ChangeEvent<HTMLInputElement>) => {
+    // HAPUS BATAS DIGIT (NO LENGTH LIMIT)
     const value = e.target.value.replace(/[^0-9.,-]/g, '');
     if (value === '') { setter(''); return; }
     

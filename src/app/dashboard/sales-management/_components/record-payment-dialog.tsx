@@ -44,6 +44,7 @@ export function RecordPaymentDialog({ isOpen, onOpenChange, onSave, selectedCoun
   }, [isOpen, totalAmount]);
 
   const handleNumericChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    // HAPUS BATAS DIGIT (NO LENGTH LIMIT)
     const value = e.target.value.replace(/[^0-9.,-]/g, '');
     if (value === '') { setAmountInput(''); return; }
     const num = parseFormattedNumber(value);

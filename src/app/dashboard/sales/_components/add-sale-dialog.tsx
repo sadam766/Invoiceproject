@@ -120,10 +120,13 @@ export function AddSaleDialog({ isOpen, onOpenChange, onSave, saleData, onAddCli
     }, [saleData, isOpen]);
     
     const handleNumericChange = (setter: (v: string) => void) => (e: React.ChangeEvent<HTMLInputElement>) => {
+        // ALLOW ALL NUMBERS, NO LENGTH LIMIT
         const value = e.target.value.replace(/[^0-9.,-]/g, '');
         if (value === '') { setter(''); return; }
+        
         const num = parseFormattedNumber(value);
         if (!isNaN(num)) {
+            // Keep user typing experience smooth while maintaining formatting
             let formatted = formatNumberWithCommas(num);
             if (value.endsWith(',') || value.endsWith('.')) {
                 const sep = value.includes(',') ? ',' : '.';
